@@ -1,24 +1,16 @@
 import { getEnv } from '@/utils/bindings'
-import { serverEnvSchema, type ServerEnv } from './schemas'
 
-let cachedConfig: ServerEnv | null = null
-
-export function getServerConfig(): ServerEnv {
-  if (cachedConfig) {
-    return cachedConfig
-  }
-
+export function getServerConfig() {
   const env = getEnv()
 
-  const result = serverEnvSchema.safeParse({
+  return {
     BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: env.BETTER_AUTH_URL,
-  })
-
-  if (!result.success) {
-    throw new Error(`Server environment validation failed: ${result.error.message}`)
+    PASSKEY_RP_ID: env.PASSKEY_RP_ID,
+    PASSKEY_RP_NAME: env.PASSKEY_RP_NAME,
+    // Client config (VITE_ prefixed variables available at build time)
+    clientConfig: {
+      VITE_APP_NAME: process.env.VITE_APP_NAME || 'Kosarica',
+    },
   }
-
-  cachedConfig = result.data
-  return cachedConfig
 }

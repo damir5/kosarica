@@ -1,11 +1,5 @@
-import { createEnv } from '@t3-oss/env-core'
-import { z } from 'zod'
-
-export const clientEnv = createEnv({
-  clientPrefix: 'VITE_',
-  client: {
-    VITE_APP_TITLE: z.string().min(1).optional(),
-  },
-  runtimeEnv: import.meta.env,
-  emptyStringAsUndefined: true,
-})
+// Client-side config (VITE_ prefixed variables)
+// These are replaced at build time by Vite
+export const clientConfig = {
+  VITE_APP_NAME: import.meta.env.VITE_APP_NAME || 'Kosarica',
+}
