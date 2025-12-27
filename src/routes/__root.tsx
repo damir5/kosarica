@@ -3,6 +3,7 @@ import {
   Scripts,
   createRootRouteWithContext,
 } from '@tanstack/react-router'
+import { redirect } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
@@ -12,6 +13,8 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
 
+import { checkSetupRequired } from '@/lib/auth-server'
+
 import type { QueryClient } from '@tanstack/react-query'
 
 interface MyRouterContext {
@@ -19,6 +22,21 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+  beforeLoad: async ({ location }) => {
+    // Skip check for setup, login, and API routes
+    if (
+      location.pathname === '/setup' ||
+      location.pathname === '/login' ||
+      location.pathname.startsWith('/api/')
+    ) {
+      return
+    }
+
+    const needsSetup = await checkSetupRequired()
+    if (needsSetup) {
+      throw redirect({ to: '/setup' as const })
+    }
+  },
   head: () => ({
     meta: [
       {

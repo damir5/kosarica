@@ -3,5 +3,19 @@
   "name": "tanstack-start-app",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry"
+  "main": "@tanstack/react-start/server-entry",
+  // D1 Database configuration - run: wrangler d1 create kosarica-db
+  // Then update database_id with the returned ID
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kosarica-db",
+      "database_id": "<run 'wrangler d1 create kosarica-db' and paste ID here>"
+    }
+  ],
+  // Environment variables for production
+  "vars": {
+    "BETTER_AUTH_URL": "https://your-app.workers.dev"
+  }
+  // Note: Set BETTER_AUTH_SECRET via: wrangler secret put BETTER_AUTH_SECRET
 }
