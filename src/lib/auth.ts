@@ -1,61 +1,74 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { passkey } from '@better-auth/passkey'
-import { db } from '@/db'
+import { getDb, getEnv } from '@/utils/bindings'
 import * as schema from '@/db/schema'
 
-export const auth = betterAuth({
-  secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL,
-  basePath: '/api/auth',
+export function createAuth() {
+  const env = getEnv()
+  const db = getDb()
 
-  database: drizzleAdapter(db, {
-    provider: 'sqlite',
-    schema: {
-      user: schema.user,
-      session: schema.session,
-      account: schema.account,
-      verification: schema.verification,
-      passkey: schema.passkey,
-    },
-  }),
+  return betterAuth({
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    basePath: '/api/auth',
 
-  emailAndPassword: {
-    enabled: true,
-    minPasswordLength: 8,
-    maxPasswordLength: 128,
-    requireEmailVerification: false,
-  },
-
-  plugins: [
-    passkey({
-      rpID: process.env.PASSKEY_RP_ID || 'localhost',
-      rpName: process.env.PASSKEY_RP_NAME || 'Kosarica App',
-      origin: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
+    database: drizzleAdapter(db, {
+      provider: 'sqlite',
+      schema: {
+        user: schema.user,
+        session: schema.session,
+        account: schema.account,
+        verification: schema.verification,
+        passkey: schema.passkey,
+      },
     }),
-  ],
 
-  user: {
-    additionalFields: {
-      role: {
-        type: 'string',
-        defaultValue: 'user',
-        input: false,
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 8,
+      maxPasswordLength: 128,
+      requireEmailVerification: false,
+    },
+
+    plugins: [
+      passkey({
+        rpID: env.PASSKEY_RP_ID || 'localhost',
+        rpName: env.PASSKEY_RP_NAME || 'Kosarica App',
+        origin: env.BETTER_AUTH_URL || 'http://localhost:3000',
+      }),
+    ],
+
+    user: {
+      additionalFields: {
+        role: {
+          type: 'string',
+          defaultValue: 'user',
+          input: false,
+        },
       },
     },
+  })
+}
+
+// Lazy-initialized auth instance
+let authInstance: ReturnType<typeof createAuth> | null = null
+
+export function getAuth() {
+  if (!authInstance) {
+    authInstance = createAuth()
+  }
+  return authInstance
+}
+
+// For backwards compatibility - use getAuth() in server handlers
+export const auth = {
+  get api() {
+    return getAuth().api
   },
+  get $Infer() {
+    return getAuth().$Infer
+  },
+}
 
-  // OAuth providers structure (uncomment when needed)
-  // socialProviders: {
-  //   github: {
-  //     clientId: process.env.GITHUB_CLIENT_ID!,
-  //     clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-  //   },
-  //   google: {
-  //     clientId: process.env.GOOGLE_CLIENT_ID!,
-  //     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  //   },
-  // },
-})
-
-export type Session = typeof auth.$Infer.Session
+export type Session = ReturnType<typeof createAuth>['$Infer']['Session']

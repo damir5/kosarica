@@ -1,12 +1,13 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
-import { db } from '@/db'
+import { getDb } from '@/utils/bindings'
 import { desc } from 'drizzle-orm'
 import { todos } from '@/db/schema'
 
 const getTodos = createServerFn({
   method: 'GET',
 }).handler(async () => {
+  const db = getDb()
   return await db.query.todos.findMany({
     orderBy: [desc(todos.createdAt)],
   })
@@ -17,6 +18,7 @@ const createTodo = createServerFn({
 })
   .inputValidator((data: { title: string }) => data)
   .handler(async ({ data }) => {
+    const db = getDb()
     await db.insert(todos).values({ title: data.title })
     return { success: true }
   })
@@ -122,7 +124,6 @@ function DemoDrizzle() {
             style={{
               background: 'rgba(93, 103, 227, 0.1)',
               borderColor: 'rgba(93, 103, 227, 0.3)',
-              focusRing: 'rgba(93, 103, 227, 0.5)',
             }}
           />
           <button

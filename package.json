@@ -1,20 +1,24 @@
 {
   "name": "kosarica",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
-    "preview": "vite preview",
+    "build:test": "BUILD_ENV=test vite build --mode test",
+    "build:prod": "BUILD_ENV=prod vite build --mode prod",
+    "preview": "pnpm build && wrangler dev --config wrangler.jsonc --port 3000",
     "test": "vitest run",
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
-    "deploy": "npm run build && wrangler deploy",
+    "release:test": "rm -rf dist .wrangler/deploy && pnpm build:test && wrangler deploy --config wrangler.test.jsonc",
+    "release:prod": "rm -rf dist .wrangler/deploy && pnpm build:prod && wrangler deploy --config wrangler.prod.jsonc",
+    "cf:generate": "wrangler types --env-interface Env",
+    "generate": "pnpm cf:generate && pnpm db:generate",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:pull": "drizzle-kit pull",
+    "db:migrate:local": "wrangler d1 migrations apply kosarica-db --local",
+    "db:migrate:test": "wrangler d1 migrations apply kosarica-db-test --config wrangler.test.jsonc --remote",
+    "db:migrate:prod": "wrangler d1 migrations apply kosarica-db-prod --config wrangler.prod.jsonc --remote",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
@@ -56,6 +60,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
+    "@cloudflare/workers-types": "^4.20251225.0",
     "@tanstack/devtools-vite": "^0.3.11",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
@@ -72,5 +77,7 @@
     "vitest": "^3.0.5",
     "web-vitals": "^5.1.0",
     "wrangler": "^4.56.0"
-  }
+  },
+  "sideEffects": false,
+  "type": "module"
 }

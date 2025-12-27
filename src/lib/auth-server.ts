@@ -3,14 +3,15 @@ import { getRequestHeaders } from '@tanstack/react-start/server'
 import { redirect } from '@tanstack/react-router'
 import { count, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { auth } from './auth'
-import { db } from '@/db'
+import { getAuth } from './auth'
+import { getDb } from '@/utils/bindings'
 import { user } from '@/db/schema'
 
 export const getSession = createServerFn({ method: 'GET' }).handler(async () => {
   const headers = getRequestHeaders()
   if (!headers) return null
 
+  const auth = getAuth()
   const session = await auth.api.getSession({
     headers: headers as unknown as Headers,
   })
@@ -19,6 +20,7 @@ export const getSession = createServerFn({ method: 'GET' }).handler(async () => 
 
 export const checkSetupRequired = createServerFn({ method: 'GET' }).handler(
   async () => {
+    const db = getDb()
     const result = await db.select({ count: count() }).from(user)
     return result[0].count === 0
   },
@@ -37,6 +39,8 @@ type SuperadminInput = z.infer<typeof superadminSchema>
 export const createSuperadmin = createServerFn({ method: 'POST' }).handler(
   async (input: any) => {
     const data = superadminSchema.parse(input) as SuperadminInput
+    const db = getDb()
+    const auth = getAuth()
 
     // Verify no users exist (security check)
     const result = await db.select({ count: count() }).from(user)
