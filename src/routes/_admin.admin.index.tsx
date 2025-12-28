@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Settings } from 'lucide-react'
+import { Settings, Users, Wrench } from 'lucide-react'
 import { orpc } from '@/orpc/client'
 
 export const Route = createFileRoute('/_admin/admin/')({
@@ -54,10 +54,30 @@ function AdminDashboard() {
         {/* Navigation Cards */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Link
-            to="/admin/config"
+            to="/admin/users"
+            className="block rounded-lg border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md"
+          >
+            <Users className="mb-3 size-8 text-primary" />
+            <h3 className="mb-2 font-semibold text-foreground text-lg">User Management</h3>
+            <p className="text-muted-foreground text-sm">
+              View, edit, and manage user accounts, roles, and permissions
+            </p>
+          </Link>
+          <Link
+            to="/admin/settings"
             className="block rounded-lg border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md"
           >
             <Settings className="mb-3 size-8 text-primary" />
+            <h3 className="mb-2 font-semibold text-foreground text-lg">Settings</h3>
+            <p className="text-muted-foreground text-sm">
+              Configure app and authentication settings
+            </p>
+          </Link>
+          <Link
+            to="/admin/config"
+            className="block rounded-lg border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md"
+          >
+            <Wrench className="mb-3 size-8 text-primary" />
             <h3 className="mb-2 font-semibold text-foreground text-lg">Configuration</h3>
             <p className="text-muted-foreground text-sm">
               View build information, client configuration, and server environment variables

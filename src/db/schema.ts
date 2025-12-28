@@ -19,6 +19,9 @@ export const user = sqliteTable('user', {
   emailVerified: integer('emailVerified', { mode: 'boolean' }).notNull(),
   image: text('image'),
   role: text('role').default('user'),
+  banned: integer('banned', { mode: 'boolean' }).default(false),
+  bannedAt: integer('bannedAt', { mode: 'timestamp' }),
+  bannedReason: text('bannedReason'),
   createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
 })
@@ -76,4 +79,15 @@ export const passkey = sqliteTable('passkey', {
   backedUp: integer('backedUp', { mode: 'boolean' }).notNull(),
   transports: text('transports'),
   createdAt: integer('createdAt', { mode: 'timestamp' }),
+})
+
+// App Settings table
+export const appSettings = sqliteTable('app_settings', {
+  id: text('id').primaryKey(),
+  appName: text('appName').default('Kosarica'),
+  requireEmailVerification: integer('requireEmailVerification', { mode: 'boolean' }).default(false),
+  minPasswordLength: integer('minPasswordLength').default(8),
+  maxPasswordLength: integer('maxPasswordLength').default(128),
+  passkeyEnabled: integer('passkeyEnabled', { mode: 'boolean' }).default(true),
+  updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
 })

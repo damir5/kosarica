@@ -9,11 +9,15 @@ import { OpenAPIReferencePlugin } from '@orpc/openapi/plugins'
 
 import { TodoSchema } from '@/orpc/schema'
 import router from '@/orpc/router'
+import { createLogger } from '@/utils/logger'
+import { runWithContext, extractRequestId } from '@/utils/request-context'
+
+const log = createLogger('http')
 
 const handler = new OpenAPIHandler(router, {
   interceptors: [
     onError((error) => {
-      console.error(error)
+      log.error('OpenAPI handler error', undefined, error)
     }),
   ],
   plugins: [
@@ -55,12 +59,33 @@ const handler = new OpenAPIHandler(router, {
 })
 
 async function handle({ request }: { request: Request }) {
-  const { response } = await handler.handle(request, {
-    prefix: '/api',
-    context: {},
-  })
+  const requestId = extractRequestId(request)
 
-  return response ?? new Response('Not Found', { status: 404 })
+  return runWithContext(requestId, async () => {
+    const start = Date.now()
+    const url = new URL(request.url)
+
+    log.info('Request started', {
+      method: request.method,
+      path: url.pathname,
+    })
+
+    const { response } = await handler.handle(request, {
+      prefix: '/api',
+      context: {},
+    })
+
+    const result = response ?? new Response('Not Found', { status: 404 })
+
+    log.info('Request completed', {
+      method: request.method,
+      path: url.pathname,
+      status: result.status,
+      duration: Date.now() - start,
+    })
+
+    return result
+  })
 }
 
 export const Route = createFileRoute('/api/$')({

@@ -26,6 +26,8 @@ import { Route as DemoApiTqTodosRouteImport } from './routes/demo/api.tq-todos'
 import { Route as DemoApiNamesRouteImport } from './routes/demo/api.names'
 import { Route as ApiRpcSplatRouteImport } from './routes/api.rpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
+import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users'
+import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as DemoStartSsrIndexRouteImport } from './routes/demo/start.ssr.index'
 import { Route as AdminAdminConfigIndexRouteImport } from './routes/_admin.admin.config.index'
 import { Route as DemoStartSsrSpaModeRouteImport } from './routes/demo/start.ssr.spa-mode'
@@ -116,6 +118,16 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminAdminUsersRoute = AdminAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
+const AdminAdminSettingsRoute = AdminAdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
 const DemoStartSsrIndexRoute = DemoStartSsrIndexRouteImport.update({
   id: '/demo/start/ssr/',
   path: '/demo/start/ssr/',
@@ -152,6 +164,8 @@ export interface FileRoutesByFullPath {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/admin/settings': typeof AdminAdminSettingsRoute
+  '/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -174,6 +188,8 @@ export interface FileRoutesByTo {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/admin/settings': typeof AdminAdminSettingsRoute
+  '/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -199,6 +215,8 @@ export interface FileRoutesById {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/_admin/admin/settings': typeof AdminAdminSettingsRoute
+  '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -224,6 +242,8 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/admin/settings'
+    | '/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/demo/api/names'
@@ -246,6 +266,8 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/admin/settings'
+    | '/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/demo/api/names'
@@ -270,6 +292,8 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/_admin/admin/settings'
+    | '/_admin/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/demo/api/names'
@@ -427,6 +451,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_admin/admin/users': {
+      id: '/_admin/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminAdminUsersRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
+    '/_admin/admin/settings': {
+      id: '/_admin/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminAdminSettingsRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
     '/demo/start/ssr/': {
       id: '/demo/start/ssr/'
       path: '/demo/start/ssr'
@@ -466,11 +504,15 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminAdminRouteChildren {
+  AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
+  AdminAdminUsersRoute: typeof AdminAdminUsersRoute
   AdminAdminIndexRoute: typeof AdminAdminIndexRoute
   AdminAdminConfigIndexRoute: typeof AdminAdminConfigIndexRoute
 }
 
 const AdminAdminRouteChildren: AdminAdminRouteChildren = {
+  AdminAdminSettingsRoute: AdminAdminSettingsRoute,
+  AdminAdminUsersRoute: AdminAdminUsersRoute,
   AdminAdminIndexRoute: AdminAdminIndexRoute,
   AdminAdminConfigIndexRoute: AdminAdminConfigIndexRoute,
 }
