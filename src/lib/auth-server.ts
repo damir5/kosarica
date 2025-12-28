@@ -32,13 +32,12 @@ const superadminSchema = z.object({
   name: z.string().min(1),
 })
 
-type SuperadminInput = z.infer<typeof superadminSchema>
-
 // Server function to create superadmin account
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const createSuperadmin = createServerFn({ method: 'POST' }).handler(
-  async (input: any) => {
-    const data = superadminSchema.parse(input) as SuperadminInput
+export const createSuperadmin = createServerFn({ method: 'POST' })
+  .inputValidator((input: { email: string; password: string; name: string }) => {
+    return superadminSchema.parse(input)
+  })
+  .handler(async ({ data }) => {
     const db = getDb()
     const auth = getAuth()
 

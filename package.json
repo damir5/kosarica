@@ -2,11 +2,11 @@
   "name": "kosarica",
   "private": true,
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "vite dev",
     "build": "vite build",
     "build:test": "BUILD_ENV=test vite build --mode test",
     "build:prod": "BUILD_ENV=prod vite build --mode prod",
-    "preview": "pnpm build && wrangler dev --config wrangler.jsonc --port 3000",
+    "preview": "pnpm build && wrangler dev --config wrangler.jsonc",
     "test": "vitest run",
     "format": "biome format",
     "lint": "biome lint",

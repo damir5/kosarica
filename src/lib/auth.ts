@@ -69,6 +69,9 @@ export const auth = {
   get $Infer() {
     return getAuth().$Infer
   },
+  get handler() {
+    return getAuth().handler
+  },
 }
 
 export type Session = ReturnType<typeof createAuth>['$Infer']['Session']

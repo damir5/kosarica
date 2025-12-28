@@ -27,7 +27,7 @@ export function SetupWizard() {
     setLoading(true)
 
     try {
-      await (createSuperadmin as (data: typeof formData) => Promise<{ success: boolean }>)(formData)
+      await createSuperadmin({ data: formData })
 
       // Sign in immediately after creation
       await authClient.signIn.email({

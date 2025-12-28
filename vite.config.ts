@@ -40,6 +40,10 @@ const config = defineConfig({
     'process.env.GIT_COMMIT': JSON.stringify(buildMetadata.gitCommit),
     'process.env.BUILD_ENV': JSON.stringify(buildMetadata.environment),
   },
+  server: {
+    port: 3002,
+    strictPort: true,
+  },
   plugins: [
     devtools(),
     cloudflare({ viteEnvironment: { name: 'ssr' }, configPath }),
@@ -64,6 +68,10 @@ const config = defineConfig({
         '@orpc/json-schema',
         '@orpc/openapi/plugins',
         'zod',
+        'drizzle-orm',
+        'drizzle-orm/d1',
+        'drizzle-orm/sqlite-core',
+        'lucide-react',
       ],
     },
   },

@@ -8,7 +8,8 @@
     {
       "binding": "DB",
       "database_name": "kosarica-db",
-      "database_id": "<run 'wrangler d1 create kosarica-db' and paste ID here>"
+      "database_id": "<run 'wrangler d1 create kosarica-db' and paste ID here>",
+      "migrations_dir": "drizzle"
     }
   ],
   "vars": {
