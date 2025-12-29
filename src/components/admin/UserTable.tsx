@@ -1,21 +1,8 @@
-import { useState } from 'react'
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  type ColumnDef,
-} from '@tanstack/react-table'
+import { type ColumnDef } from '@tanstack/react-table'
 import { MoreHorizontal, Eye, UserCog, Trash2, Ban, CheckCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { DataTable } from '@/components/ui/data-table'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,18 +34,26 @@ interface UserTableProps {
   onBanUser: (user: User) => void
 }
 
-export function UserTable({
-  users,
+function getUserColumns({
   currentUserId,
   onViewUser,
   onEditRole,
   onDeleteUser,
   onBanUser,
-}: UserTableProps) {
-  const columns: ColumnDef<User>[] = [
+}: {
+  currentUserId: string
+  onViewUser: (user: User) => void
+  onEditRole: (user: User) => void
+  onDeleteUser: (user: User) => void
+  onBanUser: (user: User) => void
+}): ColumnDef<User>[] {
+  return [
     {
       accessorKey: 'name',
       header: 'Name',
+      size: 180,
+      minSize: 100,
+      maxSize: 300,
       cell: ({ row }) => (
         <div className="font-medium">{row.getValue('name')}</div>
       ),
@@ -66,6 +61,9 @@ export function UserTable({
     {
       accessorKey: 'email',
       header: 'Email',
+      size: 250,
+      minSize: 150,
+      maxSize: 400,
       cell: ({ row }) => (
         <div className="text-muted-foreground">{row.getValue('email')}</div>
       ),
@@ -73,6 +71,9 @@ export function UserTable({
     {
       accessorKey: 'role',
       header: 'Role',
+      size: 120,
+      minSize: 80,
+      maxSize: 160,
       cell: ({ row }) => {
         const role = row.getValue('role') as string
         return (
@@ -85,6 +86,9 @@ export function UserTable({
     {
       accessorKey: 'banned',
       header: 'Status',
+      size: 100,
+      minSize: 80,
+      maxSize: 140,
       cell: ({ row }) => {
         const banned = row.getValue('banned') as boolean
         return banned ? (
@@ -97,10 +101,13 @@ export function UserTable({
     {
       accessorKey: 'createdAt',
       header: 'Created',
+      size: 120,
+      minSize: 100,
+      maxSize: 180,
       cell: ({ row }) => {
         const date = row.getValue('createdAt') as Date
         return (
-          <div className="text-muted-foreground text-sm">
+          <div className="text-sm text-muted-foreground">
             {new Date(date).toLocaleDateString()}
           </div>
         )
@@ -109,6 +116,12 @@ export function UserTable({
     {
       id: 'actions',
       header: '',
+      size: 60,
+      minSize: 60,
+      maxSize: 60,
+      enableResizing: false,
+      enableSorting: false,
+      enableHiding: false,
       cell: ({ row }) => {
         const user = row.original
         const isCurrentUser = user.id === currentUserId
@@ -164,55 +177,38 @@ export function UserTable({
       },
     },
   ]
+}
 
-  const table = useReactTable({
-    data: users,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
+export function UserTable({
+  users,
+  currentUserId,
+  onViewUser,
+  onEditRole,
+  onDeleteUser,
+  onBanUser,
+}: UserTableProps) {
+  const columns = getUserColumns({
+    currentUserId,
+    onViewUser,
+    onEditRole,
+    onDeleteUser,
+    onBanUser,
   })
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && 'selected'}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                No users found.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+    <DataTable
+      columns={columns}
+      data={users}
+      storageKey="admin-users-table"
+      enableColumnResizing
+      enableColumnOrdering
+      enableColumnVisibility
+      enableSorting
+      // Pagination and global filter are handled externally by the page
+      enablePagination={false}
+      enableGlobalFilter={false}
+      enableColumnFilters={false}
+      emptyMessage="No users found."
+    />
   )
 }
