@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kosarica-prod",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kosarica-db-prod",
+      "database_id": "<run 'wrangler d1 create kosarica-db-prod' and paste ID here>"
+    }
+  ],
+  "vars": {
+    "BETTER_AUTH_URL": "https://kosarica-prod.<your-subdomain>.workers.dev"
+  }
+}

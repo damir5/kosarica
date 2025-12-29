@@ -1,0 +1,17 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+count.txt
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+todos.json
+.pnpm-store

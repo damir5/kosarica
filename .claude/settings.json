@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "feature-dev@claude-plugins-official": true,
+    "beads@beads-marketplace": true,
+    "code-review@claude-plugins-official": true
+  }
+}
