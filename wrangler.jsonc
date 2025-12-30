@@ -4,6 +4,8 @@
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
+
+  // D1 Database binding
   "d1_databases": [
     {
       "binding": "DB",
@@ -12,7 +14,54 @@
       "migrations_dir": "drizzle"
     }
   ],
+
+  // R2 Bucket for ingestion file storage
+  "r2_buckets": [
+    {
+      "binding": "INGESTION_BUCKET",
+      "bucket_name": "kosarica-data"
+    }
+  ],
+
+  // Queue producer bindings
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGESTION_QUEUE",
+        "queue": "price-ingestion"
+      },
+      {
+        // Optional: Dead letter queue for failed messages
+        "binding": "INGESTION_DLQ",
+        "queue": "price-ingestion-dlq"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "price-ingestion",
+        "max_batch_size": 10,
+        "max_retries": 3,
+        // Dead letter queue configuration
+        "dead_letter_queue": "price-ingestion-dlq"
+      }
+    ]
+  },
+
+  // Scheduled triggers for automated ingestion runs
+  "triggers": {
+    "crons": [
+      // Daily ingestion run at 6:00 AM UTC
+      "0 6 * * *"
+    ]
+  },
+
+  // Environment variables
   "vars": {
-    "BETTER_AUTH_URL": "http://localhost:3000"
+    "BETTER_AUTH_URL": "http://localhost:3000",
+    // Comma-separated list of chains to process (empty = all chains)
+    // Available: konzum, lidl, plodine, interspar, studenac, kaufland, eurospin, dm, ktc, metro, trgocentar
+    "INGESTION_CHAINS": "",
+    // Maximum retries before sending to DLQ (default: 3)
+    "MAX_RETRIES": "3"
   }
 }
