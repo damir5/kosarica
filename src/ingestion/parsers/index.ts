@@ -9,3 +9,6 @@ export type { ParseContext } from './base'
 
 export { CsvParser, detectDelimiter, detectEncoding } from './csv'
 export type { CsvColumnMapping, CsvDelimiter, CsvEncoding, CsvParserOptions } from './csv'
+
+export { XmlParser, createXmlParser, detectItemsPath } from './xml'
+export type { XmlFieldMapping, XmlParserOptions } from './xml'
