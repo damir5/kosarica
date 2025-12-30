@@ -2,6 +2,7 @@
   "name": "kosarica",
   "private": true,
   "scripts": {
+    "setup-dev": "tsx scripts/setup-dev.ts",
     "dev": "vite dev",
     "build": "vite build",
     "build:test": "BUILD_ENV=test vite build --mode test",
