@@ -15,6 +15,13 @@
       "when": 1766948390441,
       "tag": "0001_rich_frog_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1767096046119,
+      "tag": "0002_clean_magdalene",
+      "breakpoints": true
     }
   ]
 }
