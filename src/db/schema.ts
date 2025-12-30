@@ -92,3 +92,224 @@ export const appSettings = sqliteTable('app_settings', {
   passkeyEnabled: integer('passkeyEnabled', { mode: 'boolean' }).default(true),
   updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
 })
+
+// ============================================================================
+// Retail World: chains, stores, store_identifiers, retailer_items, retailer_item_barcodes
+// ============================================================================
+
+export const chains = sqliteTable('chains', {
+  slug: text('slug').primaryKey(), // konzum, lidl, plodine, etc.
+  name: text('name').notNull(),
+  website: text('website'),
+  logoUrl: text('logo_url'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const stores = sqliteTable('stores', {
+  id: cuid2('sto').primaryKey(),
+  chainSlug: text('chain_slug')
+    .notNull()
+    .references(() => chains.slug, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  address: text('address'),
+  city: text('city'),
+  postalCode: text('postal_code'),
+  latitude: text('latitude'), // stored as text for precision
+  longitude: text('longitude'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const storeIdentifiers = sqliteTable('store_identifiers', {
+  id: cuid2('sid').primaryKey(),
+  storeId: text('store_id')
+    .notNull()
+    .references(() => stores.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // 'filename_code', 'portal_id', 'internal_id', etc.
+  value: text('value').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const retailerItems = sqliteTable('retailer_items', {
+  id: cuid2('rit').primaryKey(),
+  chainSlug: text('chain_slug')
+    .notNull()
+    .references(() => chains.slug, { onDelete: 'cascade' }),
+  externalId: text('external_id'), // retailer's internal ID for the item
+  name: text('name').notNull(),
+  description: text('description'),
+  category: text('category'),
+  subcategory: text('subcategory'),
+  brand: text('brand'),
+  unit: text('unit'), // kg, l, kom, etc.
+  unitQuantity: text('unit_quantity'), // "1", "0.5", "500g", etc.
+  imageUrl: text('image_url'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const retailerItemBarcodes = sqliteTable('retailer_item_barcodes', {
+  id: cuid2('rib').primaryKey(),
+  retailerItemId: text('retailer_item_id')
+    .notNull()
+    .references(() => retailerItems.id, { onDelete: 'cascade' }),
+  barcode: text('barcode').notNull(), // EAN-13, EAN-8, etc.
+  isPrimary: integer('is_primary', { mode: 'boolean' }).default(false),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+// ============================================================================
+// Canonical Catalog: products, product_aliases, product_links, product_relations
+// ============================================================================
+
+export const products = sqliteTable('products', {
+  id: cuid2('prd').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  category: text('category'),
+  subcategory: text('subcategory'),
+  brand: text('brand'),
+  unit: text('unit'),
+  unitQuantity: text('unit_quantity'),
+  imageUrl: text('image_url'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const productAliases = sqliteTable('product_aliases', {
+  id: cuid2('pal').primaryKey(),
+  productId: text('product_id')
+    .notNull()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  alias: text('alias').notNull(), // alternative name/variant
+  source: text('source'), // where this alias came from
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const productLinks = sqliteTable('product_links', {
+  id: cuid2('plk').primaryKey(),
+  productId: text('product_id')
+    .notNull()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  retailerItemId: text('retailer_item_id')
+    .notNull()
+    .references(() => retailerItems.id, { onDelete: 'cascade' }),
+  confidence: text('confidence'), // 'auto', 'manual', 'verified'
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const productRelations = sqliteTable('product_relations', {
+  id: cuid2('prl').primaryKey(),
+  productId: text('product_id')
+    .notNull()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  relatedProductId: text('related_product_id')
+    .notNull()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  relationType: text('relation_type').notNull(), // 'variant', 'substitute', 'bundle', etc.
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+// ============================================================================
+// Prices: store_item_state, store_item_price_periods
+// ============================================================================
+
+export const storeItemState = sqliteTable('store_item_state', {
+  id: cuid2('sis').primaryKey(),
+  storeId: text('store_id')
+    .notNull()
+    .references(() => stores.id, { onDelete: 'cascade' }),
+  retailerItemId: text('retailer_item_id')
+    .notNull()
+    .references(() => retailerItems.id, { onDelete: 'cascade' }),
+  currentPrice: integer('current_price'), // price in cents/lipa
+  previousPrice: integer('previous_price'), // for comparison
+  discountPrice: integer('discount_price'), // promotional price if active
+  discountStart: integer('discount_start', { mode: 'timestamp' }),
+  discountEnd: integer('discount_end', { mode: 'timestamp' }),
+  inStock: integer('in_stock', { mode: 'boolean' }).default(true),
+  priceSignature: text('price_signature'), // hash for deduplication
+  lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const storeItemPricePeriods = sqliteTable('store_item_price_periods', {
+  id: cuid2('sip').primaryKey(),
+  storeItemStateId: text('store_item_state_id')
+    .notNull()
+    .references(() => storeItemState.id, { onDelete: 'cascade' }),
+  price: integer('price').notNull(), // price in cents/lipa
+  discountPrice: integer('discount_price'),
+  startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
+  endedAt: integer('ended_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+// ============================================================================
+// Ingestion: ingestion_runs, ingestion_files, ingestion_file_entries, ingestion_errors
+// ============================================================================
+
+export const ingestionRuns = sqliteTable('ingestion_runs', {
+  id: cuid2('igr').primaryKey(),
+  chainSlug: text('chain_slug')
+    .notNull()
+    .references(() => chains.slug, { onDelete: 'cascade' }),
+  source: text('source').notNull(), // 'cli', 'worker', 'scheduled'
+  status: text('status').notNull().default('pending'), // 'pending', 'running', 'completed', 'failed'
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+  totalFiles: integer('total_files').default(0),
+  processedFiles: integer('processed_files').default(0),
+  totalEntries: integer('total_entries').default(0),
+  processedEntries: integer('processed_entries').default(0),
+  errorCount: integer('error_count').default(0),
+  metadata: text('metadata'), // JSON for additional run info
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const ingestionFiles = sqliteTable('ingestion_files', {
+  id: cuid2('igf').primaryKey(),
+  runId: text('run_id')
+    .notNull()
+    .references(() => ingestionRuns.id, { onDelete: 'cascade' }),
+  filename: text('filename').notNull(),
+  fileType: text('file_type').notNull(), // 'csv', 'xml', 'xlsx', 'zip'
+  fileSize: integer('file_size'),
+  fileHash: text('file_hash'), // for deduplication
+  status: text('status').notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  entryCount: integer('entry_count').default(0),
+  processedAt: integer('processed_at', { mode: 'timestamp' }),
+  metadata: text('metadata'), // JSON for file-specific info
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const ingestionFileEntries = sqliteTable('ingestion_file_entries', {
+  id: cuid2('ige').primaryKey(),
+  fileId: text('file_id')
+    .notNull()
+    .references(() => ingestionFiles.id, { onDelete: 'cascade' }),
+  rowNumber: integer('row_number'),
+  storeIdentifier: text('store_identifier'), // resolved to store
+  itemExternalId: text('item_external_id'),
+  itemName: text('item_name'),
+  price: integer('price'), // price in cents/lipa
+  discountPrice: integer('discount_price'),
+  barcode: text('barcode'),
+  rawData: text('raw_data'), // JSON of original row
+  status: text('status').notNull().default('pending'), // 'pending', 'processed', 'skipped', 'failed'
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
+
+export const ingestionErrors = sqliteTable('ingestion_errors', {
+  id: cuid2('ier').primaryKey(),
+  runId: text('run_id')
+    .notNull()
+    .references(() => ingestionRuns.id, { onDelete: 'cascade' }),
+  fileId: text('file_id').references(() => ingestionFiles.id, { onDelete: 'set null' }),
+  entryId: text('entry_id').references(() => ingestionFileEntries.id, { onDelete: 'set null' }),
+  errorType: text('error_type').notNull(), // 'parse', 'validation', 'store_resolution', 'persist', etc.
+  errorMessage: text('error_message').notNull(),
+  errorDetails: text('error_details'), // JSON with stack trace, context, etc.
+  severity: text('severity').notNull().default('error'), // 'warning', 'error', 'critical'
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+})
