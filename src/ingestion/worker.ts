@@ -1,0 +1,733 @@
+/**
+ * Ingestion Worker for Cloudflare Workers
+ *
+ * Handles the ingestion pipeline in production using Cloudflare Queues.
+ * Processes queue messages for: discover, fetch, expand, parse, persist
+ * Scheduled handler triggers periodic ingestion runs.
+ */
+
+import { unzipSync } from 'fflate'
+
+import { createDb, type Database } from '@/db'
+import { generatePrefixedId } from '@/utils/id'
+import {
+  type QueueMessage,
+  type DiscoverQueueMessage,
+  type FetchQueueMessage,
+  type ExpandQueueMessage,
+  type ParseQueueMessage,
+  type PersistQueueMessage,
+  type DiscoveredFile,
+  type NormalizedRow,
+  type FileType,
+  isDiscoverMessage,
+  isFetchMessage,
+  isExpandMessage,
+  isParseMessage,
+  isPersistMessage,
+} from './core/types'
+import {
+  R2Storage,
+  computeSha256,
+  generateStorageKey,
+  type Storage,
+} from './core/storage'
+import { persistRowsForStore } from './core/persist'
+import {
+  chainAdapterRegistry,
+  CHAIN_IDS,
+  type ChainId,
+  isValidChainId,
+} from './chains'
+
+// Import chain adapter factories
+import { createKonzumAdapter } from './chains/konzum'
+import { createLidlAdapter } from './chains/lidl'
+import { createPlodineAdapter } from './chains/plodine'
+import { createIntersparAdapter } from './chains/interspar'
+import { createStudenacAdapter } from './chains/studenac'
+import { createKauflandAdapter } from './chains/kaufland'
+import { createEurospinAdapter } from './chains/eurospin'
+import { createDmAdapter } from './chains/dm'
+import { createKtcAdapter } from './chains/ktc'
+import { createMetroAdapter } from './chains/metro'
+import { createTrgocentarAdapter } from './chains/trgocentar'
+
+// ============================================================================
+// Worker Environment Types
+// ============================================================================
+
+/**
+ * Extended environment bindings for the ingestion worker.
+ * Extends the base Env with R2 and Queue bindings.
+ */
+export interface IngestionEnv {
+  /** D1 database binding */
+  DB: D1Database
+  /** R2 bucket for file storage */
+  INGESTION_BUCKET: R2Bucket
+  /** Queue for ingestion messages */
+  INGESTION_QUEUE: Queue<QueueMessage>
+  /** Dead letter queue for failed messages */
+  INGESTION_DLQ?: Queue<QueueMessage>
+  /** Chains to process on scheduled runs (comma-separated) */
+  INGESTION_CHAINS?: string
+  /** Maximum retries before sending to DLQ */
+  MAX_RETRIES?: string
+}
+
+// ============================================================================
+// Adapter Registration
+// ============================================================================
+
+let adaptersRegistered = false
+
+/**
+ * Register all chain adapters with the global registry.
+ * Called once at worker initialization.
+ */
+function registerAdapters(): void {
+  if (adaptersRegistered) return
+
+  chainAdapterRegistry.register('konzum', createKonzumAdapter())
+  chainAdapterRegistry.register('lidl', createLidlAdapter())
+  chainAdapterRegistry.register('plodine', createPlodineAdapter())
+  chainAdapterRegistry.register('interspar', createIntersparAdapter())
+  chainAdapterRegistry.register('studenac', createStudenacAdapter())
+  chainAdapterRegistry.register('kaufland', createKauflandAdapter())
+  chainAdapterRegistry.register('eurospin', createEurospinAdapter())
+  chainAdapterRegistry.register('dm', createDmAdapter())
+  chainAdapterRegistry.register('ktc', createKtcAdapter())
+  chainAdapterRegistry.register('metro', createMetroAdapter())
+  chainAdapterRegistry.register('trgocentar', createTrgocentarAdapter())
+
+  adaptersRegistered = true
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Get today's date in YYYY-MM-DD format.
+ */
+function getTodayDate(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Detect file type from filename extension.
+ */
+function detectFileType(filename: string): FileType {
+  const ext = filename.split('.').pop()?.toLowerCase()
+  switch (ext) {
+    case 'csv':
+      return 'csv'
+    case 'xml':
+      return 'xml'
+    case 'xlsx':
+      return 'xlsx'
+    case 'zip':
+      return 'zip'
+    default:
+      return 'csv'
+  }
+}
+
+/**
+ * Create a queue message with common fields.
+ */
+function createMessage<T extends QueueMessage['type']>(
+  type: T,
+  runId: string,
+  chainSlug: string,
+): QueueMessageBase & { type: T } {
+  return {
+    id: generatePrefixedId('msg'),
+    type,
+    runId,
+    chainSlug,
+    createdAt: new Date().toISOString(),
+  } as QueueMessageBase & { type: T }
+}
+
+interface QueueMessageBase {
+  id: string
+  type: string
+  runId: string
+  chainSlug: string
+  createdAt: string
+}
+
+/**
+ * Parse configured chains from environment.
+ */
+function getConfiguredChains(env: IngestionEnv): ChainId[] {
+  if (!env.INGESTION_CHAINS) {
+    // Default to all chains
+    return [...CHAIN_IDS]
+  }
+
+  const configured = env.INGESTION_CHAINS.split(',')
+    .map((s) => s.trim())
+    .filter(isValidChainId)
+
+  return configured.length > 0 ? configured : [...CHAIN_IDS]
+}
+
+/**
+ * Get maximum retries from environment.
+ */
+function getMaxRetries(env: IngestionEnv): number {
+  const value = env.MAX_RETRIES
+  if (!value) return 3
+  const parsed = parseInt(value, 10)
+  return isNaN(parsed) ? 3 : parsed
+}
+
+// ============================================================================
+// Message Handlers
+// ============================================================================
+
+/**
+ * Handle discover message - find available files from a chain.
+ */
+async function handleDiscover(
+  message: DiscoverQueueMessage,
+  env: IngestionEnv,
+  _storage: Storage,
+): Promise<void> {
+  const adapter = chainAdapterRegistry.getAdapter(message.chainSlug as ChainId)
+  if (!adapter) {
+    throw new Error(`No adapter registered for chain "${message.chainSlug}"`)
+  }
+
+  console.log(`[discover] Starting discovery for ${adapter.name}`)
+
+  const files = await adapter.discover()
+  console.log(`[discover] Found ${files.length} file(s) for ${adapter.name}`)
+
+  if (files.length === 0) {
+    return
+  }
+
+  // Enqueue fetch messages for each file
+  const fetchMessages: FetchQueueMessage[] = files.map((file) => ({
+    ...createMessage('fetch', message.runId, message.chainSlug),
+    file,
+  }))
+
+  await env.INGESTION_QUEUE.sendBatch(
+    fetchMessages.map((msg) => ({ body: msg })),
+  )
+
+  console.log(`[discover] Enqueued ${fetchMessages.length} fetch message(s)`)
+}
+
+/**
+ * Handle fetch message - download a file and store in R2.
+ */
+async function handleFetch(
+  message: FetchQueueMessage,
+  env: IngestionEnv,
+  storage: Storage,
+): Promise<void> {
+  const adapter = chainAdapterRegistry.getAdapter(message.chainSlug as ChainId)
+  if (!adapter) {
+    throw new Error(`No adapter registered for chain "${message.chainSlug}"`)
+  }
+
+  const { file } = message
+  console.log(`[fetch] Fetching ${file.filename} from ${adapter.name}`)
+
+  const fetched = await adapter.fetch(file)
+  const r2Key = generateStorageKey(
+    message.runId,
+    message.chainSlug,
+    file.filename,
+  )
+
+  // Check for duplicate by hash
+  const existing = await storage.head(r2Key)
+  if (existing?.sha256 === fetched.hash) {
+    console.log(`[fetch] Skipped duplicate: ${file.filename}`)
+    return
+  }
+
+  // Store in R2
+  await storage.put(r2Key, fetched.content, {
+    sha256: fetched.hash,
+    customMetadata: {
+      filename: file.filename,
+      type: file.type,
+      url: file.url,
+    },
+  })
+
+  console.log(
+    `[fetch] Stored ${file.filename} (${fetched.content.byteLength} bytes)`,
+  )
+
+  // Determine next step based on file type
+  if (file.type === 'zip') {
+    // Enqueue expand message for ZIP files
+    const expandMessage: ExpandQueueMessage = {
+      ...createMessage('expand', message.runId, message.chainSlug),
+      r2Key,
+      file,
+    }
+    await env.INGESTION_QUEUE.send(expandMessage)
+    console.log(`[fetch] Enqueued expand message for ${file.filename}`)
+  } else {
+    // Enqueue parse message for non-ZIP files
+    const parseMessage: ParseQueueMessage = {
+      ...createMessage('parse', message.runId, message.chainSlug),
+      r2Key,
+      file,
+      innerFilename: null,
+      hash: fetched.hash,
+    }
+    await env.INGESTION_QUEUE.send(parseMessage)
+    console.log(`[fetch] Enqueued parse message for ${file.filename}`)
+  }
+}
+
+/**
+ * Handle expand message - extract files from ZIP and enqueue parse messages.
+ */
+async function handleExpand(
+  message: ExpandQueueMessage,
+  env: IngestionEnv,
+  storage: Storage,
+): Promise<void> {
+  const { r2Key, file } = message
+  console.log(`[expand] Expanding ${file.filename}`)
+
+  const result = await storage.get(r2Key)
+  if (!result) {
+    throw new Error(`ZIP file not found in R2: ${r2Key}`)
+  }
+
+  const uint8Content = new Uint8Array(result.content)
+  const unzipped = unzipSync(uint8Content)
+
+  const parseMessages: ParseQueueMessage[] = []
+  let expandedCount = 0
+
+  for (const [innerFilename, innerContent] of Object.entries(unzipped)) {
+    // Skip directories and hidden files
+    if (innerFilename.endsWith('/') || innerFilename.startsWith('__MACOSX')) {
+      continue
+    }
+
+    const innerType = detectFileType(innerFilename)
+    const innerHash = await computeSha256(innerContent)
+
+    // Store expanded file in R2
+    const expandedKey = generateStorageKey(
+      message.runId,
+      message.chainSlug,
+      `expanded/${file.filename}/${innerFilename}`,
+    )
+
+    await storage.put(expandedKey, innerContent, {
+      sha256: innerHash,
+      customMetadata: {
+        parentFilename: file.filename,
+        innerFilename,
+        type: innerType,
+      },
+    })
+
+    // Create parse message
+    const expandedFile: DiscoveredFile = {
+      ...file,
+      filename: innerFilename,
+      type: innerType,
+      size: innerContent.byteLength,
+    }
+
+    parseMessages.push({
+      ...createMessage('parse', message.runId, message.chainSlug),
+      r2Key: expandedKey,
+      file: expandedFile,
+      innerFilename,
+      hash: innerHash,
+    })
+
+    expandedCount++
+  }
+
+  if (parseMessages.length > 0) {
+    await env.INGESTION_QUEUE.sendBatch(
+      parseMessages.map((msg) => ({ body: msg })),
+    )
+  }
+
+  console.log(
+    `[expand] Expanded ${expandedCount} file(s), enqueued ${parseMessages.length} parse message(s)`,
+  )
+}
+
+/**
+ * Handle parse message - parse file and persist to database.
+ */
+async function handleParse(
+  message: ParseQueueMessage,
+  _env: IngestionEnv,
+  storage: Storage,
+  db: Database,
+): Promise<void> {
+  const adapter = chainAdapterRegistry.getAdapter(message.chainSlug as ChainId)
+  if (!adapter) {
+    throw new Error(`No adapter registered for chain "${message.chainSlug}"`)
+  }
+
+  const { r2Key, file, innerFilename } = message
+  const filename = innerFilename || file.filename
+  console.log(`[parse] Parsing ${filename} from ${adapter.name}`)
+
+  const result = await storage.get(r2Key)
+  if (!result) {
+    throw new Error(`File not found in R2: ${r2Key}`)
+  }
+
+  const parseResult = await adapter.parse(result.content, filename)
+  console.log(
+    `[parse] Parsed ${parseResult.validRows}/${parseResult.totalRows} valid rows`,
+  )
+
+  if (parseResult.errors.length > 0) {
+    console.warn(`[parse] ${parseResult.errors.length} parse error(s)`)
+  }
+
+  if (parseResult.rows.length === 0) {
+    console.log(`[parse] No rows to persist for ${filename}`)
+    return
+  }
+
+  // Group rows by store identifier
+  const rowsByStore = new Map<string, NormalizedRow[]>()
+  for (const row of parseResult.rows) {
+    const storeId = row.storeIdentifier || 'unknown'
+    if (!rowsByStore.has(storeId)) {
+      rowsByStore.set(storeId, [])
+    }
+    rowsByStore.get(storeId)!.push(row)
+  }
+
+  // Persist rows for each store
+  let totalPersisted = 0
+  let totalPriceChanges = 0
+  const storesNotFound: string[] = []
+
+  for (const [storeIdentifier, rows] of rowsByStore) {
+    try {
+      const persistResult = await persistRowsForStore(
+        db,
+        message.chainSlug,
+        storeIdentifier,
+        rows,
+        'filename_code',
+      )
+
+      if (persistResult === null) {
+        storesNotFound.push(storeIdentifier)
+        continue
+      }
+
+      totalPersisted += persistResult.persisted
+      totalPriceChanges += persistResult.priceChanges
+    } catch (error) {
+      console.error(
+        `[parse] Failed to persist for store "${storeIdentifier}":`,
+        error,
+      )
+    }
+  }
+
+  console.log(
+    `[parse] Persisted ${totalPersisted} rows, ${totalPriceChanges} price changes`,
+  )
+
+  if (storesNotFound.length > 0) {
+    console.warn(
+      `[parse] ${storesNotFound.length} store(s) not found: ${storesNotFound.slice(0, 5).join(', ')}${storesNotFound.length > 5 ? '...' : ''}`,
+    )
+  }
+}
+
+/**
+ * Handle persist message - persist pre-parsed rows from R2.
+ */
+async function handlePersist(
+  message: PersistQueueMessage,
+  _env: IngestionEnv,
+  storage: Storage,
+  db: Database,
+): Promise<void> {
+  const { rowsR2Key, rowCount } = message
+  console.log(`[persist] Persisting ${rowCount} rows from ${rowsR2Key}`)
+
+  const result = await storage.get(rowsR2Key)
+  if (!result) {
+    throw new Error(`Rows file not found in R2: ${rowsR2Key}`)
+  }
+
+  const rows: NormalizedRow[] = JSON.parse(
+    new TextDecoder().decode(result.content),
+  )
+
+  // Group rows by store identifier
+  const rowsByStore = new Map<string, NormalizedRow[]>()
+  for (const row of rows) {
+    const storeId = row.storeIdentifier || 'unknown'
+    if (!rowsByStore.has(storeId)) {
+      rowsByStore.set(storeId, [])
+    }
+    rowsByStore.get(storeId)!.push(row)
+  }
+
+  // Persist rows for each store
+  let totalPersisted = 0
+  let totalPriceChanges = 0
+
+  for (const [storeIdentifier, storeRows] of rowsByStore) {
+    try {
+      const persistResult = await persistRowsForStore(
+        db,
+        message.chainSlug,
+        storeIdentifier,
+        storeRows,
+        'filename_code',
+      )
+
+      if (persistResult === null) {
+        console.warn(`[persist] Store not found: "${storeIdentifier}"`)
+        continue
+      }
+
+      totalPersisted += persistResult.persisted
+      totalPriceChanges += persistResult.priceChanges
+    } catch (error) {
+      console.error(
+        `[persist] Failed to persist for store "${storeIdentifier}":`,
+        error,
+      )
+    }
+  }
+
+  console.log(
+    `[persist] Completed: ${totalPersisted} persisted, ${totalPriceChanges} price changes`,
+  )
+}
+
+// ============================================================================
+// Queue Handler
+// ============================================================================
+
+/**
+ * Process a single queue message.
+ */
+async function processMessage(
+  message: Message<QueueMessage>,
+  env: IngestionEnv,
+  storage: Storage,
+  db: Database,
+): Promise<void> {
+  const msg = message.body
+  console.log(`[queue] Processing ${msg.type} message: ${msg.id}`)
+
+  try {
+    if (isDiscoverMessage(msg)) {
+      await handleDiscover(msg, env, storage)
+    } else if (isFetchMessage(msg)) {
+      await handleFetch(msg, env, storage)
+    } else if (isExpandMessage(msg)) {
+      await handleExpand(msg, env, storage)
+    } else if (isParseMessage(msg)) {
+      await handleParse(msg, env, storage, db)
+    } else if (isPersistMessage(msg)) {
+      await handlePersist(msg, env, storage, db)
+    } else {
+      throw new Error(`Unknown message type: ${(msg as QueueMessage).type}`)
+    }
+
+    message.ack()
+    console.log(`[queue] Completed ${msg.type} message: ${msg.id}`)
+  } catch (error) {
+    const maxRetries = getMaxRetries(env)
+    const errorMessage =
+      error instanceof Error ? error.message : String(error)
+
+    console.error(
+      `[queue] Failed ${msg.type} message (attempt ${message.attempts}/${maxRetries}): ${errorMessage}`,
+    )
+
+    if (message.attempts >= maxRetries) {
+      // Send to dead letter queue if available
+      if (env.INGESTION_DLQ) {
+        await env.INGESTION_DLQ.send(msg)
+        console.log(`[queue] Sent to DLQ: ${msg.id}`)
+      }
+      message.ack() // Don't retry anymore
+    } else {
+      // Retry with exponential backoff
+      const delaySeconds = Math.min(60 * Math.pow(2, message.attempts - 1), 3600)
+      message.retry({ delaySeconds })
+      console.log(`[queue] Retrying in ${delaySeconds}s: ${msg.id}`)
+    }
+  }
+}
+
+/**
+ * Queue consumer handler.
+ * Processes batches of queue messages.
+ */
+export async function queue(
+  batch: MessageBatch<QueueMessage>,
+  env: IngestionEnv,
+  _ctx: ExecutionContext,
+): Promise<void> {
+  registerAdapters()
+
+  // Cast to any to satisfy R2Storage's internal R2Bucket interface
+  // The global R2Bucket type is structurally compatible
+  const storage = new R2Storage(env.INGESTION_BUCKET as any)
+  const db = createDb(env.DB)
+
+  console.log(
+    `[queue] Processing batch of ${batch.messages.length} message(s) from ${batch.queue}`,
+  )
+
+  // Process messages in parallel with concurrency limit
+  const CONCURRENCY_LIMIT = 5
+  const messages = [...batch.messages]
+
+  while (messages.length > 0) {
+    const chunk = messages.splice(0, CONCURRENCY_LIMIT)
+    await Promise.all(
+      chunk.map((message) => processMessage(message, env, storage, db)),
+    )
+  }
+
+  console.log(`[queue] Batch completed`)
+}
+
+// ============================================================================
+// Scheduled Handler
+// ============================================================================
+
+/**
+ * Scheduled handler for periodic ingestion runs.
+ * Triggers discover+fetch for configured chains.
+ */
+export async function scheduled(
+  controller: ScheduledController,
+  env: IngestionEnv,
+  _ctx: ExecutionContext,
+): Promise<void> {
+  registerAdapters()
+
+  const runId = generatePrefixedId('run')
+  const chains = getConfiguredChains(env)
+  const date = getTodayDate()
+
+  console.log(
+    `[scheduled] Starting ingestion run ${runId} for ${chains.length} chain(s) on ${date}`,
+  )
+  console.log(`[scheduled] Cron: ${controller.cron}`)
+
+  // Enqueue discover messages for each chain
+  const discoverMessages: DiscoverQueueMessage[] = chains.map((chainSlug) => ({
+    ...createMessage('discover', runId, chainSlug),
+  }))
+
+  await env.INGESTION_QUEUE.sendBatch(
+    discoverMessages.map((msg) => ({ body: msg })),
+  )
+
+  console.log(
+    `[scheduled] Enqueued ${discoverMessages.length} discover message(s)`,
+  )
+}
+
+// ============================================================================
+// HTTP Handler (for manual triggers and health checks)
+// ============================================================================
+
+/**
+ * HTTP handler for manual triggers and health checks.
+ */
+export async function fetch(
+  request: Request,
+  env: IngestionEnv,
+  _ctx: ExecutionContext,
+): Promise<Response> {
+  const url = new URL(request.url)
+
+  // Health check
+  if (url.pathname === '/health') {
+    return new Response(JSON.stringify({ status: 'ok' }), {
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  // Manual trigger endpoint
+  if (url.pathname === '/trigger' && request.method === 'POST') {
+    registerAdapters()
+
+    const runId = generatePrefixedId('run')
+    const chainParam = url.searchParams.get('chain')
+
+    let chains: ChainId[]
+    if (chainParam && isValidChainId(chainParam)) {
+      chains = [chainParam]
+    } else {
+      chains = getConfiguredChains(env)
+    }
+
+    console.log(
+      `[trigger] Manual trigger for ${chains.length} chain(s): ${chains.join(', ')}`,
+    )
+
+    // Enqueue discover messages
+    const discoverMessages: DiscoverQueueMessage[] = chains.map(
+      (chainSlug) => ({
+        ...createMessage('discover', runId, chainSlug),
+      }),
+    )
+
+    await env.INGESTION_QUEUE.sendBatch(
+      discoverMessages.map((msg) => ({ body: msg })),
+    )
+
+    return new Response(
+      JSON.stringify({
+        status: 'ok',
+        runId,
+        chains,
+        messagesEnqueued: discoverMessages.length,
+      }),
+      {
+        headers: { 'Content-Type': 'application/json' },
+      },
+    )
+  }
+
+  return new Response('Not Found', { status: 404 })
+}
+
+// ============================================================================
+// Default Export
+// ============================================================================
+
+export default {
+  fetch,
+  queue,
+  scheduled,
+} satisfies ExportedHandler<IngestionEnv, QueueMessage>
