@@ -2,7 +2,17 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { passkey } from '@better-auth/passkey'
 import { getDb, getEnv } from '@/utils/bindings'
+import { generatePrefixedId } from '@/utils/id'
 import * as schema from '@/db/schema'
+
+/** Model name to ID prefix mapping for Better Auth tables */
+const MODEL_PREFIXES: Record<string, string> = {
+  user: 'usr',
+  session: 'ses',
+  account: 'acc',
+  verification: 'ver',
+  passkey: 'psk',
+}
 
 export function createAuth() {
   const env = getEnv()
@@ -45,6 +55,15 @@ export function createAuth() {
           type: 'string',
           defaultValue: 'user',
           input: false,
+        },
+      },
+    },
+
+    advanced: {
+      database: {
+        generateId: ({ model }) => {
+          const prefix = MODEL_PREFIXES[model] || model.slice(0, 3)
+          return generatePrefixedId(prefix)
         },
       },
     },

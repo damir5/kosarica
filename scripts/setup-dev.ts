@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { randomBytes, scryptSync } from 'node:crypto'
+import { generatePrefixedId } from '../src/utils/id'
 
 const ROOT = resolve(import.meta.dirname, '..')
 
@@ -52,9 +53,6 @@ function hashPassword(password: string): string {
   return `${salt}:${hash}`
 }
 
-function generateId(): string {
-  return randomBytes(16).toString('hex')
-}
 
 async function main() {
   log('Starting development setup...')
@@ -99,8 +97,8 @@ async function main() {
     log('Fresh database detected, seeding default admin user...')
 
     const now = Math.floor(Date.now() / 1000)
-    const userId = generateId()
-    const accountId = generateId()
+    const userId = generatePrefixedId('usr')
+    const accountId = generatePrefixedId('acc')
     const passwordHash = hashPassword('admin123')
 
     // Create superadmin user
@@ -110,7 +108,7 @@ async function main() {
     const accountSql = `INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt) VALUES ('${accountId}', '${userId}', 'credential', '${userId}', '${passwordHash}', ${now}, ${now});`
 
     // Create default app settings
-    const settingsId = generateId()
+    const settingsId = generatePrefixedId('cfg')
     const settingsSql = `INSERT OR IGNORE INTO app_settings (id, appName, updatedAt) VALUES ('${settingsId}', 'Kosarica', ${now});`
 
     run(`wrangler d1 execute kosarica-db --local --command "${userSql}"`)

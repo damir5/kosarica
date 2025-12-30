@@ -1,5 +1,6 @@
 import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
+import { cuid2 } from './custom-types'
 
 export const todos = sqliteTable('todos', {
   id: integer({ mode: 'number' }).primaryKey({
@@ -83,7 +84,7 @@ export const passkey = sqliteTable('passkey', {
 
 // App Settings table
 export const appSettings = sqliteTable('app_settings', {
-  id: text('id').primaryKey(),
+  id: cuid2('cfg').primaryKey(),
   appName: text('appName').default('Kosarica'),
   requireEmailVerification: integer('requireEmailVerification', { mode: 'boolean' }).default(false),
   minPasswordLength: integer('minPasswordLength').default(8),
