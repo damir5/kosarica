@@ -136,15 +136,10 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     id: 'studenac',
     name: 'Studenac',
     baseUrl: 'https://www.studenac.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: ';',
-      encoding: 'windows-1250',
-      hasHeader: true,
-    },
+    primaryFileType: 'xml',
+    supportedFileTypes: ['xml'],
     usesZip: false,
-    storeResolution: 'filename',
+    storeResolution: 'portal_id',
   },
   kaufland: {
     id: 'kaufland',
