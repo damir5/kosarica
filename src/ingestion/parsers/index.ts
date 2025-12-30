@@ -12,3 +12,6 @@ export type { CsvColumnMapping, CsvDelimiter, CsvEncoding, CsvParserOptions } fr
 
 export { XmlParser, createXmlParser, detectItemsPath } from './xml'
 export type { XmlFieldMapping, XmlParserOptions } from './xml'
+
+export { XlsxParser, createXlsxParser, detectXlsxHeaders, getXlsxSheetNames } from './xlsx'
+export type { XlsxColumnMapping, XlsxParserOptions } from './xlsx'
