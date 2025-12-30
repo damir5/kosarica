@@ -148,7 +148,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {
-      delimiter: ',',
+      delimiter: '\t',
       encoding: 'utf-8',
       hasHeader: true,
     },
