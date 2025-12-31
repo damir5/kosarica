@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { CopyableCell } from '@/components/ui/copyable-cell'
 import type { User } from './UserTable'
 
 interface UserViewModalProps {
@@ -32,7 +33,12 @@ export function UserViewModal({ user, open, onOpenChange }: UserViewModalProps) 
               <label className="text-sm font-medium text-muted-foreground">
                 ID
               </label>
-              <p className="mt-1 font-mono text-sm">{user.id}</p>
+              <CopyableCell
+                value={user.id}
+                label="ID"
+                mono
+                className="-ml-2 mt-1"
+              />
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">
@@ -50,14 +56,22 @@ export function UserViewModal({ user, open, onOpenChange }: UserViewModalProps) 
             <label className="text-sm font-medium text-muted-foreground">
               Name
             </label>
-            <p className="mt-1">{user.name}</p>
+            <CopyableCell
+              value={user.name}
+              label="Name"
+              className="-ml-2 mt-1"
+            />
           </div>
 
           <div>
             <label className="text-sm font-medium text-muted-foreground">
               Email
             </label>
-            <p className="mt-1">{user.email}</p>
+            <CopyableCell
+              value={user.email}
+              label="Email"
+              className="-ml-2 mt-1"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -2,6 +2,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { MoreHorizontal, Eye, UserCog, Trash2, Ban, CheckCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { CopyableCell } from '@/components/ui/copyable-cell'
 import { DataTable } from '@/components/ui/data-table'
 import {
   DropdownMenu,
@@ -55,7 +56,11 @@ function getUserColumns({
       minSize: 100,
       maxSize: 300,
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('name')}</div>
+        <CopyableCell
+          value={row.getValue('name')}
+          label="Name"
+          className="-ml-2 font-medium"
+        />
       ),
     },
     {
@@ -65,7 +70,11 @@ function getUserColumns({
       minSize: 150,
       maxSize: 400,
       cell: ({ row }) => (
-        <div className="text-muted-foreground">{row.getValue('email')}</div>
+        <CopyableCell
+          value={row.getValue('email')}
+          label="Email"
+          className="-ml-2 text-muted-foreground"
+        />
       ),
     },
     {
