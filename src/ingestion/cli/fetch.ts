@@ -13,42 +13,13 @@ import * as path from 'node:path'
 import {
   CHAIN_IDS,
   isValidChainId,
-  chainAdapterRegistry,
   type ChainId,
 } from '../chains'
 import { LocalStorage, computeSha256 } from '../core/storage'
-import type { DiscoveredFile, FetchedFile, FileType } from '../core/types'
+import type { DiscoveredFile, FileType } from '../core/types'
 
-// Import adapter factory functions
-import { createKonzumAdapter } from '../chains/konzum'
-import { createLidlAdapter } from '../chains/lidl'
-import { createPlodineAdapter } from '../chains/plodine'
-import { createIntersparAdapter } from '../chains/interspar'
-import { createStudenacAdapter } from '../chains/studenac'
-import { createKauflandAdapter } from '../chains/kaufland'
-import { createEurospinAdapter } from '../chains/eurospin'
-import { createDmAdapter } from '../chains/dm'
-import { createKtcAdapter } from '../chains/ktc'
-import { createMetroAdapter } from '../chains/metro'
-import { createTrgocentarAdapter } from '../chains/trgocentar'
-
-/**
- * Register all chain adapters in the registry.
- * This should be called before using the registry.
- */
-export function registerAllAdapters(): void {
-  chainAdapterRegistry.register('konzum', createKonzumAdapter())
-  chainAdapterRegistry.register('lidl', createLidlAdapter())
-  chainAdapterRegistry.register('plodine', createPlodineAdapter())
-  chainAdapterRegistry.register('interspar', createIntersparAdapter())
-  chainAdapterRegistry.register('studenac', createStudenacAdapter())
-  chainAdapterRegistry.register('kaufland', createKauflandAdapter())
-  chainAdapterRegistry.register('eurospin', createEurospinAdapter())
-  chainAdapterRegistry.register('dm', createDmAdapter())
-  chainAdapterRegistry.register('ktc', createKtcAdapter())
-  chainAdapterRegistry.register('metro', createMetroAdapter())
-  chainAdapterRegistry.register('trgocentar', createTrgocentarAdapter())
-}
+// Note: Adapters are automatically registered when importing from '../chains'.
+// No manual registration is required.
 
 /**
  * Detect file type from URL or filename.
@@ -223,8 +194,7 @@ async function main(): Promise<void> {
         process.exit(1)
       }
 
-      // Register all adapters
-      registerAllAdapters()
+      // Adapters are pre-registered via centralized initialization in '../chains'
 
       try {
         const result = await fetchAndStore(chain as ChainId, url, outputDir)

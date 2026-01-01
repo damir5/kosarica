@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { NormalizedRow, DiscoveredFile, NormalizedRowValidation } from '../core/types'
 
 // Import all adapters
@@ -31,8 +32,17 @@ import { KtcAdapter, createKtcAdapter } from './ktc'
 import { MetroAdapter, createMetroAdapter } from './metro'
 import { TrgocentarAdapter, createTrgocentarAdapter } from './trgocentar'
 
-// Sample data directory path
-const SAMPLE_DATA_DIR = '/Users/damir/dev/test/kosarica/data/sample'
+// Sample data directory path - configurable via environment variable with fallback to relative path
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const SAMPLE_DATA_DIR = process.env.SAMPLE_DATA_DIR || path.resolve(__dirname, '../../../data/sample')
+
+// Check if sample data directory exists
+const SAMPLE_DATA_AVAILABLE = fs.existsSync(SAMPLE_DATA_DIR)
+if (!SAMPLE_DATA_AVAILABLE) {
+  console.warn(`Sample data directory not found at: ${SAMPLE_DATA_DIR}`)
+  console.warn('Tests requiring sample data will be skipped.')
+  console.warn('Set SAMPLE_DATA_DIR environment variable to specify a custom location.')
+}
 
 // Helper function to read sample file as ArrayBuffer
 function readSampleFile(chain: string, filename: string): ArrayBuffer {
@@ -43,6 +53,9 @@ function readSampleFile(chain: string, filename: string): ArrayBuffer {
 
 // Helper function to list files in a sample directory
 function getSampleFiles(chain: string): string[] {
+  if (!SAMPLE_DATA_AVAILABLE) {
+    return []
+  }
   const dirPath = path.join(SAMPLE_DATA_DIR, chain)
   if (!fs.existsSync(dirPath)) {
     return []

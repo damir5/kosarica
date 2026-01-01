@@ -22,6 +22,20 @@
       "when": 1767096046119,
       "tag": "0002_clean_magdalene",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1767283805717,
+      "tag": "0003_cute_the_professor",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1767283921875,
+      "tag": "0004_ancient_newton_destine",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX `product_links_product_retailer_item_unique` ON `product_links` (`product_id`,`retailer_item_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `store_identifiers_store_type_value_unique` ON `store_identifiers` (`store_id`,`type`,`value`);

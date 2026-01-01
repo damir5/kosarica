@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, integer, text, uniqueIndex, index } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { cuid2 } from './custom-types'
 
@@ -118,7 +118,10 @@ export const stores = sqliteTable('stores', {
   longitude: text('longitude'),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-})
+}, (table) => ({
+  chainSlugIdx: index('stores_chain_slug_idx').on(table.chainSlug),
+  cityIdx: index('stores_city_idx').on(table.city),
+}))
 
 export const storeIdentifiers = sqliteTable('store_identifiers', {
   id: cuid2('sid').primaryKey(),
@@ -128,7 +131,11 @@ export const storeIdentifiers = sqliteTable('store_identifiers', {
   type: text('type').notNull(), // 'filename_code', 'portal_id', 'internal_id', etc.
   value: text('value').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-})
+}, (table) => ({
+  storeTypeValueUnique: uniqueIndex('store_identifiers_store_type_value_unique')
+    .on(table.storeId, table.type, table.value),
+  typeValueIdx: index('store_identifiers_type_value_idx').on(table.type, table.value),
+}))
 
 export const retailerItems = sqliteTable('retailer_items', {
   id: cuid2('rit').primaryKey(),
@@ -146,7 +153,10 @@ export const retailerItems = sqliteTable('retailer_items', {
   imageUrl: text('image_url'),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-})
+}, (table) => ({
+  chainExternalIdIdx: index('retailer_items_chain_external_id_idx').on(table.chainSlug, table.externalId),
+  chainNameIdx: index('retailer_items_chain_name_idx').on(table.chainSlug, table.name),
+}))
 
 export const retailerItemBarcodes = sqliteTable('retailer_item_barcodes', {
   id: cuid2('rib').primaryKey(),
@@ -156,7 +166,9 @@ export const retailerItemBarcodes = sqliteTable('retailer_item_barcodes', {
   barcode: text('barcode').notNull(), // EAN-13, EAN-8, etc.
   isPrimary: integer('is_primary', { mode: 'boolean' }).default(false),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-})
+}, (table) => ({
+  barcodeIdx: index('retailer_item_barcodes_barcode_idx').on(table.barcode),
+}))
 
 // ============================================================================
 // Canonical Catalog: products, product_aliases, product_links, product_relations
@@ -196,7 +208,10 @@ export const productLinks = sqliteTable('product_links', {
     .references(() => retailerItems.id, { onDelete: 'cascade' }),
   confidence: text('confidence'), // 'auto', 'manual', 'verified'
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-})
+}, (table) => ({
+  productRetailerItemUnique: uniqueIndex('product_links_product_retailer_item_unique')
+    .on(table.productId, table.retailerItemId),
+}))
 
 export const productRelations = sqliteTable('product_relations', {
   id: cuid2('prl').primaryKey(),
@@ -231,7 +246,11 @@ export const storeItemState = sqliteTable('store_item_state', {
   priceSignature: text('price_signature'), // hash for deduplication
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-})
+}, (table) => ({
+  storeRetailerIdx: index('store_item_state_store_retailer_idx').on(table.storeId, table.retailerItemId),
+  lastSeenIdx: index('store_item_state_last_seen_idx').on(table.lastSeenAt),
+  priceSignatureIdx: index('store_item_state_price_signature_idx').on(table.priceSignature),
+}))
 
 export const storeItemPricePeriods = sqliteTable('store_item_price_periods', {
   id: cuid2('sip').primaryKey(),
@@ -243,7 +262,10 @@ export const storeItemPricePeriods = sqliteTable('store_item_price_periods', {
   startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
   endedAt: integer('ended_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-})
+}, (table) => ({
+  storeItemStateIdx: index('store_item_price_periods_state_idx').on(table.storeItemStateId),
+  timeRangeIdx: index('store_item_price_periods_time_range_idx').on(table.startedAt, table.endedAt),
+}))
 
 // ============================================================================
 // Ingestion: ingestion_runs, ingestion_files, ingestion_file_entries, ingestion_errors

@@ -40,19 +40,6 @@ import {
   isValidChainId,
 } from './chains'
 
-// Import chain adapter factories
-import { createKonzumAdapter } from './chains/konzum'
-import { createLidlAdapter } from './chains/lidl'
-import { createPlodineAdapter } from './chains/plodine'
-import { createIntersparAdapter } from './chains/interspar'
-import { createStudenacAdapter } from './chains/studenac'
-import { createKauflandAdapter } from './chains/kaufland'
-import { createEurospinAdapter } from './chains/eurospin'
-import { createDmAdapter } from './chains/dm'
-import { createKtcAdapter } from './chains/ktc'
-import { createMetroAdapter } from './chains/metro'
-import { createTrgocentarAdapter } from './chains/trgocentar'
-
 // ============================================================================
 // Worker Environment Types
 // ============================================================================
@@ -76,33 +63,8 @@ export interface IngestionEnv {
   MAX_RETRIES?: string
 }
 
-// ============================================================================
-// Adapter Registration
-// ============================================================================
-
-let adaptersRegistered = false
-
-/**
- * Register all chain adapters with the global registry.
- * Called once at worker initialization.
- */
-function registerAdapters(): void {
-  if (adaptersRegistered) return
-
-  chainAdapterRegistry.register('konzum', createKonzumAdapter())
-  chainAdapterRegistry.register('lidl', createLidlAdapter())
-  chainAdapterRegistry.register('plodine', createPlodineAdapter())
-  chainAdapterRegistry.register('interspar', createIntersparAdapter())
-  chainAdapterRegistry.register('studenac', createStudenacAdapter())
-  chainAdapterRegistry.register('kaufland', createKauflandAdapter())
-  chainAdapterRegistry.register('eurospin', createEurospinAdapter())
-  chainAdapterRegistry.register('dm', createDmAdapter())
-  chainAdapterRegistry.register('ktc', createKtcAdapter())
-  chainAdapterRegistry.register('metro', createMetroAdapter())
-  chainAdapterRegistry.register('trgocentar', createTrgocentarAdapter())
-
-  adaptersRegistered = true
-}
+// Note: Adapters are automatically registered when importing from './chains'.
+// The chainAdapterRegistry is pre-populated and ready to use.
 
 // ============================================================================
 // Utility Functions
@@ -593,7 +555,7 @@ export async function queue(
   env: IngestionEnv,
   _ctx: ExecutionContext,
 ): Promise<void> {
-  registerAdapters()
+  // Adapters are pre-registered via centralized initialization
 
   // Cast to any to satisfy R2Storage's internal R2Bucket interface
   // The global R2Bucket type is structurally compatible
@@ -631,7 +593,7 @@ export async function scheduled(
   env: IngestionEnv,
   _ctx: ExecutionContext,
 ): Promise<void> {
-  registerAdapters()
+  // Adapters are pre-registered via centralized initialization
 
   const runId = generatePrefixedId('run')
   const chains = getConfiguredChains(env)
@@ -679,7 +641,7 @@ export async function fetch(
 
   // Manual trigger endpoint
   if (url.pathname === '/trigger' && request.method === 'POST') {
-    registerAdapters()
+    // Adapters are pre-registered via centralized initialization
 
     const runId = generatePrefixedId('run')
     const chainParam = url.searchParams.get('chain')

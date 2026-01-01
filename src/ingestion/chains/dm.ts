@@ -6,18 +6,14 @@
  */
 
 import type {
-  ChainAdapter,
   DiscoveredFile,
-  FetchedFile,
-  FileType,
-  NormalizedRow,
-  NormalizedRowValidation,
   ParseOptions,
   ParseResult,
   StoreIdentifier,
 } from '../core/types'
-import { computeSha256 } from '../core/storage'
 import { XlsxParser, type XlsxColumnMapping } from '../parsers/xlsx'
+import { BaseChainAdapter } from './base'
+import { CHAIN_CONFIGS } from './config'
 
 /**
  * Column mapping for DM XLSX files.
@@ -63,50 +59,36 @@ const DM_NATIONAL_STORE_IDENTIFIER = 'dm_national'
 
 /**
  * DM chain adapter implementation.
+ * Extends BaseChainAdapter with XLSX-specific parsing logic.
+ * DM is unique in using XLSX format with national pricing.
  */
-export class DmAdapter implements ChainAdapter {
-  readonly slug = 'dm'
-  readonly name = 'DM'
-  readonly supportedTypes: FileType[] = ['xlsx']
-
+export class DmAdapter extends BaseChainAdapter {
   private xlsxParser: XlsxParser
 
   constructor() {
+    super({
+      slug: 'dm',
+      name: 'DM',
+      supportedTypes: ['xlsx'],
+      chainConfig: CHAIN_CONFIGS.dm,
+      filenamePrefixPatterns: [
+        /^DM[_-]?/i,
+        /^dm[_-]?/i,
+        /^cjenik[_-]?/i,
+      ],
+      fileExtensionPattern: /\.(xlsx|xls|XLSX|XLS)$/,
+      rateLimitConfig: {
+        requestsPerSecond: 2,
+        maxRetries: 3,
+      },
+    })
+
     this.xlsxParser = new XlsxParser({
       columnMapping: DM_COLUMN_MAPPING,
       hasHeader: true,
       skipEmptyRows: true,
       defaultStoreIdentifier: DM_NATIONAL_STORE_IDENTIFIER,
     })
-  }
-
-  /**
-   * Discover available DM price files.
-   * In production, this would scrape the DM price portal.
-   */
-  async discover(): Promise<DiscoveredFile[]> {
-    // TODO: Implement actual discovery from DM's price portal
-    // For now, return empty array - files will be provided directly
-    return []
-  }
-
-  /**
-   * Fetch a discovered file.
-   */
-  async fetch(file: DiscoveredFile): Promise<FetchedFile> {
-    const response = await fetch(file.url)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${file.url}: ${response.status} ${response.statusText}`)
-    }
-
-    const content = await response.arrayBuffer()
-    const hash = await computeSha256(content)
-
-    return {
-      discovered: file,
-      content,
-      hash,
-    }
   }
 
   /**
@@ -149,46 +131,6 @@ export class DmAdapter implements ChainAdapter {
     return {
       type: 'national',
       value: DM_NATIONAL_STORE_IDENTIFIER,
-    }
-  }
-
-  /**
-   * Validate a normalized row according to DM-specific rules.
-   */
-  validateRow(row: NormalizedRow): NormalizedRowValidation {
-    const errors: string[] = []
-    const warnings: string[] = []
-
-    // Required field validation
-    if (!row.name || row.name.trim() === '') {
-      errors.push('Missing product name')
-    }
-
-    if (row.price <= 0) {
-      errors.push('Price must be positive')
-    }
-
-    // DM-specific validations
-    if (row.price > 100000000) {
-      // > 1,000,000 EUR seems unlikely
-      warnings.push('Price seems unusually high')
-    }
-
-    if (row.discountPrice !== null && row.discountPrice >= row.price) {
-      warnings.push('Discount price is not less than regular price')
-    }
-
-    // Barcode validation
-    for (const barcode of row.barcodes) {
-      if (!/^\d{8,14}$/.test(barcode)) {
-        warnings.push(`Invalid barcode format: ${barcode}`)
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
     }
   }
 }

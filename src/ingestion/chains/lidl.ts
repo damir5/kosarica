@@ -3,24 +3,19 @@
  *
  * Adapter for parsing Lidl retail chain price data files.
  * Lidl uses CSV format with comma delimiter and UTF-8 encoding.
- * Store resolution is based on filename (daily ZIP files → fanout).
+ * Store resolution is based on filename (daily ZIP files -> fanout).
  * Handles multiple GTINs per SKU.
  */
 
 import type {
-  ChainAdapter,
   DiscoveredFile,
-  FetchedFile,
-  FileType,
   NormalizedRow,
   NormalizedRowValidation,
-  ParseOptions,
   ParseResult,
-  StoreIdentifier,
 } from '../core/types'
-import { computeSha256 } from '../core/storage'
-import { CsvParser, type CsvColumnMapping } from '../parsers/csv'
-import { CHAIN_CONFIGS } from './index'
+import type { CsvColumnMapping } from '../parsers/csv'
+import { BaseCsvAdapter } from './base'
+import { CHAIN_CONFIGS } from './config'
 
 /**
  * Column mapping for Lidl CSV files (Croatian headers).
@@ -61,86 +56,128 @@ const LIDL_COLUMN_MAPPING_ALT: CsvColumnMapping = {
 
 /**
  * Lidl chain adapter implementation.
+ * Extends BaseCsvAdapter with custom GTIN handling and discovery logic.
  */
-export class LidlAdapter implements ChainAdapter {
-  readonly slug = 'lidl'
-  readonly name = 'Lidl'
-  readonly supportedTypes: FileType[] = ['csv', 'zip']
-
-  private config = CHAIN_CONFIGS.lidl
-  private csvParser: CsvParser
-
+export class LidlAdapter extends BaseCsvAdapter {
   constructor() {
-    this.csvParser = new CsvParser({
-      delimiter: this.config.csv!.delimiter,
-      encoding: this.config.csv!.encoding,
-      hasHeader: this.config.csv!.hasHeader,
+    super({
+      slug: 'lidl',
+      name: 'Lidl',
+      supportedTypes: ['csv', 'zip'],
+      chainConfig: CHAIN_CONFIGS.lidl,
       columnMapping: LIDL_COLUMN_MAPPING,
-      skipEmptyRows: true,
+      alternativeColumnMapping: LIDL_COLUMN_MAPPING_ALT,
+      filenamePrefixPatterns: [
+        /^Lidl[_-]?/i,
+        /^cjenik[_-]?/i,
+        /^\d{4}[_-]\d{2}[_-]\d{2}[_-]?/, // Remove date prefix
+      ],
+      rateLimitConfig: {
+        requestsPerSecond: 2,
+        maxRetries: 3,
+      },
     })
   }
 
   /**
    * Discover available Lidl price files.
-   * In production, this would scrape the Lidl price portal.
+   * Fetches the Lidl price portal and parses HTML for ZIP and CSV file links.
+   * Lidl typically publishes daily ZIP files containing per-store CSVs.
    */
   async discover(): Promise<DiscoveredFile[]> {
-    // TODO: Implement actual discovery from Lidl's price portal
-    // Lidl typically publishes daily ZIP files with per-store CSVs
-    return []
-  }
+    const baseUrl = this.config.baseUrl
+    const discoveredFiles: DiscoveredFile[] = []
 
-  /**
-   * Fetch a discovered file.
-   */
-  async fetch(file: DiscoveredFile): Promise<FetchedFile> {
-    const response = await fetch(file.url)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${file.url}: ${response.status} ${response.statusText}`)
-    }
-
-    const content = await response.arrayBuffer()
-    const hash = await computeSha256(content)
-
-    return {
-      discovered: file,
-      content,
-      hash,
-    }
-  }
-
-  /**
-   * Parse Lidl CSV content into normalized rows.
-   * Handles multiple GTINs per SKU by splitting on semicolon.
-   */
-  async parse(
-    content: ArrayBuffer,
-    filename: string,
-    options?: ParseOptions,
-  ): Promise<ParseResult> {
-    // Extract store identifier from filename to use as default
-    const storeIdentifier = this.extractStoreIdentifierFromFilename(filename)
-
-    // Try parsing with standard Croatian headers first
-    this.csvParser.setOptions({
-      columnMapping: LIDL_COLUMN_MAPPING,
-      defaultStoreIdentifier: storeIdentifier,
-    })
-
-    let result = await this.csvParser.parse(content, filename, options)
-
-    // If no valid rows, try abbreviated headers
-    if (result.validRows === 0 && result.errors.length > 0) {
-      this.csvParser.setOptions({
-        columnMapping: LIDL_COLUMN_MAPPING_ALT,
-        defaultStoreIdentifier: storeIdentifier,
+    try {
+      const response = await fetch(baseUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
       })
-      result = await this.csvParser.parse(content, filename, options)
+
+      if (!response.ok) {
+        console.error(`Failed to fetch Lidl portal: ${response.status} ${response.statusText}`)
+        return []
+      }
+
+      const html = await response.text()
+
+      // Parse HTML to find ZIP file links (Lidl's primary format)
+      const zipLinkPattern = /href=["']([^"']*\.zip(?:\?[^"']*)?)["']/gi
+      let match: RegExpExecArray | null
+
+      while ((match = zipLinkPattern.exec(html)) !== null) {
+        const href = match[1]
+        const fileUrl = href.startsWith('http') ? href : new URL(href, baseUrl).toString()
+        const filename = this.extractFilenameFromUrl(fileUrl)
+
+        // Extract date from filename if present (e.g., Lidl_2024-01-15.zip)
+        const dateMatch = filename.match(/(\d{4}[-_]\d{2}[-_]\d{2})/)
+        const fileDate = dateMatch ? dateMatch[1].replace(/_/g, '-') : null
+
+        discoveredFiles.push({
+          url: fileUrl,
+          filename,
+          type: 'zip',
+          size: null,
+          lastModified: fileDate ? new Date(fileDate) : null,
+          metadata: {
+            source: 'lidl_portal',
+            discoveredAt: new Date().toISOString(),
+            ...(fileDate && { fileDate }),
+          },
+        })
+      }
+
+      // Also look for direct CSV file links
+      const csvLinkPattern = /href=["']([^"']*\.csv(?:\?[^"']*)?)["']/gi
+      while ((match = csvLinkPattern.exec(html)) !== null) {
+        const href = match[1]
+        const fileUrl = href.startsWith('http') ? href : new URL(href, baseUrl).toString()
+        const filename = this.extractFilenameFromUrl(fileUrl)
+
+        discoveredFiles.push({
+          url: fileUrl,
+          filename,
+          type: 'csv',
+          size: null,
+          lastModified: null,
+          metadata: {
+            source: 'lidl_portal',
+            discoveredAt: new Date().toISOString(),
+          },
+        })
+      }
+
+      return discoveredFiles
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`Error discovering Lidl files: ${errorMessage}`)
+      return []
     }
+  }
 
-    // Post-process to handle multiple GTINs
+  /**
+   * Override base extractFilenameFromUrl to use 'unknown.zip' as default.
+   */
+  protected override extractFilenameFromUrl(url: string): string {
+    try {
+      const urlObj = new URL(url)
+      const pathname = urlObj.pathname
+      const filename = pathname.split('/').pop() || 'unknown.zip'
+      return filename.split('?')[0]
+    } catch {
+      return 'unknown.zip'
+    }
+  }
+
+  /**
+   * Post-process parse result to handle multiple GTINs.
+   * Lidl may list multiple GTINs separated by semicolon or pipe.
+   */
+  protected postprocessResult(result: ParseResult): ParseResult {
     result.rows = result.rows.map((row) => this.normalizeMultipleGtins(row))
-
     return result
   }
 
@@ -164,28 +201,10 @@ export class LidlAdapter implements ChainAdapter {
   }
 
   /**
-   * Extract store identifier from Lidl filename.
-   * Lidl filenames typically follow pattern: LIDL_DATE_STOREID.csv
-   * or from ZIP: Lidl_Poslovnica_123_Zagreb.csv
-   * Example: "Lidl_2024-01-15_42.csv" -> "42"
-   * Example: "Lidl_Poslovnica_Zagreb_Ilica_123.csv" -> "Zagreb_Ilica_123"
-   */
-  extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null {
-    const identifier = this.extractStoreIdentifierFromFilename(file.filename)
-    if (!identifier) {
-      return null
-    }
-
-    return {
-      type: 'filename_code',
-      value: identifier,
-    }
-  }
-
-  /**
    * Extract store identifier string from filename.
+   * Lidl has special patterns for store identification.
    */
-  private extractStoreIdentifierFromFilename(filename: string): string {
+  protected extractStoreIdentifierFromFilename(filename: string): string {
     // Remove file extension
     const baseName = filename.replace(/\.(csv|CSV)$/, '')
 
@@ -208,59 +227,38 @@ export class LidlAdapter implements ChainAdapter {
       return simpleMatch[1]
     }
 
-    // Remove common prefixes
-    const cleanName = baseName
-      .replace(/^Lidl[_-]?/i, '')
-      .replace(/^cjenik[_-]?/i, '')
-      .replace(/^\d{4}[_-]\d{2}[_-]\d{2}[_-]?/, '') // Remove date prefix
-      .trim()
-
-    // If nothing left, use full basename
-    return cleanName || baseName
+    // Fall back to base class implementation
+    return super.extractStoreIdentifierFromFilename(filename)
   }
 
   /**
    * Validate a normalized row according to Lidl-specific rules.
+   * Uses stricter GTIN validation.
    */
   validateRow(row: NormalizedRow): NormalizedRowValidation {
-    const errors: string[] = []
-    const warnings: string[] = []
+    // Get base validation from parent
+    const baseValidation = super.validateRow(row)
+    const warnings = [...baseValidation.warnings]
 
-    // Required field validation
-    if (!row.name || row.name.trim() === '') {
-      errors.push('Missing product name')
-    }
-
-    if (row.price <= 0) {
-      errors.push('Price must be positive')
-    }
-
-    // Lidl-specific validations
-    if (row.price > 100000000) {
-      // > 1,000,000 EUR seems unlikely
-      warnings.push('Price seems unusually high')
-    }
-
-    if (row.discountPrice !== null && row.discountPrice >= row.price) {
-      warnings.push('Discount price is not less than regular price')
-    }
+    // Replace barcode warnings with Lidl-specific GTIN validation
+    const gtinWarnings = warnings.filter(w => !w.includes('Invalid barcode format'))
 
     // GTIN validation - Lidl uses EAN-13 and EAN-8
     for (const barcode of row.barcodes) {
       if (!/^\d{8}$|^\d{13}$|^\d{14}$/.test(barcode)) {
-        warnings.push(`Invalid GTIN format: ${barcode} (expected EAN-8, EAN-13, or GTIN-14)`)
+        gtinWarnings.push(`Invalid GTIN format: ${barcode} (expected EAN-8, EAN-13, or GTIN-14)`)
       }
     }
 
     // Lidl products should typically have at least one GTIN
     if (row.barcodes.length === 0) {
-      warnings.push('No GTIN/barcode found for product')
+      gtinWarnings.push('No GTIN/barcode found for product')
     }
 
     return {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
+      isValid: baseValidation.isValid,
+      errors: baseValidation.errors,
+      warnings: gtinWarnings,
     }
   }
 }

@@ -14,40 +14,13 @@ import * as path from 'node:path'
 import {
   CHAIN_IDS,
   isValidChainId,
-  chainAdapterRegistry,
+  getAdapterOrThrow,
   type ChainId,
 } from '../chains'
 import type { ParseResult, ParseOptions, NormalizedRow } from '../core/types'
 
-// Import all chain adapter factories
-import { createKonzumAdapter } from '../chains/konzum'
-import { createLidlAdapter } from '../chains/lidl'
-import { createPlodineAdapter } from '../chains/plodine'
-import { createIntersparAdapter } from '../chains/interspar'
-import { createStudenacAdapter } from '../chains/studenac'
-import { createKauflandAdapter } from '../chains/kaufland'
-import { createEurospinAdapter } from '../chains/eurospin'
-import { createDmAdapter } from '../chains/dm'
-import { createKtcAdapter } from '../chains/ktc'
-import { createMetroAdapter } from '../chains/metro'
-import { createTrgocentarAdapter } from '../chains/trgocentar'
-
-/**
- * Register all chain adapters in the registry.
- */
-function registerAllAdapters(): void {
-  chainAdapterRegistry.register('konzum', createKonzumAdapter())
-  chainAdapterRegistry.register('lidl', createLidlAdapter())
-  chainAdapterRegistry.register('plodine', createPlodineAdapter())
-  chainAdapterRegistry.register('interspar', createIntersparAdapter())
-  chainAdapterRegistry.register('studenac', createStudenacAdapter())
-  chainAdapterRegistry.register('kaufland', createKauflandAdapter())
-  chainAdapterRegistry.register('eurospin', createEurospinAdapter())
-  chainAdapterRegistry.register('dm', createDmAdapter())
-  chainAdapterRegistry.register('ktc', createKtcAdapter())
-  chainAdapterRegistry.register('metro', createMetroAdapter())
-  chainAdapterRegistry.register('trgocentar', createTrgocentarAdapter())
-}
+// Note: Adapters are automatically registered when importing from '../chains'.
+// No manual registration is required.
 
 /**
  * Format a price value in cents to a displayable string.
@@ -184,15 +157,8 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  // Register all adapters
-  registerAllAdapters()
-
-  // Get the adapter
-  const adapter = chainAdapterRegistry.getAdapter(chainId)
-  if (!adapter) {
-    console.error(`Error: No adapter registered for chain "${chainId}"`)
-    process.exit(1)
-  }
+  // Get the adapter (pre-registered via centralized initialization)
+  const adapter = getAdapterOrThrow(chainId)
 
   // Read the file
   const fileBuffer = await fs.readFile(filePath)

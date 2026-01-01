@@ -17,8 +17,8 @@ import { unzipSync } from 'fflate'
 import {
   CHAIN_IDS,
   isValidChainId,
-  chainAdapterRegistry,
   getChainConfig,
+  getAdapterOrThrow,
   type ChainId,
 } from '../chains'
 import { LocalStorage, computeSha256 } from '../core/storage'
@@ -32,18 +32,8 @@ import type {
 } from '../core/types'
 import * as schema from '@/db/schema'
 
-// Import all chain adapter factory functions
-import { createKonzumAdapter } from '../chains/konzum'
-import { createLidlAdapter } from '../chains/lidl'
-import { createPlodineAdapter } from '../chains/plodine'
-import { createIntersparAdapter } from '../chains/interspar'
-import { createStudenacAdapter } from '../chains/studenac'
-import { createKauflandAdapter } from '../chains/kaufland'
-import { createEurospinAdapter } from '../chains/eurospin'
-import { createDmAdapter } from '../chains/dm'
-import { createKtcAdapter } from '../chains/ktc'
-import { createMetroAdapter } from '../chains/metro'
-import { createTrgocentarAdapter } from '../chains/trgocentar'
+// Note: Adapters are automatically registered when importing from '../chains'.
+// No manual registration is required.
 
 // ============================================================================
 // Types
@@ -88,22 +78,6 @@ interface PipelineStats {
 // Utility Functions
 // ============================================================================
 
-/**
- * Register all chain adapters with the global registry.
- */
-function registerAllAdapters(): void {
-  chainAdapterRegistry.register('konzum', createKonzumAdapter())
-  chainAdapterRegistry.register('lidl', createLidlAdapter())
-  chainAdapterRegistry.register('plodine', createPlodineAdapter())
-  chainAdapterRegistry.register('interspar', createIntersparAdapter())
-  chainAdapterRegistry.register('studenac', createStudenacAdapter())
-  chainAdapterRegistry.register('kaufland', createKauflandAdapter())
-  chainAdapterRegistry.register('eurospin', createEurospinAdapter())
-  chainAdapterRegistry.register('dm', createDmAdapter())
-  chainAdapterRegistry.register('ktc', createKtcAdapter())
-  chainAdapterRegistry.register('metro', createMetroAdapter())
-  chainAdapterRegistry.register('trgocentar', createTrgocentarAdapter())
-}
 
 /**
  * Get today's date in YYYY-MM-DD format.
@@ -255,10 +229,7 @@ async function discoverPhase(
 ): Promise<DiscoveredFile[]> {
   logger.phase('Phase 1: Discover')
 
-  const adapter = chainAdapterRegistry.getAdapter(chainId)
-  if (!adapter) {
-    throw new Error(`No adapter registered for chain "${chainId}"`)
-  }
+  const adapter = getAdapterOrThrow(chainId)
 
   logger.info(`Discovering files for ${adapter.name}...`)
 
@@ -311,10 +282,7 @@ async function fetchPhase(
 ): Promise<FetchedFile[]> {
   logger.phase('Phase 2: Fetch')
 
-  const adapter = chainAdapterRegistry.getAdapter(chainId)
-  if (!adapter) {
-    throw new Error(`No adapter registered for chain "${chainId}"`)
-  }
+  const adapter = getAdapterOrThrow(chainId)
 
   const fetched: FetchedFile[] = []
 
@@ -456,10 +424,7 @@ async function parsePhase(
 ): Promise<Map<string, NormalizedRow[]>> {
   logger.phase('Phase 4: Parse')
 
-  const adapter = chainAdapterRegistry.getAdapter(chainId)
-  if (!adapter) {
-    throw new Error(`No adapter registered for chain "${chainId}"`)
-  }
+  const adapter = getAdapterOrThrow(chainId)
 
   // Group rows by store identifier
   const rowsByStore = new Map<string, NormalizedRow[]>()
@@ -722,7 +687,7 @@ async function main(): Promise<void> {
   console.log(`Verbose:    ${options.verbose}`)
 
   // Register adapters
-  registerAllAdapters()
+  // Adapters are pre-registered via centralized initialization in '../chains'
 
   // Initialize storage
   const outputDir = path.resolve(options.outputDir)

@@ -3,219 +3,39 @@
  *
  * Registry for chain adapters mapping chain_id to their implementations.
  * Each chain has configuration for data source URLs, file formats, and parsing options.
+ *
+ * This module provides a centralized, pre-registered adapter registry that is
+ * ready to use on import. All adapters are automatically registered when
+ * the module is loaded.
  */
 
-import type {
-  ChainAdapter,
-  FileType,
-} from '../core/types'
-import type { CsvDelimiter, CsvEncoding } from '../parsers/csv'
+import type { ChainAdapter } from '../core/types'
 
-/**
- * Unique identifier for each retail chain.
- */
-export type ChainId =
-  | 'konzum'
-  | 'lidl'
-  | 'plodine'
-  | 'interspar'
-  | 'studenac'
-  | 'kaufland'
-  | 'eurospin'
-  | 'dm'
-  | 'ktc'
-  | 'metro'
-  | 'trgocentar'
+// Re-export configuration types and constants from config module
+// This breaks circular dependency: adapters import from config.ts, not index.ts
+export {
+  type ChainId,
+  type ChainConfig,
+  CHAIN_IDS,
+  CHAIN_CONFIGS,
+  getChainConfig,
+  isValidChainId,
+} from './config'
 
-/**
- * All supported chain IDs.
- */
-export const CHAIN_IDS: readonly ChainId[] = [
-  'konzum',
-  'lidl',
-  'plodine',
-  'interspar',
-  'studenac',
-  'kaufland',
-  'eurospin',
-  'dm',
-  'ktc',
-  'metro',
-  'trgocentar',
-] as const
+import { type ChainId, type ChainConfig, CHAIN_CONFIGS } from './config'
 
-/**
- * Configuration for a retail chain's data source.
- */
-export interface ChainConfig {
-  /** Unique chain identifier */
-  id: ChainId
-  /** Human-readable chain name */
-  name: string
-  /** Base URL for price data files */
-  baseUrl: string
-  /** Primary file type for this chain */
-  primaryFileType: FileType
-  /** All supported file types */
-  supportedFileTypes: FileType[]
-  /** CSV-specific configuration */
-  csv?: {
-    delimiter: CsvDelimiter
-    encoding: CsvEncoding
-    hasHeader: boolean
-  }
-  /** Whether this chain uses ZIP archives */
-  usesZip: boolean
-  /** Store resolution strategy */
-  storeResolution: 'filename' | 'portal_id' | 'national'
-  /** Additional metadata */
-  metadata?: Record<string, string>
-}
-
-/**
- * Configuration for all supported chains.
- */
-export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
-  konzum: {
-    id: 'konzum',
-    name: 'Konzum',
-    baseUrl: 'https://www.konzum.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: ',',
-      encoding: 'utf-8',
-      hasHeader: true,
-    },
-    usesZip: false,
-    storeResolution: 'filename',
-  },
-  lidl: {
-    id: 'lidl',
-    name: 'Lidl',
-    baseUrl: 'https://www.lidl.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv', 'zip'],
-    csv: {
-      delimiter: ',',
-      encoding: 'utf-8',
-      hasHeader: true,
-    },
-    usesZip: true,
-    storeResolution: 'filename',
-  },
-  plodine: {
-    id: 'plodine',
-    name: 'Plodine',
-    baseUrl: 'https://www.plodine.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: ';',
-      encoding: 'windows-1250',
-      hasHeader: true,
-    },
-    usesZip: false,
-    storeResolution: 'filename',
-  },
-  interspar: {
-    id: 'interspar',
-    name: 'Interspar',
-    baseUrl: 'https://www.interspar.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: ';',
-      encoding: 'utf-8',
-      hasHeader: true,
-    },
-    usesZip: false,
-    storeResolution: 'filename',
-  },
-  studenac: {
-    id: 'studenac',
-    name: 'Studenac',
-    baseUrl: 'https://www.studenac.hr/cjenik',
-    primaryFileType: 'xml',
-    supportedFileTypes: ['xml'],
-    usesZip: false,
-    storeResolution: 'portal_id',
-  },
-  kaufland: {
-    id: 'kaufland',
-    name: 'Kaufland',
-    baseUrl: 'https://www.kaufland.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: '\t',
-      encoding: 'utf-8',
-      hasHeader: true,
-    },
-    usesZip: false,
-    storeResolution: 'filename',
-  },
-  eurospin: {
-    id: 'eurospin',
-    name: 'Eurospin',
-    baseUrl: 'https://www.eurospin.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: ';',
-      encoding: 'utf-8',
-      hasHeader: true,
-    },
-    usesZip: false,
-    storeResolution: 'filename',
-  },
-  dm: {
-    id: 'dm',
-    name: 'DM',
-    baseUrl: 'https://www.dm.hr/cjenik',
-    primaryFileType: 'xlsx',
-    supportedFileTypes: ['xlsx'],
-    usesZip: false,
-    storeResolution: 'national',
-  },
-  ktc: {
-    id: 'ktc',
-    name: 'KTC',
-    baseUrl: 'https://www.ktc.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: ';',
-      encoding: 'windows-1250',
-      hasHeader: true,
-    },
-    usesZip: false,
-    storeResolution: 'filename',
-  },
-  metro: {
-    id: 'metro',
-    name: 'Metro',
-    baseUrl: 'https://www.metro.hr/cjenik',
-    primaryFileType: 'xml',
-    supportedFileTypes: ['xml'],
-    usesZip: false,
-    storeResolution: 'portal_id',
-  },
-  trgocentar: {
-    id: 'trgocentar',
-    name: 'Trgocentar',
-    baseUrl: 'https://www.trgocentar.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: ';',
-      encoding: 'windows-1250',
-      hasHeader: true,
-    },
-    usesZip: false,
-    storeResolution: 'filename',
-  },
-}
+// Import all adapter factory functions
+import { createKonzumAdapter } from './konzum'
+import { createLidlAdapter } from './lidl'
+import { createPlodineAdapter } from './plodine'
+import { createIntersparAdapter } from './interspar'
+import { createStudenacAdapter } from './studenac'
+import { createKauflandAdapter } from './kaufland'
+import { createEurospinAdapter } from './eurospin'
+import { createDmAdapter } from './dm'
+import { createKtcAdapter } from './ktc'
+import { createMetroAdapter } from './metro'
+import { createTrgocentarAdapter } from './trgocentar'
 
 /**
  * Registry for chain adapter instances.
@@ -285,11 +105,55 @@ export class ChainAdapterRegistry {
   }
 }
 
+// ============================================================================
+// Registry Initialization
+// ============================================================================
+
+/**
+ * Adapter factory functions mapped by chain ID.
+ * Used for initialization of adapters.
+ */
+const ADAPTER_FACTORIES: Record<ChainId, () => ChainAdapter> = {
+  konzum: createKonzumAdapter,
+  lidl: createLidlAdapter,
+  plodine: createPlodineAdapter,
+  interspar: createIntersparAdapter,
+  studenac: createStudenacAdapter,
+  kaufland: createKauflandAdapter,
+  eurospin: createEurospinAdapter,
+  dm: createDmAdapter,
+  ktc: createKtcAdapter,
+  metro: createMetroAdapter,
+  trgocentar: createTrgocentarAdapter,
+}
+
+/**
+ * Initialize the registry with all adapters.
+ * Instantiates all adapters on module load.
+ *
+ * @returns A fully initialized ChainAdapterRegistry
+ */
+function initializeRegistry(): ChainAdapterRegistry {
+  const registry = new ChainAdapterRegistry()
+
+  // Register all adapters from factory functions
+  for (const [chainId, factory] of Object.entries(ADAPTER_FACTORIES)) {
+    registry.register(chainId as ChainId, factory())
+  }
+
+  return registry
+}
+
 /**
  * Default chain adapter registry instance.
- * Import and use this, or create your own registry.
+ * Pre-registered with all available chain adapters.
+ * Ready to use on import - no manual registration required.
  */
-export const chainAdapterRegistry = new ChainAdapterRegistry()
+export const chainAdapterRegistry = initializeRegistry()
+
+// ============================================================================
+// Convenience Functions
+// ============================================================================
 
 /**
  * Get a chain adapter by ID from the default registry.
@@ -301,19 +165,47 @@ export function getAdapter(chainId: ChainId): ChainAdapter | undefined {
 }
 
 /**
- * Get the configuration for a chain.
+ * Get a chain adapter by ID, throwing an error if not found.
+ * Use this when you know the adapter should exist.
+ *
  * @param chainId - The chain identifier
- * @returns The chain configuration
+ * @returns The adapter
+ * @throws Error if no adapter is registered for the chain
  */
-export function getChainConfig(chainId: ChainId): ChainConfig {
-  return CHAIN_CONFIGS[chainId]
+export function getAdapterOrThrow(chainId: ChainId): ChainAdapter {
+  const adapter = chainAdapterRegistry.getAdapter(chainId)
+  if (!adapter) {
+    throw new Error(`No adapter registered for chain: ${chainId}`)
+  }
+  return adapter
 }
 
 /**
- * Check if a string is a valid chain ID.
- * @param value - The value to check
- * @returns true if it's a valid ChainId
+ * Get all registered adapters as an array.
+ * Useful for iterating over all adapters.
+ *
+ * @returns Array of all registered chain adapters
  */
-export function isValidChainId(value: string): value is ChainId {
-  return CHAIN_IDS.includes(value as ChainId)
+export function getAllAdapters(): ChainAdapter[] {
+  return Array.from(chainAdapterRegistry.getAllAdapters().values())
+}
+
+// ============================================================================
+// Re-exports for convenience
+// ============================================================================
+
+// Re-export adapter factory functions for cases where
+// a fresh adapter instance is needed
+export {
+  createKonzumAdapter,
+  createLidlAdapter,
+  createPlodineAdapter,
+  createIntersparAdapter,
+  createStudenacAdapter,
+  createKauflandAdapter,
+  createEurospinAdapter,
+  createDmAdapter,
+  createKtcAdapter,
+  createMetroAdapter,
+  createTrgocentarAdapter,
 }

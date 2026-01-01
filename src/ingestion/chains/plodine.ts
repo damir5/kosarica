@@ -9,20 +9,9 @@
  * (e.g., ",69" instead of "0,69"), which this adapter handles via preprocessing.
  */
 
-import type {
-  ChainAdapter,
-  DiscoveredFile,
-  FetchedFile,
-  FileType,
-  NormalizedRow,
-  NormalizedRowValidation,
-  ParseOptions,
-  ParseResult,
-  StoreIdentifier,
-} from '../core/types'
-import { computeSha256 } from '../core/storage'
-import { CsvParser, type CsvColumnMapping } from '../parsers/csv'
-import { CHAIN_CONFIGS } from './index'
+import type { CsvColumnMapping, CsvParserOptions } from '../parsers/csv'
+import { BaseCsvAdapter } from './base'
+import { CHAIN_CONFIGS } from './config'
 
 /**
  * Column mapping for Plodine CSV files.
@@ -62,61 +51,35 @@ const PLODINE_COLUMN_MAPPING_ALT: CsvColumnMapping = {
 
 /**
  * Plodine chain adapter implementation.
+ * Extends BaseCsvAdapter with custom preprocessing for price formatting issues.
  */
-export class PlodineAdapter implements ChainAdapter {
-  readonly slug = 'plodine'
-  readonly name = 'Plodine'
-  readonly supportedTypes: FileType[] = ['csv']
-
-  private config = CHAIN_CONFIGS.plodine
-  private csvParser: CsvParser
-
+export class PlodineAdapter extends BaseCsvAdapter {
   constructor() {
-    this.csvParser = new CsvParser({
-      delimiter: this.config.csv!.delimiter,
-      encoding: this.config.csv!.encoding,
-      hasHeader: this.config.csv!.hasHeader,
+    super({
+      slug: 'plodine',
+      name: 'Plodine',
+      supportedTypes: ['csv'],
+      chainConfig: CHAIN_CONFIGS.plodine,
       columnMapping: PLODINE_COLUMN_MAPPING,
-      skipEmptyRows: true,
+      alternativeColumnMapping: PLODINE_COLUMN_MAPPING_ALT,
+      filenamePrefixPatterns: [
+        /^Plodine[_-]?/i,
+        /^cjenik[_-]?/i,
+      ],
+      rateLimitConfig: {
+        requestsPerSecond: 2,
+        maxRetries: 3,
+      },
     })
-  }
-
-  /**
-   * Discover available Plodine price files.
-   * In production, this would scrape the Plodine price portal.
-   */
-  async discover(): Promise<DiscoveredFile[]> {
-    // TODO: Implement actual discovery from Plodine's price portal
-    // For now, return empty array - files will be provided directly
-    return []
-  }
-
-  /**
-   * Fetch a discovered file.
-   */
-  async fetch(file: DiscoveredFile): Promise<FetchedFile> {
-    const response = await fetch(file.url)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${file.url}: ${response.status} ${response.statusText}`)
-    }
-
-    const content = await response.arrayBuffer()
-    const hash = await computeSha256(content)
-
-    return {
-      discovered: file,
-      content,
-      hash,
-    }
   }
 
   /**
    * Preprocess CSV content to fix Plodine-specific formatting issues.
    * Handles missing leading zeros in decimal values (e.g., ",69" -> "0,69").
    */
-  private preprocessContent(content: ArrayBuffer): ArrayBuffer {
+  protected preprocessContent(content: ArrayBuffer): ArrayBuffer {
     // Decode with Windows-1250 encoding
-    const decoder = new TextDecoder(this.config.csv!.encoding)
+    const decoder = new TextDecoder(this.csvConfig.encoding)
     let text = decoder.decode(content)
 
     // Fix missing leading zeros in prices
@@ -135,112 +98,13 @@ export class PlodineAdapter implements ChainAdapter {
   }
 
   /**
-   * Parse Plodine CSV content into normalized rows.
+   * Get parser options with encoding override.
+   * After preprocessing, content is UTF-8.
    */
-  async parse(
-    content: ArrayBuffer,
-    filename: string,
-    options?: ParseOptions,
-  ): Promise<ParseResult> {
-    // Preprocess content to fix price format issues
-    const processedContent = this.preprocessContent(content)
-
-    // Extract store identifier from filename to use as default
-    const storeIdentifier = this.extractStoreIdentifierFromFilename(filename)
-
-    // Try parsing with primary column mapping first
-    this.csvParser.setOptions({
-      columnMapping: PLODINE_COLUMN_MAPPING,
+  protected getParserOptions(storeIdentifier: string): Partial<CsvParserOptions> {
+    return {
       defaultStoreIdentifier: storeIdentifier,
       encoding: 'utf-8', // After preprocessing, content is UTF-8
-    })
-
-    let result = await this.csvParser.parse(processedContent, filename, options)
-
-    // If no valid rows, try alternative column mapping
-    if (result.validRows === 0 && result.errors.length > 0) {
-      this.csvParser.setOptions({
-        columnMapping: PLODINE_COLUMN_MAPPING_ALT,
-        defaultStoreIdentifier: storeIdentifier,
-        encoding: 'utf-8',
-      })
-      result = await this.csvParser.parse(processedContent, filename, options)
-    }
-
-    return result
-  }
-
-  /**
-   * Extract store identifier from Plodine filename.
-   * Plodine filenames typically follow pattern: STORE_LOCATION_ID.csv
-   * Example: "Plodine_Zagreb_Dubrava_123.csv" -> "Zagreb_Dubrava_123"
-   */
-  extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null {
-    const identifier = this.extractStoreIdentifierFromFilename(file.filename)
-    if (!identifier) {
-      return null
-    }
-
-    return {
-      type: 'filename_code',
-      value: identifier,
-    }
-  }
-
-  /**
-   * Extract store identifier string from filename.
-   */
-  private extractStoreIdentifierFromFilename(filename: string): string {
-    // Remove file extension
-    const baseName = filename.replace(/\.(csv|CSV)$/, '')
-
-    // Remove common prefixes
-    const cleanName = baseName
-      .replace(/^Plodine[_-]?/i, '')
-      .replace(/^cjenik[_-]?/i, '')
-      .trim()
-
-    // If nothing left, use full basename
-    return cleanName || baseName
-  }
-
-  /**
-   * Validate a normalized row according to Plodine-specific rules.
-   */
-  validateRow(row: NormalizedRow): NormalizedRowValidation {
-    const errors: string[] = []
-    const warnings: string[] = []
-
-    // Required field validation
-    if (!row.name || row.name.trim() === '') {
-      errors.push('Missing product name')
-    }
-
-    if (row.price <= 0) {
-      errors.push('Price must be positive')
-    }
-
-    // Plodine-specific validations
-    if (row.price > 100000000) {
-      // > 1,000,000 HRK/EUR seems unlikely
-      warnings.push('Price seems unusually high')
-    }
-
-    if (row.discountPrice !== null && row.discountPrice >= row.price) {
-      warnings.push('Discount price is not less than regular price')
-    }
-
-    // Barcode validation
-    for (const barcode of row.barcodes) {
-      if (!/^\d{8,14}$/.test(barcode)) {
-        warnings.push(`Invalid barcode format: ${barcode}`)
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
     }
   }
 }
