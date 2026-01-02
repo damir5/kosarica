@@ -16,3 +16,6 @@ count.txt
 .vinxi
 todos.json
 .pnpm-store
+
+# bv (beads viewer) local config and caches
+.bv/
