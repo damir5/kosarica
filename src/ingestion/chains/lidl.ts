@@ -18,11 +18,32 @@ import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
 /**
- * Column mapping for Lidl CSV files (Croatian headers).
+ * Column mapping for Lidl CSV files (2026 format).
  * Maps Lidl's column names to NormalizedRow fields.
  * Lidl may include multiple GTINs separated by semicolon in the barcode field.
+ *
+ * Current columns (as of 2026):
+ * NAZIV, ŠIFRA, NETO_KOLIČINA, JEDINICA_MJERE, MARKA, MALOPRODAJNA_CIJENA,
+ * MPC_ZA_VRIJEME_POSEBNOG_OBLIKA_PRODAJE, NAJNIZA_CIJENA_U_POSLJ._30_DANA,
+ * CIJENA_ZA_JEDINICU_MJERE, BARKOD, KATEGORIJA_PROIZVODA, Sidrena_cijena_na_...
  */
 const LIDL_COLUMN_MAPPING: CsvColumnMapping = {
+  externalId: 'ŠIFRA',
+  name: 'NAZIV',
+  category: 'KATEGORIJA_PROIZVODA',
+  brand: 'MARKA',
+  unit: 'JEDINICA_MJERE',
+  unitQuantity: 'NETO_KOLIČINA',
+  price: 'MALOPRODAJNA_CIJENA',
+  discountPrice: 'MPC_ZA_VRIJEME_POSEBNOG_OBLIKA_PRODAJE',
+  barcodes: 'BARKOD',
+}
+
+/**
+ * Alternative column mapping for Lidl CSV files (legacy format).
+ * Some older Lidl exports may use these column names.
+ */
+const LIDL_COLUMN_MAPPING_ALT: CsvColumnMapping = {
   externalId: 'Artikl',
   name: 'Naziv artikla',
   category: 'Kategorija',
@@ -37,28 +58,17 @@ const LIDL_COLUMN_MAPPING: CsvColumnMapping = {
 }
 
 /**
- * Alternative column mapping for Lidl CSV files (abbreviated headers).
- * Some Lidl exports may use abbreviated column names.
- */
-const LIDL_COLUMN_MAPPING_ALT: CsvColumnMapping = {
-  externalId: 'Art.br.',
-  name: 'Naziv',
-  category: 'Kat.',
-  brand: 'Marka',
-  unit: 'JM',
-  unitQuantity: 'Kol.',
-  price: 'Cijena',
-  discountPrice: 'Akc. cijena',
-  discountStart: 'Akc. od',
-  discountEnd: 'Akc. do',
-  barcodes: 'GTIN',
-}
-
-/**
  * Lidl chain adapter implementation.
  * Extends BaseCsvAdapter with custom GTIN handling and discovery logic.
+ *
+ * Lidl portal: https://tvrtka.lidl.hr/cijene
+ * Download URL pattern: https://tvrtka.lidl.hr/content/download/[DYNAMIC_ID]/fileupload/[FILENAME].zip
+ * Filename format: Popis_cijena_po_trgovinama_na_dan_DD_MM_YYYY.zip
  */
 export class LidlAdapter extends BaseCsvAdapter {
+  /** Date to discover files for (YYYY-MM-DD format, set by CLI before discovery) */
+  private discoveryDate: string | null = null
+
   constructor() {
     super({
       slug: 'lidl',
@@ -69,6 +79,7 @@ export class LidlAdapter extends BaseCsvAdapter {
       alternativeColumnMapping: LIDL_COLUMN_MAPPING_ALT,
       filenamePrefixPatterns: [
         /^Lidl[_-]?/i,
+        /^Popis_cijena[_-]?/i,
         /^cjenik[_-]?/i,
         /^\d{4}[_-]\d{2}[_-]\d{2}[_-]?/, // Remove date prefix
       ],
@@ -80,16 +91,49 @@ export class LidlAdapter extends BaseCsvAdapter {
   }
 
   /**
+   * Set the date to use for discovery.
+   * @param date - Date in YYYY-MM-DD format
+   */
+  setDiscoveryDate(date: string): void {
+    this.discoveryDate = date
+  }
+
+  /**
+   * Convert date from YYYY-MM-DD to DD_MM_YYYY format (Lidl filename format).
+   */
+  private formatDateForFilename(date: string): string {
+    const [year, month, day] = date.split('-')
+    return `${day}_${month}_${year}`
+  }
+
+  /**
+   * Extract date from Lidl filename (DD_MM_YYYY) to YYYY-MM-DD format.
+   */
+  private extractDateFromFilename(filename: string): string | null {
+    // Pattern: Popis_cijena_po_trgovinama_na_dan_DD_MM_YYYY.zip
+    const match = filename.match(/(\d{2})_(\d{2})_(\d{4})\.zip$/i)
+    if (match) {
+      const [, day, month, year] = match
+      return `${year}-${month}-${day}`
+    }
+    return null
+  }
+
+  /**
    * Discover available Lidl price files.
-   * Fetches the Lidl price portal and parses HTML for ZIP and CSV file links.
-   * Lidl typically publishes daily ZIP files containing per-store CSVs.
+   *
+   * Lidl's portal uses dynamic download IDs that must be parsed from the HTML:
+   * - URL format: https://tvrtka.lidl.hr/cijene
+   * - Download links: /content/download/[ID]/fileupload/Popis_cijena_po_trgovinama_na_dan_DD_MM_YYYY.zip
+   *
+   * @returns Array of discovered files (filtered by date if setDiscoveryDate was called)
    */
   async discover(): Promise<DiscoveredFile[]> {
-    const baseUrl = this.config.baseUrl
     const discoveredFiles: DiscoveredFile[] = []
+    const seenUrls = new Set<string>()
 
     try {
-      const response = await fetch(baseUrl, {
+      const response = await fetch(this.config.baseUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -103,18 +147,28 @@ export class LidlAdapter extends BaseCsvAdapter {
 
       const html = await response.text()
 
-      // Parse HTML to find ZIP file links (Lidl's primary format)
-      const zipLinkPattern = /href=["']([^"']*\.zip(?:\?[^"']*)?)["']/gi
+      // Extract download links matching Lidl's URL pattern
+      // Pattern: href="(https://tvrtka.lidl.hr/content/download/\d+/fileupload/Popis_cijena[^"]+\.zip)"
+      const downloadPattern = /href=["'](https:\/\/tvrtka\.lidl\.hr\/content\/download\/\d+\/fileupload\/([^"']+\.zip))["']/gi
+
       let match: RegExpExecArray | null
+      while ((match = downloadPattern.exec(html)) !== null) {
+        const fileUrl = match[1]
+        const filename = match[2]
 
-      while ((match = zipLinkPattern.exec(html)) !== null) {
-        const href = match[1]
-        const fileUrl = href.startsWith('http') ? href : new URL(href, baseUrl).toString()
-        const filename = this.extractFilenameFromUrl(fileUrl)
+        // Skip duplicates
+        if (seenUrls.has(fileUrl)) {
+          continue
+        }
+        seenUrls.add(fileUrl)
 
-        // Extract date from filename if present (e.g., Lidl_2024-01-15.zip)
-        const dateMatch = filename.match(/(\d{4}[-_]\d{2}[-_]\d{2})/)
-        const fileDate = dateMatch ? dateMatch[1].replace(/_/g, '-') : null
+        // Extract date from filename
+        const fileDate = this.extractDateFromFilename(filename)
+
+        // If discoveryDate is set, filter to only that date
+        if (this.discoveryDate && fileDate !== this.discoveryDate) {
+          continue
+        }
 
         discoveredFiles.push({
           url: fileUrl,
@@ -125,29 +179,45 @@ export class LidlAdapter extends BaseCsvAdapter {
           metadata: {
             source: 'lidl_portal',
             discoveredAt: new Date().toISOString(),
-            ...(fileDate && { fileDate }),
+            ...(fileDate && { portalDate: fileDate }),
           },
         })
       }
 
-      // Also look for direct CSV file links
-      const csvLinkPattern = /href=["']([^"']*\.csv(?:\?[^"']*)?)["']/gi
-      while ((match = csvLinkPattern.exec(html)) !== null) {
-        const href = match[1]
-        const fileUrl = href.startsWith('http') ? href : new URL(href, baseUrl).toString()
-        const filename = this.extractFilenameFromUrl(fileUrl)
+      // If using specific date and no exact match found, try relative URL pattern
+      if (this.discoveryDate && discoveredFiles.length === 0) {
+        // Try alternative pattern for relative URLs
+        const relativePattern = /href=["'](\/content\/download\/\d+\/fileupload\/([^"']+\.zip))["']/gi
 
-        discoveredFiles.push({
-          url: fileUrl,
-          filename,
-          type: 'csv',
-          size: null,
-          lastModified: null,
-          metadata: {
-            source: 'lidl_portal',
-            discoveredAt: new Date().toISOString(),
-          },
-        })
+        while ((match = relativePattern.exec(html)) !== null) {
+          const href = match[1]
+          const filename = match[2]
+          const fileUrl = new URL(href, this.config.baseUrl).toString()
+
+          if (seenUrls.has(fileUrl)) {
+            continue
+          }
+          seenUrls.add(fileUrl)
+
+          const fileDate = this.extractDateFromFilename(filename)
+
+          if (this.discoveryDate && fileDate !== this.discoveryDate) {
+            continue
+          }
+
+          discoveredFiles.push({
+            url: fileUrl,
+            filename,
+            type: 'zip',
+            size: null,
+            lastModified: fileDate ? new Date(fileDate) : null,
+            metadata: {
+              source: 'lidl_portal',
+              discoveredAt: new Date().toISOString(),
+              ...(fileDate && { portalDate: fileDate }),
+            },
+          })
+        }
       }
 
       return discoveredFiles

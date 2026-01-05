@@ -90,12 +90,12 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   lidl: {
     id: 'lidl',
     name: 'Lidl',
-    baseUrl: 'https://www.lidl.hr/cjenik',
+    baseUrl: 'https://tvrtka.lidl.hr/cijene',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv', 'zip'],
     csv: {
       delimiter: ',',
-      encoding: 'utf-8',
+      encoding: 'windows-1250',
       hasHeader: true,
     },
     usesZip: true,
