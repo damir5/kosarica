@@ -76,7 +76,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   konzum: {
     id: 'konzum',
     name: 'Konzum',
-    baseUrl: 'https://www.konzum.hr/cjenik',
+    baseUrl: 'https://www.konzum.hr/cjenici',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {

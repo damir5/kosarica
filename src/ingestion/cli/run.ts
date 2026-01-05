@@ -21,6 +21,7 @@ import {
   getAdapterOrThrow,
   type ChainId,
 } from '../chains'
+import { KonzumAdapter } from '../chains/konzum'
 import { LocalStorage, computeSha256 } from '../core/storage'
 import { persistRowsForStore } from '../core/persist'
 import type {
@@ -230,6 +231,12 @@ async function discoverPhase(
   logger.phase('Phase 1: Discover')
 
   const adapter = getAdapterOrThrow(chainId)
+
+  // Set discovery date for Konzum adapter (uses date parameter in portal URL)
+  if (adapter instanceof KonzumAdapter) {
+    adapter.setDiscoveryDate(dateFilter)
+    logger.debug(`Set Konzum discovery date to ${dateFilter}`)
+  }
 
   logger.info(`Discovering files for ${adapter.name}...`)
 
