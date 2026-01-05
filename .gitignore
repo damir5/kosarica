@@ -19,3 +19,6 @@ todos.json
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# Ingestion data (fetched price files)
+data/ingestion/
