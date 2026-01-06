@@ -95,7 +95,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     supportedFileTypes: ['csv', 'zip'],
     csv: {
       delimiter: ',',
-      encoding: 'utf-8',
+      encoding: 'windows-1250',
       hasHeader: true,
     },
     usesZip: true,

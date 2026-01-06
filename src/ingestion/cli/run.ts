@@ -227,6 +227,12 @@ async function discoverPhase(
 
   const adapter = getAdapterOrThrow(chainId)
 
+  // Set discovery date for adapters that support it (Konzum, Lidl, etc.)
+  if ('setDiscoveryDate' in adapter && typeof adapter.setDiscoveryDate === 'function') {
+    adapter.setDiscoveryDate(dateFilter)
+    logger.debug(`Set discovery date to ${dateFilter} for ${adapter.name}`)
+  }
+
   logger.info(`Discovering files for ${adapter.name}...`)
 
   const files = await adapter.discover()
@@ -293,8 +299,18 @@ async function fetchPhase(
       const existing = await storage.head(storageKey)
 
       if (existing?.sha256 === fetchedFile.hash) {
-        logger.debug(`  Skipped (duplicate): ${fetchedFile.hash.substring(0, 12)}...`)
+        logger.debug(`  Using cached: ${fetchedFile.hash.substring(0, 12)}...`)
         stats.skippedDuplicate++
+
+        // Retrieve cached content and add to fetched so expand phase can process it
+        const cached = await storage.get(storageKey)
+        if (cached) {
+          fetched.push({
+            discovered: file,
+            content: cached.content,
+            hash: fetchedFile.hash,
+          })
+        }
         continue
       }
 

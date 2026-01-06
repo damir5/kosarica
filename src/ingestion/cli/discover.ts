@@ -197,6 +197,11 @@ async function main(): Promise<void> {
   }
 
   try {
+    // Set discovery date if adapter supports it
+    if ('setDiscoveryDate' in adapter && typeof adapter.setDiscoveryDate === 'function') {
+      adapter.setDiscoveryDate(options.date)
+    }
+
     // Call the adapter's discover method
     const files = await adapter.discover()
 
