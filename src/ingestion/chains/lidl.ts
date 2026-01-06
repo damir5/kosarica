@@ -112,9 +112,21 @@ export class LidlAdapter extends BaseCsvAdapter {
         const fileUrl = href.startsWith('http') ? href : new URL(href, baseUrl).toString()
         const filename = this.extractFilenameFromUrl(fileUrl)
 
-        // Extract date from filename if present (e.g., Lidl_2024-01-15.zip)
-        const dateMatch = filename.match(/(\d{4}[-_]\d{2}[-_]\d{2})/)
-        const fileDate = dateMatch ? dateMatch[1].replace(/_/g, '-') : null
+        // Extract date from filename if present
+        // Pattern 1: YYYY-MM-DD or YYYY_MM_DD (e.g., Lidl_2024-01-15.zip)
+        // Pattern 2: DD_MM_YYYY (e.g., Popis_cijena_po_trgovinama_na_dan_07_12_2025.zip)
+        let fileDate: string | null = null
+
+        const isoDateMatch = filename.match(/(\d{4})[-_](\d{2})[-_](\d{2})/)
+        const euDateMatch = filename.match(/(\d{2})[-_](\d{2})[-_](\d{4})/)
+
+        if (isoDateMatch) {
+          // YYYY-MM-DD format
+          fileDate = `${isoDateMatch[1]}-${isoDateMatch[2]}-${isoDateMatch[3]}`
+        } else if (euDateMatch) {
+          // DD-MM-YYYY format -> convert to YYYY-MM-DD
+          fileDate = `${euDateMatch[3]}-${euDateMatch[2]}-${euDateMatch[1]}`
+        }
 
         discoveredFiles.push({
           url: fileUrl,

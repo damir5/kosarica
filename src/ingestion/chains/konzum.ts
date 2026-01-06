@@ -15,17 +15,15 @@ import { CHAIN_CONFIGS } from './config'
  * Maps Konzum's column names to NormalizedRow fields.
  */
 const KONZUM_COLUMN_MAPPING: CsvColumnMapping = {
-  externalId: 'Šifra',
-  name: 'Naziv',
-  category: 'Kategorija',
-  brand: 'Marka',
-  unit: 'Mjerna jedinica',
-  unitQuantity: 'Količina',
-  price: 'Cijena',
-  discountPrice: 'Akcijska cijena',
-  discountStart: 'Početak akcije',
-  discountEnd: 'Kraj akcije',
-  barcodes: 'Barkod',
+  externalId: 'ŠIFRA PROIZVODA',
+  name: 'NAZIV PROIZVODA',
+  category: 'KATEGORIJA PROIZVODA',
+  brand: 'MARKA PROIZVODA',
+  unit: 'JEDINICA MJERE',
+  unitQuantity: 'NETO KOLIČINA',
+  price: 'MALOPRODAJNA CIJENA',
+  discountPrice: 'MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE',
+  barcodes: 'BARKOD',
 }
 
 /**

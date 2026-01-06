@@ -76,7 +76,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   konzum: {
     id: 'konzum',
     name: 'Konzum',
-    baseUrl: 'https://www.konzum.hr/cjenik',
+    baseUrl: 'https://www.konzum.hr/cjenici',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {
@@ -90,7 +90,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   lidl: {
     id: 'lidl',
     name: 'Lidl',
-    baseUrl: 'https://www.lidl.hr/cjenik',
+    baseUrl: 'https://tvrtka.lidl.hr/cijene',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv', 'zip'],
     csv: {
