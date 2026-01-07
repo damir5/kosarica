@@ -312,6 +312,12 @@ describe('KonzumAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -338,6 +344,12 @@ describe('KonzumAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(invalidRow)
@@ -365,6 +377,12 @@ describe('KonzumAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(invalidRow)
@@ -391,6 +409,12 @@ describe('KonzumAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)
@@ -416,6 +440,12 @@ describe('KonzumAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)
@@ -539,6 +569,12 @@ describe('LidlAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -564,6 +600,12 @@ describe('LidlAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)
@@ -681,6 +723,12 @@ describe('PlodineAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -791,6 +839,12 @@ describe('IntersparAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -891,6 +945,12 @@ describe('StudenacAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -991,6 +1051,12 @@ describe('KauflandAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -1075,6 +1141,12 @@ describe('EurospinAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -1177,6 +1249,12 @@ describe('DmAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -1276,6 +1354,12 @@ describe('KtcAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -1358,6 +1442,12 @@ describe('MetroAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -1429,6 +1519,12 @@ describe('TrgocentarAdapter', () => {
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(validRow)
@@ -1500,6 +1596,12 @@ describe('Cross-Adapter Tests', () => {
           imageUrl: null,
           rowNumber: 1,
           rawData: '{}',
+          unitPrice: null,
+          unitPriceBaseQuantity: null,
+          unitPriceBaseUnit: null,
+          lowestPrice30d: null,
+          anchorPrice: null,
+          anchorPriceAsOf: null,
         }
 
         const result = adapter.validateRow(validRow)
@@ -1538,6 +1640,12 @@ describe('Cross-Adapter Tests', () => {
           imageUrl: null,
           rowNumber: 1,
           rawData: '{}',
+          unitPrice: null,
+          unitPriceBaseQuantity: null,
+          unitPriceBaseUnit: null,
+          lowestPrice30d: null,
+          anchorPrice: null,
+          anchorPriceAsOf: null,
         }
 
         const result = adapter.validateRow(invalidRow)
@@ -1566,6 +1674,12 @@ describe('Cross-Adapter Tests', () => {
           imageUrl: null,
           rowNumber: 1,
           rawData: '{}',
+          unitPrice: null,
+          unitPriceBaseQuantity: null,
+          unitPriceBaseUnit: null,
+          lowestPrice30d: null,
+          anchorPrice: null,
+          anchorPriceAsOf: null,
         }
 
         const result = adapter.validateRow(invalidRow)
@@ -1665,6 +1779,12 @@ Test Product;123;Brand;1 kg;KOM;12,99;12,99;;;12,99;1234567890123;FOOD;`
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)
@@ -1692,6 +1812,12 @@ Test Product;123;Brand;1 kg;KOM;12,99;12,99;;;12,99;1234567890123;FOOD;`
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)
@@ -1719,6 +1845,12 @@ Test Product;123;Brand;1 kg;KOM;12,99;12,99;;;12,99;1234567890123;FOOD;`
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)
@@ -1748,6 +1880,12 @@ Test Product;123;Brand;1 kg;KOM;12,99;12,99;;;12,99;1234567890123;FOOD;`
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)
@@ -1775,6 +1913,12 @@ Test Product;123;Brand;1 kg;KOM;12,99;12,99;;;12,99;1234567890123;FOOD;`
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)
@@ -1804,6 +1948,12 @@ Test Product;123;Brand;1 kg;KOM;12,99;12,99;;;12,99;1234567890123;FOOD;`
         imageUrl: null,
         rowNumber: 1,
         rawData: '{}',
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       }
 
       const result = adapter.validateRow(row)

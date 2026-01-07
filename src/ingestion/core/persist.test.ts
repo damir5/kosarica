@@ -332,6 +332,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
 
     const discountEqualsPrice = {
@@ -339,6 +345,12 @@ describe('computePriceSignature', () => {
       discountPrice: 1999,
       discountStart: null,
       discountEnd: null,
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
 
     const sig1 = await computePriceSignature(withoutDiscount)
@@ -364,6 +376,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: row1.discountPrice,
         discountStart: row1.discountStart,
         discountEnd: row1.discountEnd,
+        unitPrice: row1.unitPrice,
+        unitPriceBaseQuantity: row1.unitPriceBaseQuantity,
+        unitPriceBaseUnit: row1.unitPriceBaseUnit,
+        lowestPrice30d: row1.lowestPrice30d,
+        anchorPrice: row1.anchorPrice,
+        anchorPriceAsOf: row1.anchorPriceAsOf,
       })
 
       const sig2 = await computePriceSignature({
@@ -371,6 +389,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: row2.discountPrice,
         discountStart: row2.discountStart,
         discountEnd: row2.discountEnd,
+        unitPrice: row2.unitPrice,
+        unitPriceBaseQuantity: row2.unitPriceBaseQuantity,
+        unitPriceBaseUnit: row2.unitPriceBaseUnit,
+        lowestPrice30d: row2.lowestPrice30d,
+        anchorPrice: row2.anchorPrice,
+        anchorPriceAsOf: row2.anchorPriceAsOf,
       })
 
       // When signatures match, persistPrice should NOT create a new period
@@ -397,6 +421,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: row1.discountPrice,
         discountStart: row1.discountStart,
         discountEnd: row1.discountEnd,
+        unitPrice: row1.unitPrice,
+        unitPriceBaseQuantity: row1.unitPriceBaseQuantity,
+        unitPriceBaseUnit: row1.unitPriceBaseUnit,
+        lowestPrice30d: row1.lowestPrice30d,
+        anchorPrice: row1.anchorPrice,
+        anchorPriceAsOf: row1.anchorPriceAsOf,
       })
 
       const sig2 = await computePriceSignature({
@@ -404,6 +434,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: row2.discountPrice,
         discountStart: row2.discountStart,
         discountEnd: row2.discountEnd,
+        unitPrice: row2.unitPrice,
+        unitPriceBaseQuantity: row2.unitPriceBaseQuantity,
+        unitPriceBaseUnit: row2.unitPriceBaseUnit,
+        lowestPrice30d: row2.lowestPrice30d,
+        anchorPrice: row2.anchorPrice,
+        anchorPriceAsOf: row2.anchorPriceAsOf,
       })
 
       expect(sig1).toBe(sig2)
@@ -420,6 +456,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: row1.discountPrice,
         discountStart: row1.discountStart,
         discountEnd: row1.discountEnd,
+        unitPrice: row1.unitPrice,
+        unitPriceBaseQuantity: row1.unitPriceBaseQuantity,
+        unitPriceBaseUnit: row1.unitPriceBaseUnit,
+        lowestPrice30d: row1.lowestPrice30d,
+        anchorPrice: row1.anchorPrice,
+        anchorPriceAsOf: row1.anchorPriceAsOf,
       })
 
       const sig2 = await computePriceSignature({
@@ -427,6 +469,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: row2.discountPrice,
         discountStart: row2.discountStart,
         discountEnd: row2.discountEnd,
+        unitPrice: row2.unitPrice,
+        unitPriceBaseQuantity: row2.unitPriceBaseQuantity,
+        unitPriceBaseUnit: row2.unitPriceBaseUnit,
+        lowestPrice30d: row2.lowestPrice30d,
+        anchorPrice: row2.anchorPrice,
+        anchorPriceAsOf: row2.anchorPriceAsOf,
       })
 
       // When signatures differ, persistPrice should create a new period
@@ -440,6 +488,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: null,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       const price2499sig = await computePriceSignature({
@@ -447,6 +501,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: null,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       const price1999sigAgain = await computePriceSignature({
@@ -454,6 +514,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: null,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       // First and third should match
@@ -470,6 +536,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: null,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       const withDiscount = await computePriceSignature({
@@ -477,6 +549,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       expect(noDiscount).not.toBe(withDiscount)
@@ -488,6 +566,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       const noDiscount = await computePriceSignature({
@@ -495,6 +579,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: null,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       expect(withDiscount).not.toBe(noDiscount)
@@ -506,6 +596,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       const discount1299 = await computePriceSignature({
@@ -513,6 +609,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1299,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       expect(discount1499).not.toBe(discount1299)
@@ -524,6 +626,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: new Date('2024-01-01'),
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       const start2 = await computePriceSignature({
@@ -531,6 +639,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: new Date('2024-01-15'),
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       expect(start1).not.toBe(start2)
@@ -542,6 +656,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: null,
         discountEnd: new Date('2024-01-31'),
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       const end2 = await computePriceSignature({
@@ -549,6 +669,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: null,
         discountEnd: new Date('2024-02-15'),
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       expect(end1).not.toBe(end2)
@@ -560,6 +686,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: new Date('2024-01-01'),
         discountEnd: new Date('2024-01-31'),
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       const sig2 = await computePriceSignature({
@@ -567,6 +699,12 @@ describe('price signature deduplication rules', () => {
         discountPrice: 1499,
         discountStart: new Date('2024-01-01'),
         discountEnd: new Date('2024-01-31'),
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
 
       expect(sig1).toBe(sig2)
@@ -585,6 +723,12 @@ describe('computePriceSignature determinism', () => {
       discountPrice: 1499,
       discountStart: new Date('2024-01-01'),
       discountEnd: new Date('2024-01-31'),
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
 
     const signatures: string[] = []
@@ -607,6 +751,12 @@ describe('computePriceSignature determinism', () => {
       discountPrice: null,
       discountStart: date1,
       discountEnd: null,
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     })
 
     const sig2 = await computePriceSignature({
@@ -614,6 +764,12 @@ describe('computePriceSignature determinism', () => {
       discountPrice: null,
       discountStart: date2,
       discountEnd: null,
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     })
 
     expect(sig1).toBe(sig2)
@@ -628,6 +784,12 @@ describe('computePriceSignature determinism', () => {
       discountPrice: null,
       discountStart: date1,
       discountEnd: null,
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     })
 
     const sig2 = await computePriceSignature({
@@ -635,6 +797,12 @@ describe('computePriceSignature determinism', () => {
       discountPrice: null,
       discountStart: date2,
       discountEnd: null,
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     })
 
     expect(sig1).not.toBe(sig2)
@@ -653,6 +821,12 @@ describe('complex deduplication scenarios', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
 
     const week1Sig = await computePriceSignature(baseFields)
@@ -672,6 +846,12 @@ describe('complex deduplication scenarios', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
 
     const discountPrice = {
@@ -679,6 +859,12 @@ describe('complex deduplication scenarios', () => {
       discountPrice: 1499,
       discountStart: new Date('2024-01-15'),
       discountEnd: new Date('2024-01-31'),
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
 
     const sigBefore = await computePriceSignature(regularPrice)
@@ -702,6 +888,12 @@ describe('complex deduplication scenarios', () => {
         discountPrice: null,
         discountStart: null,
         discountEnd: null,
+        unitPrice: null,
+        unitPriceBaseQuantity: null,
+        unitPriceBaseUnit: null,
+        lowestPrice30d: null,
+        anchorPrice: null,
+        anchorPriceAsOf: null,
       })
       signatures.push(sig)
     }
@@ -742,6 +934,12 @@ describe('complex deduplication scenarios', () => {
       discountPrice: 1499,
       discountStart: new Date('2024-01-01'),
       discountEnd: new Date('2024-01-31'),
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
 
     const discountExtended = {
@@ -749,6 +947,12 @@ describe('complex deduplication scenarios', () => {
       discountPrice: 1499,
       discountStart: new Date('2024-01-01'),
       discountEnd: new Date('2024-02-15'),
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
 
     const sig1 = await computePriceSignature(discount1)
@@ -776,6 +980,12 @@ describe('integration scenarios - deduplication verification', () => {
       discountPrice: row.discountPrice,
       discountStart: row.discountStart,
       discountEnd: row.discountEnd,
+      unitPrice: row.unitPrice,
+      unitPriceBaseQuantity: row.unitPriceBaseQuantity,
+      unitPriceBaseUnit: row.unitPriceBaseUnit,
+      lowestPrice30d: row.lowestPrice30d,
+      anchorPrice: row.anchorPrice,
+      anchorPriceAsOf: row.anchorPriceAsOf,
     })
 
     // If no existing signature, this is first insert

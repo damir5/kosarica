@@ -232,6 +232,13 @@ export abstract class Parser {
       imageUrl: null,
       rowNumber,
       rawData: '',
+      // Croatian price transparency fields
+      unitPrice: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
+      anchorPriceAsOf: null,
     }
   }
 
