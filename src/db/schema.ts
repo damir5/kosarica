@@ -250,7 +250,14 @@ export const storeItemState = sqliteTable('store_item_state', {
   anchorPriceCents: integer('anchor_price_cents'), // sidrena cijena in cents
   anchorPriceAsOf: integer('anchor_price_as_of', { mode: 'timestamp' }), // date when anchor price was set
   inStock: integer('in_stock', { mode: 'boolean' }).default(true),
-  priceSignature: text('price_signature'), // hash for deduplication
+  // Price transparency fields (Croatian regulation)
+  unitPrice: integer('unit_price'), // price per unit in cents (e.g., per kg/l)
+  unitPriceBaseQuantity: text('unit_price_base_quantity'), // base quantity for unit price (e.g., "1", "100")
+  unitPriceBaseUnit: text('unit_price_base_unit'), // unit for unit price (e.g., "kg", "l", "kom")
+  lowestPrice30d: integer('lowest_price_30d'), // lowest price in last 30 days, in cents
+  anchorPrice: integer('anchor_price'), // "sidrena cijena" anchor/reference price in cents
+  anchorPriceAsOf: integer('anchor_price_as_of', { mode: 'timestamp' }), // date when anchor price was set
+  priceSignature: text('price_signature'), // hash for deduplication (excludes lowestPrice30d to avoid churn)
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 }, (table) => ({
