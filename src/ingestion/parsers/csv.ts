@@ -53,6 +53,19 @@ export interface CsvColumnMapping {
   barcodes?: number | string
   /** Column for image URL */
   imageUrl?: number | string
+  // Croatian price transparency fields
+  /** Column for unit price */
+  unitPrice?: number | string
+  /** Column for unit price base quantity */
+  unitPriceBaseQuantity?: number | string
+  /** Column for unit price base unit */
+  unitPriceBaseUnit?: number | string
+  /** Column for lowest price in last 30 days */
+  lowestPrice30d?: number | string
+  /** Column for anchor price (sidrena cijena) */
+  anchorPrice?: number | string
+  /** Column for anchor price date */
+  anchorPriceAsOf?: number | string
 }
 
 /**
@@ -328,6 +341,13 @@ export class CsvParser extends Parser {
       'discountEnd',
       'barcodes',
       'imageUrl',
+      // Croatian price transparency fields
+      'unitPrice',
+      'unitPriceBaseQuantity',
+      'unitPriceBaseUnit',
+      'lowestPrice30d',
+      'anchorPrice',
+      'anchorPriceAsOf',
     ]
 
     for (const field of fields) {
@@ -421,6 +441,51 @@ export class CsvParser extends Parser {
     // Get store identifier
     const storeIdentifier = getValue('storeIdentifier') ?? defaultStoreIdentifier
 
+    // Parse price transparency fields
+    let unitPriceCents: number | null = null
+    const unitPriceStr = getValue('unitPrice')
+    if (unitPriceStr) {
+      unitPriceCents = this.parsePrice(unitPriceStr)
+      if (isNaN(unitPriceCents)) {
+        context.addWarning({
+          rowNumber,
+          field: 'unitPrice',
+          message: 'Invalid unit price value, ignoring',
+        })
+        unitPriceCents = null
+      }
+    }
+
+    let lowestPrice30dCents: number | null = null
+    const lowestPrice30dStr = getValue('lowestPrice30d')
+    if (lowestPrice30dStr) {
+      lowestPrice30dCents = this.parsePrice(lowestPrice30dStr)
+      if (isNaN(lowestPrice30dCents)) {
+        context.addWarning({
+          rowNumber,
+          field: 'lowestPrice30d',
+          message: 'Invalid lowest price in 30 days value, ignoring',
+        })
+        lowestPrice30dCents = null
+      }
+    }
+
+    let anchorPriceCents: number | null = null
+    const anchorPriceStr = getValue('anchorPrice')
+    if (anchorPriceStr) {
+      anchorPriceCents = this.parsePrice(anchorPriceStr)
+      if (isNaN(anchorPriceCents)) {
+        context.addWarning({
+          rowNumber,
+          field: 'anchorPrice',
+          message: 'Invalid anchor price value, ignoring',
+        })
+        anchorPriceCents = null
+      }
+    }
+
+    const anchorPriceAsOf = this.parseDate(getValue('anchorPriceAsOf'))
+
     const row: NormalizedRow = {
       storeIdentifier,
       externalId: getValue('externalId'),
@@ -439,6 +504,13 @@ export class CsvParser extends Parser {
       imageUrl: getValue('imageUrl'),
       rowNumber,
       rawData: JSON.stringify(rawRow),
+      // Croatian price transparency fields
+      unitPriceCents,
+      unitPriceBaseQuantity: getValue('unitPriceBaseQuantity'),
+      unitPriceBaseUnit: getValue('unitPriceBaseUnit'),
+      lowestPrice30dCents,
+      anchorPriceCents,
+      anchorPriceAsOf,
     }
 
     return row

@@ -37,6 +37,10 @@ const LIDL_COLUMN_MAPPING: CsvColumnMapping = {
   price: 'MALOPRODAJNA_CIJENA',
   discountPrice: 'MPC_ZA_VRIJEME_POSEBNOG_OBLIKA_PRODAJE',
   barcodes: 'BARKOD',
+  // Croatian price transparency fields
+  unitPrice: 'CIJENA_ZA_JEDINICU_MJERE',
+  lowestPrice30d: 'NAJNIZA_CIJENA_U_POSLJ._30_DANA',
+  anchorPrice: 'Sidrena_cijena_na_dan',
 }
 
 /**

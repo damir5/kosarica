@@ -51,6 +51,13 @@ function createTestRow(overrides: Partial<NormalizedRow> = {}): NormalizedRow {
     imageUrl: null,
     rowNumber: 1,
     rawData: '{}',
+    // Croatian price transparency fields
+    unitPriceCents: null,
+    unitPriceBaseQuantity: null,
+    unitPriceBaseUnit: null,
+    lowestPrice30dCents: null,
+    anchorPriceCents: null,
+    anchorPriceAsOf: null,
     ...overrides,
   }
 }
@@ -66,6 +73,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const fields2 = {
@@ -73,6 +86,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const sig1 = await computePriceSignature(fields1)
@@ -87,6 +106,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const fields2 = {
@@ -94,6 +119,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const sig1 = await computePriceSignature(fields1)
@@ -108,6 +139,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const withDiscount = {
@@ -115,6 +152,12 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const sig1 = await computePriceSignature(withoutDiscount)
@@ -129,6 +172,12 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const discount2 = {
@@ -136,6 +185,12 @@ describe('computePriceSignature', () => {
       discountPrice: 1299,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const sig1 = await computePriceSignature(discount1)
@@ -153,6 +208,12 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: date1,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const fields2 = {
@@ -160,6 +221,12 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: date2,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const sig1 = await computePriceSignature(fields1)
@@ -176,6 +243,12 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: new Date('2024-01-01'),
       discountEnd: new Date('2024-01-31'),
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const fields2 = {
@@ -183,6 +256,12 @@ describe('computePriceSignature', () => {
       discountStart: new Date('2024-01-01'),
       discountPrice: 1499,
       price: 1999,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const sig1 = await computePriceSignature(fields1)
@@ -197,6 +276,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const signature = await computePriceSignature(fields)
@@ -211,6 +296,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const signature = await computePriceSignature(fields)
@@ -223,6 +314,12 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
+      unitPriceCents: null,
+      unitPriceBaseQuantity: null,
+      unitPriceBaseUnit: null,
+      lowestPrice30dCents: null,
+      anchorPriceCents: null,
+      anchorPriceAsOf: null,
     }
 
     const signature = await computePriceSignature(fields)

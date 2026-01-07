@@ -64,6 +64,13 @@ interface PriceSignatureFields {
   discountPrice: number | null
   discountStart: Date | null
   discountEnd: Date | null
+  // Croatian price transparency fields
+  unitPriceCents: number | null
+  unitPriceBaseQuantity: string | null
+  unitPriceBaseUnit: string | null
+  lowestPrice30dCents: number | null
+  anchorPriceCents: number | null
+  anchorPriceAsOf: Date | null
 }
 
 /**
@@ -81,6 +88,13 @@ export async function computePriceSignature(
     dp: fields.discountPrice,
     ds: fields.discountStart?.getTime() ?? null,
     de: fields.discountEnd?.getTime() ?? null,
+    // Croatian price transparency fields
+    up: fields.unitPriceCents,
+    ubq: fields.unitPriceBaseQuantity,
+    ubu: fields.unitPriceBaseUnit,
+    lp30: fields.lowestPrice30dCents,
+    ap: fields.anchorPriceCents,
+    apa: fields.anchorPriceAsOf?.getTime() ?? null,
   })
   return computeSha256(data)
 }
@@ -593,6 +607,13 @@ export async function persistPrice(
     discountPrice: row.discountPrice,
     discountStart: row.discountStart,
     discountEnd: row.discountEnd,
+    // Croatian price transparency fields
+    unitPriceCents: row.unitPriceCents,
+    unitPriceBaseQuantity: row.unitPriceBaseQuantity,
+    unitPriceBaseUnit: row.unitPriceBaseUnit,
+    lowestPrice30dCents: row.lowestPrice30dCents,
+    anchorPriceCents: row.anchorPriceCents,
+    anchorPriceAsOf: row.anchorPriceAsOf,
   })
 
   // Look for existing store item state
@@ -614,6 +635,13 @@ export async function persistPrice(
       discountPrice: row.discountPrice,
       discountStart: row.discountStart,
       discountEnd: row.discountEnd,
+      // Croatian price transparency fields
+      unitPriceCents: row.unitPriceCents,
+      unitPriceBaseQuantity: row.unitPriceBaseQuantity,
+      unitPriceBaseUnit: row.unitPriceBaseUnit,
+      lowestPrice30dCents: row.lowestPrice30dCents,
+      anchorPriceCents: row.anchorPriceCents,
+      anchorPriceAsOf: row.anchorPriceAsOf,
       priceSignature: signature,
       lastSeenAt: now,
       updatedAt: now,
@@ -672,6 +700,13 @@ export async function persistPrice(
       discountPrice: row.discountPrice,
       discountStart: row.discountStart,
       discountEnd: row.discountEnd,
+      // Croatian price transparency fields
+      unitPriceCents: row.unitPriceCents,
+      unitPriceBaseQuantity: row.unitPriceBaseQuantity,
+      unitPriceBaseUnit: row.unitPriceBaseUnit,
+      lowestPrice30dCents: row.lowestPrice30dCents,
+      anchorPriceCents: row.anchorPriceCents,
+      anchorPriceAsOf: row.anchorPriceAsOf,
       priceSignature: signature,
       lastSeenAt: now,
       updatedAt: now,
@@ -761,6 +796,13 @@ async function batchPersistPrices(
           discountPrice: item.row.discountPrice,
           discountStart: item.row.discountStart,
           discountEnd: item.row.discountEnd,
+          // Croatian price transparency fields
+          unitPriceCents: item.row.unitPriceCents,
+          unitPriceBaseQuantity: item.row.unitPriceBaseQuantity,
+          unitPriceBaseUnit: item.row.unitPriceBaseUnit,
+          lowestPrice30dCents: item.row.lowestPrice30dCents,
+          anchorPriceCents: item.row.anchorPriceCents,
+          anchorPriceAsOf: item.row.anchorPriceAsOf,
           priceSignature: item.signature,
           lastSeenAt: now,
           updatedAt: now,
@@ -828,6 +870,13 @@ async function batchPersistPrices(
         discountPrice: data.row.discountPrice,
         discountStart: data.row.discountStart,
         discountEnd: data.row.discountEnd,
+        // Croatian price transparency fields
+        unitPriceCents: data.row.unitPriceCents,
+        unitPriceBaseQuantity: data.row.unitPriceBaseQuantity,
+        unitPriceBaseUnit: data.row.unitPriceBaseUnit,
+        lowestPrice30dCents: data.row.lowestPrice30dCents,
+        anchorPriceCents: data.row.anchorPriceCents,
+        anchorPriceAsOf: data.row.anchorPriceAsOf,
         priceSignature: data.signature,
         lastSeenAt: now,
         updatedAt: now,
@@ -900,6 +949,13 @@ export async function persistRows(
           discountPrice: m.row.discountPrice,
           discountStart: m.row.discountStart,
           discountEnd: m.row.discountEnd,
+          // Croatian price transparency fields
+          unitPriceCents: m.row.unitPriceCents,
+          unitPriceBaseQuantity: m.row.unitPriceBaseQuantity,
+          unitPriceBaseUnit: m.row.unitPriceBaseUnit,
+          lowestPrice30dCents: m.row.lowestPrice30dCents,
+          anchorPriceCents: m.row.anchorPriceCents,
+          anchorPriceAsOf: m.row.anchorPriceAsOf,
         })
         return {
           rowIndex: m.rowIndex,

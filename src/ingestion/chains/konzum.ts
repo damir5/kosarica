@@ -19,6 +19,11 @@ import { CHAIN_CONFIGS } from './config'
 /**
  * Column mapping for Konzum CSV files.
  * Maps Konzum's column names to NormalizedRow fields.
+ *
+ * Croatian price transparency columns (2026 format):
+ * - CIJENA ZA JEDINICU MJERE - unit price
+ * - NAJNIŽA CIJENA U ZADNJIH 30 DANA - lowest price in 30 days
+ * - SIDRENA CIJENA - anchor price
  */
 const KONZUM_COLUMN_MAPPING: CsvColumnMapping = {
   externalId: 'ŠIFRA PROIZVODA',
@@ -30,6 +35,10 @@ const KONZUM_COLUMN_MAPPING: CsvColumnMapping = {
   price: 'MALOPRODAJNA CIJENA',
   discountPrice: 'MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE',
   barcodes: 'BARKOD',
+  // Croatian price transparency fields
+  unitPrice: 'CIJENA ZA JEDINICU MJERE',
+  lowestPrice30d: 'NAJNIŽA CIJENA U ZADNJIH 30 DANA',
+  anchorPrice: 'SIDRENA CIJENA',
 }
 
 /**

@@ -39,6 +39,13 @@ const STUDENAC_FIELD_MAPPING: XmlFieldMapping = {
   discountEnd: 'discount_end',
   barcodes: 'barcode',
   imageUrl: 'image_url',
+  // Croatian price transparency fields
+  unitPrice: 'unit_price',
+  unitPriceBaseQuantity: 'unit_price_quantity',
+  unitPriceBaseUnit: 'unit_price_unit',
+  lowestPrice30d: 'lowest_price_30d',
+  anchorPrice: 'anchor_price',
+  anchorPriceAsOf: 'anchor_price_date',
 }
 
 /**
@@ -67,6 +74,13 @@ const STUDENAC_FIELD_MAPPING_ALT: XmlFieldMapping = {
   discountEnd: 'KrajAkcije',
   barcodes: 'Barkod',
   imageUrl: 'Slika',
+  // Croatian price transparency fields
+  unitPrice: 'CijenaZaJedinicuMjere',
+  unitPriceBaseQuantity: 'JedinicaMjereKolicina',
+  unitPriceBaseUnit: 'JedinicaMjereOznaka',
+  lowestPrice30d: 'NajnizaCijena30Dana',
+  anchorPrice: 'SidrenaCijena',
+  anchorPriceAsOf: 'SidrenaCijenaDatum',
 }
 
 /**

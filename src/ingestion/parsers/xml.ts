@@ -46,6 +46,19 @@ export interface XmlFieldMapping {
   barcodes?: string | ((item: Record<string, unknown>) => string[] | null)
   /** Path to image URL element */
   imageUrl?: string | ((item: Record<string, unknown>) => string | null)
+  // Croatian price transparency fields
+  /** Path to unit price element */
+  unitPrice?: string | ((item: Record<string, unknown>) => string | null)
+  /** Path to unit price base quantity element */
+  unitPriceBaseQuantity?: string | ((item: Record<string, unknown>) => string | null)
+  /** Path to unit price base unit element */
+  unitPriceBaseUnit?: string | ((item: Record<string, unknown>) => string | null)
+  /** Path to lowest price in last 30 days element */
+  lowestPrice30d?: string | ((item: Record<string, unknown>) => string | null)
+  /** Path to anchor price (sidrena cijena) element */
+  anchorPrice?: string | ((item: Record<string, unknown>) => string | null)
+  /** Path to anchor price date element */
+  anchorPriceAsOf?: string | ((item: Record<string, unknown>) => string | null)
 }
 
 /**
@@ -343,6 +356,53 @@ export class XmlParser extends Parser {
     const storeIdentifier =
       this.extractStringValue(item, mapping.storeIdentifier) ?? defaultStoreIdentifier
 
+    // Parse price transparency fields
+    let unitPriceCents: number | null = null
+    const unitPriceStr = this.extractStringValue(item, mapping.unitPrice)
+    if (unitPriceStr) {
+      unitPriceCents = this.parsePrice(unitPriceStr)
+      if (isNaN(unitPriceCents)) {
+        context.addWarning({
+          rowNumber,
+          field: 'unitPrice',
+          message: 'Invalid unit price value, ignoring',
+        })
+        unitPriceCents = null
+      }
+    }
+
+    let lowestPrice30dCents: number | null = null
+    const lowestPrice30dStr = this.extractStringValue(item, mapping.lowestPrice30d)
+    if (lowestPrice30dStr) {
+      lowestPrice30dCents = this.parsePrice(lowestPrice30dStr)
+      if (isNaN(lowestPrice30dCents)) {
+        context.addWarning({
+          rowNumber,
+          field: 'lowestPrice30d',
+          message: 'Invalid lowest price in 30 days value, ignoring',
+        })
+        lowestPrice30dCents = null
+      }
+    }
+
+    let anchorPriceCents: number | null = null
+    const anchorPriceStr = this.extractStringValue(item, mapping.anchorPrice)
+    if (anchorPriceStr) {
+      anchorPriceCents = this.parsePrice(anchorPriceStr)
+      if (isNaN(anchorPriceCents)) {
+        context.addWarning({
+          rowNumber,
+          field: 'anchorPrice',
+          message: 'Invalid anchor price value, ignoring',
+        })
+        anchorPriceCents = null
+      }
+    }
+
+    const anchorPriceAsOf = this.parseDate(
+      this.extractStringValue(item, mapping.anchorPriceAsOf),
+    )
+
     const row: NormalizedRow = {
       storeIdentifier,
       externalId: this.extractStringValue(item, mapping.externalId),
@@ -361,6 +421,13 @@ export class XmlParser extends Parser {
       imageUrl: this.extractStringValue(item, mapping.imageUrl),
       rowNumber,
       rawData: JSON.stringify(item),
+      // Croatian price transparency fields
+      unitPriceCents,
+      unitPriceBaseQuantity: this.extractStringValue(item, mapping.unitPriceBaseQuantity),
+      unitPriceBaseUnit: this.extractStringValue(item, mapping.unitPriceBaseUnit),
+      lowestPrice30dCents,
+      anchorPriceCents,
+      anchorPriceAsOf,
     }
 
     return row

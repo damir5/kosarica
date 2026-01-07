@@ -242,6 +242,13 @@ export const storeItemState = sqliteTable('store_item_state', {
   discountPrice: integer('discount_price'), // promotional price if active
   discountStart: integer('discount_start', { mode: 'timestamp' }),
   discountEnd: integer('discount_end', { mode: 'timestamp' }),
+  // Croatian price transparency fields
+  unitPriceCents: integer('unit_price_cents'), // unit price in cents/lipa
+  unitPriceBaseQuantity: text('unit_price_base_quantity'), // e.g., "1", "100"
+  unitPriceBaseUnit: text('unit_price_base_unit'), // e.g., "kg", "l", "kom"
+  lowestPrice30dCents: integer('lowest_price_30d_cents'), // lowest price in last 30 days in cents
+  anchorPriceCents: integer('anchor_price_cents'), // sidrena cijena in cents
+  anchorPriceAsOf: integer('anchor_price_as_of', { mode: 'timestamp' }), // date when anchor price was set
   inStock: integer('in_stock', { mode: 'boolean' }).default(true),
   priceSignature: text('price_signature'), // hash for deduplication
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),

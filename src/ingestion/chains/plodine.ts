@@ -29,6 +29,10 @@ const PLODINE_COLUMN_MAPPING: CsvColumnMapping = {
   discountStart: 'Početak akcije',
   discountEnd: 'Kraj akcije',
   barcodes: 'Barkod',
+  // Croatian price transparency fields
+  unitPrice: 'Cijena za jedinicu mjere',
+  lowestPrice30d: 'Najniža cijena u zadnjih 30 dana',
+  anchorPrice: 'Sidrena cijena',
 }
 
 /**
