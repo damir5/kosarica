@@ -50,15 +50,15 @@ export interface NormalizedRow {
   rawData: string
   // Croatian price transparency fields
   /** Unit price in cents/lipa (e.g., price per kg, per liter) */
-  unitPriceCents: number | null
+  unitPrice: number | null
   /** Base quantity for unit price (e.g., "1", "100") */
   unitPriceBaseQuantity: string | null
   /** Base unit for unit price (e.g., "kg", "l", "kom") */
   unitPriceBaseUnit: string | null
   /** Lowest price in the last 30 days in cents/lipa */
-  lowestPrice30dCents: number | null
+  lowestPrice30d: number | null
   /** Anchor price (sidrena cijena) in cents/lipa */
-  anchorPriceCents: number | null
+  anchorPrice: number | null
   /** Date when the anchor price was set */
   anchorPriceAsOf: Date | null
 }

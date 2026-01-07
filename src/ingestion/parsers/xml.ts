@@ -357,45 +357,45 @@ export class XmlParser extends Parser {
       this.extractStringValue(item, mapping.storeIdentifier) ?? defaultStoreIdentifier
 
     // Parse price transparency fields
-    let unitPriceCents: number | null = null
+    let unitPrice: number | null = null
     const unitPriceStr = this.extractStringValue(item, mapping.unitPrice)
     if (unitPriceStr) {
-      unitPriceCents = this.parsePrice(unitPriceStr)
-      if (isNaN(unitPriceCents)) {
+      unitPrice = this.parsePrice(unitPriceStr)
+      if (isNaN(unitPrice)) {
         context.addWarning({
           rowNumber,
           field: 'unitPrice',
           message: 'Invalid unit price value, ignoring',
         })
-        unitPriceCents = null
+        unitPrice = null
       }
     }
 
-    let lowestPrice30dCents: number | null = null
+    let lowestPrice30d: number | null = null
     const lowestPrice30dStr = this.extractStringValue(item, mapping.lowestPrice30d)
     if (lowestPrice30dStr) {
-      lowestPrice30dCents = this.parsePrice(lowestPrice30dStr)
-      if (isNaN(lowestPrice30dCents)) {
+      lowestPrice30d = this.parsePrice(lowestPrice30dStr)
+      if (isNaN(lowestPrice30d)) {
         context.addWarning({
           rowNumber,
           field: 'lowestPrice30d',
           message: 'Invalid lowest price in 30 days value, ignoring',
         })
-        lowestPrice30dCents = null
+        lowestPrice30d = null
       }
     }
 
-    let anchorPriceCents: number | null = null
+    let anchorPrice: number | null = null
     const anchorPriceStr = this.extractStringValue(item, mapping.anchorPrice)
     if (anchorPriceStr) {
-      anchorPriceCents = this.parsePrice(anchorPriceStr)
-      if (isNaN(anchorPriceCents)) {
+      anchorPrice = this.parsePrice(anchorPriceStr)
+      if (isNaN(anchorPrice)) {
         context.addWarning({
           rowNumber,
           field: 'anchorPrice',
           message: 'Invalid anchor price value, ignoring',
         })
-        anchorPriceCents = null
+        anchorPrice = null
       }
     }
 
@@ -422,11 +422,11 @@ export class XmlParser extends Parser {
       rowNumber,
       rawData: JSON.stringify(item),
       // Croatian price transparency fields
-      unitPriceCents,
+      unitPrice,
       unitPriceBaseQuantity: this.extractStringValue(item, mapping.unitPriceBaseQuantity),
       unitPriceBaseUnit: this.extractStringValue(item, mapping.unitPriceBaseUnit),
-      lowestPrice30dCents,
-      anchorPriceCents,
+      lowestPrice30d,
+      anchorPrice,
       anchorPriceAsOf,
     }
 

@@ -52,11 +52,11 @@ function createTestRow(overrides: Partial<NormalizedRow> = {}): NormalizedRow {
     rowNumber: 1,
     rawData: '{}',
     // Croatian price transparency fields
-    unitPriceCents: null,
+    unitPrice: null,
     unitPriceBaseQuantity: null,
     unitPriceBaseUnit: null,
-    lowestPrice30dCents: null,
-    anchorPriceCents: null,
+    lowestPrice30d: null,
+    anchorPrice: null,
     anchorPriceAsOf: null,
     ...overrides,
   }
@@ -73,11 +73,11 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -86,11 +86,11 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -106,11 +106,11 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -119,11 +119,11 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -139,11 +139,11 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -152,11 +152,11 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -172,11 +172,11 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -185,11 +185,11 @@ describe('computePriceSignature', () => {
       discountPrice: 1299,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -208,11 +208,11 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: date1,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -221,11 +221,11 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: date2,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -243,11 +243,11 @@ describe('computePriceSignature', () => {
       discountPrice: 1499,
       discountStart: new Date('2024-01-01'),
       discountEnd: new Date('2024-01-31'),
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -256,11 +256,11 @@ describe('computePriceSignature', () => {
       discountStart: new Date('2024-01-01'),
       discountPrice: 1499,
       price: 1999,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -276,11 +276,11 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -296,11 +296,11 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
@@ -314,11 +314,11 @@ describe('computePriceSignature', () => {
       discountPrice: null,
       discountStart: null,
       discountEnd: null,
-      unitPriceCents: null,
+      unitPrice: null,
       unitPriceBaseQuantity: null,
       unitPriceBaseUnit: null,
-      lowestPrice30dCents: null,
-      anchorPriceCents: null,
+      lowestPrice30d: null,
+      anchorPrice: null,
       anchorPriceAsOf: null,
     }
 
