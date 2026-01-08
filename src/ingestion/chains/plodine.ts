@@ -13,16 +13,54 @@
  * Download links: /cjenik/download?file=FILENAME
  */
 
+import { Agent } from 'undici'
 import type { DiscoveredFile } from '../core/types'
 import type { CsvColumnMapping, CsvParserOptions } from '../parsers/csv'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
 /**
- * Column mapping for Plodine CSV files.
+ * Custom fetch agent that relaxes SSL certificate verification.
+ * Required because Plodine's server uses a certificate that isn't
+ * in Node.js's default trust store.
+ */
+const plodineAgent = new Agent({
+  connect: {
+    rejectUnauthorized: false,
+  },
+})
+
+/**
+ * Column mapping for Plodine CSV files (current format as of 2026).
  * Maps Plodine's column names to NormalizedRow fields.
+ *
+ * Sample header:
+ * Naziv proizvoda;Sifra proizvoda;Marka proizvoda;Neto kolicina;Jedinica mjere;
+ * Maloprodajna cijena;Cijena po JM;MPC za vrijeme posebnog oblika prodaje;
+ * Najniza cijena u poslj. 30 dana;Sidrena cijena na 2.5.2025;Barkod;Kategorija proizvoda;
  */
 const PLODINE_COLUMN_MAPPING: CsvColumnMapping = {
+  name: 'Naziv proizvoda',
+  externalId: 'Sifra proizvoda',
+  brand: 'Marka proizvoda',
+  unitQuantity: 'Neto kolicina',
+  unit: 'Jedinica mjere',
+  price: 'Maloprodajna cijena',
+  unitPrice: 'Cijena po JM',
+  discountPrice: 'MPC za vrijeme posebnog oblika prodaje',
+  lowestPrice30d: 'Najniza cijena u poslj. 30 dana',
+  // Note: anchorPrice column has dynamic date in name (e.g., "Sidrena cijena na 2.5.2025")
+  // Handled via preprocessContent which normalizes the header
+  anchorPrice: 'Sidrena cijena',
+  barcodes: 'Barkod',
+  category: 'Kategorija proizvoda',
+}
+
+/**
+ * Alternative column mapping for Plodine CSV files (legacy format).
+ * Some older Plodine exports may use different column names.
+ */
+const PLODINE_COLUMN_MAPPING_ALT: CsvColumnMapping = {
   externalId: 'Šifra',
   name: 'Naziv',
   category: 'Kategorija',
@@ -34,37 +72,11 @@ const PLODINE_COLUMN_MAPPING: CsvColumnMapping = {
   discountStart: 'Početak akcije',
   discountEnd: 'Kraj akcije',
   barcodes: 'Barkod',
-  // Croatian price transparency fields
   unitPrice: 'Cijena za jedinicu mjere',
   lowestPrice30d: 'Najniža cijena u zadnjih 30 dana',
   anchorPrice: 'Sidrena cijena',
   unitPriceBaseQuantity: 'Količina za jedinicu mjere',
   unitPriceBaseUnit: 'Jedinica mjere za cijenu',
-  anchorPriceAsOf: 'Datum sidrene cijene',
-}
-
-/**
- * Alternative column mapping for Plodine CSV files.
- * Some Plodine exports may use abbreviated or different column names.
- */
-const PLODINE_COLUMN_MAPPING_ALT: CsvColumnMapping = {
-  externalId: 'Sifra',
-  name: 'Naziv artikla',
-  category: 'Kategorija',
-  brand: 'Marka',
-  unit: 'JM',
-  unitQuantity: 'Kolicina',
-  price: 'Cijena',
-  discountPrice: 'Akcija',
-  discountStart: 'Pocetak akcije',
-  discountEnd: 'Kraj akcije',
-  barcodes: 'EAN',
-  // Croatian price transparency fields
-  unitPrice: 'Cijena za JM',
-  lowestPrice30d: 'Najniza cijena 30 dana',
-  anchorPrice: 'Sidrena cijena',
-  unitPriceBaseQuantity: 'Kolicina za JM',
-  unitPriceBaseUnit: 'JM za cijenu',
   anchorPriceAsOf: 'Datum sidrene cijene',
 }
 
@@ -82,13 +94,14 @@ export class PlodineAdapter extends BaseCsvAdapter {
     super({
       slug: 'plodine',
       name: 'Plodine',
-      supportedTypes: ['csv'],
+      supportedTypes: ['csv', 'zip'],
       chainConfig: CHAIN_CONFIGS.plodine,
       columnMapping: PLODINE_COLUMN_MAPPING,
       alternativeColumnMapping: PLODINE_COLUMN_MAPPING_ALT,
       filenamePrefixPatterns: [
         /^Plodine[_-]?/i,
         /^cjenik[_-]?/i,
+        /^cjenici[_-]?/i,
       ],
       rateLimitConfig: {
         requestsPerSecond: 2,
@@ -108,11 +121,10 @@ export class PlodineAdapter extends BaseCsvAdapter {
   /**
    * Discover available price files from Plodine portal.
    *
-   * Plodine's portal uses a date query parameter and pagination:
-   * - URL format: /cjenik?date=YYYY-MM-DD&page=N
-   * - Download links: /cjenik/download?file=FILENAME
+   * Plodine provides ZIP archives containing CSV files for each store.
+   * URL pattern: https://www.plodine.hr/cjenici/cjenici_DD_MM_YYYY_HH_MM_SS.zip
    *
-   * Fetches all pages until no more download links are found.
+   * The portal lists all available dates. We filter by the discovery date.
    *
    * @returns Array of discovered files for the specified date
    */
@@ -121,95 +133,128 @@ export class PlodineAdapter extends BaseCsvAdapter {
     const seenUrls = new Set<string>()
 
     // Use provided date or default to today
-    const date = this.discoveryDate || new Date().toISOString().split('T')[0]
+    const targetDate = this.discoveryDate || new Date().toISOString().split('T')[0]
 
-    let page = 1
-    const maxPages = 50 // Safety limit to prevent infinite loops
+    // Convert YYYY-MM-DD to DD_MM_YYYY format used in Plodine filenames
+    const [year, month, day] = targetDate.split('-')
+    const targetDatePattern = `${day}_${month}_${year}`
 
-    while (page <= maxPages) {
-      const pageUrl = `${this.config.baseUrl}?date=${date}&page=${page}`
-      console.log(`[DEBUG] Fetching Plodine page ${page}: ${pageUrl}`)
+    const pageUrl = this.config.baseUrl
+    console.log(`[DEBUG] Fetching Plodine page: ${pageUrl}`)
+    console.log(`[DEBUG] Looking for date pattern: ${targetDatePattern}`)
 
-      try {
-        const response = await fetch(pageUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    try {
+      const response = await fetch(pageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        // @ts-expect-error - undici dispatcher option not in standard fetch types
+        dispatcher: plodineAgent,
+      })
+
+      if (!response.ok) {
+        console.error(`Failed to fetch Plodine portal: ${response.status} ${response.statusText}`)
+        console.error(`  URL: ${pageUrl}`)
+        return []
+      }
+
+      const html = await response.text()
+
+      // Extract ZIP download links: href="https://www.plodine.hr/cjenici/cjenici_DD_MM_YYYY_HH_MM_SS.zip"
+      const zipPattern = /href=["'](https?:\/\/[^"']*\/cjenici\/cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi
+
+      let match: RegExpExecArray | null
+      while ((match = zipPattern.exec(html)) !== null) {
+        const fileUrl = match[1]
+        const fileDatePattern = match[2] // DD_MM_YYYY
+
+        // Filter by target date
+        if (fileDatePattern !== targetDatePattern) {
+          continue
+        }
+
+        // Skip duplicates
+        if (seenUrls.has(fileUrl)) {
+          continue
+        }
+        seenUrls.add(fileUrl)
+
+        // Extract filename from URL
+        const filename = fileUrl.split('/').pop() || `cjenici_${fileDatePattern}.zip`
+
+        discoveredFiles.push({
+          url: fileUrl,
+          filename,
+          type: 'zip',
+          size: null,
+          lastModified: new Date(targetDate),
+          metadata: {
+            source: 'plodine_portal',
+            discoveredAt: new Date().toISOString(),
+            portalDate: targetDate,
+            fileDatePattern,
           },
         })
-
-        if (!response.ok) {
-          console.error(`Failed to fetch Plodine portal page ${page}: ${response.status} ${response.statusText}`)
-          console.error(`  URL: ${pageUrl}`)
-          break
-        }
-
-        const html = await response.text()
-
-        // Extract download links: href="/cjenik/download?file=..."
-        // Pattern matches both /cjenik/download?file= and ?file= formats
-        const downloadPattern = /href=["']((?:\/cjenik)?\/download\?file=([^"'&]+)[^"']*)["']/gi
-
-        let foundNewFiles = false
-        let match: RegExpExecArray | null
-        while ((match = downloadPattern.exec(html)) !== null) {
-          const href = match[1]
-          const encodedFilename = match[2]
-
-          // Build full download URL
-          const fileUrl = new URL(href, this.config.baseUrl).toString()
-
-          // Skip duplicates (same URL might appear in pagination)
-          if (seenUrls.has(fileUrl)) {
-            continue
-          }
-          seenUrls.add(fileUrl)
-
-          // Decode the filename from URL encoding
-          const filename = decodeURIComponent(encodedFilename)
-
-          discoveredFiles.push({
-            url: fileUrl,
-            filename: filename.endsWith('.CSV') || filename.endsWith('.csv') ? filename : `${filename}.csv`,
-            type: 'csv',
-            size: null,
-            lastModified: new Date(date),
-            metadata: {
-              source: 'plodine_portal',
-              discoveredAt: new Date().toISOString(),
-              portalDate: date,
-              page: String(page),
-            },
-          })
-
-          foundNewFiles = true
-        }
-
-        // Stop if no new files found on this page (end of pagination)
-        if (!foundNewFiles) {
-          break
-        }
-
-        page++
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        console.error(`Error discovering Plodine files on page ${page}: ${errorMessage}`)
-        console.error(`  URL: ${pageUrl}`)
-        break
       }
+
+      if (discoveredFiles.length === 0) {
+        console.log(`[DEBUG] No ZIP files found for date ${targetDate} (pattern: ${targetDatePattern})`)
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`Error discovering Plodine files: ${errorMessage}`)
+      console.error(`  URL: ${pageUrl}`)
     }
 
     return discoveredFiles
   }
 
   /**
+   * Fetch a discovered file with SSL certificate handling.
+   * Overrides base class to use custom agent that handles Plodine's certificate.
+   */
+  async fetch(file: import('../core/types').DiscoveredFile): Promise<import('../core/types').FetchedFile> {
+    // Wait for rate limiting
+    await this.rateLimiter.throttle()
+
+    const response = await fetch(file.url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
+        'Accept': '*/*',
+      },
+      // @ts-expect-error - undici dispatcher option not in standard fetch types
+      dispatcher: plodineAgent,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${file.url}: ${response.status} ${response.statusText}`)
+    }
+
+    const content = await response.arrayBuffer()
+    const { computeSha256 } = await import('../core/storage')
+    const hash = await computeSha256(content)
+
+    return {
+      discovered: file,
+      content,
+      hash,
+    }
+  }
+
+  /**
    * Preprocess CSV content to fix Plodine-specific formatting issues.
-   * Handles missing leading zeros in decimal values (e.g., ",69" -> "0,69").
+   * - Handles missing leading zeros in decimal values (e.g., ",69" -> "0,69")
+   * - Normalizes dynamic column names (e.g., "Sidrena cijena na 2.5.2025" -> "Sidrena cijena")
    */
   protected preprocessContent(content: ArrayBuffer): ArrayBuffer {
     // Decode with Windows-1250 encoding
     const decoder = new TextDecoder(this.csvConfig.encoding)
     let text = decoder.decode(content)
+
+    // Normalize anchor price column header (remove the dynamic date suffix)
+    // "Sidrena cijena na 2.5.2025" -> "Sidrena cijena"
+    text = text.replace(/Sidrena cijena na \d+\.\d+\.\d+/gi, 'Sidrena cijena')
 
     // Fix missing leading zeros in prices
     // Pattern matches: semicolon followed by comma and digits (;,69)
