@@ -49,8 +49,11 @@ type DatabaseConnection = any
 // Constants
 // ============================================================================
 
-/** Default batch size for batch operations */
-const DEFAULT_BATCH_SIZE = 100
+/** Default batch size for batch operations - reduced to stay under D1's 100 bound parameter limit */
+const DEFAULT_BATCH_SIZE = 50
+
+/** Max rows per INSERT to stay under D1's 100 bound parameter limit (~10 columns) */
+const INSERT_BATCH_SIZE = 8
 
 // ============================================================================
 // Price Signature
@@ -1031,12 +1034,16 @@ async function batchPersistPrices(
 }
 
 // ============================================================================
-// Main Persist Functions
+// Main Persist Functions (Optimized with db.batch())
 // ============================================================================
 
 /**
  * Persist a batch of normalized rows for a store.
- * Uses optimized batch operations for improved performance on large datasets.
+ * Uses db.batch() to minimize network round-trips to D1.
+ *
+ * Two-phase approach:
+ * 1. Phase 1: Batch all lookups in single call
+ * 2. Phase 2: Batch all writes in single call
  *
  * @param db - Database instance
  * @param store - Resolved store descriptor
@@ -1074,63 +1081,22 @@ export async function persistRows(
       console.log(`[persist] Processing batch ${chunkIndex}/${chunks.length} (${Math.round(chunkIndex / chunks.length * 100)}%)`)
     }
     try {
-      // Step 1: Batch upsert retailer items
-      const mappings = await batchUpsertRetailerItems(
-        db,
-        store.chainSlug,
-        rowChunk,
-      )
+      const chunkResult = await persistRowChunkBatched(db, store, rowChunk)
 
-      // Step 2: Batch sync barcodes
-      const barcodeItems = mappings.map((m) => ({
-        retailerItemId: m.retailerItemId,
-        barcodes: m.row.barcodes,
-      }))
-      await batchSyncBarcodes(db, barcodeItems)
-
-      // Step 3: Prepare price data with signatures
-      const priceDataPromises = mappings.map(async (m) => {
-        const signature = await computePriceSignature({
-          price: m.row.price,
-          discountPrice: m.row.discountPrice,
-          discountStart: m.row.discountStart,
-          discountEnd: m.row.discountEnd,
-          // Croatian price transparency fields
-          unitPrice: m.row.unitPrice,
-          unitPriceBaseQuantity: m.row.unitPriceBaseQuantity,
-          unitPriceBaseUnit: m.row.unitPriceBaseUnit,
-          lowestPrice30d: m.row.lowestPrice30d,
-          anchorPrice: m.row.anchorPrice,
-          anchorPriceAsOf: m.row.anchorPriceAsOf,
-        })
-        return {
-          rowIndex: m.rowIndex,
-          retailerItemId: m.retailerItemId,
-          row: m.row,
-          signature,
-        } as PreparedPriceData
-      })
-      const priceData = await Promise.all(priceDataPromises)
-
-      // Step 4: Batch persist prices
-      const priceResults = await batchPersistPrices(db, store.id, priceData)
-
-      // Log first batch completion and any batch with many new items
+      // Log first batch completion
       if (chunkIndex === 1) {
         console.log(`[persist] First batch completed successfully`)
       }
 
       // Update result statistics
-      for (const pr of priceResults) {
-        result.persisted++
-        if (pr.priceChanged) {
-          result.priceChanges++
-        } else {
-          result.unchanged++
-        }
-      }
-    } catch (_error) {
-      // If chunk fails, fall back to individual processing for this chunk
+      result.persisted += chunkResult.persisted
+      result.priceChanges += chunkResult.priceChanges
+      result.unchanged += chunkResult.unchanged
+      result.failed += chunkResult.failed
+      result.errors.push(...chunkResult.errors)
+    } catch (error) {
+      // If batch fails, fall back to individual processing for this chunk
+      console.warn(`[persist] Batch failed, falling back to individual processing: ${error instanceof Error ? error.message : String(error)}`)
       for (const { row } of rowChunk) {
         try {
           const retailerItemId = await upsertRetailerItem(
@@ -1163,6 +1129,406 @@ export async function persistRows(
       }
     }
   }
+
+  return result
+}
+
+/**
+ * Process a chunk of rows using db.batch() for optimal performance.
+ * Uses two-phase approach: batch lookups, then batch writes.
+ */
+async function persistRowChunkBatched(
+  db: AnyDatabase,
+  store: StoreDescriptor,
+  rowChunk: Array<{ rowIndex: number; row: NormalizedRow }>,
+): Promise<{
+  persisted: number
+  priceChanges: number
+  unchanged: number
+  failed: number
+  errors: Array<{ rowNumber: number; error: string }>
+}> {
+  const now = new Date()
+  const result = { persisted: 0, priceChanges: 0, unchanged: 0, failed: 0, errors: [] as Array<{ rowNumber: number; error: string }> }
+
+  // Separate rows with and without externalId
+  const rowsWithExternalId = rowChunk.filter((r) => r.row.externalId !== null)
+  const rowsWithoutExternalId = rowChunk.filter((r) => r.row.externalId === null)
+
+  // Collect all lookup keys
+  const externalIds = rowsWithExternalId.map((r) => r.row.externalId as string)
+  const allNames = rowChunk.map((r) => r.row.name)
+
+  // ============================================================================
+  // PHASE 1: Batch all lookups in a single db.batch() call
+  // ============================================================================
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lookupQueries: any[] = []
+
+  // Query 0: Lookup retailer items by externalId
+  if (externalIds.length > 0) {
+    lookupQueries.push(
+      db.query.retailerItems.findMany({
+        where: and(
+          eq(retailerItems.chainSlug, store.chainSlug),
+          inArray(retailerItems.externalId, externalIds),
+        ),
+      })
+    )
+  }
+
+  // Query 1: Lookup retailer items by name (for items without externalId match)
+  lookupQueries.push(
+    db.query.retailerItems.findMany({
+      where: and(
+        eq(retailerItems.chainSlug, store.chainSlug),
+        inArray(retailerItems.name, allNames),
+      ),
+    })
+  )
+
+  // Execute all lookups in single batch
+  const lookupResults = await db.batch(lookupQueries)
+
+  // Parse lookup results
+  let queryIndex = 0
+  const existingByExternalId = externalIds.length > 0
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? new Map((lookupResults[queryIndex++] as any[]).map((item: any) => [item.externalId, item]))
+    : new Map()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingByName = new Map((lookupResults[queryIndex++] as any[]).map((item: any) => [item.name, item]))
+
+  // ============================================================================
+  // Process results: Categorize items for insert vs update
+  // ============================================================================
+  const matchedRowIndices = new Set<number>()
+  const retailerItemMappings: RetailerItemMapping[] = []
+
+  // Items to update (existing)
+  const retailerItemUpdates: Array<{ id: string; rowData: NormalizedRow; mergeExisting?: boolean }> = []
+  // Items to insert (new)
+  const retailerItemInserts: Array<{ id: string; rowIndex: number; row: NormalizedRow }> = []
+
+  // Match by externalId first
+  for (const { rowIndex, row } of rowsWithExternalId) {
+    const existing = existingByExternalId.get(row.externalId as string)
+    if (existing) {
+      matchedRowIndices.add(rowIndex)
+      retailerItemMappings.push({ rowIndex, retailerItemId: existing.id, row })
+      retailerItemUpdates.push({ id: existing.id, rowData: row })
+    }
+  }
+
+  // Match remaining by name
+  const unmatchedRows = [
+    ...rowsWithExternalId.filter((r) => !matchedRowIndices.has(r.rowIndex)),
+    ...rowsWithoutExternalId,
+  ]
+
+  for (const { rowIndex, row } of unmatchedRows) {
+    const existing = existingByName.get(row.name)
+    if (existing) {
+      matchedRowIndices.add(rowIndex)
+      retailerItemMappings.push({ rowIndex, retailerItemId: existing.id, row })
+      retailerItemUpdates.push({ id: existing.id, rowData: row, mergeExisting: true })
+    }
+  }
+
+  // Items that need to be inserted
+  for (const { rowIndex, row } of rowChunk) {
+    if (!matchedRowIndices.has(rowIndex)) {
+      const id = generatePrefixedId('rit')
+      retailerItemMappings.push({ rowIndex, retailerItemId: id, row })
+      retailerItemInserts.push({ id, rowIndex, row })
+    }
+  }
+
+  // ============================================================================
+  // PHASE 1b: Lookup barcodes and store item states for all retailer items
+  // ============================================================================
+  const allRetailerItemIds = retailerItemMappings.map((m) => m.retailerItemId)
+
+  // Only lookup barcodes for existing items (new items have no barcodes yet)
+  const existingRetailerItemIds = retailerItemMappings
+    .filter((m) => !retailerItemInserts.some((ins) => ins.id === m.retailerItemId))
+    .map((m) => m.retailerItemId)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lookupQueries2: any[] = []
+
+  // Query: Lookup existing barcodes
+  if (existingRetailerItemIds.length > 0) {
+    lookupQueries2.push(
+      db.query.retailerItemBarcodes.findMany({
+        where: inArray(retailerItemBarcodes.retailerItemId, existingRetailerItemIds),
+      })
+    )
+  }
+
+  // Query: Lookup existing store item states
+  lookupQueries2.push(
+    db.query.storeItemState.findMany({
+      where: and(
+        eq(storeItemState.storeId, store.id),
+        inArray(storeItemState.retailerItemId, allRetailerItemIds),
+      ),
+    })
+  )
+
+  const lookupResults2 = lookupQueries2.length > 0 ? await db.batch(lookupQueries2) : []
+
+  // Parse barcode lookup results
+  let queryIndex2 = 0
+  const existingBarcodesByItem = new Map<string, Set<string>>()
+  if (existingRetailerItemIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const barcode of (lookupResults2[queryIndex2++] as any[])) {
+      if (!existingBarcodesByItem.has(barcode.retailerItemId)) {
+        existingBarcodesByItem.set(barcode.retailerItemId, new Set())
+      }
+      existingBarcodesByItem.get(barcode.retailerItemId)!.add(barcode.barcode)
+    }
+  }
+
+  // Parse store item state lookup results
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingStatesByRetailerId = new Map((lookupResults2[queryIndex2] as any[] || []).map((s: any) => [s.retailerItemId, s]))
+
+  // ============================================================================
+  // Prepare price data with signatures
+  // ============================================================================
+  const priceDataPromises = retailerItemMappings.map(async (m) => {
+    const signature = await computePriceSignature({
+      price: m.row.price,
+      discountPrice: m.row.discountPrice,
+      discountStart: m.row.discountStart,
+      discountEnd: m.row.discountEnd,
+      unitPrice: m.row.unitPrice,
+      unitPriceBaseQuantity: m.row.unitPriceBaseQuantity,
+      unitPriceBaseUnit: m.row.unitPriceBaseUnit,
+      lowestPrice30d: m.row.lowestPrice30d,
+      anchorPrice: m.row.anchorPrice,
+      anchorPriceAsOf: m.row.anchorPriceAsOf,
+    })
+    return { ...m, signature }
+  })
+  const priceData = await Promise.all(priceDataPromises)
+
+  // Categorize price data
+  const newPriceItems: Array<typeof priceData[0] & { stateId: string }> = []
+  const unchangedPriceItems: Array<{ data: typeof priceData[0]; existingId: string }> = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const changedPriceItems: Array<{ data: typeof priceData[0]; existing: any }> = []
+
+  for (const item of priceData) {
+    const existing = existingStatesByRetailerId.get(item.retailerItemId)
+    if (!existing) {
+      const stateId = generatePrefixedId('sis')
+      newPriceItems.push({ ...item, stateId })
+    } else if (existing.priceSignature === item.signature) {
+      unchangedPriceItems.push({ data: item, existingId: existing.id })
+    } else {
+      changedPriceItems.push({ data: item, existing })
+    }
+  }
+
+  // ============================================================================
+  // PHASE 2: Batch all writes in a single db.batch() call
+  // ============================================================================
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const writeQueries: any[] = []
+
+  // 1. Retailer item updates
+  for (const { id, rowData, mergeExisting } of retailerItemUpdates) {
+    if (mergeExisting) {
+      // For name-matched items, only update if new values exist
+      writeQueries.push(
+        db.update(retailerItems)
+          .set({
+            externalId: rowData.externalId,
+            description: rowData.description,
+            category: rowData.category,
+            subcategory: rowData.subcategory,
+            brand: rowData.brand,
+            unit: rowData.unit,
+            unitQuantity: rowData.unitQuantity,
+            imageUrl: rowData.imageUrl,
+            updatedAt: now,
+          })
+          .where(eq(retailerItems.id, id))
+      )
+    } else {
+      writeQueries.push(
+        db.update(retailerItems)
+          .set({
+            name: rowData.name,
+            description: rowData.description,
+            category: rowData.category,
+            subcategory: rowData.subcategory,
+            brand: rowData.brand,
+            unit: rowData.unit,
+            unitQuantity: rowData.unitQuantity,
+            imageUrl: rowData.imageUrl,
+            updatedAt: now,
+          })
+          .where(eq(retailerItems.id, id))
+      )
+    }
+  }
+
+  // 2. Retailer item inserts (chunked to INSERT_BATCH_SIZE)
+  if (retailerItemInserts.length > 0) {
+    const insertData = retailerItemInserts.map(({ id, row }) => ({
+      id,
+      chainSlug: store.chainSlug,
+      externalId: row.externalId,
+      name: row.name,
+      description: row.description,
+      category: row.category,
+      subcategory: row.subcategory,
+      brand: row.brand,
+      unit: row.unit,
+      unitQuantity: row.unitQuantity,
+      imageUrl: row.imageUrl,
+    }))
+
+    for (const insertChunk of chunk(insertData, INSERT_BATCH_SIZE)) {
+      writeQueries.push(db.insert(retailerItems).values(insertChunk))
+    }
+  }
+
+  // 3. Barcode inserts
+  const barcodeInserts: Array<{ id: string; retailerItemId: string; barcode: string; isPrimary: boolean }> = []
+  for (const mapping of retailerItemMappings) {
+    if (mapping.row.barcodes.length === 0) continue
+
+    const existingBarcodes = existingBarcodesByItem.get(mapping.retailerItemId) ?? new Set()
+    const hasExisting = existingBarcodes.size > 0
+
+    const newBarcodes = mapping.row.barcodes.filter((b) => !existingBarcodes.has(b))
+    for (let i = 0; i < newBarcodes.length; i++) {
+      barcodeInserts.push({
+        id: generatePrefixedId('rib'),
+        retailerItemId: mapping.retailerItemId,
+        barcode: newBarcodes[i],
+        isPrimary: !hasExisting && i === 0,
+      })
+    }
+  }
+
+  if (barcodeInserts.length > 0) {
+    for (const insertChunk of chunk(barcodeInserts, INSERT_BATCH_SIZE)) {
+      writeQueries.push(db.insert(retailerItemBarcodes).values(insertChunk))
+    }
+  }
+
+  // 4. New store item states
+  if (newPriceItems.length > 0) {
+    const stateInserts = newPriceItems.map((item) => ({
+      id: item.stateId,
+      storeId: store.id,
+      retailerItemId: item.retailerItemId,
+      currentPrice: item.row.price,
+      discountPrice: item.row.discountPrice,
+      discountStart: item.row.discountStart,
+      discountEnd: item.row.discountEnd,
+      unitPrice: item.row.unitPrice,
+      unitPriceBaseQuantity: item.row.unitPriceBaseQuantity,
+      unitPriceBaseUnit: item.row.unitPriceBaseUnit,
+      lowestPrice30d: item.row.lowestPrice30d,
+      anchorPrice: item.row.anchorPrice,
+      anchorPriceAsOf: item.row.anchorPriceAsOf,
+      priceSignature: item.signature,
+      lastSeenAt: now,
+      updatedAt: now,
+    }))
+
+    for (const insertChunk of chunk(stateInserts, INSERT_BATCH_SIZE)) {
+      writeQueries.push(db.insert(storeItemState).values(insertChunk))
+    }
+
+    // 5. New price periods for new items
+    const periodInserts = newPriceItems.map((item) => ({
+      id: generatePrefixedId('sip'),
+      storeItemStateId: item.stateId,
+      price: item.row.price,
+      discountPrice: item.row.discountPrice,
+      startedAt: now,
+    }))
+
+    for (const insertChunk of chunk(periodInserts, INSERT_BATCH_SIZE)) {
+      writeQueries.push(db.insert(storeItemPricePeriods).values(insertChunk))
+    }
+  }
+
+  // 6. Unchanged price items - update lastSeenAt
+  if (unchangedPriceItems.length > 0) {
+    const unchangedIds = unchangedPriceItems.map((u) => u.existingId)
+    writeQueries.push(
+      db.update(storeItemState)
+        .set({ lastSeenAt: now })
+        .where(inArray(storeItemState.id, unchangedIds))
+    )
+  }
+
+  // 7. Changed price items - close old period, create new period, update state
+  for (const { data, existing } of changedPriceItems) {
+    // Close old period
+    writeQueries.push(
+      db.update(storeItemPricePeriods)
+        .set({ endedAt: now })
+        .where(
+          and(
+            eq(storeItemPricePeriods.storeItemStateId, existing.id),
+            sql`${storeItemPricePeriods.endedAt} IS NULL`,
+          ),
+        )
+    )
+
+    // Create new period
+    writeQueries.push(
+      db.insert(storeItemPricePeriods).values({
+        id: generatePrefixedId('sip'),
+        storeItemStateId: existing.id,
+        price: data.row.price,
+        discountPrice: data.row.discountPrice,
+        startedAt: now,
+      })
+    )
+
+    // Update state
+    writeQueries.push(
+      db.update(storeItemState)
+        .set({
+          previousPrice: existing.currentPrice,
+          currentPrice: data.row.price,
+          discountPrice: data.row.discountPrice,
+          discountStart: data.row.discountStart,
+          discountEnd: data.row.discountEnd,
+          unitPrice: data.row.unitPrice,
+          unitPriceBaseQuantity: data.row.unitPriceBaseQuantity,
+          unitPriceBaseUnit: data.row.unitPriceBaseUnit,
+          lowestPrice30d: data.row.lowestPrice30d,
+          anchorPrice: data.row.anchorPrice,
+          anchorPriceAsOf: data.row.anchorPriceAsOf,
+          priceSignature: data.signature,
+          lastSeenAt: now,
+          updatedAt: now,
+        })
+        .where(eq(storeItemState.id, existing.id))
+    )
+  }
+
+  // Execute all writes in a single batch
+  if (writeQueries.length > 0) {
+    await db.batch(writeQueries)
+  }
+
+  // Calculate results
+  result.persisted = retailerItemMappings.length
+  result.priceChanges = newPriceItems.length + changedPriceItems.length
+  result.unchanged = unchangedPriceItems.length
 
   return result
 }
