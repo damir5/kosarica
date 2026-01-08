@@ -114,7 +114,7 @@ git push                # Push to remote
 | Interspar | https://www.spar.hr/usluge/cjenici | CSV | Pending |
 | Eurospin | https://www.eurospin.hr/cjenik/ | CSV | Pending |
 | Kaufland | https://www.kaufland.hr/akcije-novosti/popis-mpc.html | CSV | Pending |
-| KTC | https://www.ktc.hr/cjenici | CSV | Pending |
+| KTC | https://www.ktc.hr/cjenici | CSV | ✅ Done |
 | Metro | https://metrocjenik.com.hr/ | CSV | Pending |
 | Studenac | https://www.studenac.hr/popis-maloprodajnih-cijena | XML | Pending |
 | Trgocentar | https://trgocentar.com/Trgovine-cjenik/ | XML | Pending |

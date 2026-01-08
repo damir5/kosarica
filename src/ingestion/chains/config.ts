@@ -104,7 +104,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   plodine: {
     id: 'plodine',
     name: 'Plodine',
-    baseUrl: 'https://www.plodine.hr/cjenik',
+    baseUrl: 'https://www.plodine.hr/info-o-cijenama',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {
@@ -118,7 +118,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   interspar: {
     id: 'interspar',
     name: 'Interspar',
-    baseUrl: 'https://www.interspar.hr/cjenik',
+    baseUrl: 'https://www.spar.hr/usluge/cjenici',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {
@@ -132,7 +132,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   studenac: {
     id: 'studenac',
     name: 'Studenac',
-    baseUrl: 'https://www.studenac.hr/cjenik',
+    baseUrl: 'https://www.studenac.hr/popis-maloprodajnih-cijena',
     primaryFileType: 'xml',
     supportedFileTypes: ['xml'],
     usesZip: false,
@@ -141,7 +141,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   kaufland: {
     id: 'kaufland',
     name: 'Kaufland',
-    baseUrl: 'https://www.kaufland.hr/cjenik',
+    baseUrl: 'https://www.kaufland.hr/akcije-novosti/popis-mpc.html',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {
@@ -155,7 +155,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   eurospin: {
     id: 'eurospin',
     name: 'Eurospin',
-    baseUrl: 'https://www.eurospin.hr/cjenik',
+    baseUrl: 'https://www.eurospin.hr/cjenik/',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {
@@ -169,7 +169,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   dm: {
     id: 'dm',
     name: 'DM',
-    baseUrl: 'https://www.dm.hr/cjenik',
+    baseUrl: 'https://www.dm.hr/novo/promocije/nove-oznake-cijena-i-vazeci-cjenik-u-dm-u-2906632',
     primaryFileType: 'xlsx',
     supportedFileTypes: ['xlsx'],
     usesZip: false,
@@ -178,7 +178,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   ktc: {
     id: 'ktc',
     name: 'KTC',
-    baseUrl: 'https://www.ktc.hr/cjenik',
+    baseUrl: 'https://www.ktc.hr/cjenici',
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {
@@ -192,23 +192,23 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
   metro: {
     id: 'metro',
     name: 'Metro',
-    baseUrl: 'https://www.metro.hr/cjenik',
-    primaryFileType: 'xml',
-    supportedFileTypes: ['xml'],
+    baseUrl: 'https://metrocjenik.com.hr/',
+    primaryFileType: 'csv',
+    supportedFileTypes: ['csv'],
+    csv: {
+      delimiter: ';',
+      encoding: 'utf-8',
+      hasHeader: true,
+    },
     usesZip: false,
     storeResolution: 'portal_id',
   },
   trgocentar: {
     id: 'trgocentar',
     name: 'Trgocentar',
-    baseUrl: 'https://www.trgocentar.hr/cjenik',
-    primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
-    csv: {
-      delimiter: ';',
-      encoding: 'windows-1250',
-      hasHeader: true,
-    },
+    baseUrl: 'https://trgocentar.com/Trgovine-cjenik/',
+    primaryFileType: 'xml',
+    supportedFileTypes: ['xml'],
     usesZip: false,
     storeResolution: 'filename',
   },

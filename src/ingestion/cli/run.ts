@@ -22,7 +22,7 @@ import {
   type ChainId,
 } from '../chains'
 import { LocalStorage, computeSha256 } from '../core/storage'
-import { persistRowsForStore } from '../core/persist'
+import { persistRowsForStore, type StoreAutoRegisterOptions } from '../core/persist'
 import type {
   DiscoveredFile,
   FetchedFile,
@@ -30,6 +30,21 @@ import type {
   NormalizedRow,
   FileType,
 } from '../core/types'
+
+/**
+ * Metadata for a store collected during discovery/parse phase.
+ * Used for auto-registration when a store is not found.
+ */
+interface StoreMetadata {
+  /** Raw store name from portal/URL (e.g., "RC DUGO SELO PJ-90") */
+  rawName: string
+  /** Clean store name with PJ-XX suffix removed (e.g., "RC DUGO SELO") */
+  cleanName: string
+  /** Address extracted from filename if available */
+  address?: string
+  /** City extracted from address if available */
+  city?: string
+}
 import * as schema from '@/db/schema'
 
 // Note: Adapters are automatically registered when importing from '../chains'.
@@ -91,6 +106,81 @@ function getTodayDate(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+/**
+ * Extract store metadata from a discovered file.
+ * Extracts store name from URL path or metadata and cleans it.
+ *
+ * For KTC URLs like:
+ * https://www.ktc.hr/ktcftp/Cjenici/SAMOPOSLUGA%20CAZMA%20PJ-89/TRGOVINA-...csv
+ * The store folder is "SAMOPOSLUGA CAZMA PJ-89"
+ *
+ * @param file - Discovered file with URL and metadata
+ * @param storeIdentifier - Store identifier extracted from filename (e.g., "PJ89-1")
+ * @returns Store metadata for auto-registration
+ */
+function extractStoreMetadata(file: DiscoveredFile, storeIdentifier: string): StoreMetadata {
+  let rawName = storeIdentifier // Default to identifier
+
+  // Try to extract from URL path (for KTC and similar)
+  // URL format: .../Cjenici/STORE_FOLDER_NAME/filename.csv
+  try {
+    const url = new URL(file.url)
+    const pathParts = url.pathname.split('/')
+    // Find the folder containing the file (second to last part)
+    if (pathParts.length >= 2) {
+      const folderName = decodeURIComponent(pathParts[pathParts.length - 2])
+      // Check if it looks like a store name (not just "Cjenici" or similar)
+      if (folderName && folderName.length > 3 && !folderName.toLowerCase().includes('cjeni')) {
+        rawName = folderName
+      }
+    }
+  } catch {
+    // URL parsing failed, use default
+  }
+
+  // Clean the store name by removing PJ-XX or PJ XX suffix
+  // Examples:
+  // "RC DUGO SELO PJ-90" -> "RC DUGO SELO"
+  // "SAMOPOSLUGA CAZMA PJ-89" -> "SAMOPOSLUGA CAZMA"
+  // "TRGOVINA VARAZDIN PJ7B" -> "TRGOVINA VARAZDIN"
+  const cleanName = rawName
+    .replace(/\s+PJ[- ]?\d+[A-Z]?$/i, '') // Remove " PJ-90", " PJ 90", " PJ7B" at end
+    .replace(/\s+PJ[A-Z]?\d+$/i, '')      // Remove " PJA50" at end (letter before number)
+    .trim()
+
+  // Try to extract city from the name or address
+  // KTC filenames: TRGOVINA-ADDRESS-STORE_ID-DATE.csv
+  // e.g., TRGOVINA-PAKRACKA ULICA 1 BJELOVAR-PJ50-1-20260105-071001.csv
+  let address: string | undefined
+  let city: string | undefined
+
+  const decodedFilename = decodeURIComponent(file.filename)
+  const filenameMatch = decodedFilename.match(/^TRGOVINA-(.+?)-(PJ[\dA-Z]+-\d+)-\d{8}/i)
+  if (filenameMatch) {
+    const addressPart = filenameMatch[1]
+    address = addressPart
+
+    // Try to extract city - usually the last word(s) in address that are all caps or proper case
+    // e.g., "PAKRACKA ULICA 1 BJELOVAR" -> city is "BJELOVAR"
+    const words = addressPart.split(' ')
+    // Find the last word that looks like a city name (all caps, not a number)
+    for (let i = words.length - 1; i >= 0; i--) {
+      const word = words[i]
+      if (word && /^[A-ZČĆŽŠĐ]+$/i.test(word) && !/^\d+$/.test(word)) {
+        city = word
+        break
+      }
+    }
+  }
+
+  return {
+    rawName,
+    cleanName: cleanName || rawName,
+    address,
+    city,
+  }
 }
 
 /**
@@ -426,6 +516,14 @@ async function expandPhase(
 }
 
 /**
+ * Result from parse phase including rows and store metadata.
+ */
+interface ParsePhaseResult {
+  rowsByStore: Map<string, NormalizedRow[]>
+  storeMetadataMap: Map<string, StoreMetadata>
+}
+
+/**
  * Phase 4: Parse all entries.
  */
 async function parsePhase(
@@ -433,13 +531,15 @@ async function parsePhase(
   chainId: ChainId,
   logger: Logger,
   stats: PipelineStats,
-): Promise<Map<string, NormalizedRow[]>> {
+): Promise<ParsePhaseResult> {
   logger.phase('Phase 4: Parse')
 
   const adapter = getAdapterOrThrow(chainId)
 
   // Group rows by store identifier
   const rowsByStore = new Map<string, NormalizedRow[]>()
+  // Track store metadata for auto-registration
+  const storeMetadataMap = new Map<string, StoreMetadata>()
 
   for (const entry of entries) {
     logger.info(`Parsing ${entry.filename}...`)
@@ -481,6 +581,9 @@ async function parsePhase(
         const storeId = row.storeIdentifier || 'unknown'
         if (!rowsByStore.has(storeId)) {
           rowsByStore.set(storeId, [])
+          // Extract and store metadata for this store identifier
+          const metadata = extractStoreMetadata(entry.parentFile, storeId)
+          storeMetadataMap.set(storeId, metadata)
         }
         rowsByStore.get(storeId)!.push(row)
       }
@@ -493,7 +596,23 @@ async function parsePhase(
 
   logger.info(`Parsed ${stats.validRows} valid rows across ${rowsByStore.size} store(s)`)
 
-  return rowsByStore
+  return { rowsByStore, storeMetadataMap }
+}
+
+/**
+ * Map chain storeResolution strategy to store identifier type.
+ */
+function getIdentifierTypeFromResolution(resolution: 'filename' | 'portal_id' | 'national'): string {
+  switch (resolution) {
+    case 'filename':
+      return 'filename_code'
+    case 'portal_id':
+      return 'portal_id'
+    case 'national':
+      return 'national'
+    default:
+      return 'filename_code'
+  }
 }
 
 /**
@@ -501,6 +620,7 @@ async function parsePhase(
  */
 async function persistPhase(
   rowsByStore: Map<string, NormalizedRow[]>,
+  storeMetadataMap: Map<string, StoreMetadata>,
   chainId: ChainId,
   dryRun: boolean,
   logger: Logger,
@@ -512,7 +632,8 @@ async function persistPhase(
     logger.info('Dry run mode - no data will be persisted')
 
     for (const [storeId, rows] of rowsByStore) {
-      logger.info(`  Store "${storeId}": ${rows.length} row(s) would be persisted`)
+      const metadata = storeMetadataMap.get(storeId)
+      logger.info(`  Store "${storeId}" (${metadata?.cleanName || 'unknown'}): ${rows.length} row(s) would be persisted`)
       stats.storesProcessed++
     }
 
@@ -524,8 +645,22 @@ async function persistPhase(
   // Create database connection
   const db = await createCliDatabase()
 
+  // Get chain config to determine store identifier type
+  const config = getChainConfig(chainId)
+  const identifierType = getIdentifierTypeFromResolution(config.storeResolution)
+
   for (const [storeIdentifier, rows] of rowsByStore) {
-    logger.info(`Persisting ${rows.length} row(s) for store "${storeIdentifier}"...`)
+    const metadata = storeMetadataMap.get(storeIdentifier)
+    logger.info(`Persisting ${rows.length} row(s) for store "${storeIdentifier}" (${metadata?.cleanName || 'unknown'})...`)
+
+    // Prepare auto-registration options from metadata
+    const autoRegister: StoreAutoRegisterOptions | undefined = metadata
+      ? {
+          name: metadata.cleanName,
+          address: metadata.address,
+          city: metadata.city,
+        }
+      : undefined
 
     try {
       const result = await persistRowsForStore(
@@ -533,11 +668,12 @@ async function persistPhase(
         chainId,
         storeIdentifier,
         rows,
-        'filename_code',
+        identifierType,
+        autoRegister,
       )
 
       if (result === null) {
-        logger.warn(`  Store not found: "${storeIdentifier}"`)
+        logger.warn(`  Store not found and auto-registration failed: "${storeIdentifier}"`)
         stats.storesNotFound.push(storeIdentifier)
         continue
       }
@@ -741,7 +877,7 @@ async function main(): Promise<void> {
     }
 
     // Phase 4: Parse
-    const rowsByStore = await parsePhase(entries, chainId, logger, stats)
+    const { rowsByStore, storeMetadataMap } = await parsePhase(entries, chainId, logger, stats)
 
     if (rowsByStore.size === 0) {
       logger.warn('No rows to persist. Exiting.')
@@ -750,7 +886,7 @@ async function main(): Promise<void> {
     }
 
     // Phase 5: Persist
-    await persistPhase(rowsByStore, chainId, options.dryRun, logger, stats)
+    await persistPhase(rowsByStore, storeMetadataMap, chainId, options.dryRun, logger, stats)
 
     // Print summary
     printSummary(stats, logger)

@@ -4,6 +4,8 @@
  * Adapter for parsing Kaufland retail chain price data files.
  * Kaufland uses CSV format with tab delimiter and UTF-8 encoding.
  * Store resolution is based on filename.
+ *
+ * Kaufland portal: https://www.kaufland.hr/akcije-novosti/popis-mpc.html
  */
 
 import type { CsvColumnMapping } from '../parsers/csv'
@@ -30,6 +32,9 @@ const KAUFLAND_COLUMN_MAPPING: CsvColumnMapping = {
   unitPrice: 'Cijena za jedinicu mjere',
   lowestPrice30d: 'Najniža cijena u zadnjih 30 dana',
   anchorPrice: 'Sidrena cijena',
+  unitPriceBaseQuantity: 'Količina za jedinicu mjere',
+  unitPriceBaseUnit: 'Jedinica mjere za cijenu',
+  anchorPriceAsOf: 'Datum sidrene cijene',
 }
 
 /**
@@ -48,6 +53,13 @@ const KAUFLAND_COLUMN_MAPPING_ALT: CsvColumnMapping = {
   discountStart: 'Pocetak akcije',
   discountEnd: 'Kraj akcije',
   barcodes: 'EAN',
+  // Croatian price transparency fields
+  unitPrice: 'Cijena za JM',
+  lowestPrice30d: 'Najniza cijena 30 dana',
+  anchorPrice: 'Sidrena cijena',
+  unitPriceBaseQuantity: 'Kolicina za JM',
+  unitPriceBaseUnit: 'JM za cijenu',
+  anchorPriceAsOf: 'Datum sidrene cijene',
 }
 
 /**

@@ -10,6 +10,7 @@
 import { eq, and, sql, inArray } from 'drizzle-orm'
 import * as schema from '@/db/schema'
 import {
+  chains,
   stores,
   storeIdentifiers,
   retailerItems,
@@ -418,7 +419,8 @@ async function batchUpsertRetailerItems(
   // Step 4: Collect rows that still need to be inserted
   const rowsToInsert = rows.filter((r) => !matchedRowIndices.has(r.rowIndex))
 
-  // Step 5: Batch insert new items
+  // Step 5: Batch insert new items in smaller chunks to avoid overwhelming the database
+  const INSERT_BATCH_SIZE = 50
   if (rowsToInsert.length > 0) {
     const newItems = rowsToInsert.map(({ rowIndex, row }) => {
       const id = generatePrefixedId('rit')
@@ -438,7 +440,10 @@ async function batchUpsertRetailerItems(
       }
     })
 
-    await db.insert(retailerItems).values(newItems)
+    const insertChunks = chunk(newItems, INSERT_BATCH_SIZE)
+    for (const insertChunk of insertChunks) {
+      await db.insert(retailerItems).values(insertChunk)
+    }
   }
 
   return mappings
@@ -539,9 +544,13 @@ async function batchSyncBarcodes(
     }
   }
 
-  // Batch insert new barcodes
+  // Batch insert new barcodes in smaller chunks to avoid overwhelming the database
+  const INSERT_BATCH_SIZE = 50
   if (barcodesToInsert.length > 0) {
-    await db.insert(retailerItemBarcodes).values(barcodesToInsert)
+    const barcodeChunks = chunk(barcodesToInsert, INSERT_BATCH_SIZE)
+    for (const barcodeChunk of barcodeChunks) {
+      await db.insert(retailerItemBarcodes).values(barcodeChunk)
+    }
   }
 }
 
@@ -578,6 +587,130 @@ export async function resolveStoreId(
     .limit(1)
 
   return result.length > 0 ? result[0].storeId : null
+}
+
+// ============================================================================
+// Store Auto-Registration
+// ============================================================================
+
+/**
+ * Options for auto-registering a store when it doesn't exist.
+ */
+export interface StoreAutoRegisterOptions {
+  /** Store name (e.g., "RC DUGO SELO") */
+  name: string
+  /** Optional address extracted from filename or metadata */
+  address?: string
+  /** Optional city */
+  city?: string
+}
+
+/**
+ * Chain configuration for auto-registration.
+ */
+interface ChainConfig {
+  slug: string
+  name: string
+  website?: string
+}
+
+/** Known chain configurations for auto-registration */
+const CHAIN_CONFIGS: Record<string, ChainConfig> = {
+  ktc: { slug: 'ktc', name: 'KTC', website: 'https://www.ktc.hr' },
+  konzum: { slug: 'konzum', name: 'Konzum', website: 'https://www.konzum.hr' },
+  lidl: { slug: 'lidl', name: 'Lidl', website: 'https://www.lidl.hr' },
+  plodine: { slug: 'plodine', name: 'Plodine', website: 'https://www.plodine.hr' },
+  interspar: { slug: 'interspar', name: 'Interspar', website: 'https://www.interspar.hr' },
+  studenac: { slug: 'studenac', name: 'Studenac', website: 'https://www.studenac.hr' },
+  kaufland: { slug: 'kaufland', name: 'Kaufland', website: 'https://www.kaufland.hr' },
+  eurospin: { slug: 'eurospin', name: 'Eurospin', website: 'https://www.eurospin.hr' },
+  dm: { slug: 'dm', name: 'DM', website: 'https://www.dm.hr' },
+  metro: { slug: 'metro', name: 'Metro', website: 'https://www.metro.hr' },
+  trgocentar: { slug: 'trgocentar', name: 'Trgocentar', website: 'https://www.trgocentar.hr' },
+}
+
+/**
+ * Ensure a chain exists in the database.
+ * Creates it if it doesn't exist.
+ *
+ * @param db - Database instance
+ * @param chainSlug - Chain identifier
+ * @returns true if chain exists or was created
+ */
+export async function ensureChainExists(
+  db: AnyDatabase,
+  chainSlug: string,
+): Promise<boolean> {
+  // Check if chain exists
+  const existing = await db.query.chains.findFirst({
+    where: eq(chains.slug, chainSlug),
+  })
+
+  if (existing) {
+    return true
+  }
+
+  // Get chain config
+  const config = CHAIN_CONFIGS[chainSlug]
+  if (!config) {
+    console.warn(`[persist] Unknown chain slug: "${chainSlug}", cannot auto-register`)
+    return false
+  }
+
+  // Create chain
+  await db.insert(chains).values({
+    slug: config.slug,
+    name: config.name,
+    website: config.website,
+  })
+
+  console.log(`[persist] Auto-registered chain: ${config.name} (${config.slug})`)
+  return true
+}
+
+/**
+ * Auto-register a store when it's encountered for the first time.
+ *
+ * @param db - Database instance
+ * @param chainSlug - Chain identifier
+ * @param identifier - Store identifier value (e.g., "PJ50-1")
+ * @param identifierType - Type of identifier (defaults to 'filename_code')
+ * @param options - Store details for registration
+ * @returns Store ID if created successfully, null otherwise
+ */
+export async function autoRegisterStore(
+  db: AnyDatabase,
+  chainSlug: string,
+  identifier: string,
+  identifierType: string,
+  options: StoreAutoRegisterOptions,
+): Promise<string | null> {
+  // Ensure chain exists first
+  const chainExists = await ensureChainExists(db, chainSlug)
+  if (!chainExists) {
+    return null
+  }
+
+  // Create store
+  const storeId = generatePrefixedId('sto')
+  await db.insert(stores).values({
+    id: storeId,
+    chainSlug,
+    name: options.name,
+    address: options.address,
+    city: options.city,
+  })
+
+  // Create store identifier
+  await db.insert(storeIdentifiers).values({
+    id: generatePrefixedId('sid'),
+    storeId,
+    type: identifierType,
+    value: identifier,
+  })
+
+  console.log(`[persist] Auto-registered store: ${options.name} (${identifier}) for chain ${chainSlug}`)
+  return storeId
 }
 
 // ============================================================================
@@ -781,6 +914,8 @@ async function batchPersistPrices(
   }
 
   // Process new items - batch insert states and periods
+  // Use smaller sub-batches to avoid overwhelming the database
+  const INSERT_BATCH_SIZE = 50
   if (newItems.length > 0) {
     const newStates = newItems.map((item) => {
       const stateId = generatePrefixedId('sis')
@@ -810,10 +945,13 @@ async function batchPersistPrices(
       }
     })
 
-    // Batch insert store item states
-    await db.insert(storeItemState).values(newStates.map((s) => s.stateData))
+    // Batch insert store item states in smaller chunks
+    const stateChunks = chunk(newStates, INSERT_BATCH_SIZE)
+    for (const stateChunk of stateChunks) {
+      await db.insert(storeItemState).values(stateChunk.map((s) => s.stateData))
+    }
 
-    // Batch insert price periods
+    // Batch insert price periods in smaller chunks
     const newPeriods = newStates.map((s) => ({
       id: generatePrefixedId('sip'),
       storeItemStateId: s.stateId,
@@ -822,7 +960,10 @@ async function batchPersistPrices(
       startedAt: now,
     }))
 
-    await db.insert(storeItemPricePeriods).values(newPeriods)
+    const periodChunks = chunk(newPeriods, INSERT_BATCH_SIZE)
+    for (const periodChunk of periodChunks) {
+      await db.insert(storeItemPricePeriods).values(periodChunk)
+    }
   }
 
   // Process unchanged items - batch update lastSeenAt
@@ -926,7 +1067,12 @@ export async function persistRows(
   // Process in chunks to avoid memory issues
   const chunks = chunk(indexedRows, batchSize)
 
+  let chunkIndex = 0
   for (const rowChunk of chunks) {
+    chunkIndex++
+    if (chunks.length > 10 && chunkIndex % 10 === 0) {
+      console.log(`[persist] Processing batch ${chunkIndex}/${chunks.length} (${Math.round(chunkIndex / chunks.length * 100)}%)`)
+    }
     try {
       // Step 1: Batch upsert retailer items
       const mappings = await batchUpsertRetailerItems(
@@ -968,6 +1114,11 @@ export async function persistRows(
 
       // Step 4: Batch persist prices
       const priceResults = await batchPersistPrices(db, store.id, priceData)
+
+      // Log first batch completion and any batch with many new items
+      if (chunkIndex === 1) {
+        console.log(`[persist] First batch completed successfully`)
+      }
 
       // Update result statistics
       for (const pr of priceResults) {
@@ -1018,14 +1169,16 @@ export async function persistRows(
 
 /**
  * Persist rows using a store identifier instead of a resolved store.
- * Resolves the store first, then persists.
+ * Resolves the store first, then persists. If autoRegister is provided
+ * and the store doesn't exist, it will be created automatically.
  *
  * @param db - Database instance
  * @param chainSlug - Chain identifier
  * @param storeIdentifier - Store identifier value
  * @param rows - Normalized rows to persist
  * @param identifierType - Type of identifier (defaults to 'filename_code')
- * @returns Persist result, or null if store not found
+ * @param autoRegister - Optional options for auto-registering store if not found
+ * @returns Persist result, or null if store not found and auto-register not provided/failed
  */
 export async function persistRowsForStore(
   db: AnyDatabase,
@@ -1033,14 +1186,26 @@ export async function persistRowsForStore(
   storeIdentifier: string,
   rows: NormalizedRow[],
   identifierType: string = 'filename_code',
+  autoRegister?: StoreAutoRegisterOptions,
 ): Promise<PersistResult | null> {
   // Resolve store
-  const storeId = await resolveStoreId(
+  let storeId = await resolveStoreId(
     db,
     chainSlug,
     storeIdentifier,
     identifierType,
   )
+
+  // Auto-register if not found and options provided
+  if (!storeId && autoRegister) {
+    storeId = await autoRegisterStore(
+      db,
+      chainSlug,
+      storeIdentifier,
+      identifierType,
+      autoRegister,
+    )
+  }
 
   if (!storeId) {
     return null
@@ -1066,5 +1231,6 @@ export async function persistRowsForStore(
     longitude: storeData.longitude,
   }
 
+  console.log(`[persist] Starting persist for ${rows.length} rows...`)
   return persistRows(db, store, rows)
 }

@@ -85,6 +85,8 @@ export abstract class BaseChainAdapter implements ChainAdapter {
     const baseUrl = this.config.baseUrl
     const discoveredFiles: DiscoveredFile[] = []
 
+    console.log(`[DEBUG] Fetching ${this.name} portal: ${baseUrl}`)
+
     try {
       const response = await fetch(baseUrl, {
         headers: {
@@ -95,6 +97,7 @@ export abstract class BaseChainAdapter implements ChainAdapter {
 
       if (!response.ok) {
         console.error(`Failed to fetch ${this.name} portal: ${response.status} ${response.statusText}`)
+        console.error(`  URL: ${baseUrl}`)
         return []
       }
 
@@ -129,6 +132,7 @@ export abstract class BaseChainAdapter implements ChainAdapter {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       console.error(`Error discovering ${this.name} files: ${errorMessage}`)
+      console.error(`  URL: ${baseUrl}`)
       return []
     }
   }

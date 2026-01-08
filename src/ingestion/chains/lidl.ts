@@ -136,6 +136,8 @@ export class LidlAdapter extends BaseCsvAdapter {
     const discoveredFiles: DiscoveredFile[] = []
     const seenUrls = new Set<string>()
 
+    console.log(`[DEBUG] Fetching Lidl portal: ${this.config.baseUrl}`)
+
     try {
       const response = await fetch(this.config.baseUrl, {
         headers: {
@@ -146,6 +148,7 @@ export class LidlAdapter extends BaseCsvAdapter {
 
       if (!response.ok) {
         console.error(`Failed to fetch Lidl portal: ${response.status} ${response.statusText}`)
+        console.error(`  URL: ${this.config.baseUrl}`)
         return []
       }
 
@@ -228,6 +231,7 @@ export class LidlAdapter extends BaseCsvAdapter {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       console.error(`Error discovering Lidl files: ${errorMessage}`)
+      console.error(`  URL: ${this.config.baseUrl}`)
       return []
     }
   }

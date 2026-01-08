@@ -2,101 +2,79 @@
  * Metro Chain Adapter
  *
  * Adapter for parsing Metro retail chain price data files.
- * Metro uses XML format with store information embedded in the XML structure.
- * Store resolution is based on portal ID within the XML content.
+ * Metro uses CSV format with semicolon delimiter.
+ * Store resolution is based on portal ID within the content.
+ *
+ * Metro portal: https://metrocjenik.com.hr/
  */
 
-import type { XmlFieldMapping } from '../parsers/xml'
-import { BaseXmlAdapter } from './base'
+import type { CsvColumnMapping } from '../parsers/csv'
+import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
 /**
- * XML field mapping for Metro files.
- * Maps Metro's XML elements to NormalizedRow fields.
- * Metro XML structure typically has store info and product data nested.
+ * Column mapping for Metro CSV files.
+ * Maps Metro's column names to NormalizedRow fields.
  */
-const METRO_FIELD_MAPPING: XmlFieldMapping = {
-  storeIdentifier: (item) => {
-    // Extract store ID from item or parent store block
-    const storeId =
-      (item['store_id'] as string) ??
-      (item['storeId'] as string) ??
-      (item['Store'] as Record<string, unknown>)?.['Id'] as string ??
-      null
-    return storeId ? String(storeId) : null
-  },
-  externalId: 'code',
-  name: 'name',
-  description: 'description',
-  category: 'category',
-  subcategory: 'subcategory',
-  brand: 'brand',
-  unit: 'unit',
-  unitQuantity: 'quantity',
-  price: 'price',
-  discountPrice: 'discount_price',
-  discountStart: 'discount_start',
-  discountEnd: 'discount_end',
-  barcodes: 'barcode',
-  imageUrl: 'image_url',
+const METRO_COLUMN_MAPPING: CsvColumnMapping = {
+  externalId: 'Šifra',
+  name: 'Naziv',
+  category: 'Kategorija',
+  brand: 'Marka',
+  unit: 'Mjerna jedinica',
+  unitQuantity: 'Količina',
+  price: 'Cijena',
+  discountPrice: 'Akcijska cijena',
+  discountStart: 'Početak akcije',
+  discountEnd: 'Kraj akcije',
+  barcodes: 'Barkod',
   // Croatian price transparency fields
-  unitPrice: 'unit_price',
-  unitPriceBaseQuantity: 'unit_price_quantity',
-  unitPriceBaseUnit: 'unit_price_unit',
-  lowestPrice30d: 'lowest_price_30d',
-  anchorPrice: 'anchor_price',
-  anchorPriceAsOf: 'anchor_price_date',
+  unitPrice: 'Cijena za jedinicu mjere',
+  lowestPrice30d: 'Najniža cijena u zadnjih 30 dana',
+  anchorPrice: 'Sidrena cijena',
+  unitPriceBaseQuantity: 'Količina za jedinicu mjere',
+  unitPriceBaseUnit: 'Jedinica mjere za cijenu',
+  anchorPriceAsOf: 'Datum sidrene cijene',
 }
 
 /**
- * Alternative field mapping for Metro XML files (uppercase/different naming).
+ * Alternative column mapping for Metro CSV files.
+ * Some Metro exports may use abbreviated or different column names.
  */
-const METRO_FIELD_MAPPING_ALT: XmlFieldMapping = {
-  storeIdentifier: (item) => {
-    const storeId =
-      (item['StoreId'] as string) ??
-      (item['STORE_ID'] as string) ??
-      (item['Poslovnica'] as Record<string, unknown>)?.['Id'] as string ??
-      null
-    return storeId ? String(storeId) : null
-  },
+const METRO_COLUMN_MAPPING_ALT: CsvColumnMapping = {
   externalId: 'Sifra',
-  name: 'Naziv',
-  description: 'Opis',
+  name: 'Naziv artikla',
   category: 'Kategorija',
-  subcategory: 'Podkategorija',
   brand: 'Marka',
-  unit: 'Jedinica',
+  unit: 'JM',
   unitQuantity: 'Kolicina',
   price: 'Cijena',
-  discountPrice: 'AkcijskaCijena',
-  discountStart: 'PocetakAkcije',
-  discountEnd: 'KrajAkcije',
-  barcodes: 'Barkod',
-  imageUrl: 'Slika',
+  discountPrice: 'Akcija',
+  discountStart: 'Pocetak akcije',
+  discountEnd: 'Kraj akcije',
+  barcodes: 'EAN',
   // Croatian price transparency fields
-  unitPrice: 'CijenaZaJedinicuMjere',
-  unitPriceBaseQuantity: 'JedinicaMjereKolicina',
-  unitPriceBaseUnit: 'JedinicaMjereOznaka',
-  lowestPrice30d: 'NajnizaCijena30Dana',
-  anchorPrice: 'SidrenaCijena',
-  anchorPriceAsOf: 'SidrenaCijenaDatum',
+  unitPrice: 'Cijena za jedinicu mjere',
+  lowestPrice30d: 'Najniza cijena u zadnjih 30 dana',
+  anchorPrice: 'Sidrena cijena',
+  unitPriceBaseQuantity: 'Kolicina za JM',
+  unitPriceBaseUnit: 'JM za cijenu',
+  anchorPriceAsOf: 'Datum sidrene cijene',
 }
 
 /**
  * Metro chain adapter implementation.
- * Extends BaseXmlAdapter for common XML parsing functionality.
+ * Extends BaseCsvAdapter for common CSV parsing functionality.
  */
-export class MetroAdapter extends BaseXmlAdapter {
+export class MetroAdapter extends BaseCsvAdapter {
   constructor() {
     super({
       slug: 'metro',
       name: 'Metro',
-      supportedTypes: ['xml'],
+      supportedTypes: ['csv'],
       chainConfig: CHAIN_CONFIGS.metro,
-      fieldMapping: METRO_FIELD_MAPPING,
-      alternativeFieldMapping: METRO_FIELD_MAPPING_ALT,
-      defaultItemsPath: 'products.product',
+      columnMapping: METRO_COLUMN_MAPPING,
+      alternativeColumnMapping: METRO_COLUMN_MAPPING_ALT,
       filenamePrefixPatterns: [
         /^Metro[_-]?/i,
         /^cjenik[_-]?/i,

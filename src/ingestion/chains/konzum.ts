@@ -119,6 +119,7 @@ export class KonzumAdapter extends BaseCsvAdapter {
 
     while (page <= maxPages) {
       const pageUrl = `${this.config.baseUrl}?date=${date}&page=${page}`
+      console.log(`[DEBUG] Fetching Konzum page ${page}: ${pageUrl}`)
 
       try {
         const response = await fetch(pageUrl, {
@@ -130,6 +131,7 @@ export class KonzumAdapter extends BaseCsvAdapter {
 
         if (!response.ok) {
           console.error(`Failed to fetch Konzum portal page ${page}: ${response.status} ${response.statusText}`)
+          console.error(`  URL: ${pageUrl}`)
           break
         }
 
@@ -182,6 +184,7 @@ export class KonzumAdapter extends BaseCsvAdapter {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         console.error(`Error discovering Konzum files on page ${page}: ${errorMessage}`)
+        console.error(`  URL: ${pageUrl}`)
         break
       }
     }
