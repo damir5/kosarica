@@ -47,6 +47,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { StoreAddModal } from '@/components/admin/stores'
 
 export const Route = createFileRoute('/_admin/admin/stores')({
   component: StoresPage,
@@ -99,6 +100,8 @@ function StoresPage() {
   const [linkModalStore, setLinkModalStore] = useState<PhysicalStore | null>(null)
   const [unlinkModalStore, setUnlinkModalStore] = useState<PhysicalStore | null>(null)
   const [selectedPriceSource, setSelectedPriceSource] = useState<string>('')
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [addModalChain, setAddModalChain] = useState<{ slug: string; name: string } | null>(null)
 
   // Debounce search
   useEffect(() => {
@@ -338,10 +341,30 @@ function StoresPage() {
                       Real-world store addresses. They inherit prices from a virtual source or have their own.
                     </CardDescription>
                   </div>
-                  <Button variant="outline" size="sm" disabled>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Physical Location
-                  </Button>
+                  <Select
+                    value=""
+                    onValueChange={(chainSlug) => {
+                      const chain = CHAINS.find((c) => c.slug === chainSlug)
+                      if (chain) {
+                        setAddModalChain({ slug: chain.slug, name: chain.name })
+                        setAddModalOpen(true)
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-auto">
+                      <span className="flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add Physical Location
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CHAINS.map((chain) => (
+                        <SelectItem key={chain.slug} value={chain.slug}>
+                          {chain.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardHeader>
               <CardContent>
@@ -537,6 +560,21 @@ function StoresPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add Physical Store Modal */}
+      {addModalChain && (
+        <StoreAddModal
+          open={addModalOpen}
+          onOpenChange={(open) => {
+            setAddModalOpen(open)
+            if (!open) {
+              setAddModalChain(null)
+            }
+          }}
+          chainSlug={addModalChain.slug}
+          chainName={addModalChain.name}
+        />
+      )}
     </div>
   )
 }

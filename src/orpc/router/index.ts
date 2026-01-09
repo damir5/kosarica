@@ -16,6 +16,7 @@ import {
 import { getSettings, updateSettings } from "./settings";
 import {
 	approveStore,
+	createPhysicalStore,
 	getEnrichmentTasks,
 	getLinkedPhysicalStores,
 	getPendingStores,
@@ -77,6 +78,7 @@ export default {
 			listPhysical: listPhysicalStores,
 			getVirtualStoresForLinking: getVirtualStoresForLinking,
 			get: getStore,
+			create: createPhysicalStore,
 			update: updateStore,
 			approve: approveStore,
 			reject: rejectStore,

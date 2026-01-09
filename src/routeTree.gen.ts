@@ -29,12 +29,16 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users'
 import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stores'
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
+import { Route as AdminAdminIngestionRouteImport } from './routes/_admin.admin.ingestion'
 import { Route as DemoStartSsrIndexRouteImport } from './routes/demo/start.ssr.index'
 import { Route as AdminAdminConfigIndexRouteImport } from './routes/_admin.admin.config.index'
 import { Route as DemoStartSsrSpaModeRouteImport } from './routes/demo/start.ssr.spa-mode'
 import { Route as DemoStartSsrFullSsrRouteImport } from './routes/demo/start.ssr.full-ssr'
 import { Route as DemoStartSsrDataOnlyRouteImport } from './routes/demo/start.ssr.data-only'
+import { Route as AdminAdminStoresPendingRouteImport } from './routes/_admin.admin.stores.pending'
 import { Route as AdminAdminStoresStoreIdRouteImport } from './routes/_admin.admin.stores.$storeId'
+import { Route as AdminAdminIngestionRunIdRouteImport } from './routes/_admin.admin.ingestion.$runId'
+import { Route as AdminAdminIngestionRunIdFileIdRouteImport } from './routes/_admin.admin.ingestion.$runId.$fileId'
 
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
@@ -135,6 +139,11 @@ const AdminAdminSettingsRoute = AdminAdminSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AdminAdminRoute,
 } as any)
+const AdminAdminIngestionRoute = AdminAdminIngestionRouteImport.update({
+  id: '/ingestion',
+  path: '/ingestion',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
 const DemoStartSsrIndexRoute = DemoStartSsrIndexRouteImport.update({
   id: '/demo/start/ssr/',
   path: '/demo/start/ssr/',
@@ -160,11 +169,28 @@ const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
   path: '/demo/start/ssr/data-only',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminAdminStoresPendingRoute = AdminAdminStoresPendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => AdminAdminStoresRoute,
+} as any)
 const AdminAdminStoresStoreIdRoute = AdminAdminStoresStoreIdRouteImport.update({
   id: '/$storeId',
   path: '/$storeId',
   getParentRoute: () => AdminAdminStoresRoute,
 } as any)
+const AdminAdminIngestionRunIdRoute =
+  AdminAdminIngestionRunIdRouteImport.update({
+    id: '/$runId',
+    path: '/$runId',
+    getParentRoute: () => AdminAdminIngestionRoute,
+  } as any)
+const AdminAdminIngestionRunIdFileIdRoute =
+  AdminAdminIngestionRunIdFileIdRouteImport.update({
+    id: '/$fileId',
+    path: '/$fileId',
+    getParentRoute: () => AdminAdminIngestionRunIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -176,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
   '/admin/users': typeof AdminAdminUsersRoute
@@ -186,12 +213,15 @@ export interface FileRoutesByFullPath {
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/admin/': typeof AdminAdminIndexRoute
+  '/admin/ingestion/$runId': typeof AdminAdminIngestionRunIdRouteWithChildren
   '/admin/stores/$storeId': typeof AdminAdminStoresStoreIdRoute
+  '/admin/stores/pending': typeof AdminAdminStoresPendingRoute
   '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
   '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
   '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
   '/admin/config': typeof AdminAdminConfigIndexRoute
   '/demo/start/ssr': typeof DemoStartSsrIndexRoute
+  '/admin/ingestion/$runId/$fileId': typeof AdminAdminIngestionRunIdFileIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -202,6 +232,7 @@ export interface FileRoutesByTo {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
   '/admin/users': typeof AdminAdminUsersRoute
@@ -212,12 +243,15 @@ export interface FileRoutesByTo {
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/admin': typeof AdminAdminIndexRoute
+  '/admin/ingestion/$runId': typeof AdminAdminIngestionRunIdRouteWithChildren
   '/admin/stores/$storeId': typeof AdminAdminStoresStoreIdRoute
+  '/admin/stores/pending': typeof AdminAdminStoresPendingRoute
   '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
   '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
   '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
   '/admin/config': typeof AdminAdminConfigIndexRoute
   '/demo/start/ssr': typeof DemoStartSsrIndexRoute
+  '/admin/ingestion/$runId/$fileId': typeof AdminAdminIngestionRunIdFileIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -231,6 +265,7 @@ export interface FileRoutesById {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/_admin/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
   '/_admin/admin/stores': typeof AdminAdminStoresRouteWithChildren
   '/_admin/admin/users': typeof AdminAdminUsersRoute
@@ -241,12 +276,15 @@ export interface FileRoutesById {
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/_admin/admin/': typeof AdminAdminIndexRoute
+  '/_admin/admin/ingestion/$runId': typeof AdminAdminIngestionRunIdRouteWithChildren
   '/_admin/admin/stores/$storeId': typeof AdminAdminStoresStoreIdRoute
+  '/_admin/admin/stores/pending': typeof AdminAdminStoresPendingRoute
   '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
   '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
   '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
   '/_admin/admin/config/': typeof AdminAdminConfigIndexRoute
   '/demo/start/ssr/': typeof DemoStartSsrIndexRoute
+  '/_admin/admin/ingestion/$runId/$fileId': typeof AdminAdminIngestionRunIdFileIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -260,6 +298,7 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/admin/ingestion'
     | '/admin/settings'
     | '/admin/stores'
     | '/admin/users'
@@ -270,12 +309,15 @@ export interface FileRouteTypes {
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
     | '/admin/'
+    | '/admin/ingestion/$runId'
     | '/admin/stores/$storeId'
+    | '/admin/stores/pending'
     | '/demo/start/ssr/data-only'
     | '/demo/start/ssr/full-ssr'
     | '/demo/start/ssr/spa-mode'
     | '/admin/config'
     | '/demo/start/ssr'
+    | '/admin/ingestion/$runId/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -286,6 +328,7 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/admin/ingestion'
     | '/admin/settings'
     | '/admin/stores'
     | '/admin/users'
@@ -296,12 +339,15 @@ export interface FileRouteTypes {
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
     | '/admin'
+    | '/admin/ingestion/$runId'
     | '/admin/stores/$storeId'
+    | '/admin/stores/pending'
     | '/demo/start/ssr/data-only'
     | '/demo/start/ssr/full-ssr'
     | '/demo/start/ssr/spa-mode'
     | '/admin/config'
     | '/demo/start/ssr'
+    | '/admin/ingestion/$runId/$fileId'
   id:
     | '__root__'
     | '/'
@@ -314,6 +360,7 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/_admin/admin/ingestion'
     | '/_admin/admin/settings'
     | '/_admin/admin/stores'
     | '/_admin/admin/users'
@@ -324,12 +371,15 @@ export interface FileRouteTypes {
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
     | '/_admin/admin/'
+    | '/_admin/admin/ingestion/$runId'
     | '/_admin/admin/stores/$storeId'
+    | '/_admin/admin/stores/pending'
     | '/demo/start/ssr/data-only'
     | '/demo/start/ssr/full-ssr'
     | '/demo/start/ssr/spa-mode'
     | '/_admin/admin/config/'
     | '/demo/start/ssr/'
+    | '/_admin/admin/ingestion/$runId/$fileId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -496,6 +546,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminSettingsRouteImport
       parentRoute: typeof AdminAdminRoute
     }
+    '/_admin/admin/ingestion': {
+      id: '/_admin/admin/ingestion'
+      path: '/ingestion'
+      fullPath: '/admin/ingestion'
+      preLoaderRoute: typeof AdminAdminIngestionRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
     '/demo/start/ssr/': {
       id: '/demo/start/ssr/'
       path: '/demo/start/ssr'
@@ -531,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoStartSsrDataOnlyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_admin/admin/stores/pending': {
+      id: '/_admin/admin/stores/pending'
+      path: '/pending'
+      fullPath: '/admin/stores/pending'
+      preLoaderRoute: typeof AdminAdminStoresPendingRouteImport
+      parentRoute: typeof AdminAdminStoresRoute
+    }
     '/_admin/admin/stores/$storeId': {
       id: '/_admin/admin/stores/$storeId'
       path: '/$storeId'
@@ -538,21 +602,63 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminStoresStoreIdRouteImport
       parentRoute: typeof AdminAdminStoresRoute
     }
+    '/_admin/admin/ingestion/$runId': {
+      id: '/_admin/admin/ingestion/$runId'
+      path: '/$runId'
+      fullPath: '/admin/ingestion/$runId'
+      preLoaderRoute: typeof AdminAdminIngestionRunIdRouteImport
+      parentRoute: typeof AdminAdminIngestionRoute
+    }
+    '/_admin/admin/ingestion/$runId/$fileId': {
+      id: '/_admin/admin/ingestion/$runId/$fileId'
+      path: '/$fileId'
+      fullPath: '/admin/ingestion/$runId/$fileId'
+      preLoaderRoute: typeof AdminAdminIngestionRunIdFileIdRouteImport
+      parentRoute: typeof AdminAdminIngestionRunIdRoute
+    }
   }
 }
 
+interface AdminAdminIngestionRunIdRouteChildren {
+  AdminAdminIngestionRunIdFileIdRoute: typeof AdminAdminIngestionRunIdFileIdRoute
+}
+
+const AdminAdminIngestionRunIdRouteChildren: AdminAdminIngestionRunIdRouteChildren =
+  {
+    AdminAdminIngestionRunIdFileIdRoute: AdminAdminIngestionRunIdFileIdRoute,
+  }
+
+const AdminAdminIngestionRunIdRouteWithChildren =
+  AdminAdminIngestionRunIdRoute._addFileChildren(
+    AdminAdminIngestionRunIdRouteChildren,
+  )
+
+interface AdminAdminIngestionRouteChildren {
+  AdminAdminIngestionRunIdRoute: typeof AdminAdminIngestionRunIdRouteWithChildren
+}
+
+const AdminAdminIngestionRouteChildren: AdminAdminIngestionRouteChildren = {
+  AdminAdminIngestionRunIdRoute: AdminAdminIngestionRunIdRouteWithChildren,
+}
+
+const AdminAdminIngestionRouteWithChildren =
+  AdminAdminIngestionRoute._addFileChildren(AdminAdminIngestionRouteChildren)
+
 interface AdminAdminStoresRouteChildren {
   AdminAdminStoresStoreIdRoute: typeof AdminAdminStoresStoreIdRoute
+  AdminAdminStoresPendingRoute: typeof AdminAdminStoresPendingRoute
 }
 
 const AdminAdminStoresRouteChildren: AdminAdminStoresRouteChildren = {
   AdminAdminStoresStoreIdRoute: AdminAdminStoresStoreIdRoute,
+  AdminAdminStoresPendingRoute: AdminAdminStoresPendingRoute,
 }
 
 const AdminAdminStoresRouteWithChildren =
   AdminAdminStoresRoute._addFileChildren(AdminAdminStoresRouteChildren)
 
 interface AdminAdminRouteChildren {
+  AdminAdminIngestionRoute: typeof AdminAdminIngestionRouteWithChildren
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
   AdminAdminStoresRoute: typeof AdminAdminStoresRouteWithChildren
   AdminAdminUsersRoute: typeof AdminAdminUsersRoute
@@ -561,6 +667,7 @@ interface AdminAdminRouteChildren {
 }
 
 const AdminAdminRouteChildren: AdminAdminRouteChildren = {
+  AdminAdminIngestionRoute: AdminAdminIngestionRouteWithChildren,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,
   AdminAdminStoresRoute: AdminAdminStoresRouteWithChildren,
   AdminAdminUsersRoute: AdminAdminUsersRoute,

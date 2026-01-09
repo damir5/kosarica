@@ -3,6 +3,7 @@ import { and, count, desc, eq, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
 import { getDb } from "@/utils/bindings";
+import { generatePrefixedId } from "@/utils/id";
 
 // ============================================================================
 // Core Store Operations
@@ -601,4 +602,68 @@ export const verifyEnrichment = os
 		}
 
 		return { success: true };
+	});
+
+// ============================================================================
+// Create Physical Store
+// ============================================================================
+
+export const createPhysicalStore = os
+	.input(
+		z.object({
+			chainSlug: z.string(),
+			name: z.string().min(1, "Name is required"),
+			address: z.string().optional(),
+			city: z.string().optional(),
+			latitude: z.string().optional(),
+			longitude: z.string().optional(),
+			priceSourceStoreId: z.string().optional(),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const db = getDb();
+
+		// If priceSourceStoreId is provided, verify it exists and is a virtual store
+		if (input.priceSourceStoreId) {
+			const priceSource = await db
+				.select()
+				.from(stores)
+				.where(eq(stores.id, input.priceSourceStoreId));
+			if (priceSource.length === 0) {
+				throw new Error("Price source store not found");
+			}
+			if (!priceSource[0].isVirtual) {
+				throw new Error("Price source must be a virtual store");
+			}
+			if (priceSource[0].chainSlug !== input.chainSlug) {
+				throw new Error("Price source must be from the same chain");
+			}
+		}
+
+		// Generate ID manually since D1 doesn't support .returning()
+		const storeId = generatePrefixedId("sto");
+		const now = new Date();
+
+		await db.insert(stores).values({
+			id: storeId,
+			chainSlug: input.chainSlug,
+			name: input.name,
+			address: input.address || null,
+			city: input.city || null,
+			latitude: input.latitude || null,
+			longitude: input.longitude || null,
+			isVirtual: false,
+			priceSourceStoreId: input.priceSourceStoreId || null,
+			status: "active",
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		// Fetch the created store to return it
+		const [createdStore] = await db
+			.select()
+			.from(stores)
+			.where(eq(stores.id, storeId));
+
+		return { store: createdStore };
 	});
