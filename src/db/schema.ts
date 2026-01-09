@@ -116,11 +116,17 @@ export const stores = sqliteTable('stores', {
   postalCode: text('postal_code'),
   latitude: text('latitude'), // stored as text for precision
   longitude: text('longitude'),
+  // Virtual store support
+  isVirtual: integer('is_virtual', { mode: 'boolean' }).default(true),
+  priceSourceStoreId: text('price_source_store_id').references(() => stores.id),
+  status: text('status').default('active'), // 'active' | 'pending'
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 }, (table) => ({
   chainSlugIdx: index('stores_chain_slug_idx').on(table.chainSlug),
   cityIdx: index('stores_city_idx').on(table.city),
+  statusIdx: index('stores_status_idx').on(table.status),
+  priceSourceIdx: index('stores_price_source_idx').on(table.priceSourceStoreId),
 }))
 
 export const storeIdentifiers = sqliteTable('store_identifiers', {
