@@ -20,6 +20,7 @@ import {
 } from '@/db/schema'
 import { generatePrefixedId } from '@/utils/id'
 import { computeSha256 } from './storage'
+import { computeBatchSize } from './sql'
 import type { NormalizedRow, StoreDescriptor } from './types'
 
 // ============================================================================
@@ -52,8 +53,67 @@ type DatabaseConnection = any
 /** Default batch size for batch operations - reduced to stay under D1's 100 bound parameter limit */
 const DEFAULT_BATCH_SIZE = 50
 
-/** Max rows per INSERT to stay under D1's 100 bound parameter limit (~10 columns) */
-const INSERT_BATCH_SIZE = 8
+/**
+ * Dynamic batch sizes computed based on column counts.
+ * D1 has a limit of 100 bound params per query; we use 80 for safety.
+ */
+const BATCH_SIZE_RETAILER_ITEMS = computeBatchSize(11) // 11 columns → 7 rows
+const BATCH_SIZE_BARCODES = computeBatchSize(4) // 4 columns → 20 rows
+const BATCH_SIZE_STORE_ITEM_STATE = computeBatchSize(18) // 18 columns → 4 rows
+const BATCH_SIZE_PRICE_PERIODS = computeBatchSize(5) // 5 columns → 16 rows
+
+/** Maximum retry attempts for SQLITE_BUSY errors */
+const MAX_BUSY_RETRIES = 10
+
+/** Base delay in ms for SQLITE_BUSY retry backoff (exponential) */
+const BUSY_RETRY_DELAY_MS = 100
+
+/**
+ * Retry a database operation on SQLITE_BUSY errors with exponential backoff.
+ *
+ * @param operation - The async operation to retry
+ * @param operationName - Name of the operation for error messages
+ * @returns Result of the operation
+ */
+async function retryOnBusy<T>(
+  operation: () => Promise<T>,
+  operationName: string = 'database operation',
+): Promise<T> {
+  let lastError: Error | undefined
+  for (let attempt = 0; attempt < MAX_BUSY_RETRIES; attempt++) {
+    try {
+      return await operation()
+    } catch (error) {
+      const err = error as Error
+      lastError = err
+
+      // Check if it's a SQLITE_BUSY error
+      const isBusyError =
+        err.message.includes('SQLITE_BUSY') ||
+        err.message.includes('database is locked') ||
+        err.message.includes('database is locked: SQLITE_BUSY')
+
+      if (!isBusyError) {
+        // Not a busy error, rethrow immediately
+        throw err
+      }
+
+      // Calculate exponential backoff delay
+      const delay = BUSY_RETRY_DELAY_MS * Math.pow(2, attempt)
+
+      // Log retry (only on first attempt and every 3rd attempt to reduce noise)
+      if (attempt === 0 || (attempt + 1) % 3 === 0) {
+        console.log(`[retry] ${operationName}: database busy, retry ${attempt + 1}/${MAX_BUSY_RETRIES} after ${delay}ms`)
+      }
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+
+  // All retries exhausted
+  throw new Error(`Failed after ${MAX_BUSY_RETRIES} retries: ${lastError?.message || 'unknown error'}`)
+}
 
 // ============================================================================
 // Price Signature
@@ -422,8 +482,7 @@ async function batchUpsertRetailerItems(
   // Step 4: Collect rows that still need to be inserted
   const rowsToInsert = rows.filter((r) => !matchedRowIndices.has(r.rowIndex))
 
-  // Step 5: Batch insert new items in smaller chunks to avoid overwhelming the database
-  const INSERT_BATCH_SIZE = 50
+  // Step 5: Batch insert new items in smaller chunks to stay under D1's param limit
   if (rowsToInsert.length > 0) {
     const newItems = rowsToInsert.map(({ rowIndex, row }) => {
       const id = generatePrefixedId('rit')
@@ -443,7 +502,7 @@ async function batchUpsertRetailerItems(
       }
     })
 
-    const insertChunks = chunk(newItems, INSERT_BATCH_SIZE)
+    const insertChunks = chunk(newItems, BATCH_SIZE_RETAILER_ITEMS)
     for (const insertChunk of insertChunks) {
       await db.insert(retailerItems).values(insertChunk)
     }
@@ -547,10 +606,9 @@ async function batchSyncBarcodes(
     }
   }
 
-  // Batch insert new barcodes in smaller chunks to avoid overwhelming the database
-  const INSERT_BATCH_SIZE = 50
+  // Batch insert new barcodes in smaller chunks to stay under D1's param limit
   if (barcodesToInsert.length > 0) {
-    const barcodeChunks = chunk(barcodesToInsert, INSERT_BATCH_SIZE)
+    const barcodeChunks = chunk(barcodesToInsert, BATCH_SIZE_BARCODES)
     for (const barcodeChunk of barcodeChunks) {
       await db.insert(retailerItemBarcodes).values(barcodeChunk)
     }
@@ -917,8 +975,7 @@ async function batchPersistPrices(
   }
 
   // Process new items - batch insert states and periods
-  // Use smaller sub-batches to avoid overwhelming the database
-  const INSERT_BATCH_SIZE = 50
+  // Use smaller sub-batches to stay under D1's 100 bound parameter limit
   if (newItems.length > 0) {
     const newStates = newItems.map((item) => {
       const stateId = generatePrefixedId('sis')
@@ -949,7 +1006,7 @@ async function batchPersistPrices(
     })
 
     // Batch insert store item states in smaller chunks
-    const stateChunks = chunk(newStates, INSERT_BATCH_SIZE)
+    const stateChunks = chunk(newStates, BATCH_SIZE_STORE_ITEM_STATE)
     for (const stateChunk of stateChunks) {
       await db.insert(storeItemState).values(stateChunk.map((s) => s.stateData))
     }
@@ -963,7 +1020,7 @@ async function batchPersistPrices(
       startedAt: now,
     }))
 
-    const periodChunks = chunk(newPeriods, INSERT_BATCH_SIZE)
+    const periodChunks = chunk(newPeriods, BATCH_SIZE_PRICE_PERIODS)
     for (const periodChunk of periodChunks) {
       await db.insert(storeItemPricePeriods).values(periodChunk)
     }
@@ -1187,8 +1244,8 @@ async function persistRowChunkBatched(
     })
   )
 
-  // Execute all lookups in single batch
-  const lookupResults = await db.batch(lookupQueries)
+  // Execute all lookups in single batch (with retry for SQLITE_BUSY)
+  const lookupResults = await retryOnBusy(() => db.batch(lookupQueries), 'lookup batch')
 
   // Parse lookup results
   let queryIndex = 0
@@ -1276,7 +1333,7 @@ async function persistRowChunkBatched(
     })
   )
 
-  const lookupResults2 = lookupQueries2.length > 0 ? await db.batch(lookupQueries2) : []
+  const lookupResults2 = lookupQueries2.length > 0 ? await retryOnBusy(() => db.batch(lookupQueries2), 'barcode/state lookup batch') : []
 
   // Parse barcode lookup results
   let queryIndex2 = 0
@@ -1393,7 +1450,7 @@ async function persistRowChunkBatched(
       imageUrl: row.imageUrl,
     }))
 
-    for (const insertChunk of chunk(insertData, INSERT_BATCH_SIZE)) {
+    for (const insertChunk of chunk(insertData, BATCH_SIZE_RETAILER_ITEMS)) {
       writeQueries.push(db.insert(retailerItems).values(insertChunk))
     }
   }
@@ -1418,7 +1475,7 @@ async function persistRowChunkBatched(
   }
 
   if (barcodeInserts.length > 0) {
-    for (const insertChunk of chunk(barcodeInserts, INSERT_BATCH_SIZE)) {
+    for (const insertChunk of chunk(barcodeInserts, BATCH_SIZE_BARCODES)) {
       writeQueries.push(db.insert(retailerItemBarcodes).values(insertChunk))
     }
   }
@@ -1444,7 +1501,7 @@ async function persistRowChunkBatched(
       updatedAt: now,
     }))
 
-    for (const insertChunk of chunk(stateInserts, INSERT_BATCH_SIZE)) {
+    for (const insertChunk of chunk(stateInserts, BATCH_SIZE_STORE_ITEM_STATE)) {
       writeQueries.push(db.insert(storeItemState).values(insertChunk))
     }
 
@@ -1457,7 +1514,7 @@ async function persistRowChunkBatched(
       startedAt: now,
     }))
 
-    for (const insertChunk of chunk(periodInserts, INSERT_BATCH_SIZE)) {
+    for (const insertChunk of chunk(periodInserts, BATCH_SIZE_PRICE_PERIODS)) {
       writeQueries.push(db.insert(storeItemPricePeriods).values(insertChunk))
     }
   }
@@ -1520,9 +1577,9 @@ async function persistRowChunkBatched(
     )
   }
 
-  // Execute all writes in a single batch
+  // Execute all writes in a single batch (with retry for SQLITE_BUSY)
   if (writeQueries.length > 0) {
-    await db.batch(writeQueries)
+    await retryOnBusy(() => db.batch(writeQueries), 'write batch')
   }
 
   // Calculate results
