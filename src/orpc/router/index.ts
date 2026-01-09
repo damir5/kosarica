@@ -1,23 +1,87 @@
-import { addTodo, listTodos } from './todos'
-import { getConfigInfo } from './admin'
-import { listUsers, getUser, updateUserRole, deleteUser, banUser } from './users'
-import { getSettings, updateSettings } from './settings'
+import { getConfigInfo } from "./admin";
+import {
+	getChunk,
+	getFile,
+	getRun,
+	getStats,
+	listChunks,
+	listErrors,
+	listFiles,
+	listRuns,
+	rerunChunk,
+	rerunFile,
+	rerunRun,
+	triggerChain,
+} from "./ingestion";
+import { getSettings, updateSettings } from "./settings";
+import {
+	approveStore,
+	getEnrichmentTasks,
+	getLinkedPhysicalStores,
+	getPendingStores,
+	getStore,
+	linkPriceSource,
+	listStores,
+	mergeStores,
+	rejectStore,
+	triggerEnrichment,
+	unlinkPriceSource,
+	updateStore,
+	verifyEnrichment,
+} from "./stores";
+import { addTodo, listTodos } from "./todos";
+import {
+	banUser,
+	deleteUser,
+	getUser,
+	listUsers,
+	updateUserRole,
+} from "./users";
 
 export default {
-  listTodos,
-  addTodo,
-  admin: {
-    getConfigInfo,
-    users: {
-      list: listUsers,
-      get: getUser,
-      updateRole: updateUserRole,
-      delete: deleteUser,
-      ban: banUser,
-    },
-    settings: {
-      get: getSettings,
-      update: updateSettings,
-    },
-  },
-}
+	listTodos,
+	addTodo,
+	admin: {
+		getConfigInfo,
+		users: {
+			list: listUsers,
+			get: getUser,
+			updateRole: updateUserRole,
+			delete: deleteUser,
+			ban: banUser,
+		},
+		settings: {
+			get: getSettings,
+			update: updateSettings,
+		},
+		ingestion: {
+			listRuns,
+			getRun,
+			listFiles,
+			getFile,
+			listChunks,
+			getChunk,
+			listErrors,
+			getStats,
+			rerunRun,
+			rerunFile,
+			rerunChunk,
+			triggerChain,
+		},
+		stores: {
+			list: listStores,
+			get: getStore,
+			update: updateStore,
+			approve: approveStore,
+			reject: rejectStore,
+			merge: mergeStores,
+			linkPriceSource: linkPriceSource,
+			unlinkPriceSource: unlinkPriceSource,
+			getPending: getPendingStores,
+			getLinkedPhysical: getLinkedPhysicalStores,
+			triggerEnrichment: triggerEnrichment,
+			getEnrichmentTasks: getEnrichmentTasks,
+			verifyEnrichment: verifyEnrichment,
+		},
+	},
+};
