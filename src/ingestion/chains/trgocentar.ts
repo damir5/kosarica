@@ -2,96 +2,79 @@
  * Trgocentar Chain Adapter
  *
  * Adapter for parsing Trgocentar retail chain price data files.
- * Trgocentar uses XML format with store information embedded.
+ * Trgocentar uses CSV format with semicolon delimiter.
  * Store resolution is based on filename.
  *
  * Trgocentar portal: https://trgocentar.com/Trgovine-cjenik/
+ *
+ * CSV format:
+ * Šifra;Naziv;Kategorija;Marka;Mjerna jedinica;Količina;Cijena;Akcijska cijena;
+ * Početak akcije;Kraj akcije;Barkod;Cijena za jedinicu mjere;
+ * Najniža cijena u zadnjih 30 dana;Sidrena cijena;Količina za jedinicu mjere;
+ * Jedinica mjere za cijenu;Datum sidrene cijene
  */
 
 import type { DiscoveredFile } from '../core/types'
-import type { XmlFieldMapping } from '../parsers/xml'
-import { BaseXmlAdapter } from './base'
+import type { CsvColumnMapping } from '../parsers/csv'
+import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
 /**
- * XML field mapping for Trgocentar files.
- * Maps Trgocentar's XML elements to NormalizedRow fields.
+ * CSV column mapping for Trgocentar files.
+ * Maps Trgocentar's CSV columns to NormalizedRow fields.
  */
-const TRGOCENTAR_FIELD_MAPPING: XmlFieldMapping = {
-  storeIdentifier: (item) => {
-    // Extract store ID from item or parent store block
-    const storeId =
-      (item['store_id'] as string) ??
-      (item['storeId'] as string) ??
-      (item['Store'] as Record<string, unknown>)?.['Id'] as string ??
-      null
-    return storeId ? String(storeId) : null
-  },
-  externalId: 'code',
-  name: 'name',
-  description: 'description',
-  category: 'category',
-  subcategory: 'subcategory',
-  brand: 'brand',
-  unit: 'unit',
-  unitQuantity: 'quantity',
-  price: 'price',
-  discountPrice: 'discount_price',
-  discountStart: 'discount_start',
-  discountEnd: 'discount_end',
-  barcodes: 'barcode',
-  imageUrl: 'image_url',
+const TRGOCENTAR_COLUMN_MAPPING: CsvColumnMapping = {
+  externalId: 'Šifra',
+  name: 'Naziv',
+  category: 'Kategorija',
+  brand: 'Marka',
+  unit: 'Mjerna jedinica',
+  unitQuantity: 'Količina',
+  price: 'Cijena',
+  discountPrice: 'Akcijska cijena',
+  discountStart: 'Početak akcije',
+  discountEnd: 'Kraj akcije',
+  barcodes: 'Barkod',
   // Croatian price transparency fields
-  unitPrice: 'unit_price',
-  unitPriceBaseQuantity: 'unit_price_quantity',
-  unitPriceBaseUnit: 'unit_price_unit',
-  lowestPrice30d: 'lowest_price_30d',
-  anchorPrice: 'anchor_price',
-  anchorPriceAsOf: 'anchor_price_date',
+  unitPrice: 'Cijena za jedinicu mjere',
+  lowestPrice30d: 'Najniža cijena u zadnjih 30 dana',
+  anchorPrice: 'Sidrena cijena',
+  unitPriceBaseQuantity: 'Količina za jedinicu mjere',
+  unitPriceBaseUnit: 'Jedinica mjere za cijenu',
+  anchorPriceAsOf: 'Datum sidrene cijene',
 }
 
 /**
- * Alternative field mapping for Trgocentar XML files (Croatian naming).
+ * Alternative column mapping for Trgocentar CSV files (ASCII/English).
  */
-const TRGOCENTAR_FIELD_MAPPING_ALT: XmlFieldMapping = {
-  storeIdentifier: (item) => {
-    const storeId =
-      (item['StoreId'] as string) ??
-      (item['STORE_ID'] as string) ??
-      (item['Poslovnica'] as Record<string, unknown>)?.['Id'] as string ??
-      null
-    return storeId ? String(storeId) : null
-  },
+const TRGOCENTAR_COLUMN_MAPPING_ALT: CsvColumnMapping = {
   externalId: 'Sifra',
   name: 'Naziv',
-  description: 'Opis',
   category: 'Kategorija',
-  subcategory: 'Podkategorija',
   brand: 'Marka',
-  unit: 'Jedinica',
+  unit: 'Mjerna jedinica',
   unitQuantity: 'Kolicina',
   price: 'Cijena',
-  discountPrice: 'AkcijskaCijena',
-  discountStart: 'PocetakAkcije',
-  discountEnd: 'KrajAkcije',
+  discountPrice: 'Akcijska cijena',
+  discountStart: 'Pocetak akcije',
+  discountEnd: 'Kraj akcije',
   barcodes: 'Barkod',
-  imageUrl: 'Slika',
   // Croatian price transparency fields
-  unitPrice: 'CijenaZaJedinicuMjere',
-  unitPriceBaseQuantity: 'JedinicaMjereKolicina',
-  unitPriceBaseUnit: 'JedinicaMjereOznaka',
-  lowestPrice30d: 'NajnizaCijena30Dana',
-  anchorPrice: 'SidrenaCijena',
-  anchorPriceAsOf: 'SidrenaCijenaDatum',
+  unitPrice: 'Cijena za jedinicu mjere',
+  lowestPrice30d: 'Najniza cijena u zadnjih 30 dana',
+  anchorPrice: 'Sidrena cijena',
+  unitPriceBaseQuantity: 'Kolicina za jedinicu mjere',
+  unitPriceBaseUnit: 'Jedinica mjere za cijenu',
+  anchorPriceAsOf: 'Datum sidrene cijene',
 }
 
 /**
  * Trgocentar chain adapter implementation.
- * Extends BaseXmlAdapter for common XML parsing functionality.
+ * Extends BaseCsvAdapter for common CSV parsing functionality.
  *
  * Supports date-based discovery via setDiscoveryDate() method.
  */
-export class TrgocentarAdapter extends BaseXmlAdapter {
+export class TrgocentarAdapter extends BaseCsvAdapter {
   /** Date to discover files for (YYYY-MM-DD format, set by CLI before discovery) */
   private discoveryDate: string | null = null
 
@@ -99,11 +82,10 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
     super({
       slug: 'trgocentar',
       name: 'Trgocentar',
-      supportedTypes: ['xml'],
+      supportedTypes: ['csv'],
       chainConfig: CHAIN_CONFIGS.trgocentar,
-      fieldMapping: TRGOCENTAR_FIELD_MAPPING,
-      alternativeFieldMapping: TRGOCENTAR_FIELD_MAPPING_ALT,
-      defaultItemsPath: 'products.product',
+      columnMapping: TRGOCENTAR_COLUMN_MAPPING,
+      alternativeColumnMapping: TRGOCENTAR_COLUMN_MAPPING_ALT,
       filenamePrefixPatterns: [
         /^Trgocentar[_-]?/i,
         /^cjenik[_-]?/i,
@@ -155,7 +137,7 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
    *
    * Trgocentar's portal structure may vary. This implementation:
    * - Fetches the portal HTML
-   * - Extracts XML file links
+   * - Extracts CSV file links
    * - Filters by date if setDiscoveryDate was called
    *
    * @returns Array of discovered files (filtered by date if setDiscoveryDate was called)
@@ -182,11 +164,11 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 
       const html = await response.text()
 
-      // Extract XML file links
-      const xmlPattern = /href=["']([^"']*\.xml(?:\?[^"']*)?)["']/gi
+      // Extract CSV file links
+      const csvPattern = /href=["']([^"']*\.csv(?:\?[^"']*)?)["']/gi
 
       let match: RegExpExecArray | null
-      while ((match = xmlPattern.exec(html)) !== null) {
+      while ((match = csvPattern.exec(html)) !== null) {
         const href = match[1]
         const fileUrl = href.startsWith('http') ? href : new URL(href, this.config.baseUrl).toString()
 
@@ -208,7 +190,7 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
         discoveredFiles.push({
           url: fileUrl,
           filename,
-          type: 'xml',
+          type: 'csv',
           size: null,
           lastModified: fileDate ? new Date(fileDate) : null,
           metadata: {
