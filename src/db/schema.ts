@@ -299,6 +299,10 @@ export const ingestionRuns = sqliteTable('ingestion_runs', {
   processedEntries: integer('processed_entries').default(0),
   errorCount: integer('error_count').default(0),
   metadata: text('metadata'), // JSON for additional run info
+  // Rerun support
+  parentRunId: text('parent_run_id'), // FK to ingestionRuns.id for rerun tracking
+  rerunType: text('rerun_type'), // 'file', 'chunk', 'entry', null for original runs
+  rerunTargetId: text('rerun_target_id'), // ID of the file/chunk/entry being rerun
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 })
 
@@ -315,8 +319,32 @@ export const ingestionFiles = sqliteTable('ingestion_files', {
   entryCount: integer('entry_count').default(0),
   processedAt: integer('processed_at', { mode: 'timestamp' }),
   metadata: text('metadata'), // JSON for file-specific info
+  // Chunking support
+  totalChunks: integer('total_chunks').default(0),
+  processedChunks: integer('processed_chunks').default(0),
+  chunkSize: integer('chunk_size'), // rows per chunk
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 })
+
+export const ingestionChunks = sqliteTable('ingestion_chunks', {
+  id: cuid2('igc').primaryKey(),
+  fileId: text('file_id')
+    .notNull()
+    .references(() => ingestionFiles.id, { onDelete: 'cascade' }),
+  chunkIndex: integer('chunk_index').notNull(), // 0-based index
+  startRow: integer('start_row').notNull(), // first row number in chunk
+  endRow: integer('end_row').notNull(), // last row number in chunk
+  rowCount: integer('row_count').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  r2Key: text('r2_key'), // R2 object key for chunk JSON
+  persistedCount: integer('persisted_count').default(0),
+  errorCount: integer('error_count').default(0),
+  processedAt: integer('processed_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (table) => ({
+  fileChunkIdx: index('ingestion_chunks_file_chunk_idx').on(table.fileId, table.chunkIndex),
+  statusIdx: index('ingestion_chunks_status_idx').on(table.status),
+}))
 
 export const ingestionFileEntries = sqliteTable('ingestion_file_entries', {
   id: cuid2('ige').primaryKey(),
@@ -341,6 +369,7 @@ export const ingestionErrors = sqliteTable('ingestion_errors', {
     .notNull()
     .references(() => ingestionRuns.id, { onDelete: 'cascade' }),
   fileId: text('file_id').references(() => ingestionFiles.id, { onDelete: 'set null' }),
+  chunkId: text('chunk_id').references(() => ingestionChunks.id, { onDelete: 'set null' }),
   entryId: text('entry_id').references(() => ingestionFileEntries.id, { onDelete: 'set null' }),
   errorType: text('error_type').notNull(), // 'parse', 'validation', 'store_resolution', 'persist', etc.
   errorMessage: text('error_message').notNull(),
@@ -348,3 +377,27 @@ export const ingestionErrors = sqliteTable('ingestion_errors', {
   severity: text('severity').notNull().default('error'), // 'warning', 'error', 'critical'
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 })
+
+// ============================================================================
+// Store Enrichment: store_enrichment_tasks
+// ============================================================================
+
+export const storeEnrichmentTasks = sqliteTable('store_enrichment_tasks', {
+  id: cuid2('set').primaryKey(),
+  storeId: text('store_id')
+    .notNull()
+    .references(() => stores.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // 'geocode', 'verify_address', 'ai_categorize'
+  status: text('status').notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  inputData: text('input_data'), // JSON of input for the task
+  outputData: text('output_data'), // JSON of output/result
+  confidence: text('confidence'), // confidence level of the result (e.g., 'high', 'medium', 'low' or numeric)
+  verifiedBy: text('verified_by').references(() => user.id, { onDelete: 'set null' }),
+  verifiedAt: integer('verified_at', { mode: 'timestamp' }),
+  errorMessage: text('error_message'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (table) => ({
+  storeTypeIdx: index('store_enrichment_tasks_store_type_idx').on(table.storeId, table.type),
+  statusIdx: index('store_enrichment_tasks_status_idx').on(table.status),
+}))
