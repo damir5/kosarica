@@ -358,6 +358,76 @@ export interface PersistQueueMessage extends QueueMessageBase {
 }
 
 /**
+ * Message to parse a file into chunks for parallel processing.
+ */
+export interface ParseChunkedQueueMessage extends QueueMessageBase {
+  type: 'parse_chunked'
+  /** R2 key where file is stored */
+  r2Key: string
+  /** File metadata */
+  file: DiscoveredFile
+  /** Inner filename if extracted from ZIP */
+  innerFilename: string | null
+  /** File content hash */
+  hash: string
+  /** Number of rows per chunk */
+  chunkSize: number
+}
+
+/**
+ * Message to persist a single chunk of rows.
+ */
+export interface PersistChunkQueueMessage extends QueueMessageBase {
+  type: 'persist_chunk'
+  /** Ingestion file ID in database */
+  fileId: string
+  /** Ingestion chunk ID in database */
+  chunkId: string
+  /** R2 key where chunk JSON is stored */
+  chunkR2Key: string
+  /** Chunk index (0-based) */
+  chunkIndex: number
+  /** Number of rows in this chunk */
+  rowCount: number
+}
+
+/**
+ * Rerun target type.
+ */
+export type RerunTargetType = 'run' | 'file' | 'chunk'
+
+/**
+ * Message to re-run ingestion at run/file/chunk level.
+ */
+export interface RerunQueueMessage extends QueueMessageBase {
+  type: 'rerun'
+  /** Original run ID being re-run */
+  originalRunId: string
+  /** Target type for re-run */
+  targetType: RerunTargetType
+  /** Target ID (run ID, file ID, or chunk ID depending on targetType) */
+  targetId: string
+}
+
+/**
+ * Store enrichment task type.
+ */
+export type EnrichmentTaskType = 'geocode' | 'verify_address' | 'ai_categorize'
+
+/**
+ * Message to enrich a store with geocoding/verification.
+ */
+export interface EnrichStoreQueueMessage extends QueueMessageBase {
+  type: 'enrich_store'
+  /** Store ID to enrich */
+  storeId: string
+  /** Type of enrichment task */
+  taskType: EnrichmentTaskType
+  /** Enrichment task ID in database */
+  taskId: string
+}
+
+/**
  * Union type of all queue messages.
  */
 export type QueueMessage =
@@ -366,6 +436,10 @@ export type QueueMessage =
   | ExpandQueueMessage
   | ParseQueueMessage
   | PersistQueueMessage
+  | ParseChunkedQueueMessage
+  | PersistChunkQueueMessage
+  | RerunQueueMessage
+  | EnrichStoreQueueMessage
 
 /**
  * Type guard for discover messages.
@@ -404,6 +478,42 @@ export function isPersistMessage(
   msg: QueueMessage,
 ): msg is PersistQueueMessage {
   return msg.type === 'persist'
+}
+
+/**
+ * Type guard for parse chunked messages.
+ */
+export function isParseChunkedMessage(
+  msg: QueueMessage,
+): msg is ParseChunkedQueueMessage {
+  return msg.type === 'parse_chunked'
+}
+
+/**
+ * Type guard for persist chunk messages.
+ */
+export function isPersistChunkMessage(
+  msg: QueueMessage,
+): msg is PersistChunkQueueMessage {
+  return msg.type === 'persist_chunk'
+}
+
+/**
+ * Type guard for rerun messages.
+ */
+export function isRerunMessage(
+  msg: QueueMessage,
+): msg is RerunQueueMessage {
+  return msg.type === 'rerun'
+}
+
+/**
+ * Type guard for enrich store messages.
+ */
+export function isEnrichStoreMessage(
+  msg: QueueMessage,
+): msg is EnrichStoreQueueMessage {
+  return msg.type === 'enrich_store'
 }
 
 // ============================================================================
