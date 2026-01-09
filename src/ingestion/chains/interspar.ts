@@ -57,23 +57,23 @@ const INTERSPAR_COLUMN_MAPPING: CsvColumnMapping = {
  * Some Interspar exports may use abbreviated or different column names.
  */
 const INTERSPAR_COLUMN_MAPPING_ALT: CsvColumnMapping = {
-  externalId: 'Sifra',
-  name: 'Naziv artikla',
+  externalId: 'Šifra',
+  name: 'Naziv',
   category: 'Kategorija',
   brand: 'Marka',
-  unit: 'JM',
-  unitQuantity: 'Kolicina',
+  unit: 'Mjerna jedinica',
+  unitQuantity: 'Količina',
   price: 'Cijena',
-  discountPrice: 'Akcija',
-  discountStart: 'Pocetak akcije',
+  discountPrice: 'Akcijska cijena',
+  discountStart: 'Početak akcije',
   discountEnd: 'Kraj akcije',
-  barcodes: 'EAN',
+  barcodes: 'Barkod',
   // Croatian price transparency fields
   unitPrice: 'Cijena za jedinicu mjere',
-  lowestPrice30d: 'Najniza cijena u zadnjih 30 dana',
+  lowestPrice30d: 'Najniža cijena u zadnjih 30 dana',
   anchorPrice: 'Sidrena cijena',
-  unitPriceBaseQuantity: 'Kolicina za JM',
-  unitPriceBaseUnit: 'JM za cijenu',
+  unitPriceBaseQuantity: 'Količina za jedinicu mjere',
+  unitPriceBaseUnit: 'Jedinica mjere za cijenu',
   anchorPriceAsOf: 'Datum sidrene cijene',
 }
 
