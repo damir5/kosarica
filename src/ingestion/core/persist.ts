@@ -730,14 +730,31 @@ export async function ensureChainExists(
 }
 
 /**
+ * Result type for auto-register store operation.
+ */
+export interface AutoRegisterStoreResult {
+  storeId: string
+  status: 'existing' | 'pending' | 'created'
+}
+
+/**
  * Auto-register a store when it's encountered for the first time.
+ *
+ * Logic:
+ * 1. Try to resolve existing store by identifier -> return { storeId, status: 'existing' }
+ * 2. If not found, check if physical store exists with same name in chain
+ * 3. If physical match -> add identifier to it, return { storeId, status: 'existing' }
+ * 4. If no match -> create store with isVirtual=true, status='pending' -> return { storeId, status: 'pending' }
+ *
+ * Special case: National stores (identifierType === 'national') are auto-approved
+ * with isVirtual=true, status='active'.
  *
  * @param db - Database instance
  * @param chainSlug - Chain identifier
  * @param identifier - Store identifier value (e.g., "PJ50-1")
  * @param identifierType - Type of identifier (defaults to 'filename_code')
  * @param options - Store details for registration
- * @returns Store ID if created successfully, null otherwise
+ * @returns Store registration result with storeId and status, or null if failed
  */
 export async function autoRegisterStore(
   db: AnyDatabase,
@@ -745,14 +762,46 @@ export async function autoRegisterStore(
   identifier: string,
   identifierType: string,
   options: StoreAutoRegisterOptions,
-): Promise<string | null> {
+): Promise<AutoRegisterStoreResult | null> {
   // Ensure chain exists first
   const chainExists = await ensureChainExists(db, chainSlug)
   if (!chainExists) {
     return null
   }
 
-  // Create store
+  // Step 1: Try to resolve existing store by identifier
+  const existingStoreId = await resolveStoreId(db, chainSlug, identifier, identifierType)
+  if (existingStoreId) {
+    return { storeId: existingStoreId, status: 'existing' }
+  }
+
+  // Step 2: Check if physical (non-virtual) store exists with same name in chain
+  const physicalStore = await db.query.stores.findFirst({
+    where: and(
+      eq(stores.chainSlug, chainSlug),
+      eq(stores.name, options.name),
+      eq(stores.isVirtual, false),
+    ),
+  })
+
+  if (physicalStore) {
+    // Step 3: Physical match found - add identifier to it
+    await db.insert(storeIdentifiers).values({
+      id: generatePrefixedId('sid'),
+      storeId: physicalStore.id,
+      type: identifierType,
+      value: identifier,
+    })
+
+    console.log(`[persist] Added identifier ${identifier} to existing physical store: ${physicalStore.name}`)
+    return { storeId: physicalStore.id, status: 'existing' }
+  }
+
+  // Step 4: No match - create new virtual store
+  // Determine status based on identifier type
+  const isNational = identifierType === 'national'
+  const storeStatus = isNational ? 'active' : 'pending'
+
   const storeId = generatePrefixedId('sto')
   await db.insert(stores).values({
     id: storeId,
@@ -760,6 +809,8 @@ export async function autoRegisterStore(
     name: options.name,
     address: options.address,
     city: options.city,
+    isVirtual: true,
+    status: storeStatus,
   })
 
   // Create store identifier
@@ -770,8 +821,13 @@ export async function autoRegisterStore(
     value: identifier,
   })
 
-  console.log(`[persist] Auto-registered store: ${options.name} (${identifier}) for chain ${chainSlug}`)
-  return storeId
+  if (isNational) {
+    console.log(`[persist] Auto-registered national store: ${options.name} (${identifier}) for chain ${chainSlug}`)
+  } else {
+    console.log(`[persist] Created pending store: "${options.name}" (${identifier}) for chain ${chainSlug} - awaiting approval`)
+  }
+
+  return { storeId, status: isNational ? 'created' : 'pending' }
 }
 
 // ============================================================================
@@ -1611,22 +1667,26 @@ export async function persistRowsForStore(
   identifierType: string = 'filename_code',
   autoRegister?: StoreAutoRegisterOptions,
 ): Promise<PersistResult | null> {
-  // Resolve store
-  let storeId = await resolveStoreId(
-    db,
-    chainSlug,
-    storeIdentifier,
-    identifierType,
-  )
+  // Resolve store or auto-register if not found
+  let storeId: string | null = null
 
-  // Auto-register if not found and options provided
-  if (!storeId && autoRegister) {
-    storeId = await autoRegisterStore(
+  if (autoRegister) {
+    // Use autoRegisterStore which handles both resolution and creation
+    const result = await autoRegisterStore(
       db,
       chainSlug,
       storeIdentifier,
       identifierType,
       autoRegister,
+    )
+    storeId = result?.storeId ?? null
+  } else {
+    // Just resolve without auto-registration
+    storeId = await resolveStoreId(
+      db,
+      chainSlug,
+      storeIdentifier,
+      identifierType,
     )
   }
 

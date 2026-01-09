@@ -20,7 +20,8 @@
     "db:migrate:local": "wrangler d1 migrations apply kosarica-db --local",
     "db:migrate:test": "wrangler d1 migrations apply kosarica-db-test --config wrangler.test.jsonc --remote",
     "db:migrate:prod": "wrangler d1 migrations apply kosarica-db-prod --config wrangler.prod.jsonc --remote",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "ingest": "tsx src/ingestion/cli/index.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.4.9",
