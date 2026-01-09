@@ -455,11 +455,15 @@ export abstract class BaseXmlAdapter extends BaseChainAdapter {
     filename: string,
     options?: ParseOptions,
   ): Promise<ParseResult> {
+    // Extract store identifier from filename to use as default
+    const storeIdentifier = this.extractStoreIdentifierFromFilename(filename)
+
     // Try with primary field mapping first
     for (const itemsPath of this.itemPaths) {
       this.xmlParser.setOptions({
         itemsPath,
         fieldMapping: this.fieldMapping,
+        defaultStoreIdentifier: storeIdentifier,
       })
 
       const result = await this.xmlParser.parse(content, filename, options)
@@ -475,6 +479,7 @@ export abstract class BaseXmlAdapter extends BaseChainAdapter {
         this.xmlParser.setOptions({
           itemsPath,
           fieldMapping: this.alternativeFieldMapping,
+          defaultStoreIdentifier: storeIdentifier,
         })
 
         const result = await this.xmlParser.parse(content, filename, options)

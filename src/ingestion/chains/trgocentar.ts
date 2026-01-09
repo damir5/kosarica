@@ -117,6 +117,33 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
   }
 
   /**
+   * Extract store identifier from Trgocentar filename.
+   * Trgocentar filenames contain store codes like P220, P195, P120, etc.
+   * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
+   * The store code is the PXXX pattern.
+   */
+  protected override extractStoreIdentifierFromFilename(filename: string): string {
+    // Remove file extension
+    const baseName = filename.replace(this.fileExtensionPattern, '')
+
+    // Remove common prefixes
+    let cleanName = baseName
+    for (const pattern of this.filenamePrefixPatterns) {
+      cleanName = cleanName.replace(pattern, '')
+    }
+    cleanName = cleanName.trim()
+
+    // Try to extract Trgocentar store code (P followed by 3 digits)
+    const storeCodeMatch = cleanName.match(/P(\d{3})/i)
+    if (storeCodeMatch) {
+      return `P${storeCodeMatch[1]}`
+    }
+
+    // Fallback to the full clean name if no pattern matches
+    return cleanName || baseName
+  }
+
+  /**
    * Extract date from Trgocentar filename.
    * Trgocentar filenames contain dates in format: DDMMYYYYHHMM
    * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
