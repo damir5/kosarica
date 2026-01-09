@@ -16,28 +16,40 @@ import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
 /**
+ * Interspar JSON API response structure.
+ * The API endpoint returns a list of available price files.
+ */
+interface IntersparJsonResponse {
+  files: Array<{
+    name: string
+    URL: string
+    SHA: string
+  }>
+}
+
+/**
  * Column mapping for Interspar CSV files.
  * Maps Interspar's column names to NormalizedRow fields.
+ *
+ * Based on actual Interspar CSV format:
+ * naziv;šifra;marka;neto količina;jedinica mjere;MPC (EUR);cijena za jedinicu mjere (EUR);
+ * MPC za vrijeme posebnog oblika prodaje (EUR);Najniža cijena u posljednjih 30 dana (EUR);
+ * sidrena cijena na DATE. (EUR);barkod;kategorija proizvoda
  */
 const INTERSPAR_COLUMN_MAPPING: CsvColumnMapping = {
-  externalId: 'Šifra',
-  name: 'Naziv',
-  category: 'Kategorija',
-  brand: 'Marka',
-  unit: 'Mjerna jedinica',
-  unitQuantity: 'Količina',
-  price: 'Cijena',
-  discountPrice: 'Akcijska cijena',
-  discountStart: 'Početak akcije',
-  discountEnd: 'Kraj akcije',
-  barcodes: 'Barkod',
+  externalId: 'šifra',
+  name: 'naziv',
+  category: 'kategorija proizvoda',
+  brand: 'marka',
+  unit: 'jedinica mjere',
+  unitQuantity: 'neto količina',
+  price: 'MPC (EUR)',
+  discountPrice: 'MPC za vrijeme posebnog oblika prodaje (EUR)',
+  barcodes: 'barkod',
   // Croatian price transparency fields
-  unitPrice: 'Cijena za jedinicu mjere',
-  lowestPrice30d: 'Najniža cijena u zadnjih 30 dana',
-  anchorPrice: 'Sidrena cijena',
-  unitPriceBaseQuantity: 'Količina za jedinicu mjere',
-  unitPriceBaseUnit: 'Jedinica mjere za cijenu',
-  anchorPriceAsOf: 'Datum sidrene cijene',
+  unitPrice: 'cijena za jedinicu mjere (EUR)',
+  lowestPrice30d: 'Najniža cijena u posljednjih 30 dana (EUR)',
+  anchorPrice: 'sidrena cijena na 2.5.2025. (EUR)',
 }
 
 /**
@@ -106,94 +118,69 @@ export class IntersparAdapter extends BaseCsvAdapter {
   /**
    * Discover available price files from Interspar portal.
    *
-   * Interspar's portal uses a date query parameter and pagination:
-   * - URL format: /cjenik?date=YYYY-MM-DD&page=N
-   * - Download links: /cjenik/download?file=FILENAME
+   * Interspar provides a JSON API endpoint that returns all available files:
+   * - API URL: /datoteke_cjenici/Cjenik{YYYYMMDD}.json
+   * - Returns: { "files": [{ "name": "...", "URL": "...", "SHA": "..." }] }
    *
-   * Fetches all pages until no more download links are found.
+   * This is much more efficient than scraping the HTML page.
    *
    * @returns Array of discovered files for the specified date
    */
   async discover(): Promise<DiscoveredFile[]> {
     const discoveredFiles: DiscoveredFile[] = []
-    const seenUrls = new Set<string>()
 
     // Use provided date or default to today
     const date = this.discoveryDate || new Date().toISOString().split('T')[0]
 
-    let page = 1
-    const maxPages = 50 // Safety limit to prevent infinite loops
+    // Convert date from YYYY-MM-DD to YYYYMMDD format for the API
+    const dateForApi = date.replace(/-/g, '')
 
-    while (page <= maxPages) {
-      const pageUrl = `${this.config.baseUrl}?date=${date}&page=${page}`
-      console.log(`[DEBUG] Fetching Interspar page ${page}: ${pageUrl}`)
+    // Construct the JSON API URL
+    const apiUrl = `https://www.spar.hr/datoteke_cjenici/Cjenik${dateForApi}.json`
+    console.log(`[DEBUG] Fetching Interspar JSON API: ${apiUrl}`)
 
-      try {
-        const response = await fetch(pageUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    try {
+      const response = await fetch(apiUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
+          'Accept': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        console.error(`Failed to fetch Interspar JSON API: ${response.status} ${response.statusText}`)
+        console.error(`  URL: ${apiUrl}`)
+        return []
+      }
+
+      const data = await response.json() as IntersparJsonResponse
+
+      if (!data.files || data.files.length === 0) {
+        console.log(`[INFO] No files found in JSON response for date ${date}`)
+        return []
+      }
+
+      console.log(`[DEBUG] Found ${data.files.length} file(s) in JSON response`)
+
+      for (const file of data.files) {
+        discoveredFiles.push({
+          url: file.URL,
+          filename: file.name,
+          type: 'csv',
+          size: null,
+          lastModified: new Date(date),
+          metadata: {
+            source: 'interspar_json_api',
+            discoveredAt: new Date().toISOString(),
+            portalDate: date,
+            sha: file.SHA,
           },
         })
-
-        if (!response.ok) {
-          console.error(`Failed to fetch Interspar portal page ${page}: ${response.status} ${response.statusText}`)
-          console.error(`  URL: ${pageUrl}`)
-          break
-        }
-
-        const html = await response.text()
-
-        // Extract download links: href="/cjenik/download?file=..."
-        const downloadPattern = /href=["'](\/cjenik\/download\?file=([^"'&]+)[^"']*)["']/gi
-
-        let foundNewFiles = false
-        let match: RegExpExecArray | null
-        while ((match = downloadPattern.exec(html)) !== null) {
-          const href = match[1]
-          const encodedFilename = match[2]
-
-          // Build full download URL
-          const fileUrl = new URL(href, this.config.baseUrl).toString()
-
-          // Skip duplicates (same URL might appear in pagination)
-          if (seenUrls.has(fileUrl)) {
-            continue
-          }
-          seenUrls.add(fileUrl)
-
-          // Decode the filename from URL encoding
-          const filename = decodeURIComponent(encodedFilename)
-
-          discoveredFiles.push({
-            url: fileUrl,
-            filename: filename.endsWith('.CSV') || filename.endsWith('.csv') ? filename : `${filename}.csv`,
-            type: 'csv',
-            size: null,
-            lastModified: new Date(date),
-            metadata: {
-              source: 'interspar_portal',
-              discoveredAt: new Date().toISOString(),
-              portalDate: date,
-              page: String(page),
-            },
-          })
-
-          foundNewFiles = true
-        }
-
-        // Stop if no new files found on this page (end of pagination)
-        if (!foundNewFiles) {
-          break
-        }
-
-        page++
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        console.error(`Error discovering Interspar files on page ${page}: ${errorMessage}`)
-        console.error(`  URL: ${pageUrl}`)
-        break
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`Error discovering Interspar files: ${errorMessage}`)
+      console.error(`  URL: ${apiUrl}`)
     }
 
     return discoveredFiles

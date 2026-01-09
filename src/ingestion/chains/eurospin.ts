@@ -6,39 +6,43 @@
  * Store resolution is based on filename.
  *
  * Supports single-date discovery via setDiscoveryDate() method.
- * Discovery looks for local files in the data directory matching the date pattern.
+ * Discovery fetches ZIP files from the Eurospin portal containing CSV data.
+ *
+ * Eurospin portal: https://www.eurospin.hr/cjenik/
+ * URL format: https://www.eurospin.hr/wp-content/themes/eurospin/documenti-prezzi/cjenik_DD.MM.YYYY-7.30.zip
  */
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 import type { CsvColumnMapping } from '../parsers/csv'
-import type { DiscoveredFile, FetchedFile } from '../core/types'
+import type { DiscoveredFile } from '../core/types'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
 /**
  * Column mapping for Eurospin CSV files.
  * Maps Eurospin's column names to NormalizedRow fields.
+ *
+ * Eurospin uses uppercase column names with underscores:
+ * NAZIV_PROIZVODA, ŠIFRA_PROIZVODA, MARKA_PROIZVODA, etc.
  */
 const EUROSPIN_COLUMN_MAPPING: CsvColumnMapping = {
-  externalId: 'Šifra',
-  name: 'Naziv',
-  category: 'Kategorija',
-  brand: 'Marka',
-  unit: 'Mjerna jedinica',
-  unitQuantity: 'Količina',
-  price: 'Cijena',
-  discountPrice: 'Akcijska cijena',
-  discountStart: 'Početak akcije',
-  discountEnd: 'Kraj akcije',
-  barcodes: 'Barkod',
+  externalId: 'ŠIFRA_PROIZVODA',
+  name: 'NAZIV_PROIZVODA',
+  category: 'KATEGORIJA_PROIZVODA',
+  brand: 'MARKA_PROIZVODA',
+  unit: 'JEDINICA_MJERE',
+  unitQuantity: 'NETO_KOLIČINA',
+  price: 'MALOPROD.CIJENA(EUR)',
+  discountPrice: 'MPC_POSEB.OBLIK_PROD',
+  discountStart: 'POČETAK_AKCIJE',
+  discountEnd: 'KRAJ_AKCIJE',
+  barcodes: 'BARKOD',
   // Croatian price transparency fields
-  unitPrice: 'Cijena za jedinicu mjere',
-  lowestPrice30d: 'Najniža cijena u zadnjih 30 dana',
-  anchorPrice: 'Sidrena cijena',
-  unitPriceBaseQuantity: 'Količina za jedinicu mjere',
-  unitPriceBaseUnit: 'Jedinica mjere za cijenu',
-  anchorPriceAsOf: 'Datum sidrene cijene',
+  unitPrice: 'CIJENA_ZA_JEDINICU_MJERE',
+  lowestPrice30d: 'NAJNIŽA_MPC_U_30DANA',
+  anchorPrice: 'SIDRENA_CIJENA',
+  unitPriceBaseQuantity: 'KOLIČINA_ZA_JEDINICU_MJERE',
+  unitPriceBaseUnit: 'JEDINICA_MJERE_ZA_CIJENU',
+  anchorPriceAsOf: 'DATUM_SIDRENE_CIJENE',
 }
 
 /**
@@ -46,31 +50,32 @@ const EUROSPIN_COLUMN_MAPPING: CsvColumnMapping = {
  * Some Eurospin exports may use abbreviated or different column names.
  */
 const EUROSPIN_COLUMN_MAPPING_ALT: CsvColumnMapping = {
-  externalId: 'Sifra',
-  name: 'Naziv artikla',
-  category: 'Kategorija',
-  brand: 'Marka',
+  externalId: 'SIFRA_PROIZVODA',
+  name: 'NAZIV_PROIZVODA',
+  category: 'KATEGORIJA',
+  brand: 'MARKA',
   unit: 'JM',
-  unitQuantity: 'Kolicina',
-  price: 'Cijena',
-  discountPrice: 'Akcija',
-  discountStart: 'Pocetak akcije',
-  discountEnd: 'Kraj akcije',
-  barcodes: 'EAN',
+  unitQuantity: 'NETO_KOLICINA',
+  price: 'MALOPROD_CIJENA',
+  discountPrice: 'MPC_POSEB_OBLIK_PROD',
+  discountStart: 'Pocetak_akcije',
+  discountEnd: 'Kraj_akcije',
+  barcodes: 'BARKOD',
   // Croatian price transparency fields
-  unitPrice: 'Cijena za jedinicu mjere',
-  lowestPrice30d: 'Najniza cijena u zadnjih 30 dana',
-  anchorPrice: 'Sidrena cijena',
-  unitPriceBaseQuantity: 'Kolicina za JM',
-  unitPriceBaseUnit: 'JM za cijenu',
-  anchorPriceAsOf: 'Datum sidrene cijene',
+  unitPrice: 'CIJENA_ZA_JEDINICU_MJERE',
+  lowestPrice30d: 'NAJNIZA_MPC_U_30DANA',
+  anchorPrice: 'SIDRENA_CIJENA',
+  unitPriceBaseQuantity: 'KOLICINA_ZA_JM',
+  unitPriceBaseUnit: 'JM_ZA_CIJENU',
+  anchorPriceAsOf: 'DATUM_SIDRENE_CIJENE',
 }
 
 /**
  * Eurospin chain adapter implementation.
  * Extends BaseCsvAdapter for common CSV parsing functionality.
  *
- * Supports date-based local file discovery via setDiscoveryDate() method.
+ * Supports date-based web discovery via setDiscoveryDate() method.
+ * Downloads ZIP files from the Eurospin portal.
  */
 export class EurospinAdapter extends BaseCsvAdapter {
   /** Date to discover files for (YYYY-MM-DD format, set by CLI before discovery) */
@@ -80,7 +85,7 @@ export class EurospinAdapter extends BaseCsvAdapter {
     super({
       slug: 'eurospin',
       name: 'Eurospin',
-      supportedTypes: ['csv'],
+      supportedTypes: ['csv', 'zip'],
       chainConfig: CHAIN_CONFIGS.eurospin,
       columnMapping: EUROSPIN_COLUMN_MAPPING,
       alternativeColumnMapping: EUROSPIN_COLUMN_MAPPING_ALT,
@@ -105,13 +110,11 @@ export class EurospinAdapter extends BaseCsvAdapter {
   }
 
   /**
-   * Discover available Eurospin price files.
+   * Discover available Eurospin price files from the portal.
    *
-   * Eurospin files are stored locally with naming patterns:
-   * - Eurospin_store_XXX_YYYY-MM-DD.csv
-   * - diskontna_prodavaonica-XXXXXX-...-DD.MM.YYYY-....csv
-   *
-   * Discovery searches the local data directory for matching files.
+   * Eurospin's portal provides ZIP files in a dropdown with format:
+   * - cjenik_DD.MM.YYYY-7.30.zip
+   * URL: https://www.eurospin.hr/wp-content/themes/eurospin/documenti-prezzi/cjenik_DD.MM.YYYY-7.30.zip
    *
    * @returns Array of discovered files (filtered by date if setDiscoveryDate was called)
    */
@@ -121,108 +124,76 @@ export class EurospinAdapter extends BaseCsvAdapter {
     // Use provided date or default to today
     const date = this.discoveryDate || new Date().toISOString().split('T')[0]
 
-    // Look for local files in ./data/input/eurospin/ directory
-    // (separate from ./data/ingestion/ to avoid overwriting source files)
-    const dataDir = path.resolve('./data/input/eurospin')
-    console.log(`[DEBUG] Scanning Eurospin local directory: ${dataDir}`)
+    console.log(`[DEBUG] Fetching Eurospin portal for date: ${date}`)
 
     try {
-      if (!fs.existsSync(dataDir)) {
-        console.error(`Eurospin data directory not found: ${dataDir}`)
+      const response = await fetch(this.config.baseUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'hr-HR,hr;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+      })
+
+      if (!response.ok) {
+        console.error(`Failed to fetch Eurospin portal: ${response.status} ${response.statusText}`)
         return []
       }
 
-      const files = fs.readdirSync(dataDir)
+      const html = await response.text()
 
-      for (const filename of files) {
-        // Skip non-CSV files
-        if (!filename.toLowerCase().endsWith('.csv')) {
+      // Extract download links from the dropdown: <option value="URL">filename</option>
+      const optionPattern = /<option[^>]*value=["']([^"']*cjenik_[^"']*\.zip)["'][^>]*>([^<]*)<\/option>/gi
+      const seenUrls = new Set<string>()
+
+      let match: RegExpExecArray | null
+      while ((match = optionPattern.exec(html)) !== null) {
+        const url = match[1]
+        const filename = match[2].trim()
+
+        // Skip duplicates
+        if (seenUrls.has(url)) {
           continue
         }
+        seenUrls.add(url)
 
-        // Try to extract date from various filename patterns
-        let fileDate: string | null = null
-
-        // Pattern 1: Eurospin_store_XXX_YYYY-MM-DD.csv
-        const isoDateMatch = filename.match(/(\d{4}-\d{2}-\d{2})\.csv$/i)
-        if (isoDateMatch) {
-          fileDate = isoDateMatch[1]
-        }
-
-        // Pattern 2: ...DD.MM.YYYY... (European date format)
-        if (!fileDate) {
-          const euDateMatch = filename.match(/(\d{2})\.(\d{2})\.(\d{4})/)
-          if (euDateMatch) {
-            const [, day, month, year] = euDateMatch
-            fileDate = `${year}-${month}-${day}`
-          }
-        }
-
-        // Pattern 3: DDMMYYYY (compact date)
-        if (!fileDate) {
-          const compactDateMatch = filename.match(/(\d{2})(\d{2})(\d{4})/)
-          if (compactDateMatch) {
-            const [, day, month, year] = compactDateMatch
-            fileDate = `${year}-${month}-${day}`
-          }
+        // Extract date from filename (format: cjenik_DD.MM.YYYY-7.30.zip)
+        const dateMatch = filename.match(/cjenik_(\d{2})\.(\d{2})\.(\d{4})/)
+        let fileDate: string | undefined
+        if (dateMatch) {
+          const [, day, month, year] = dateMatch
+          fileDate = `${year}-${month}-${day}`
         }
 
         // Filter by discovery date if set
-        if (date && fileDate !== date) {
+        if (date && fileDate && fileDate !== date) {
           continue
         }
 
-        const filePath = path.join(dataDir, filename)
-        const stats = fs.statSync(filePath)
-
-        discoveredFiles.push({
-          url: `file://${filePath}`,
-          filename,
-          type: 'csv',
-          size: stats.size,
-          lastModified: fileDate ? new Date(fileDate) : new Date(stats.mtime),
-          metadata: {
-            source: 'eurospin_local',
-            discoveredAt: new Date().toISOString(),
-            ...(fileDate && { portalDate: fileDate }),
-          },
-        })
+        // If we're filtering by date and found a match, or we're not filtering
+        if (!date || (fileDate && fileDate === date)) {
+          discoveredFiles.push({
+            url,
+            filename,
+            type: 'zip',
+            size: null,
+            lastModified: fileDate ? new Date(fileDate) : new Date(),
+            metadata: {
+              source: 'eurospin_portal',
+              discoveredAt: new Date().toISOString(),
+              ...(fileDate && { portalDate: fileDate }),
+            },
+          })
+        }
       }
 
+      console.log(`[DEBUG] Found ${discoveredFiles.length} file(s) for date ${date}`)
       return discoveredFiles
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       console.error(`Error discovering Eurospin files: ${errorMessage}`)
-      console.error(`  Directory: ${dataDir}`)
       return []
     }
-  }
-
-  /**
-   * Fetch a discovered Eurospin file.
-   * For local files (file:// URLs), reads directly from filesystem.
-   */
-  async fetch(file: DiscoveredFile): Promise<FetchedFile> {
-    if (file.url.startsWith('file://')) {
-      const filePath = file.url.replace('file://', '')
-      const buffer = fs.readFileSync(filePath)
-      // Extract the actual content from the buffer (Node.js buffers use shared memory pools)
-      const content = buffer.buffer.slice(
-        buffer.byteOffset,
-        buffer.byteOffset + buffer.byteLength,
-      ) as ArrayBuffer
-      const { computeSha256 } = await import('../core/storage')
-      const hash = await computeSha256(content)
-
-      return {
-        discovered: file,
-        content,
-        hash,
-      }
-    }
-
-    // Fall back to base class implementation for remote URLs
-    return super.fetch(file)
   }
 }
 

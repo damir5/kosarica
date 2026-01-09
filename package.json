@@ -58,6 +58,8 @@
     "fflate": "^0.8.2",
     "iconv-lite": "^0.7.1",
     "lucide-react": "^0.561.0",
+    "playwright": "^1.57.0",
+    "puppeteer": "^24.34.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "serialize-error": "^12.0.0",

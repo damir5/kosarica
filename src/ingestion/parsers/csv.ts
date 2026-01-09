@@ -164,7 +164,14 @@ export class CsvParser extends Parser {
     }
 
     const rows: NormalizedRow[] = []
-    const totalRows = rawRows.length - dataStartRow
+
+    // Count non-empty data rows for accurate total
+    let totalRows = 0
+    for (let i = dataStartRow; i < rawRows.length; i++) {
+      if (!opts.skipEmptyRows || !rawRows[i].every((cell) => cell.trim() === '')) {
+        totalRows++
+      }
+    }
 
     for (let i = dataStartRow; i < rawRows.length; i++) {
       const rawRow = rawRows[i]

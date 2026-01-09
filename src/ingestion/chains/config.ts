@@ -157,13 +157,13 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     name: 'Eurospin',
     baseUrl: 'https://www.eurospin.hr/cjenik/',
     primaryFileType: 'csv',
-    supportedFileTypes: ['csv'],
+    supportedFileTypes: ['csv', 'zip'],
     csv: {
       delimiter: ';',
       encoding: 'utf-8',
       hasHeader: true,
     },
-    usesZip: false,
+    usesZip: true,
     storeResolution: 'filename',
   },
   dm: {
@@ -196,7 +196,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     primaryFileType: 'csv',
     supportedFileTypes: ['csv'],
     csv: {
-      delimiter: ';',
+      delimiter: ',',
       encoding: 'utf-8',
       hasHeader: true,
     },
