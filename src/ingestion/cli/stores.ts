@@ -2,7 +2,7 @@
 /**
  * Stores CLI Command
  *
- * Manage stores: list, approve, reject, and view store details.
+ * Manage stores: list, approve, reject, add physical stores, and import from CSV.
  *
  * Usage:
  *   pnpm ingest stores --pending           # List pending stores
@@ -10,16 +10,26 @@
  *   pnpm ingest stores --approve <id>      # Approve a pending store
  *   pnpm ingest stores --reject <id>       # Reject/delete a store
  *   pnpm ingest stores --show <id>         # Show store details
+ *
+ * Physical store management:
+ *   pnpm ingest stores --add --chain=dm --name="DM Zagreb" --price-source=dm_national
+ *   pnpm ingest stores --add --chain=dm --name="DM Zagreb" --city="Zagreb" --address="Ilica 123" --lat=45.815 --lng=15.982 --price-source=dm_national
+ *   pnpm ingest stores --link <store_id> --price-source=dm_national
+ *   pnpm ingest stores --import-csv ./stores.csv --chain=dm --price-source=dm_national
  */
 
+import * as fs from "fs";
+import * as readline from "readline";
+
 import { Command } from "commander";
-import { count, eq, sql } from "drizzle-orm";
+import { count, eq, sql, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { getPlatformProxy, type PlatformProxy } from "wrangler";
 
 import * as schema from "@/db/schema";
 import { chains, storeIdentifiers, storeItemState, stores } from "@/db/schema";
 import { CHAIN_IDS, isValidChainId } from "../chains";
+import { generatePrefixedId } from "@/utils/id";
 
 // Platform proxy for accessing Cloudflare bindings in local dev
 let platformProxy: PlatformProxy<Env> | null = null;
@@ -340,6 +350,329 @@ async function showStore(storeId: string): Promise<void> {
 }
 
 /**
+ * Resolve a price source identifier to a store ID.
+ * The identifier can be:
+ * 1. A store ID (starts with 'sto_')
+ * 2. A store identifier value (e.g., 'dm_national')
+ *
+ * For identifier values, searches in storeIdentifiers table across all types.
+ * Only returns virtual stores (isVirtual=true) as price sources.
+ *
+ * @param chainSlug - Chain identifier to search within
+ * @param identifier - Store ID or identifier value
+ * @returns Store ID if found, null otherwise
+ */
+async function resolvePriceSourceStore(
+	chainSlug: string,
+	identifier: string,
+): Promise<string | null> {
+	const db = await createCliDatabase();
+
+	// If it looks like a store ID, try direct lookup first
+	if (identifier.startsWith("sto_")) {
+		const store = await db.query.stores.findFirst({
+			where: and(
+				eq(stores.id, identifier),
+				eq(stores.chainSlug, chainSlug),
+				eq(stores.isVirtual, true),
+			),
+		});
+		if (store) {
+			return store.id;
+		}
+	}
+
+	// Search by identifier value in storeIdentifiers
+	const result = await db
+		.select({ storeId: storeIdentifiers.storeId })
+		.from(storeIdentifiers)
+		.innerJoin(stores, eq(stores.id, storeIdentifiers.storeId))
+		.where(
+			and(
+				eq(stores.chainSlug, chainSlug),
+				eq(stores.isVirtual, true),
+				eq(storeIdentifiers.value, identifier),
+			),
+		)
+		.limit(1);
+
+	return result.length > 0 ? result[0].storeId : null;
+}
+
+/**
+ * Add a new physical store with location data and link to a price source.
+ */
+async function addPhysicalStore(options: {
+	chain: string;
+	name: string;
+	address?: string;
+	city?: string;
+	postalCode?: string;
+	lat?: number;
+	lng?: number;
+	priceSource: string;
+}): Promise<void> {
+	const db = await createCliDatabase();
+
+	// Verify chain exists
+	const chain = await db.query.chains.findFirst({
+		where: eq(chains.slug, options.chain),
+	});
+
+	if (!chain) {
+		console.error(`Error: Chain "${options.chain}" not found.`);
+		process.exit(1);
+	}
+
+	// Resolve price source
+	const priceSourceStoreId = await resolvePriceSourceStore(
+		options.chain,
+		options.priceSource,
+	);
+
+	if (!priceSourceStoreId) {
+		console.error(
+			`Error: Price source "${options.priceSource}" not found for chain "${options.chain}".`,
+		);
+		console.error("The price source must be an existing virtual store.");
+		process.exit(1);
+	}
+
+	// Get price source store name for confirmation
+	const priceSourceStore = await db.query.stores.findFirst({
+		where: eq(stores.id, priceSourceStoreId),
+	});
+
+	// Create the physical store
+	const storeId = generatePrefixedId("sto");
+	await db.insert(stores).values({
+		id: storeId,
+		chainSlug: options.chain,
+		name: options.name,
+		address: options.address || null,
+		city: options.city || null,
+		postalCode: options.postalCode || null,
+		latitude: options.lat?.toString() || null,
+		longitude: options.lng?.toString() || null,
+		isVirtual: false,
+		priceSourceStoreId,
+		status: "active",
+	});
+
+	console.log(`Created physical store: ${options.name}`);
+	console.log(`  ID: ${storeId}`);
+	console.log(`  Chain: ${chain.name} (${options.chain})`);
+	console.log(
+		`  Price source: ${priceSourceStore?.name} (${priceSourceStoreId})`,
+	);
+	if (options.city) console.log(`  City: ${options.city}`);
+	if (options.address) console.log(`  Address: ${options.address}`);
+}
+
+/**
+ * Link an existing store to a price source.
+ */
+async function linkStoreToPriceSource(
+	storeId: string,
+	priceSourceIdentifier: string,
+): Promise<void> {
+	const db = await createCliDatabase();
+
+	// Find the store
+	const store = await db.query.stores.findFirst({
+		where: eq(stores.id, storeId),
+	});
+
+	if (!store) {
+		console.error(`Error: Store "${storeId}" not found.`);
+		process.exit(1);
+	}
+
+	// Resolve price source
+	const priceSourceStoreId = await resolvePriceSourceStore(
+		store.chainSlug,
+		priceSourceIdentifier,
+	);
+
+	if (!priceSourceStoreId) {
+		console.error(
+			`Error: Price source "${priceSourceIdentifier}" not found for chain "${store.chainSlug}".`,
+		);
+		console.error("The price source must be an existing virtual store.");
+		process.exit(1);
+	}
+
+	// Get price source store name
+	const priceSourceStore = await db.query.stores.findFirst({
+		where: eq(stores.id, priceSourceStoreId),
+	});
+
+	// Update the store
+	await db
+		.update(stores)
+		.set({
+			priceSourceStoreId,
+			updatedAt: new Date(),
+		})
+		.where(eq(stores.id, storeId));
+
+	console.log(
+		`Linked ${store.name} to price source ${priceSourceStore?.name}`,
+	);
+}
+
+/**
+ * Parse a CSV line handling quoted fields.
+ */
+function parseCsvLine(line: string): string[] {
+	const result: string[] = [];
+	let current = "";
+	let inQuotes = false;
+
+	for (let i = 0; i < line.length; i++) {
+		const char = line[i];
+		if (char === '"') {
+			if (inQuotes && line[i + 1] === '"') {
+				// Escaped quote
+				current += '"';
+				i++;
+			} else {
+				inQuotes = !inQuotes;
+			}
+		} else if (char === "," && !inQuotes) {
+			result.push(current.trim());
+			current = "";
+		} else {
+			current += char;
+		}
+	}
+	result.push(current.trim());
+	return result;
+}
+
+/**
+ * Import physical stores from a CSV file.
+ */
+async function importStoresFromCsv(
+	csvPath: string,
+	chainSlug: string,
+	priceSourceIdentifier: string,
+): Promise<void> {
+	const db = await createCliDatabase();
+
+	// Verify chain exists
+	const chain = await db.query.chains.findFirst({
+		where: eq(chains.slug, chainSlug),
+	});
+
+	if (!chain) {
+		console.error(`Error: Chain "${chainSlug}" not found.`);
+		process.exit(1);
+	}
+
+	// Resolve price source
+	const priceSourceStoreId = await resolvePriceSourceStore(
+		chainSlug,
+		priceSourceIdentifier,
+	);
+
+	if (!priceSourceStoreId) {
+		console.error(
+			`Error: Price source "${priceSourceIdentifier}" not found for chain "${chainSlug}".`,
+		);
+		console.error("The price source must be an existing virtual store.");
+		process.exit(1);
+	}
+
+	// Check if file exists
+	if (!fs.existsSync(csvPath)) {
+		console.error(`Error: CSV file "${csvPath}" not found.`);
+		process.exit(1);
+	}
+
+	// Read and parse CSV
+	const fileStream = fs.createReadStream(csvPath);
+	const rl = readline.createInterface({
+		input: fileStream,
+		crlfDelay: Infinity,
+	});
+
+	let headers: string[] = [];
+	let isFirstLine = true;
+	let imported = 0;
+	let errors = 0;
+	const errorMessages: string[] = [];
+
+	for await (const line of rl) {
+		if (isFirstLine) {
+			headers = parseCsvLine(line).map((h) => h.toLowerCase());
+			isFirstLine = false;
+
+			// Validate required columns
+			if (!headers.includes("name")) {
+				console.error('Error: CSV must have a "name" column.');
+				process.exit(1);
+			}
+			continue;
+		}
+
+		const values = parseCsvLine(line);
+		if (values.length === 0 || (values.length === 1 && values[0] === "")) {
+			continue; // Skip empty lines
+		}
+
+		// Map values to object
+		const row: Record<string, string> = {};
+		for (let i = 0; i < headers.length && i < values.length; i++) {
+			row[headers[i]] = values[i];
+		}
+
+		// Validate required fields
+		if (!row.name || row.name.trim() === "") {
+			errors++;
+			errorMessages.push(`Line ${imported + errors + 1}: Missing name`);
+			continue;
+		}
+
+		try {
+			// Create the physical store
+			const storeId = generatePrefixedId("sto");
+			await db.insert(stores).values({
+				id: storeId,
+				chainSlug,
+				name: row.name,
+				address: row.address || null,
+				city: row.city || null,
+				postalCode: row.postal_code || null,
+				latitude: row.lat || null,
+				longitude: row.lng || null,
+				isVirtual: false,
+				priceSourceStoreId,
+				status: "active",
+			});
+
+			imported++;
+		} catch (error) {
+			errors++;
+			errorMessages.push(
+				`Line ${imported + errors + 1}: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
+
+	console.log(`Imported ${imported} stores, ${errors} errors`);
+	if (errorMessages.length > 0) {
+		console.log("\nErrors:");
+		for (const msg of errorMessages.slice(0, 10)) {
+			console.log(`  - ${msg}`);
+		}
+		if (errorMessages.length > 10) {
+			console.log(`  ... and ${errorMessages.length - 10} more errors`);
+		}
+	}
+}
+
+/**
  * Main CLI program.
  */
 async function main(): Promise<void> {
@@ -347,15 +680,28 @@ async function main(): Promise<void> {
 
 	program
 		.name("stores")
-		.description("Manage stores: list, approve, reject, and view details")
+		.description("Manage stores: list, approve, reject, add physical stores, and import from CSV")
 		.option("--pending", "List all pending stores")
 		.option(
 			"--chain <chain>",
-			`List stores for a chain (${CHAIN_IDS.join(", ")})`,
+			`List stores for a chain / required for --add and --import-csv (${CHAIN_IDS.join(", ")})`,
 		)
 		.option("--approve <id>", "Approve a pending store")
 		.option("--reject <id>", "Reject and delete a store")
 		.option("--show <id>", "Show detailed store information")
+		// Physical store creation options
+		.option("--add", "Add a new physical store (requires --chain, --name, --price-source)")
+		.option("--name <name>", "Store name (for --add)")
+		.option("--address <address>", "Store address (for --add)")
+		.option("--city <city>", "Store city (for --add)")
+		.option("--postal-code <code>", "Store postal code (for --add)")
+		.option("--lat <latitude>", "Store latitude (for --add)", parseFloat)
+		.option("--lng <longitude>", "Store longitude (for --add)", parseFloat)
+		.option("--price-source <identifier>", "Price source store identifier (for --add, --link, --import-csv)")
+		// Link store to price source
+		.option("--link <store_id>", "Link an existing store to a price source (requires --price-source)")
+		// CSV import
+		.option("--import-csv <path>", "Import physical stores from CSV (requires --chain, --price-source)")
 		.parse(process.argv);
 
 	const opts = program.opts<{
@@ -364,16 +710,29 @@ async function main(): Promise<void> {
 		approve?: string;
 		reject?: string;
 		show?: string;
+		add?: boolean;
+		name?: string;
+		address?: string;
+		city?: string;
+		postalCode?: string;
+		lat?: number;
+		lng?: number;
+		priceSource?: string;
+		link?: string;
+		importCsv?: string;
 	}>();
 
 	try {
-		// Handle mutually exclusive options
+		// Handle mutually exclusive actions
 		const actions = [
 			opts.pending,
-			opts.chain,
+			opts.chain && !opts.add && !opts.importCsv, // --chain alone lists stores
 			opts.approve,
 			opts.reject,
 			opts.show,
+			opts.add,
+			opts.link,
+			opts.importCsv,
 		].filter(Boolean);
 
 		if (actions.length === 0) {
@@ -381,11 +740,73 @@ async function main(): Promise<void> {
 			return;
 		}
 
-		if (actions.length > 1) {
+		if (actions.length > 1 && !opts.add && !opts.importCsv) {
 			console.error("Error: Please specify only one action at a time.");
 			process.exit(1);
 		}
 
+		// Handle --add command
+		if (opts.add) {
+			if (!opts.chain) {
+				console.error("Error: --chain is required for --add");
+				process.exit(1);
+			}
+			if (!isValidChainId(opts.chain)) {
+				console.error(`Error: Invalid chain ID "${opts.chain}"`);
+				console.error(`Valid chain IDs: ${CHAIN_IDS.join(", ")}`);
+				process.exit(1);
+			}
+			if (!opts.name) {
+				console.error("Error: --name is required for --add");
+				process.exit(1);
+			}
+			if (!opts.priceSource) {
+				console.error("Error: --price-source is required for --add");
+				process.exit(1);
+			}
+			await addPhysicalStore({
+				chain: opts.chain,
+				name: opts.name,
+				address: opts.address,
+				city: opts.city,
+				postalCode: opts.postalCode,
+				lat: opts.lat,
+				lng: opts.lng,
+				priceSource: opts.priceSource,
+			});
+			return;
+		}
+
+		// Handle --link command
+		if (opts.link) {
+			if (!opts.priceSource) {
+				console.error("Error: --price-source is required for --link");
+				process.exit(1);
+			}
+			await linkStoreToPriceSource(opts.link, opts.priceSource);
+			return;
+		}
+
+		// Handle --import-csv command
+		if (opts.importCsv) {
+			if (!opts.chain) {
+				console.error("Error: --chain is required for --import-csv");
+				process.exit(1);
+			}
+			if (!isValidChainId(opts.chain)) {
+				console.error(`Error: Invalid chain ID "${opts.chain}"`);
+				console.error(`Valid chain IDs: ${CHAIN_IDS.join(", ")}`);
+				process.exit(1);
+			}
+			if (!opts.priceSource) {
+				console.error("Error: --price-source is required for --import-csv");
+				process.exit(1);
+			}
+			await importStoresFromCsv(opts.importCsv, opts.chain, opts.priceSource);
+			return;
+		}
+
+		// Handle other actions
 		if (opts.pending) {
 			await listPendingStores();
 		} else if (opts.chain) {

@@ -49,12 +49,22 @@ function runSubcommand(scriptName: string, args: string[]): void {
 // Stores subcommand
 program
 	.command("stores")
-	.description("Manage stores: list, approve, reject, and view details")
+	.description("Manage stores: list, approve, reject, add physical stores, and import from CSV")
 	.option("--pending", "List all pending stores")
-	.option("--chain <chain>", "List stores for a chain")
+	.option("--chain <chain>", "List stores for a chain / required for --add and --import-csv")
 	.option("--approve <id>", "Approve a pending store")
 	.option("--reject <id>", "Reject and delete a store")
 	.option("--show <id>", "Show detailed store information")
+	.option("--add", "Add a new physical store (requires --chain, --name, --price-source)")
+	.option("--name <name>", "Store name (for --add)")
+	.option("--address <address>", "Store address (for --add)")
+	.option("--city <city>", "Store city (for --add)")
+	.option("--postal-code <code>", "Store postal code (for --add)")
+	.option("--lat <latitude>", "Store latitude (for --add)")
+	.option("--lng <longitude>", "Store longitude (for --add)")
+	.option("--price-source <identifier>", "Price source store identifier (for --add, --link, --import-csv)")
+	.option("--link <store_id>", "Link an existing store to a price source (requires --price-source)")
+	.option("--import-csv <path>", "Import physical stores from CSV (requires --chain, --price-source)")
 	.allowUnknownOption(true)
 	.action(() => {
 		// Pass through all arguments to the stores script
