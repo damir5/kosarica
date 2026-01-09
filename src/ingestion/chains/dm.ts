@@ -4,8 +4,8 @@
  * Adapter for parsing DM retail chain price data files.
  * DM uses XLSX format and has national (uniform) pricing across all stores.
  *
- * Supports single-date discovery via setDiscoveryDate() method.
- * Discovery looks for local files in the data directory matching the date pattern.
+ * Discovery fetches the current price list directly from DM's content server.
+ * The file URL is embedded in the DM portal page and updated periodically.
  *
  * DM portal: https://www.dm.hr/novo/promocije/nove-oznake-cijena-i-vazeci-cjenik-u-dm-u-2906632
  */
@@ -23,10 +23,62 @@ import { BaseChainAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
 /**
- * Column mapping for DM XLSX files.
+ * DM web portal URL where the price list is published.
+ */
+const DM_PORTAL_URL =
+  'https://www.dm.hr/novo/promocije/nove-oznake-cijena-i-vazeci-cjenik-u-dm-u-2906632'
+
+/**
+ * Direct URL to the DM price list Excel file on their content server.
+ * This URL is embedded in the portal page and may change periodically.
+ */
+const DM_PRICE_LIST_URL =
+  'https://content.services.dmtech.com/rootpage-dm-shop-hr-hr/resource/blob/3245770/0a2d2d47073cad06c1f3a8d4fbba2e50/vlada-oznacavanje-cijena-cijenik-236-data.xlsx'
+
+/**
+ * Column mapping for DM web XLSX files (from content.services.dmtech.com).
+ * Uses numeric indices because the web format has:
+ * - Row 0: Title row
+ * - Row 1: Empty row
+ * - Row 2: Headers (with one null/empty header for šifra column)
+ * - Row 3+: Data
+ *
+ * Web format columns:
+ * 0: naziv (name)
+ * 1: šifra (product code) - column header is null/empty
+ * 2: marka (brand)
+ * 3: barkod (barcode)
+ * 4: kategorija proizvoda (category)
+ * 5: neto količina (quantity)
+ * 6: Jedinica mjere (unit)
+ * 7: Cijena za jedinicu mjere (unit price)
+ * 8: dostupno samo online (online only flag - ignored)
+ * 9: MPC (regular price)
+ * 10: MPC za vrijeme posebnog oblika prodaje (discount/clearance price)
+ * 11: Najniža cijena u posljednjih 30 dana (lowest price in 30 days)
+ * 12: sidrena cijena (anchor price)
+ */
+const DM_WEB_COLUMN_MAPPING: XlsxColumnMapping = {
+  name: 0,
+  externalId: 1,
+  brand: 2,
+  barcodes: 3,
+  category: 4,
+  unitQuantity: 5,
+  unit: 6,
+  unitPrice: 7,
+  // Column 8 is "dostupno samo online" - ignored
+  price: 9,
+  discountPrice: 10,
+  lowestPrice30d: 11,
+  anchorPrice: 12,
+}
+
+/**
+ * Column mapping for local DM XLSX files (legacy/test format).
  * Maps DM's Croatian column names to NormalizedRow fields.
  */
-const DM_COLUMN_MAPPING: XlsxColumnMapping = {
+const DM_LOCAL_COLUMN_MAPPING: XlsxColumnMapping = {
   externalId: 'Šifra',
   name: 'Naziv',
   category: 'Kategorija',
@@ -48,10 +100,10 @@ const DM_COLUMN_MAPPING: XlsxColumnMapping = {
 }
 
 /**
- * Alternative column mapping for DM XLSX files.
+ * Alternative column mapping for local DM XLSX files.
  * Some DM exports may use abbreviated or different column names.
  */
-const DM_COLUMN_MAPPING_ALT: XlsxColumnMapping = {
+const DM_LOCAL_COLUMN_MAPPING_ALT: XlsxColumnMapping = {
   externalId: 'Sifra',
   name: 'Naziv artikla',
   category: 'Kategorija',
@@ -83,7 +135,8 @@ const DM_NATIONAL_STORE_IDENTIFIER = 'dm_national'
  * Extends BaseChainAdapter with XLSX-specific parsing logic.
  * DM is unique in using XLSX format with national pricing.
  *
- * Supports date-based local file discovery via setDiscoveryDate() method.
+ * Primary discovery fetches from the DM web portal.
+ * Falls back to local files if web fetch fails.
  */
 export class DmAdapter extends BaseChainAdapter {
   private xlsxParser: XlsxParser
@@ -100,6 +153,7 @@ export class DmAdapter extends BaseChainAdapter {
         /^DM[_-]?/i,
         /^dm[_-]?/i,
         /^cjenik[_-]?/i,
+        /^vlada-oznacavanje/i,
       ],
       fileExtensionPattern: /\.(xlsx|xls|XLSX|XLS)$/,
       rateLimitConfig: {
@@ -109,9 +163,10 @@ export class DmAdapter extends BaseChainAdapter {
     })
 
     this.xlsxParser = new XlsxParser({
-      columnMapping: DM_COLUMN_MAPPING,
-      hasHeader: true,
+      columnMapping: DM_WEB_COLUMN_MAPPING,
+      hasHeader: false, // Web format uses index-based mapping, skip header detection
       skipEmptyRows: true,
+      headerRowCount: 3, // Skip title row, empty row, and header row
       defaultStoreIdentifier: DM_NATIONAL_STORE_IDENTIFIER,
     })
   }
@@ -127,18 +182,57 @@ export class DmAdapter extends BaseChainAdapter {
   /**
    * Discover available DM price files.
    *
-   * DM files are stored locally with naming pattern: dm_YYYY-MM-DD.xlsx
-   * Discovery searches the local data directory for matching files.
+   * Primary: Fetches current price list from DM web portal.
+   * Fallback: Searches local data directory for files matching date pattern.
    *
-   * @returns Array of discovered files (filtered by date if setDiscoveryDate was called)
+   * @returns Array of discovered files
    */
   async discover(): Promise<DiscoveredFile[]> {
     const discoveredFiles: DiscoveredFile[] = []
-
-    // Use provided date or default to today
     const date = this.discoveryDate || new Date().toISOString().split('T')[0]
 
-    // Look for local files in ./data/ingestion/dm/ directory
+    // Primary: Try to discover from web
+    console.log(`[INFO] Discovering DM price list from web portal...`)
+    try {
+      // The web file is the current/latest price list
+      // We use HEAD request to check if it's accessible and get metadata
+      const response = await fetch(DM_PRICE_LIST_URL, { method: 'HEAD' })
+
+      if (response.ok) {
+        const contentLength = response.headers.get('content-length')
+        const lastModified = response.headers.get('last-modified')
+
+        // Extract filename from URL
+        const urlFilename = DM_PRICE_LIST_URL.split('/').pop() || 'dm-cjenik.xlsx'
+
+        discoveredFiles.push({
+          url: DM_PRICE_LIST_URL,
+          filename: urlFilename,
+          type: 'xlsx',
+          size: contentLength ? parseInt(contentLength, 10) : null,
+          lastModified: lastModified ? new Date(lastModified) : new Date(),
+          metadata: {
+            source: 'dm_web',
+            discoveredAt: new Date().toISOString(),
+            portalUrl: DM_PORTAL_URL,
+            portalDate: date,
+          },
+        })
+
+        console.log(`[INFO] Found DM price list: ${urlFilename}`)
+        return discoveredFiles
+      }
+
+      console.warn(
+        `[WARN] DM web portal returned ${response.status}, falling back to local files`,
+      )
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.warn(`[WARN] Failed to access DM web portal: ${errorMessage}`)
+      console.warn(`[WARN] Falling back to local files...`)
+    }
+
+    // Fallback: Look for local files in ./data/ingestion/dm/ directory
     const dataDir = path.resolve('./data/ingestion/dm')
     console.log(`[DEBUG] Scanning DM local directory: ${dataDir}`)
 
@@ -152,7 +246,9 @@ export class DmAdapter extends BaseChainAdapter {
 
       for (const filename of files) {
         // Match DM filename patterns: dm_YYYY-MM-DD.xlsx or DM_YYYY-MM-DD.xlsx
-        const match = filename.match(/^(dm|DM)[_-](\d{4}-\d{2}-\d{2})\.(xlsx|xls)$/i)
+        const match = filename.match(
+          /^(dm|DM)[_-](\d{4}-\d{2}-\d{2})\.(xlsx|xls)$/i,
+        )
         if (!match) {
           continue
         }
@@ -219,18 +315,36 @@ export class DmAdapter extends BaseChainAdapter {
 
   /**
    * Parse DM XLSX content into normalized rows.
+   * Automatically detects file format (web vs local) based on filename pattern.
    */
   async parse(
     content: ArrayBuffer,
     filename: string,
     options?: ParseOptions,
   ): Promise<ParseResult> {
-    // DM has national pricing, always use the national store identifier
     const storeIdentifier = DM_NATIONAL_STORE_IDENTIFIER
 
-    // Try parsing with primary column mapping first
+    // Detect if this is a web format file (from content.services.dmtech.com)
+    const isWebFormat =
+      filename.includes('vlada-oznacavanje') || filename.includes('cijenik-')
+
+    if (isWebFormat) {
+      // Web format: uses numeric column indices, has 3 header rows to skip
+      this.xlsxParser.setOptions({
+        columnMapping: DM_WEB_COLUMN_MAPPING,
+        hasHeader: false,
+        headerRowCount: 3, // Skip title row, empty row, and header row
+        defaultStoreIdentifier: storeIdentifier,
+      })
+
+      return this.xlsxParser.parse(content, filename, options)
+    }
+
+    // Local format: uses Croatian column names with standard header
     this.xlsxParser.setOptions({
-      columnMapping: DM_COLUMN_MAPPING,
+      columnMapping: DM_LOCAL_COLUMN_MAPPING,
+      hasHeader: true,
+      headerRowCount: 0,
       defaultStoreIdentifier: storeIdentifier,
     })
 
@@ -239,7 +353,9 @@ export class DmAdapter extends BaseChainAdapter {
     // If no valid rows, try alternative column mapping
     if (result.validRows === 0 && result.errors.length > 0) {
       this.xlsxParser.setOptions({
-        columnMapping: DM_COLUMN_MAPPING_ALT,
+        columnMapping: DM_LOCAL_COLUMN_MAPPING_ALT,
+        hasHeader: true,
+        headerRowCount: 0,
         defaultStoreIdentifier: storeIdentifier,
       })
       result = await this.xlsxParser.parse(content, filename, options)
