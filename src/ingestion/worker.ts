@@ -55,6 +55,7 @@ import {
   type ChainId,
   isValidChainId,
 } from './chains'
+import { geocodeAddress } from './services/geocoding'
 
 // ============================================================================
 // Worker Environment Types
@@ -924,63 +925,34 @@ async function handleEnrichStore(
   try {
     switch (taskType) {
       case 'geocode': {
-        // Build address for geocoding
-        const addressParts = [store.address, store.city, store.postalCode].filter(
-          Boolean,
-        )
-        const fullAddress = addressParts.join(', ')
-
-        if (!fullAddress) {
-          await db
-            .update(storeEnrichmentTasks)
-            .set({
-              status: 'failed',
-              errorMessage: 'No address to geocode',
-            })
-            .where(eq(storeEnrichmentTasks.id, taskId))
-          return
-        }
-
-        // Call geocoding API (using Nominatim as example)
-        const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddress)}&format=json&limit=1&countrycodes=hr`
-
-        const response = await globalThis.fetch(geocodeUrl, {
-          headers: {
-            'User-Agent': 'Kosarica/1.0 (price-tracker@example.com)',
-          },
+        // Use the geocoding service
+        const geocodeResult = await geocodeAddress({
+          address: store.address,
+          city: store.city,
+          postalCode: store.postalCode,
+          country: 'hr',
         })
 
-        if (!response.ok) {
-          throw new Error(`Geocoding API error: ${response.status}`)
-        }
-
-        const results = (await response.json()) as Array<{
-          lat: string
-          lon: string
-          display_name: string
-        }>
-
-        if (results.length === 0) {
+        if (!geocodeResult.found) {
           await db
             .update(storeEnrichmentTasks)
             .set({
               status: 'completed',
               outputData: JSON.stringify({ found: false }),
-              confidence: 'low',
+              confidence: geocodeResult.confidence,
+              updatedAt: new Date(),
             })
             .where(eq(storeEnrichmentTasks.id, taskId))
-          console.log(`[enrich_store] No geocoding results for ${fullAddress}`)
+          console.log(`[enrich_store] No geocoding results for store ${storeId}`)
           return
         }
-
-        const result = results[0]
 
         // Update store with geocoded coordinates
         await db
           .update(stores)
           .set({
-            latitude: result.lat,
-            longitude: result.lon,
+            latitude: geocodeResult.latitude!,
+            longitude: geocodeResult.longitude!,
             updatedAt: new Date(),
           })
           .where(eq(stores.id, storeId))
@@ -992,17 +964,18 @@ async function handleEnrichStore(
             status: 'completed',
             outputData: JSON.stringify({
               found: true,
-              lat: result.lat,
-              lon: result.lon,
-              displayName: result.display_name,
+              lat: geocodeResult.latitude,
+              lon: geocodeResult.longitude,
+              displayName: geocodeResult.displayName,
+              provider: geocodeResult.provider,
             }),
-            confidence: 'high',
+            confidence: geocodeResult.confidence,
             updatedAt: new Date(),
           })
           .where(eq(storeEnrichmentTasks.id, taskId))
 
         console.log(
-          `[enrich_store] Geocoded ${fullAddress} -> ${result.lat}, ${result.lon}`,
+          `[enrich_store] Geocoded store ${storeId} -> ${geocodeResult.latitude}, ${geocodeResult.longitude} (${geocodeResult.confidence} confidence)`,
         )
         break
       }

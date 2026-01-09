@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Settings, Users, Wrench } from 'lucide-react'
+import { Settings, Users, Wrench, Store, Database } from 'lucide-react'
 import { orpc } from '@/orpc/client'
 
 export const Route = createFileRoute('/_admin/admin/')({
@@ -81,6 +81,26 @@ function AdminDashboard() {
             <h3 className="mb-2 font-semibold text-foreground text-lg">Configuration</h3>
             <p className="text-muted-foreground text-sm">
               View build information, client configuration, and server environment variables
+            </p>
+          </Link>
+          <Link
+            to="/admin/stores"
+            className="block rounded-lg border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md"
+          >
+            <Store className="mb-3 size-8 text-primary" />
+            <h3 className="mb-2 font-semibold text-foreground text-lg">Store Management</h3>
+            <p className="text-muted-foreground text-sm">
+              View and manage store locations, geocoding, and data enrichment
+            </p>
+          </Link>
+          <Link
+            to="/admin/ingestion"
+            className="block rounded-lg border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md"
+          >
+            <Database className="mb-3 size-8 text-primary" />
+            <h3 className="mb-2 font-semibold text-foreground text-lg">Ingestion Monitor</h3>
+            <p className="text-muted-foreground text-sm">
+              Monitor data ingestion runs, files, and errors
             </p>
           </Link>
         </div>
