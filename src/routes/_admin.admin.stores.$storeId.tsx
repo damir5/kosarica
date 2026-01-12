@@ -40,11 +40,9 @@ function StoreDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground">Loading store details...</p>
-          </div>
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-muted-foreground">Loading store details...</p>
         </div>
       </div>
     )
@@ -52,26 +50,24 @@ function StoreDetailPage() {
 
   if (error || !store) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-            <p className="text-sm text-destructive">
-              Error: {error?.message || 'Store not found'}
-            </p>
-          </div>
-          <Button variant="outline" className="mt-4" asChild>
-            <Link to="/admin/stores">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Stores
-            </Link>
-          </Button>
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
+            Error: {error?.message || 'Store not found'}
+          </p>
         </div>
+        <Button variant="outline" className="mt-4" asChild>
+          <Link to="/admin/stores">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Stores
+          </Link>
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       {/* Header */}
       <div className="border-border border-b bg-card">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -167,6 +163,6 @@ function StoreDetailPage() {
         {/* Enrichment Section */}
         <StoreEnrichmentSection storeId={store.id} store={store} />
       </div>
-    </div>
+    </>
   )
 }

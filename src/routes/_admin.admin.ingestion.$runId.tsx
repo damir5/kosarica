@@ -132,11 +132,9 @@ function RunDetailPage() {
 
   if (runLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground">Loading run details...</p>
-          </div>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-muted-foreground">Loading run details...</p>
         </div>
       </div>
     )
@@ -144,20 +142,18 @@ function RunDetailPage() {
 
   if (runError || !run) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-            <p className="text-sm text-destructive">
-              Error: {runError?.message || 'Run not found'}
-            </p>
-          </div>
-          <Button variant="outline" className="mt-4" asChild>
-            <a href="/admin/ingestion">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Ingestion
-            </a>
-          </Button>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
+            Error: {runError?.message || 'Run not found'}
+          </p>
         </div>
+        <Button variant="outline" className="mt-4" asChild>
+          <a href="/admin/ingestion">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Ingestion
+          </a>
+        </Button>
       </div>
     )
   }
@@ -168,7 +164,7 @@ function RunDetailPage() {
   const progress = totalFiles > 0 ? Math.round((processedFiles / totalFiles) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       {/* Header */}
       <div className="border-border border-b bg-card">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -454,6 +450,6 @@ function RunDetailPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </>
   )
 }
