@@ -21,6 +21,8 @@
     "db:migrate:test": "wrangler d1 migrations apply kosarica-db-test --config wrangler.test.jsonc --remote",
     "db:migrate:prod": "wrangler d1 migrations apply kosarica-db-prod --config wrangler.prod.jsonc --remote",
     "db:studio": "drizzle-kit studio",
+    "db:sync-test": "tsx scripts/sync-db.ts --source=test",
+    "db:sync-prod": "tsx scripts/sync-db.ts --source=prod",
     "ingest": "tsx src/ingestion/cli/index.ts"
   },
   "dependencies": {

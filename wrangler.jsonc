@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kosarica-local",
+  "account_id": "0b456d065e7e7fbf548c1814a63c25fb",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
@@ -58,6 +59,10 @@
   // Environment variables
   "vars": {
     "BETTER_AUTH_URL": "http://localhost:3002",
+    "PASSKEY_RP_ID": "localhost",
+    "PASSKEY_RP_NAME": "Kosarica App",
+    "LOG_LEVEL": "info",
+    "LOG_TYPES": "console",
     // Comma-separated list of chains to process (empty = all chains)
     // Available: konzum, lidl, plodine, interspar, studenac, kaufland, eurospin, dm, ktc, metro, trgocentar
     "INGESTION_CHAINS": "",

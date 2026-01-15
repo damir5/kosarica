@@ -4,15 +4,55 @@
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/test/worker-entry.ts",
+
+  // D1 Database binding
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "kosarica-db-test",
-      "database_id": "test-db-id",
+      "database_id": "TODO: run 'wrangler d1 create kosarica-db-test' and paste ID here",
       "migrations_dir": "drizzle"
     }
   ],
+
+  // R2 Bucket for ingestion file storage
+  "r2_buckets": [
+    {
+      "binding": "INGESTION_BUCKET",
+      "bucket_name": "kosarica-data-test"
+    }
+  ],
+
+  // Queue producer bindings
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGESTION_QUEUE",
+        "queue": "price-ingestion-test"
+      },
+      {
+        "binding": "INGESTION_DLQ",
+        "queue": "price-ingestion-dlq-test"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "price-ingestion-test",
+        "max_batch_size": 10,
+        "max_retries": 3,
+        "dead_letter_queue": "price-ingestion-dlq-test"
+      }
+    ]
+  },
+
+  // Environment variables
   "vars": {
-    "BETTER_AUTH_URL": "http://localhost:3000"
+    "BETTER_AUTH_URL": "TODO: fill in test URL",
+    "PASSKEY_RP_ID": "TODO: fill in test domain",
+    "PASSKEY_RP_NAME": "Kosarica App (Test)",
+    "LOG_LEVEL": "debug",
+    "LOG_TYPES": "console",
+    "INGESTION_CHAINS": "",
+    "MAX_RETRIES": "3"
   }
 }

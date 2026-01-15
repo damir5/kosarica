@@ -4,14 +4,62 @@
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
+
+  // D1 Database binding
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "kosarica-db-prod",
-      "database_id": "<run 'wrangler d1 create kosarica-db-prod' and paste ID here>"
+      "database_id": "TODO: run 'wrangler d1 create kosarica-db-prod' and paste ID here"
     }
   ],
+
+  // R2 Bucket for ingestion file storage
+  "r2_buckets": [
+    {
+      "binding": "INGESTION_BUCKET",
+      "bucket_name": "kosarica-data-prod"
+    }
+  ],
+
+  // Queue producer bindings
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGESTION_QUEUE",
+        "queue": "price-ingestion-prod"
+      },
+      {
+        "binding": "INGESTION_DLQ",
+        "queue": "price-ingestion-dlq-prod"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "price-ingestion-prod",
+        "max_batch_size": 10,
+        "max_retries": 3,
+        "dead_letter_queue": "price-ingestion-dlq-prod"
+      }
+    ]
+  },
+
+  // Scheduled triggers for automated ingestion runs
+  "triggers": {
+    "crons": [
+      // Daily ingestion run at 6:00 AM UTC
+      "0 6 * * *"
+    ]
+  },
+
+  // Environment variables
   "vars": {
-    "BETTER_AUTH_URL": "https://kosarica-prod.<your-subdomain>.workers.dev"
+    "BETTER_AUTH_URL": "TODO: fill in prod URL",
+    "PASSKEY_RP_ID": "TODO: fill in prod domain",
+    "PASSKEY_RP_NAME": "Kosarica App",
+    "LOG_LEVEL": "warn",
+    "LOG_TYPES": "console",
+    "INGESTION_CHAINS": "",
+    "MAX_RETRIES": "3"
   }
 }

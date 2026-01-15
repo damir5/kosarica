@@ -1,11 +1,3 @@
-# Better Auth Configuration
+# Authentication Secret (generate unique per environment, min 32 chars)
+# This is the ONLY secret that must be in .dev.vars - all other config is in wrangler.jsonc
 BETTER_AUTH_SECRET=your-secret-key-min-32-chars-here
-BETTER_AUTH_URL=http://localhost:3002
-
-# Passkey Configuration (optional - defaults shown)
-PASSKEY_RP_ID=localhost
-PASSKEY_RP_NAME=Kosarica App
-
-# Logging (optional)
-LOG_LEVEL=info
-LOG_TYPES=console
