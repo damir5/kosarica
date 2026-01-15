@@ -4,9 +4,9 @@
   "scripts": {
     "setup-dev": "tsx scripts/setup-dev.ts",
     "dev": "vite dev",
-    "build": "vite build",
-    "build:test": "BUILD_ENV=test vite build --mode test",
-    "build:prod": "BUILD_ENV=prod vite build --mode prod",
+    "build": "vite build && node scripts/create-worker-entry.mjs",
+    "build:test": "BUILD_ENV=test vite build --mode test && node scripts/create-worker-entry.mjs",
+    "build:prod": "BUILD_ENV=prod vite build --mode prod && node scripts/create-worker-entry.mjs",
     "preview": "pnpm build && wrangler dev --config wrangler.jsonc",
     "test": "vitest run",
     "format": "biome format",

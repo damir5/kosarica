@@ -1,5 +1,7 @@
 import { getConfigInfo } from "./admin";
 import {
+	deleteRun,
+	deleteRuns,
 	getChunk,
 	getFile,
 	getRun,
@@ -71,6 +73,8 @@ export default {
 			rerunFile,
 			rerunChunk,
 			triggerChain,
+			deleteRun,
+			deleteRuns,
 		},
 		stores: {
 			list: listStores,

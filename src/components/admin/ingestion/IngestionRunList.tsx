@@ -1,4 +1,4 @@
-import { Clock, CheckCircle, XCircle, Loader2, ChevronRight } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, Loader2, ChevronRight, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   Table,
@@ -14,6 +14,8 @@ import type { IngestionRun } from './IngestionRunCard'
 interface IngestionRunListProps {
   runs: IngestionRun[]
   isLoading: boolean
+  onDelete?: (runId: string) => void
+  deletingRunId?: string
 }
 
 type RunStatus = 'pending' | 'running' | 'completed' | 'failed'
@@ -38,7 +40,7 @@ const SOURCE_LABELS: Record<string, string> = {
   scheduled: 'Scheduled',
 }
 
-export function IngestionRunList({ runs, isLoading }: IngestionRunListProps) {
+export function IngestionRunList({ runs, isLoading, onDelete, deletingRunId }: IngestionRunListProps) {
   const formatTimeAgo = (date: Date | null) => {
     if (!date) return 'Never'
     const now = new Date()
@@ -186,11 +188,32 @@ export function IngestionRunList({ runs, isLoading }: IngestionRunListProps) {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" asChild>
-                    <a href={`/admin/ingestion/${run.id}`}>
-                      <ChevronRight className="h-4 w-4" />
-                    </a>
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (window.confirm(`Delete run ${run.id}? This will also delete all associated files, chunks, and errors.`)) {
+                            onDelete(run.id)
+                          }
+                        }}
+                        disabled={deletingRunId === run.id}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        {deletingRunId === run.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" asChild>
+                      <a href={`/admin/ingestion/${run.id}`}>
+                        <ChevronRight className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             )

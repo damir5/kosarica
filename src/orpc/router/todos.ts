@@ -1,4 +1,4 @@
-import { os } from '@orpc/server'
+import { procedure } from '../base'
 import * as z from 'zod'
 
 const todos = [
@@ -7,11 +7,11 @@ const todos = [
   { id: 3, name: 'Finish the project' },
 ]
 
-export const listTodos = os.input(z.object({})).handler(() => {
+export const listTodos = procedure.input(z.object({})).handler(() => {
   return todos
 })
 
-export const addTodo = os
+export const addTodo = procedure
   .input(z.object({ name: z.string() }))
   .handler(({ input }) => {
     const newTodo = { id: todos.length + 1, name: input.name }

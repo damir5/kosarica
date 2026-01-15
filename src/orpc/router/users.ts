@@ -1,10 +1,10 @@
-import { os } from '@orpc/server'
+import { procedure } from '../base'
 import * as z from 'zod'
 import { eq, like, or, count, desc, and, ne } from 'drizzle-orm'
 import { getDb } from '@/utils/bindings'
 import { user } from '@/db/schema'
 
-export const listUsers = os
+export const listUsers = procedure
   .input(
     z.object({
       page: z.number().int().min(1).default(1),
@@ -57,7 +57,7 @@ export const listUsers = os
     }
   })
 
-export const getUser = os
+export const getUser = procedure
   .input(z.object({ userId: z.string() }))
   .handler(async ({ input }) => {
     const db = getDb()
@@ -68,7 +68,7 @@ export const getUser = os
     return result[0]
   })
 
-export const updateUserRole = os
+export const updateUserRole = procedure
   .input(
     z.object({
       userId: z.string(),
@@ -104,7 +104,7 @@ export const updateUserRole = os
     return { success: true }
   })
 
-export const deleteUser = os
+export const deleteUser = procedure
   .input(
     z.object({
       userId: z.string(),
@@ -137,7 +137,7 @@ export const deleteUser = os
     return { success: true }
   })
 
-export const banUser = os
+export const banUser = procedure
   .input(
     z.object({
       userId: z.string(),

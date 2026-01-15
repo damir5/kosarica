@@ -1,4 +1,4 @@
-import { os } from '@orpc/server'
+import { procedure } from '../base'
 import * as z from 'zod'
 import { getServerConfig } from '@/config/serverConfig'
 
@@ -16,7 +16,7 @@ function maskSensitiveValue(key: string, value: string | undefined): string {
   return value
 }
 
-export const getConfigInfo = os.input(z.object({})).handler(async () => {
+export const getConfigInfo = procedure.input(z.object({})).handler(async () => {
   const config = getServerConfig()
 
   // Build info from environment (set at build time via vite.config.ts)

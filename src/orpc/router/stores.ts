@@ -1,4 +1,4 @@
-import { os } from "@orpc/server";
+import { procedure } from "../base";
 import { and, count, desc, eq, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
@@ -9,7 +9,7 @@ import { generatePrefixedId } from "@/utils/id";
 // Core Store Operations
 // ============================================================================
 
-export const listStores = os
+export const listStores = procedure
 	.input(
 		z.object({
 			chainSlug: z.string().optional(),
@@ -67,7 +67,7 @@ export const listStores = os
 		};
 	});
 
-export const getStore = os
+export const getStore = procedure
 	.input(z.object({ storeId: z.string() }))
 	.handler(async ({ input }) => {
 		const db = getDb();
@@ -81,7 +81,7 @@ export const getStore = os
 		return result[0];
 	});
 
-export const updateStore = os
+export const updateStore = procedure
 	.input(
 		z.object({
 			storeId: z.string(),
@@ -110,7 +110,7 @@ export const updateStore = os
 		return { success: true };
 	});
 
-export const approveStore = os
+export const approveStore = procedure
 	.input(z.object({ storeId: z.string() }))
 	.handler(async ({ input }) => {
 		const db = getDb();
@@ -135,7 +135,7 @@ export const approveStore = os
 		return { success: true };
 	});
 
-export const rejectStore = os
+export const rejectStore = procedure
 	.input(z.object({ storeId: z.string() }))
 	.handler(async ({ input }) => {
 		const db = getDb();
@@ -154,7 +154,7 @@ export const rejectStore = os
 		return { success: true };
 	});
 
-export const mergeStores = os
+export const mergeStores = procedure
 	.input(
 		z.object({
 			sourceStoreId: z.string(),
@@ -193,7 +193,7 @@ export const mergeStores = os
 		return { success: true };
 	});
 
-export const linkPriceSource = os
+export const linkPriceSource = procedure
 	.input(
 		z.object({
 			storeId: z.string(),
@@ -231,7 +231,7 @@ export const linkPriceSource = os
 		return { success: true };
 	});
 
-export const unlinkPriceSource = os
+export const unlinkPriceSource = procedure
 	.input(z.object({ storeId: z.string() }))
 	.handler(async ({ input }) => {
 		const db = getDb();
@@ -253,7 +253,7 @@ export const unlinkPriceSource = os
 		return { success: true };
 	});
 
-export const getPendingStores = os
+export const getPendingStores = procedure
 	.input(
 		z.object({
 			chainSlug: z.string().optional(),
@@ -277,7 +277,7 @@ export const getPendingStores = os
 		return { stores: pendingStores };
 	});
 
-export const getLinkedPhysicalStores = os
+export const getLinkedPhysicalStores = procedure
 	.input(z.object({ virtualStoreId: z.string() }))
 	.handler(async ({ input }) => {
 		const db = getDb();
@@ -308,7 +308,7 @@ export const getLinkedPhysicalStores = os
 // Enhanced List Endpoints for Admin UI
 // ============================================================================
 
-export const listVirtualStores = os
+export const listVirtualStores = procedure
 	.input(
 		z.object({
 			chainSlug: z.string().optional(),
@@ -360,7 +360,7 @@ export const listVirtualStores = os
 		return { stores: storesWithCounts };
 	});
 
-export const listPhysicalStores = os
+export const listPhysicalStores = procedure
 	.input(
 		z.object({
 			chainSlug: z.string().optional(),
@@ -445,7 +445,7 @@ export const listPhysicalStores = os
 		};
 	});
 
-export const getVirtualStoresForLinking = os
+export const getVirtualStoresForLinking = procedure
 	.input(z.object({ chainSlug: z.string() }))
 	.handler(async ({ input }) => {
 		const db = getDb();
@@ -472,7 +472,7 @@ export const getVirtualStoresForLinking = os
 // Enrichment
 // ============================================================================
 
-export const triggerEnrichment = os
+export const triggerEnrichment = procedure
 	.input(
 		z.object({
 			storeId: z.string(),
@@ -512,7 +512,7 @@ export const triggerEnrichment = os
 		return { task };
 	});
 
-export const getEnrichmentTasks = os
+export const getEnrichmentTasks = procedure
 	.input(z.object({ storeId: z.string() }))
 	.handler(async ({ input }) => {
 		const db = getDb();
@@ -535,7 +535,7 @@ export const getEnrichmentTasks = os
 		return { tasks };
 	});
 
-export const verifyEnrichment = os
+export const verifyEnrichment = procedure
 	.input(
 		z.object({
 			taskId: z.string(),
@@ -608,7 +608,7 @@ export const verifyEnrichment = os
 // Create Physical Store
 // ============================================================================
 
-export const createPhysicalStore = os
+export const createPhysicalStore = procedure
 	.input(
 		z.object({
 			chainSlug: z.string(),

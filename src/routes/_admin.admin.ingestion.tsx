@@ -86,6 +86,16 @@ function IngestionDashboard() {
     },
   })
 
+  // Delete run mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      return orpc.admin.ingestion.deleteRun.call({ runId })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'ingestion'] })
+    },
+  })
+
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['admin', 'ingestion'] })
   }
@@ -195,6 +205,8 @@ function IngestionDashboard() {
             <IngestionRunList
               runs={runsData?.runs ?? []}
               isLoading={runsLoading}
+              onDelete={(runId) => deleteMutation.mutate(runId)}
+              deletingRunId={deleteMutation.isPending ? deleteMutation.variables : undefined}
             />
 
             {/* Pagination */}

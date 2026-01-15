@@ -1,4 +1,4 @@
-import { os } from '@orpc/server'
+import { procedure } from '../base'
 import * as z from 'zod'
 import { eq } from 'drizzle-orm'
 import { getDb } from '@/utils/bindings'
@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = {
   updatedAt: new Date(),
 }
 
-export const getSettings = os.input(z.object({})).handler(async () => {
+export const getSettings = procedure.input(z.object({})).handler(async () => {
   const db = getDb()
   const settings = await db.select().from(appSettings).where(eq(appSettings.id, 'main'))
 
@@ -27,7 +27,7 @@ export const getSettings = os.input(z.object({})).handler(async () => {
   return settings[0]
 })
 
-export const updateSettings = os
+export const updateSettings = procedure
   .input(
     z.object({
       appName: z.string().min(1).max(100).optional(),

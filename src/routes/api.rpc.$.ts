@@ -29,13 +29,23 @@ async function handle({ request }: { request: Request }) {
       })
 
       const result = response ?? new Response('Not Found', { status: 404 })
+      const duration = Date.now() - start
 
-      log.info('RPC request completed', {
-        method: request.method,
-        path: url.pathname,
-        status: result.status,
-        duration: Date.now() - start,
-      })
+      if (result.status >= 500) {
+        log.error('RPC request failed', {
+          method: request.method,
+          path: url.pathname,
+          status: result.status,
+          duration,
+        })
+      } else {
+        log.info('RPC request completed', {
+          method: request.method,
+          path: url.pathname,
+          status: result.status,
+          duration,
+        })
+      }
 
       return result
     } catch (error) {

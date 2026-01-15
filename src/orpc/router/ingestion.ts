@@ -1,20 +1,23 @@
-import { os } from '@orpc/server'
+import { procedure } from '../base'
 import * as z from 'zod'
 import { eq, and, count, desc, gte, sql } from 'drizzle-orm'
-import { getDb } from '@/utils/bindings'
+import { getDb, getEnv } from '@/utils/bindings'
 import { generatePrefixedId } from '@/utils/id'
 import {
   ingestionRuns,
   ingestionFiles,
   ingestionChunks,
   ingestionErrors,
+  chains,
 } from '@/db/schema'
+import { CHAIN_CONFIGS, isValidChainId } from '@/ingestion/chains/config'
+import type { DiscoverQueueMessage } from '@/ingestion/core/types'
 
 // ============================================================================
 // Monitoring Endpoints
 // ============================================================================
 
-export const listRuns = os
+export const listRuns = procedure
   .input(
     z.object({
       chainSlug: z.string().optional(),
@@ -60,7 +63,7 @@ export const listRuns = os
     }
   })
 
-export const getRun = os
+export const getRun = procedure
   .input(z.object({ runId: z.string() }))
   .handler(async ({ input }) => {
     const db = getDb()
@@ -75,7 +78,7 @@ export const getRun = os
     return result[0]
   })
 
-export const listFiles = os
+export const listFiles = procedure
   .input(
     z.object({
       runId: z.string(),
@@ -118,7 +121,7 @@ export const listFiles = os
     }
   })
 
-export const getFile = os
+export const getFile = procedure
   .input(z.object({ fileId: z.string() }))
   .handler(async ({ input }) => {
     const db = getDb()
@@ -133,7 +136,7 @@ export const getFile = os
     return result[0]
   })
 
-export const listChunks = os
+export const listChunks = procedure
   .input(
     z.object({
       fileId: z.string(),
@@ -176,7 +179,7 @@ export const listChunks = os
     }
   })
 
-export const getChunk = os
+export const getChunk = procedure
   .input(z.object({ chunkId: z.string() }))
   .handler(async ({ input }) => {
     const db = getDb()
@@ -191,7 +194,7 @@ export const getChunk = os
     return result[0]
   })
 
-export const listErrors = os
+export const listErrors = procedure
   .input(
     z.object({
       runId: z.string().optional(),
@@ -249,7 +252,7 @@ export const listErrors = os
 // Stats Endpoint
 // ============================================================================
 
-export const getStats = os
+export const getStats = procedure
   .input(
     z.object({
       timeRange: z.enum(['24h', '7d', '30d']),
@@ -342,7 +345,7 @@ export const getStats = os
 // Re-run Endpoints
 // ============================================================================
 
-export const rerunRun = os
+export const rerunRun = procedure
   .input(z.object({ runId: z.string() }))
   .handler(async ({ input }) => {
     const db = getDb()
@@ -378,7 +381,7 @@ export const rerunRun = os
     }
   })
 
-export const rerunFile = os
+export const rerunFile = procedure
   .input(z.object({ fileId: z.string() }))
   .handler(async ({ input }) => {
     const db = getDb()
@@ -421,7 +424,7 @@ export const rerunFile = os
     }
   })
 
-export const rerunChunk = os
+export const rerunChunk = procedure
   .input(z.object({ chunkId: z.string() }))
   .handler(async ({ input }) => {
     const db = getDb()
@@ -474,26 +477,110 @@ export const rerunChunk = os
   })
 
 // ============================================================================
+// Delete Endpoints
+// ============================================================================
+
+export const deleteRun = procedure
+  .input(z.object({ runId: z.string() }))
+  .handler(async ({ input }) => {
+    const db = getDb()
+
+    // Check if run exists
+    const run = await db
+      .select()
+      .from(ingestionRuns)
+      .where(eq(ingestionRuns.id, input.runId))
+
+    if (run.length === 0) {
+      throw new Error('Run not found')
+    }
+
+    // Delete the run (cascade will handle files, chunks, errors)
+    await db.delete(ingestionRuns).where(eq(ingestionRuns.id, input.runId))
+
+    return {
+      success: true,
+      message: `Deleted run ${input.runId}`,
+    }
+  })
+
+export const deleteRuns = procedure
+  .input(z.object({ runIds: z.array(z.string()) }))
+  .handler(async ({ input }) => {
+    const db = getDb()
+
+    if (input.runIds.length === 0) {
+      return { success: true, deleted: 0, message: 'No runs to delete' }
+    }
+
+    // Delete all specified runs
+    let deleted = 0
+    for (const runId of input.runIds) {
+      const result = await db
+        .delete(ingestionRuns)
+        .where(eq(ingestionRuns.id, runId))
+      if (result.rowsAffected > 0) {
+        deleted++
+      }
+    }
+
+    return {
+      success: true,
+      deleted,
+      message: `Deleted ${deleted} run(s)`,
+    }
+  })
+
+// ============================================================================
 // Manual Trigger Endpoint
 // ============================================================================
 
-export const triggerChain = os
+export const triggerChain = procedure
   .input(z.object({ chainSlug: z.string() }))
   .handler(async ({ input }) => {
     const db = getDb()
+
+    // Validate chain slug
+    if (!isValidChainId(input.chainSlug)) {
+      throw new Error(`Invalid chain slug: ${input.chainSlug}`)
+    }
+
+    const chainConfig = CHAIN_CONFIGS[input.chainSlug]
+
+    // Ensure the chain exists in the database (upsert from config)
+    await db
+      .insert(chains)
+      .values({
+        slug: chainConfig.id,
+        name: chainConfig.name,
+        website: chainConfig.baseUrl,
+      })
+      .onConflictDoNothing()
 
     // Create a new run for manual trigger
     const newRunId = generatePrefixedId('igr')
     await db.insert(ingestionRuns).values({
       id: newRunId,
       chainSlug: input.chainSlug,
-      source: 'cli', // Manual trigger is similar to CLI
+      source: 'manual',
       status: 'pending',
     })
+
+    // Enqueue discover message to start the ingestion pipeline
+    const env = getEnv()
+    const discoverMessage: DiscoverQueueMessage = {
+      id: generatePrefixedId('msg'),
+      type: 'discover',
+      runId: newRunId,
+      chainSlug: input.chainSlug,
+      createdAt: new Date().toISOString(),
+    }
+
+    await env.INGESTION_QUEUE.send(discoverMessage)
 
     return {
       success: true,
       runId: newRunId,
-      message: `Triggered ingestion for chain ${input.chainSlug}`,
+      message: `Ingestion started for chain ${input.chainSlug}`,
     }
   })

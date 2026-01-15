@@ -13,22 +13,10 @@
  * Download links: /cjenik/download?file=FILENAME
  */
 
-import { Agent } from 'undici'
 import type { DiscoveredFile } from '../core/types'
 import type { CsvColumnMapping, CsvParserOptions } from '../parsers/csv'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
-
-/**
- * Custom fetch agent that relaxes SSL certificate verification.
- * Required because Plodine's server uses a certificate that isn't
- * in Node.js's default trust store.
- */
-const plodineAgent = new Agent({
-  connect: {
-    rejectUnauthorized: false,
-  },
-})
 
 /**
  * Column mapping for Plodine CSV files (current format as of 2026).
@@ -149,8 +137,6 @@ export class PlodineAdapter extends BaseCsvAdapter {
           'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
-        // @ts-expect-error - undici dispatcher option not in standard fetch types
-        dispatcher: plodineAgent,
       })
 
       if (!response.ok) {
@@ -223,8 +209,6 @@ export class PlodineAdapter extends BaseCsvAdapter {
         'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
         'Accept': '*/*',
       },
-      // @ts-expect-error - undici dispatcher option not in standard fetch types
-      dispatcher: plodineAgent,
     })
 
     if (!response.ok) {
