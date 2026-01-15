@@ -5,5 +5,6 @@ export { StoreAddModal } from "./StoreAddModal";
 export { StoreApprovalModal } from "./StoreApprovalModal";
 export { StoreEnrichmentSection } from "./StoreEnrichmentSection";
 export { type PricingMode, StoreForm, type StoreFormData } from "./StoreForm";
+export { StoreLocationMap } from "./StoreLocationMap";
 export { StoreMergeModal } from "./StoreMergeModal";
 export { VerifyLocationModal } from "./VerifyLocationModal";

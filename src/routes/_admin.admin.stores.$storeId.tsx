@@ -1,9 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Building2, MapPin, Store as StoreIcon } from "lucide-react";
 import { StoreEnrichmentSection } from "@/components/admin/stores/StoreEnrichmentSection";
+import { StoreLocationMap } from "@/components/admin/stores/StoreLocationMap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useState } from "react";
 import {
 	Card,
 	CardContent,
@@ -35,6 +39,7 @@ type StoreData = {
 
 function StoreDetailPage() {
 	const { storeId } = Route.useParams();
+	const queryClient = useQueryClient();
 
 	const { data, isLoading, error } = useQuery(
 		orpc.admin.stores.get.queryOptions({
@@ -43,6 +48,34 @@ function StoreDetailPage() {
 	);
 
 	const store = data as StoreData | undefined;
+
+	// State for pending coordinate changes
+	const [pendingCoordinates, setPendingCoordinates] = useState<{
+		lat: string | null;
+		lng: string | null;
+	} | null>(null);
+
+	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+	// Mutation for updating coordinates
+	const updateCoordinatesMutation = useMutation({
+		mutationFn: async (coords: { lat: string; lng: string }) => {
+			return orpc.admin.stores.update.call({
+				storeId: store!.id,
+				lat: coords.lat,
+				lng: coords.lng,
+			});
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["admin", "stores", "get"] });
+			setPendingCoordinates(null);
+			setHasUnsavedChanges(false);
+			toast.success("Coordinates updated successfully");
+		},
+		onError: (error) => {
+			toast.error(`Failed to update coordinates: ${error.message}`);
+		},
+	});
 
 	if (isLoading) {
 		return (
@@ -127,7 +160,8 @@ function StoreDetailPage() {
 							Store address and geographic coordinates
 						</CardDescription>
 					</CardHeader>
-					<CardContent>
+					<CardContent className="space-y-4">
+						{/* Address Information Grid */}
 						<div className="grid gap-4 sm:grid-cols-2">
 							<div>
 								<div className="text-sm font-medium text-muted-foreground">
@@ -151,7 +185,7 @@ function StoreDetailPage() {
 								<div className="text-sm font-medium text-muted-foreground">
 									Coordinates
 								</div>
-								<p className="mt-1 font-mono">
+								<p className="mt-1 font-mono text-sm">
 									{store.latitude && store.longitude ? (
 										<>
 											{Number(store.latitude).toFixed(6)},{" "}
@@ -164,20 +198,92 @@ function StoreDetailPage() {
 							</div>
 						</div>
 
-						{/* Map Preview (if coordinates exist) */}
-						{store.latitude && store.longitude && (
-							<div className="mt-4">
-								<a
-									href={`https://www.openstreetmap.org/?mlat=${store.latitude}&mlon=${store.longitude}&zoom=17`}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-								>
-									View on OpenStreetMap
-									<MapPin className="h-3 w-3" />
-								</a>
+						{/* Interactive Map */}
+						<div className="mt-4 space-y-3">
+							<div className="flex items-center justify-between">
+								<h4 className="text-sm font-medium">
+									{store.latitude && store.longitude
+										? "Store Location"
+										: "Set Store Location"}
+								</h4>
+								{hasUnsavedChanges && (
+									<Badge variant="secondary" className="text-xs">
+										Unsaved changes
+									</Badge>
+								)}
 							</div>
-						)}
+
+							<StoreLocationMap
+								latitude={
+									pendingCoordinates?.lat ??
+									store.latitude
+								}
+								longitude={
+									pendingCoordinates?.lng ??
+									store.longitude
+								}
+								onCoordinateChange={(lat, lng) => {
+									setPendingCoordinates({ lat, lng });
+									setHasUnsavedChanges(true);
+								}}
+								className="h-[400px] w-full"
+							/>
+
+							{/* Action Buttons */}
+							{hasUnsavedChanges && (
+								<div className="flex items-center gap-2">
+									<Button
+										onClick={() => {
+											if (
+												pendingCoordinates?.lat &&
+												pendingCoordinates?.lng
+											) {
+												updateCoordinatesMutation.mutate({
+													lat: pendingCoordinates.lat,
+													lng: pendingCoordinates.lng,
+												});
+											}
+										}}
+										disabled={
+											updateCoordinatesMutation.isPending
+										}
+										size="sm"
+									>
+										{updateCoordinatesMutation
+											.isPending && (
+											<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										)}
+										Save Coordinates
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setPendingCoordinates(null);
+											setHasUnsavedChanges(false);
+										}}
+										disabled={
+											updateCoordinatesMutation.isPending
+										}
+									>
+										Cancel
+									</Button>
+								</div>
+							)}
+						</div>
+
+						{/* External Map Link */}
+						<div className="flex items-center justify-between border-t pt-4">
+							<a
+								href={`https://www.openstreetmap.org/?mlat=${pendingCoordinates?.lat ?? store.latitude ?? 45.8150}&mlon=${pendingCoordinates?.lng ?? store.longitude ?? 15.9819}&zoom=17`}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+							>
+								View on OpenStreetMap
+								<MapPin className="h-3 w-3" />
+							</a>
+						</div>
 					</CardContent>
 				</Card>
 
