@@ -11,7 +11,7 @@
  */
 
 import type { CsvColumnMapping } from '../parsers/csv'
-import type { DiscoveredFile } from '../core/types'
+import type { DiscoveredFile, StoreMetadata } from '../core/types'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
@@ -220,6 +220,56 @@ export class KauflandAdapter extends BaseCsvAdapter {
 
     // Last resort: use base class method
     return super.extractStoreIdentifierFromFilename(filename)
+  }
+
+  /**
+   * Extract store metadata from Kaufland filename.
+   *
+   * Kaufland filenames follow the pattern:
+   * {StoreType}_{Address...}_{PostalCode}_{City}_{StoreId}_{DATE}_{Ver}.csv
+   *
+   * Example: Hipermarket_Kralja_Petra_Krešimira_IV_11_10000_Zagreb_3330_01012026_1.csv
+   *
+   * @param file - The discovered file
+   * @returns Store metadata including name, address, city, postal code
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    const parts = file.filename.replace(/\.csv$/i, '').split('_')
+    if (parts.length < 6) return super.extractStoreMetadata(file)
+
+    const storeType = parts[0] // Hipermarket
+
+    // Find postal code (5-digit pattern) working backwards
+    let postalIdx = -1
+    for (let i = parts.length - 4; i > 0; i--) {
+      if (/^\d{5}$/.test(parts[i])) {
+        postalIdx = i
+        break
+      }
+    }
+
+    if (postalIdx === -1) return super.extractStoreMetadata(file)
+
+    const address = parts.slice(1, postalIdx).join(' ')
+    const postalCode = parts[postalIdx]
+    const city = parts[postalIdx + 1]
+
+    return {
+      name: `${storeType} ${this.titleCase(city)}`,
+      address: this.titleCase(address),
+      city: this.titleCase(city),
+      postalCode,
+      storeType,
+    }
+  }
+
+  /**
+   * Convert a string to title case.
+   * @param str - The string to convert
+   * @returns Title-cased string
+   */
+  private titleCase(str: string): string {
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 }
 

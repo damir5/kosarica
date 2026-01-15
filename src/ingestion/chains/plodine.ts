@@ -13,7 +13,7 @@
  * Download links: /cjenik/download?file=FILENAME
  */
 
-import type { DiscoveredFile } from '../core/types'
+import type { DiscoveredFile, StoreMetadata } from '../core/types'
 import type { CsvColumnMapping, CsvParserOptions } from '../parsers/csv'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
@@ -264,6 +264,50 @@ export class PlodineAdapter extends BaseCsvAdapter {
       defaultStoreIdentifier: storeIdentifier,
       encoding: 'utf-8', // After preprocessing, content is UTF-8
     }
+  }
+
+  /**
+   * Extract store metadata from Plodine filename.
+   *
+   * Example filename: SUPERMARKET_ALOJZIJA_STEPINCA_201_32100_VINKOVCI_152_246_15012026015256.csv
+   * Pattern: {type}_{address...}_{postal}_{city}_{storeId}_{seq}_{date}.csv
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    const parts = file.filename.replace(/\.csv$/i, '').split('_')
+    if (parts.length < 6) return super.extractStoreMetadata(file)
+
+    const storeType = parts[0]  // "SUPERMARKET"
+
+    // Find postal code (5 digits) working from index 1
+    let postalIdx = -1
+    for (let i = 1; i < parts.length - 3; i++) {
+      if (/^\d{5}$/.test(parts[i])) {
+        postalIdx = i
+        break
+      }
+    }
+
+    if (postalIdx === -1) return super.extractStoreMetadata(file)
+
+    const address = parts.slice(1, postalIdx).join(' ')
+    const postalCode = parts[postalIdx]
+    const city = parts[postalIdx + 1]
+
+    return {
+      name: `Plodine ${this.titleCase(city)}`,
+      address: this.titleCase(address),
+      city: this.titleCase(city),
+      postalCode,
+      storeType: this.titleCase(storeType),
+    }
+  }
+
+  /**
+   * Convert string to title case.
+   * Example: "ALOJZIJA STEPINCA" -> "Alojzija Stepinca"
+   */
+  private titleCase(str: string): string {
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 }
 

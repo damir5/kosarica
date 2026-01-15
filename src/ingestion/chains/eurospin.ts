@@ -13,7 +13,7 @@
  */
 
 import type { CsvColumnMapping } from '../parsers/csv'
-import type { DiscoveredFile } from '../core/types'
+import type { DiscoveredFile, StoreMetadata } from '../core/types'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
@@ -107,6 +107,39 @@ export class EurospinAdapter extends BaseCsvAdapter {
    */
   setDiscoveryDate(date: string): void {
     this.discoveryDate = date
+  }
+
+  /**
+   * Extract store metadata from filename.
+   * Filename pattern: {type}-{storeId}-{address}-{city}-{postal}-{code}-{date}-{time}.csv
+   * Example: diskontna_prodavaonica-310002-I_Štefanovecki_zavoj_12-Zagreb-10000-310002311225-31.12.2025-7.30.csv
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    // Split by dash (careful: address may have underscores)
+    const parts = file.filename.replace(/\.csv$/i, '').split('-')
+    if (parts.length < 5) return super.extractStoreMetadata(file)
+
+    const storeType = parts[0].replace(/_/g, ' ') // "diskontna prodavaonica"
+    const address = parts[2].replace(/_/g, ' ')   // "I Štefanovecki zavoj 12"
+    const city = parts[3]                          // "Zagreb"
+    const postalCode = parts[4]                    // "10000"
+
+    return {
+      name: `Eurospin ${this.titleCase(city)}`,
+      address: this.titleCase(address),
+      city: this.titleCase(city),
+      postalCode,
+      storeType: this.titleCase(storeType),
+    }
+  }
+
+  /**
+   * Convert a string to title case.
+   * @param str - The string to convert
+   * @returns The title-cased string
+   */
+  private titleCase(str: string): string {
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 
   /**

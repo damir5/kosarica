@@ -26,7 +26,7 @@
  * </DocumentElement>
  */
 
-import type { DiscoveredFile } from '../core/types'
+import type { DiscoveredFile, StoreMetadata } from '../core/types'
 import type { XmlFieldMapping } from '../parsers/xml'
 import { BaseXmlAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
@@ -174,6 +174,34 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
     }
 
     return null
+  }
+
+  /**
+   * Extract store metadata from Trgocentar filename.
+   * Trgocentar filenames contain location information between SUPERMARKET_ and _P{code}
+   * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    // Extract location between SUPERMARKET_ and _P{code}
+    const match = file.filename.match(/^SUPERMARKET_(.+?)_P\d{3}/i)
+    if (!match) return super.extractStoreMetadata(file)
+
+    // Location might have a trailing number (street number)
+    const locationRaw = match[1] // "HUM_NA_SUTLI_185"
+    const location = locationRaw.replace(/_/g, ' ')
+
+    return {
+      name: `Trgocentar ${this.titleCase(location)}`,
+      address: this.titleCase(location),
+      storeType: 'SUPERMARKET',
+    }
+  }
+
+  /**
+   * Convert string to title case (first letter of each word capitalized).
+   */
+  private titleCase(str: string): string {
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 
   /**

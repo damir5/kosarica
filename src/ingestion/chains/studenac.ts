@@ -6,7 +6,7 @@
  * Store resolution is based on portal ID within the XML content.
  */
 
-import type { DiscoveredFile } from '../core/types'
+import type { DiscoveredFile, StoreMetadata } from '../core/types'
 import type { XmlFieldMapping } from '../parsers/xml'
 import { BaseXmlAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
@@ -221,6 +221,57 @@ export class StudenacAdapter extends BaseXmlAdapter {
       console.error(`  URL: ${this.config.baseUrl}`)
       return []
     }
+  }
+
+  /**
+   * Extract store metadata from Studenac filename.
+   * Studenac filenames follow pattern: {TYPE}-{LOCATION}-{T_CODE}-{DATE...}.xml
+   * Example: SUPERMARKET-Bijela_uvala_5_FUNTANA-T598-229-2026-12-29-07-00-14-559375.xml
+   *
+   * @param file - The discovered file
+   * @returns Store metadata, or null if pattern doesn't match
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    // Extract type and location
+    const match = file.filename.match(/^([A-Z]+)-(.+?)-T\d+-/i)
+    if (!match) return super.extractStoreMetadata(file)
+
+    const storeType = match[1] // "SUPERMARKET"
+    const locationRaw = match[2] // "Bijela_uvala_5_FUNTANA"
+    const location = locationRaw.replace(/_/g, ' ')
+
+    // Try to separate address and city (city is often last word in caps)
+    const words = location.split(' ')
+    const lastWord = words[words.length - 1]
+
+    if (lastWord === lastWord.toUpperCase() && words.length > 1) {
+      // Last word is city (all caps like FUNTANA)
+      const city = lastWord
+      const address = words.slice(0, -1).join(' ')
+      return {
+        name: `Studenac ${this.titleCase(city)}`,
+        address: this.titleCase(address),
+        city: this.titleCase(city),
+        storeType,
+      }
+    }
+
+    return {
+      name: `Studenac ${this.titleCase(location)}`,
+      address: this.titleCase(location),
+      storeType,
+    }
+  }
+
+  /**
+   * Convert string to title case.
+   * Each word's first letter is capitalized, rest are lowercase.
+   *
+   * @param str - String to convert
+   * @returns Title-cased string
+   */
+  private titleCase(str: string): string {
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 }
 

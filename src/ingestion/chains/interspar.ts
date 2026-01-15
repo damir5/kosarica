@@ -10,7 +10,7 @@
  * Download links: /cjenik/download?file=FILENAME
  */
 
-import type { DiscoveredFile } from '../core/types'
+import type { DiscoveredFile, StoreMetadata } from '../core/types'
 import type { CsvColumnMapping } from '../parsers/csv'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
@@ -215,6 +215,48 @@ export class IntersparAdapter extends BaseCsvAdapter {
 
     // Fall back to base class implementation
     return super.extractStoreIdentifierFromFilename(filename)
+  }
+
+  /**
+   * Extract store metadata from Interspar filename.
+   *
+   * Parses filenames following the pattern:
+   * {type}_{city}_{address...}_{storeId}_interspar_{city}_{code}_{date}_{time}.csv
+   *
+   * Example: hipermarket_zadar_bleiburskih_zrtava_18_8701_interspar_zadar_0259_20260115_0330.csv
+   *
+   * @param file - The discovered file
+   * @returns Store metadata extracted from filename, or null if extraction fails
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    const parts = file.filename.replace(/\.csv$/i, '').split('_')
+    if (parts.length < 8) return super.extractStoreMetadata(file)
+
+    const storeType = parts[0]  // "hipermarket"
+    const city = parts[1]       // "zadar"
+
+    // Find "interspar" marker to determine where address ends
+    const intersparIdx = parts.findIndex(p => p.toLowerCase() === 'interspar')
+    if (intersparIdx === -1 || intersparIdx < 3) return super.extractStoreMetadata(file)
+
+    // Address is between city and store ID (before interspar - 1)
+    const address = parts.slice(2, intersparIdx - 1).join(' ')
+
+    return {
+      name: `Interspar ${this.titleCase(city)}`,
+      address: this.titleCase(address),
+      city: this.titleCase(city),
+      storeType: this.titleCase(storeType),
+    }
+  }
+
+  /**
+   * Convert a string to title case.
+   * @param str - The string to convert
+   * @returns Title-cased string
+   */
+  private titleCase(str: string): string {
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 }
 

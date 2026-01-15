@@ -9,6 +9,7 @@
  */
 
 import type { CsvColumnMapping } from '../parsers/csv'
+import type { StoreMetadata } from '../core/types'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
@@ -169,6 +170,47 @@ export class MetroAdapter extends BaseCsvAdapter {
     return {
       defaultStoreIdentifier: storeCode,
     }
+  }
+
+  /**
+   * Extract store metadata from Metro filename.
+   * Metro filenames have pattern: ..._METRO_YYYYMMDDTHHM_S{code}_{LOCATION},{CITY}.csv
+   * Example: cash_and_carry_prodavaonica_METRO_20260105T0630_S10_JANKOMIR_31,ZAGREB.csv
+   */
+  override extractStoreMetadata(file: import('../core/types').DiscoveredFile): StoreMetadata | null {
+    // Extract everything after S{code}_
+    const match = file.filename.match(/_S(\d+)_(.+)\.csv$/i)
+    if (!match) return super.extractStoreMetadata(file)
+
+    // match[1] contains store code (e.g., "10"), but we use location/city for naming
+    const locationPart = match[2] // "JANKOMIR_31,ZAGREB"
+
+    // Split by comma to separate location and city
+    const commaIdx = locationPart.lastIndexOf(',')
+    if (commaIdx === -1) {
+      return {
+        name: `Metro ${this.titleCase(locationPart.replace(/_/g, ' '))}`,
+        address: this.titleCase(locationPart.replace(/_/g, ' ')),
+      }
+    }
+
+    const address = locationPart.substring(0, commaIdx).replace(/_/g, ' ')
+    const city = locationPart.substring(commaIdx + 1)
+
+    return {
+      name: `Metro ${this.titleCase(city)}`,
+      address: this.titleCase(address),
+      city: this.titleCase(city),
+    }
+  }
+
+  /**
+   * Convert string to title case.
+   * @param str Input string to convert
+   * @returns Title cased string (e.g., "hello world" -> "Hello World")
+   */
+  private titleCase(str: string): string {
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 }
 

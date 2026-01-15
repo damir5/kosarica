@@ -168,6 +168,24 @@ function getMaxRetries(env: IngestionEnv): number {
   return isNaN(parsed) ? 3 : parsed
 }
 
+/**
+ * Cloudflare Queue batch size limit.
+ */
+const QUEUE_BATCH_LIMIT = 100
+
+/**
+ * Send messages to queue in batches, respecting the 100 message limit.
+ */
+async function sendBatchChunked<T extends QueueMessage>(
+  queue: Queue<QueueMessage>,
+  messages: T[],
+): Promise<void> {
+  for (let i = 0; i < messages.length; i += QUEUE_BATCH_LIMIT) {
+    const chunk = messages.slice(i, i + QUEUE_BATCH_LIMIT)
+    await queue.sendBatch(chunk.map((msg) => ({ body: msg })))
+  }
+}
+
 // ============================================================================
 // Message Handlers
 // ============================================================================
@@ -200,9 +218,7 @@ async function handleDiscover(
     file,
   }))
 
-  await env.INGESTION_QUEUE.sendBatch(
-    fetchMessages.map((msg) => ({ body: msg })),
-  )
+  await sendBatchChunked(env.INGESTION_QUEUE, fetchMessages)
 
   console.log(`[discover] Enqueued ${fetchMessages.length} fetch message(s)`)
 }
@@ -342,9 +358,7 @@ async function handleExpand(
   }
 
   if (parseMessages.length > 0) {
-    await env.INGESTION_QUEUE.sendBatch(
-      parseMessages.map((msg) => ({ body: msg })),
-    )
+    await sendBatchChunked(env.INGESTION_QUEUE, parseMessages)
   }
 
   console.log(
@@ -399,23 +413,37 @@ async function handleParse(
     rowsByStore.get(storeId)!.push(row)
   }
 
+  // Extract store metadata for auto-registration (if adapter supports it)
+  const storeMetadata = adapter.extractStoreMetadata?.(file)
+
   // Persist rows for each store
   let totalPersisted = 0
   let totalPriceChanges = 0
-  const storesNotFound: string[] = []
 
   for (const [storeIdentifier, rows] of rowsByStore) {
     try {
+      // Build autoRegister options from store metadata
+      const autoRegisterOptions = storeMetadata
+        ? {
+            name: storeMetadata.name,
+            address: storeMetadata.address,
+            city: storeMetadata.city,
+          }
+        : {
+            name: `${adapter.name} Store ${storeIdentifier}`,
+          }
+
       const persistResult = await persistRowsForStore(
         db,
         message.chainSlug,
         storeIdentifier,
         rows,
         'filename_code',
+        autoRegisterOptions,
       )
 
       if (persistResult === null) {
-        storesNotFound.push(storeIdentifier)
+        console.warn(`[parse] Failed to register store "${storeIdentifier}"`)
         continue
       }
 
@@ -432,12 +460,6 @@ async function handleParse(
   console.log(
     `[parse] Persisted ${totalPersisted} rows, ${totalPriceChanges} price changes`,
   )
-
-  if (storesNotFound.length > 0) {
-    console.warn(
-      `[parse] ${storesNotFound.length} store(s) not found: ${storesNotFound.slice(0, 5).join(', ')}${storesNotFound.length > 5 ? '...' : ''}`,
-    )
-  }
 }
 
 /**
@@ -603,9 +625,7 @@ async function handleParseChunked(
 
   // Enqueue all persist chunk messages
   if (persistMessages.length > 0) {
-    await env.INGESTION_QUEUE.sendBatch(
-      persistMessages.map((msg) => ({ body: msg })),
-    )
+    await sendBatchChunked(env.INGESTION_QUEUE, persistMessages)
   }
 
   console.log(
@@ -1166,9 +1186,7 @@ export async function scheduled(
     ...createMessage('discover', runId, chainSlug),
   }))
 
-  await env.INGESTION_QUEUE.sendBatch(
-    discoverMessages.map((msg) => ({ body: msg })),
-  )
+  await sendBatchChunked(env.INGESTION_QUEUE, discoverMessages)
 
   console.log(
     `[scheduled] Enqueued ${discoverMessages.length} discover message(s)`,
@@ -1221,9 +1239,7 @@ export async function fetch(
       }),
     )
 
-    await env.INGESTION_QUEUE.sendBatch(
-      discoverMessages.map((msg) => ({ body: msg })),
-    )
+    await sendBatchChunked(env.INGESTION_QUEUE, discoverMessages)
 
     return new Response(
       JSON.stringify({

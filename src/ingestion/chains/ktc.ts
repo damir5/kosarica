@@ -16,7 +16,7 @@
  * Example: TRGOVINA-PAKRACKA ULICA 1 BJELOVAR-PJ50-1-20260105-071001.csv
  */
 
-import type { DiscoveredFile } from '../core/types'
+import type { DiscoveredFile, StoreMetadata } from '../core/types'
 import type { CsvColumnMapping } from '../parsers/csv'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
@@ -285,6 +285,59 @@ export class KtcAdapter extends BaseCsvAdapter {
 
     // Last resort: use base class method
     return super.extractStoreIdentifierFromFilename(decodedFilename)
+  }
+
+  /**
+   * Extract store metadata from KTC filename.
+   *
+   * KTC filenames follow the pattern:
+   * TRGOVINA-ADDRESS-STORE_ID-DATE-TIME.csv
+   *
+   * Example: TRGOVINA-PAKRACKA ULICA 1 BJELOVAR-PJ50-1-20260105-071001.csv
+   *
+   * This method extracts:
+   * - Store name: "KTC BJELOVAR" (from city)
+   * - Address: "Pakracka Ulica 1" (excluding city)
+   * - City: "Bjelovar" (last word of address)
+   *
+   * @param file - The discovered file
+   * @returns Store metadata, or null if not extractable
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    const decoded = decodeURIComponent(file.filename)
+
+    // Extract address between TRGOVINA- and -PJ
+    const match = decoded.match(/^TRGOVINA-(.+?)-(PJ[\dA-Z]+-\d+)-/i)
+    if (!match) return super.extractStoreMetadata(file)
+
+    const addressFull = match[1] // "PAKRACKA ULICA 1 BJELOVAR"
+    // match[2] contains store code (e.g., "PJ50-1"), but we use city from address for naming
+
+    // Last word is typically the city
+    const words = addressFull.split(' ')
+    const city = words.pop()
+    const address = words.join(' ')
+
+    return {
+      name: `KTC ${this.titleCase(city || addressFull)}`,
+      address: this.titleCase(address),
+      city: city ? this.titleCase(city) : undefined,
+    }
+  }
+
+  /**
+   * Convert a string to title case.
+   * Capitalizes the first letter of each word.
+   *
+   * @param str - The string to convert
+   * @returns Title-cased string
+   */
+  private titleCase(str: string): string {
+    return str
+      .toLowerCase()
+      .split(' ')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
   }
 }
 

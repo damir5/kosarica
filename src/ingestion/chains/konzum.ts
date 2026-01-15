@@ -12,7 +12,7 @@
  */
 
 import type { CsvColumnMapping } from '../parsers/csv'
-import type { DiscoveredFile } from '../core/types'
+import type { DiscoveredFile, StoreMetadata } from '../core/types'
 import { BaseCsvAdapter } from './base'
 import { CHAIN_CONFIGS } from './config'
 
@@ -219,6 +219,85 @@ export class KonzumAdapter extends BaseCsvAdapter {
 
     // Last resort: use base class method
     return super.extractStoreIdentifierFromFilename(filename)
+  }
+
+  /**
+   * Extract store metadata from Konzum filename for auto-registration.
+   *
+   * Parses the filename pattern:
+   * STORETYPE,ADDRESS+POSTAL+CITY,STORE_ID,DATE,TIME.CSV
+   *
+   * Example: SUPERMARKET,ŽITNA+1A+10310+IVANIĆ+GRAD,0204,2026-01-15,12-00-00.CSV
+   * Result: { name: "SUPERMARKET Žitna 1A", address: "Žitna 1A", city: "Ivanić Grad", postalCode: "10310", storeType: "SUPERMARKET" }
+   */
+  override extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    const parts = file.filename.split(',')
+    if (parts.length < 3) {
+      // Fall back to default behavior
+      return super.extractStoreMetadata(file)
+    }
+
+    const storeType = parts[0] // SUPERMARKET, HIPERMARKET, etc.
+    const addressPart = parts[1] // e.g., ŽITNA+1A+10310+IVANIĆ+GRAD
+
+    // Decode URL-encoded parts and replace + with spaces
+    const decodedAddress = decodeURIComponent(addressPart.replace(/\+/g, ' '))
+
+    // Try to extract postal code (5-digit number) and split address/city
+    const postalMatch = decodedAddress.match(/(\d{5})/)
+    let address: string | undefined
+    let city: string | undefined
+    let postalCode: string | undefined
+
+    if (postalMatch) {
+      postalCode = postalMatch[1]
+      const postalIndex = decodedAddress.indexOf(postalCode)
+
+      // Everything before postal code is address
+      address = decodedAddress.substring(0, postalIndex).trim()
+
+      // Everything after postal code is city
+      city = decodedAddress.substring(postalIndex + 5).trim()
+
+      // Clean up: capitalize properly
+      if (address) {
+        address = this.titleCase(address)
+      }
+      if (city) {
+        city = this.titleCase(city)
+      }
+    } else {
+      // No postal code found, use whole address part as address
+      address = this.titleCase(decodedAddress)
+    }
+
+    // Build store name
+    const nameParts = [storeType]
+    if (address) {
+      nameParts.push(address)
+    }
+    if (city) {
+      nameParts.push(city)
+    }
+
+    return {
+      name: nameParts.join(' '),
+      address,
+      city,
+      postalCode,
+      storeType,
+    }
+  }
+
+  /**
+   * Convert string to title case.
+   */
+  private titleCase(str: string): string {
+    return str
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
   }
 }
 

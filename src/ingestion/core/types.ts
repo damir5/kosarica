@@ -109,6 +109,23 @@ export interface StoreIdentifier {
 }
 
 /**
+ * Metadata extracted from file for auto-registering stores.
+ * Used when a store doesn't exist in the database yet.
+ */
+export interface StoreMetadata {
+  /** Store name (e.g., "RC DUGO SELO" or "SUPERMARKET Žitna 1A") */
+  name: string
+  /** Street address (e.g., "Žitna 1A") */
+  address?: string
+  /** City name (e.g., "Ivanić Grad") */
+  city?: string
+  /** Postal/ZIP code (e.g., "10310") */
+  postalCode?: string
+  /** Store type from retailer (e.g., "SUPERMARKET", "HIPERMARKET") */
+  storeType?: string
+}
+
+/**
  * Result of store resolution attempt.
  */
 export interface StoreResolutionResult {
@@ -280,6 +297,14 @@ export interface ChainAdapter {
    * @returns Validation result
    */
   validateRow(row: NormalizedRow): NormalizedRowValidation
+
+  /**
+   * Extract store metadata from file for auto-registration.
+   * Used when a store doesn't exist and needs to be created.
+   * @param file - The file to extract metadata from
+   * @returns Store metadata, or null if not extractable
+   */
+  extractStoreMetadata?(file: DiscoveredFile): StoreMetadata | null
 }
 
 // ============================================================================

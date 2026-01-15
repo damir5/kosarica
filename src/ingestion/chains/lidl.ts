@@ -12,6 +12,7 @@ import type {
   NormalizedRow,
   NormalizedRowValidation,
   ParseResult,
+  StoreMetadata,
 } from '../core/types'
 import type { CsvColumnMapping } from '../parsers/csv'
 import { BaseCsvAdapter } from './base'
@@ -100,14 +101,6 @@ export class LidlAdapter extends BaseCsvAdapter {
    */
   setDiscoveryDate(date: string): void {
     this.discoveryDate = date
-  }
-
-  /**
-   * Convert date from YYYY-MM-DD to DD_MM_YYYY format (Lidl filename format).
-   */
-  private formatDateForFilename(date: string): string {
-    const [year, month, day] = date.split('-')
-    return `${day}_${month}_${year}`
   }
 
   /**
@@ -338,6 +331,52 @@ export class LidlAdapter extends BaseCsvAdapter {
       errors: baseValidation.errors,
       warnings: gtinWarnings,
     }
+  }
+
+  /**
+   * Extract store metadata from filename for auto-registration.
+   * Parses Lidl filename pattern: {type} {storeId}_{address}_{number}_{postal}_{city}_{ver}_{date}_{time}.csv
+   * Example: Supermarket 265_Ulica Franje Glada_13_40323_Prelog_1_16.12.2025_7.15h.csv
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    // First part has space: "Supermarket 265"
+    const parts = file.filename.replace(/\.csv$/i, '').split('_')
+    if (parts.length < 6) return super.extractStoreMetadata(file)
+
+    const firstPart = parts[0].split(' ')
+    const storeType = firstPart[0]  // "Supermarket"
+
+    // Find postal code (5 digits) to anchor the structure
+    let postalIdx = -1
+    for (let i = 1; i < parts.length - 2; i++) {
+      if (/^\d{5}$/.test(parts[i])) {
+        postalIdx = i
+        break
+      }
+    }
+
+    if (postalIdx === -1) return super.extractStoreMetadata(file)
+
+    // Address is from index 1 to postalIdx-1, then street number at postalIdx-1
+    const addressParts = parts.slice(1, postalIdx)
+    const address = addressParts.join(' ')
+    const postalCode = parts[postalIdx]
+    const city = parts[postalIdx + 1]
+
+    return {
+      name: `Lidl ${this.titleCase(city)}`,
+      address: this.titleCase(address),
+      city: this.titleCase(city),
+      postalCode,
+      storeType: this.titleCase(storeType),
+    }
+  }
+
+  /**
+   * Convert string to title case (first letter of each word capitalized).
+   */
+  private titleCase(str: string): string {
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 }
 

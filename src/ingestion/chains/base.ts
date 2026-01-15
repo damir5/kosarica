@@ -15,6 +15,7 @@ import type {
   ParseOptions,
   ParseResult,
   StoreIdentifier,
+  StoreMetadata,
 } from '../core/types'
 import { computeSha256 } from '../core/storage'
 import {
@@ -283,6 +284,22 @@ export abstract class BaseChainAdapter implements ChainAdapter {
       isValid: errors.length === 0,
       errors,
       warnings,
+    }
+  }
+
+  /**
+   * Extract store metadata from file for auto-registration.
+   * Default implementation returns a basic name from the store identifier.
+   * Override in subclasses for chain-specific metadata extraction.
+   */
+  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+    const identifier = this.extractStoreIdentifierFromFilename(file.filename)
+    if (!identifier) {
+      return null
+    }
+
+    return {
+      name: `${this.name} ${identifier}`,
     }
   }
 }
