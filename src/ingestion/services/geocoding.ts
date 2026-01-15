@@ -1,8 +1,8 @@
 /**
  * Geocoding Service - handles address to coordinates conversion
  *
- * Uses Nominatim (OpenStreetMap) for geocoding.
- * Future: could add Google Maps API support with confidence-based selection.
+ * Uses Photon (komoot) for geocoding - based on OpenStreetMap data.
+ * More permissive than Nominatim for automated requests.
  */
 
 export interface GeocodingResult {
@@ -11,7 +11,7 @@ export interface GeocodingResult {
 	longitude?: string;
 	displayName?: string;
 	confidence: "high" | "medium" | "low";
-	provider: "nominatim" | "google";
+	provider: "photon" | "nominatim" | "google";
 	raw?: unknown;
 }
 
@@ -22,16 +22,15 @@ export interface GeocodingInput {
 	country?: string; // defaults to 'hr' (Croatia)
 }
 
-const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search";
-const USER_AGENT = "Kosarica/1.0 (price-tracker@example.com)";
+const PHOTON_BASE_URL = "https://photon.komoot.io/api";
 
 /**
- * Geocode an address using Nominatim (OpenStreetMap)
+ * Geocode an address using Photon (komoot) - OpenStreetMap based
  */
 export async function geocodeAddress(
 	input: GeocodingInput,
 ): Promise<GeocodingResult> {
-	const { address, city, postalCode, country = "hr" } = input;
+	const { address, city, postalCode } = input;
 
 	// Build full address string
 	const addressParts = [address, city, postalCode].filter(Boolean);
@@ -41,20 +40,21 @@ export async function geocodeAddress(
 		return {
 			found: false,
 			confidence: "low",
-			provider: "nominatim",
+			provider: "photon",
 		};
 	}
 
-	const url = new URL(NOMINATIM_BASE_URL);
+	const url = new URL(PHOTON_BASE_URL);
 	url.searchParams.set("q", fullAddress);
-	url.searchParams.set("format", "json");
 	url.searchParams.set("limit", "1");
-	url.searchParams.set("countrycodes", country);
-	url.searchParams.set("addressdetails", "1");
+	url.searchParams.set("lang", "en");
+	// Bias results towards Croatia
+	url.searchParams.set("lat", "45.1");
+	url.searchParams.set("lon", "15.2");
 
 	const response = await globalThis.fetch(url.toString(), {
 		headers: {
-			"User-Agent": USER_AGENT,
+			Accept: "application/json",
 		},
 	});
 
@@ -64,57 +64,69 @@ export async function geocodeAddress(
 		);
 	}
 
-	const results = (await response.json()) as NominatimResult[];
+	const data = (await response.json()) as PhotonResponse;
 
-	if (results.length === 0) {
+	if (!data.features || data.features.length === 0) {
 		return {
 			found: false,
 			confidence: "low",
-			provider: "nominatim",
+			provider: "photon",
 		};
 	}
 
-	const result = results[0];
-	const confidence = calculateConfidence(result, input);
+	const result = data.features[0];
+	const [lon, lat] = result.geometry.coordinates;
+	const props = result.properties;
+	const confidence = calculatePhotonConfidence(props, input);
+
+	// Build display name from properties
+	const displayParts = [
+		props.name,
+		props.street,
+		props.housenumber,
+		props.city || props.town || props.village,
+		props.postcode,
+		props.country,
+	].filter(Boolean);
 
 	return {
 		found: true,
-		latitude: result.lat,
-		longitude: result.lon,
-		displayName: result.display_name,
+		latitude: lat.toString(),
+		longitude: lon.toString(),
+		displayName: displayParts.join(", "),
 		confidence,
-		provider: "nominatim",
+		provider: "photon",
 		raw: result,
 	};
 }
 
 /**
- * Calculate confidence based on the geocoding result quality
+ * Calculate confidence based on Photon result quality
  */
-function calculateConfidence(
-	result: NominatimResult,
+function calculatePhotonConfidence(
+	props: PhotonProperties,
 	input: GeocodingInput,
 ): "high" | "medium" | "low" {
-	// High confidence: exact address match with good importance score
-	if (result.importance > 0.5 && result.type === "house") {
+	const osm_type = props.osm_type;
+	const osm_value = props.osm_value;
+
+	// High confidence: exact address match (house/building)
+	if (osm_type === "N" && ["house", "building"].includes(osm_value || "")) {
 		return "high";
 	}
 
-	// Medium confidence: street-level match or good importance
+	// Check if city matches
+	const resultCity = props.city || props.town || props.village;
+	const cityMatches =
+		resultCity &&
+		input.city &&
+		resultCity.toLowerCase().includes(input.city.toLowerCase());
+
+	// Medium confidence: street-level or city matches
 	if (
-		result.importance > 0.3 ||
-		["street", "road", "building", "commercial"].includes(result.type)
+		["street", "road", "shop", "amenity"].includes(osm_value || "") ||
+		cityMatches
 	) {
-		// Check if city matches
-		const resultCity =
-			result.address?.city || result.address?.town || result.address?.village;
-		if (
-			resultCity &&
-			input.city &&
-			resultCity.toLowerCase().includes(input.city.toLowerCase())
-		) {
-			return "medium";
-		}
 		return "medium";
 	}
 
@@ -163,25 +175,33 @@ export async function reverseGeocode(
 	};
 }
 
-// Types for Nominatim API responses
+// Types for Photon API responses
 
-interface NominatimResult {
-	lat: string;
-	lon: string;
-	display_name: string;
-	type: string;
-	class: string;
-	importance: number;
-	address?: {
-		road?: string;
-		house_number?: string;
-		city?: string;
-		town?: string;
-		village?: string;
-		postcode?: string;
-		country?: string;
-	};
+interface PhotonResponse {
+	features: PhotonFeature[];
 }
+
+interface PhotonFeature {
+	geometry: {
+		coordinates: [number, number]; // [lon, lat]
+	};
+	properties: PhotonProperties;
+}
+
+interface PhotonProperties {
+	name?: string;
+	street?: string;
+	housenumber?: string;
+	city?: string;
+	town?: string;
+	village?: string;
+	postcode?: string;
+	country?: string;
+	osm_type?: string;
+	osm_value?: string;
+}
+
+// Types for Nominatim reverse geocoding (still used)
 
 interface NominatimReverseResult {
 	display_name: string;

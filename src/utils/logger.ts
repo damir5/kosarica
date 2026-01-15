@@ -18,12 +18,13 @@ export function errorToObject(error: unknown): Record<string, unknown> {
 }
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
-export type LoggerType = "rpc" | "http" | "auth" | "db" | "app";
 
 /**
  * All available logger types for filtering
+ * Source of truth for LoggerType - add new types here
  */
-const ALL_LOGGER_TYPES: LoggerType[] = ["rpc", "http", "auth", "db", "app"];
+const ALL_LOGGER_TYPES = ["rpc", "http", "auth", "db", "app", "ingestion"] as const;
+export type LoggerType = (typeof ALL_LOGGER_TYPES)[number];
 
 /**
  * Log level ordering for comparison (higher = more severe)

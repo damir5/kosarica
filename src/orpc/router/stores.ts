@@ -1,7 +1,8 @@
 import { and, count, desc, eq, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
-import { getDb } from "@/utils/bindings";
+import type { EnrichStoreQueueMessage } from "@/ingestion/core/types";
+import { getDb, getEnv } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 import { procedure } from "../base";
 
@@ -511,6 +512,20 @@ export const triggerEnrichment = procedure
 				}),
 			})
 			.returning();
+
+		// Send message to queue for processing
+		const env = getEnv();
+		const enrichMessage: EnrichStoreQueueMessage = {
+			id: generatePrefixedId("msg"),
+			type: "enrich_store",
+			runId: "enrichment",
+			chainSlug: store[0].chainSlug,
+			createdAt: new Date().toISOString(),
+			storeId: input.storeId,
+			taskType: input.type,
+			taskId: task.id,
+		};
+		await env.INGESTION_QUEUE.send(enrichMessage);
 
 		return { task };
 	});

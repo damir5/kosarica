@@ -543,7 +543,12 @@ export const deleteRuns = procedure
 // ============================================================================
 
 export const triggerChain = procedure
-	.input(z.object({ chainSlug: z.string() }))
+	.input(
+		z.object({
+			chainSlug: z.string(),
+			date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format, expected YYYY-MM-DD").optional(),
+		}),
+	)
 	.handler(async ({ input }) => {
 		const db = getDb();
 
@@ -585,6 +590,7 @@ export const triggerChain = procedure
 			type: "discover",
 			runId: newRunId,
 			chainSlug: input.chainSlug,
+			targetDate: input.date,
 			createdAt: new Date().toISOString(),
 		};
 
@@ -593,6 +599,6 @@ export const triggerChain = procedure
 		return {
 			success: true,
 			runId: newRunId,
-			message: `Ingestion started for chain ${input.chainSlug}`,
+			message: `Ingestion started for chain ${input.chainSlug}${input.date ? ` for date ${input.date}` : ""}`,
 		};
 	});

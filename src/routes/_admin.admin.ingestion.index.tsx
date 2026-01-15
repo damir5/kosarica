@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
 	Activity,
+	Calendar,
 	ChevronLeft,
 	ChevronRight,
 	Database,
@@ -23,6 +24,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
 	Select,
 	SelectContent,
@@ -63,6 +65,12 @@ function IngestionDashboard() {
 	const [page, setPage] = useState(1);
 	const pageSize = 20;
 
+	// Date state for filtering - defaults to today
+	const [selectedDate, setSelectedDate] = useState<string>(() => {
+		const now = new Date();
+		return now.toISOString().split("T")[0];
+	});
+
 	// Stats query
 	const { data: stats, isLoading: statsLoading } = useQuery(
 		orpc.admin.ingestion.getStats.queryOptions({
@@ -70,9 +78,9 @@ function IngestionDashboard() {
 		}),
 	);
 
-	// Runs query
-	const { data: runsData, isLoading: runsLoading } = useQuery(
-		orpc.admin.ingestion.listRuns.queryOptions({
+	// Runs query with smart auto-refresh when runs are active
+	const { data: runsData, isLoading: runsLoading } = useQuery({
+		...orpc.admin.ingestion.listRuns.queryOptions({
 			input: {
 				chainSlug: chainFilter !== "all" ? chainFilter : undefined,
 				status:
@@ -81,12 +89,25 @@ function IngestionDashboard() {
 				pageSize,
 			},
 		}),
+		// Poll every 3s when active runs, every 30s otherwise
+		refetchInterval: (query) => {
+			const runs = query.state.data?.runs;
+			const hasActiveRuns = runs?.some(
+				(run) => run.status === "pending" || run.status === "running",
+			);
+			return hasActiveRuns ? 3000 : 30000;
+		},
+	});
+
+	// Compute active status for UI indicator
+	const hasActiveRuns = runsData?.runs.some(
+		(run) => run.status === "pending" || run.status === "running",
 	);
 
 	// Trigger chain mutation
 	const triggerMutation = useMutation({
 		mutationFn: async (chainSlug: string) => {
-			return orpc.admin.ingestion.triggerChain.call({ chainSlug });
+			return orpc.admin.ingestion.triggerChain.call({ chainSlug, date: selectedDate });
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
@@ -139,8 +160,11 @@ function IngestionDashboard() {
 								</SelectContent>
 							</Select>
 							<Button variant="outline" size="icon" onClick={handleRefresh}>
-								<RefreshCw className="h-4 w-4" />
+								<RefreshCw className={`h-4 w-4 ${hasActiveRuns ? "animate-spin" : ""}`} />
 							</Button>
+							{hasActiveRuns && (
+								<span className="text-xs text-muted-foreground">Auto-refreshing</span>
+							)}
 						</div>
 					</div>
 				</div>
@@ -268,6 +292,21 @@ function IngestionDashboard() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
+						{/* Date picker for filtering discovery */}
+						<div className="flex items-center gap-2 mb-4">
+							<Calendar className="h-4 w-4 text-muted-foreground" />
+							<label htmlFor="target-date" className="text-sm font-medium">
+								Target Date:
+							</label>
+							<Input
+								id="target-date"
+								type="date"
+								value={selectedDate}
+								onChange={(e) => setSelectedDate(e.target.value)}
+								className="w-[150px]"
+							/>
+						</div>
+
 						<div className="flex flex-wrap gap-2">
 							{CHAINS.map((chain) => (
 								<Button

@@ -332,6 +332,8 @@ interface QueueMessageBase {
  */
 export interface DiscoverQueueMessage extends QueueMessageBase {
 	type: "discover";
+	/** Target date for discovery (YYYY-MM-DD format) - if not set, discovers all available files */
+	targetDate?: string;
 }
 
 /**

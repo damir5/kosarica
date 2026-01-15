@@ -19,9 +19,12 @@ import {
 	stores,
 } from "@/db/schema";
 import { generatePrefixedId } from "@/utils/id";
+import { createLogger } from "@/utils/logger";
 import { computeBatchSize } from "./sql";
 import { computeSha256 } from "./storage";
 import type { NormalizedRow, StoreDescriptor } from "./types";
+
+const log = createLogger("ingestion");
 
 // ============================================================================
 // Type definitions for database query results
@@ -116,9 +119,13 @@ async function retryOnBusy<T>(
 
 			// Log retry (only on first attempt and every 3rd attempt to reduce noise)
 			if (attempt === 0 || (attempt + 1) % 3 === 0) {
-				console.log(
-					`[retry] ${operationName}: database busy, retry ${attempt + 1}/${MAX_BUSY_RETRIES} after ${delay}ms`,
-				);
+				log.info("Database busy, retrying", {
+					phase: "retry",
+					operation: operationName,
+					attempt: attempt + 1,
+					maxRetries: MAX_BUSY_RETRIES,
+					delay,
+				});
 			}
 
 			// Wait before retrying
@@ -216,6 +223,10 @@ export interface PersistResult {
 	failed: number;
 	/** Errors encountered */
 	errors: Array<{ rowNumber: number; error: string }>;
+	/** Store ID that was persisted to */
+	storeId?: string;
+	/** True if store needs geocoding (new pending store with address) */
+	needsGeocoding?: boolean;
 }
 
 // ============================================================================
@@ -506,9 +517,7 @@ export async function ensureChainExists(
 	// Get chain config
 	const config = CHAIN_CONFIGS[chainSlug];
 	if (!config) {
-		console.warn(
-			`[persist] Unknown chain slug: "${chainSlug}", cannot auto-register`,
-		);
+		log.warn("Unknown chain slug, cannot auto-register", { phase: "persist", chainSlug });
 		return false;
 	}
 
@@ -519,9 +528,7 @@ export async function ensureChainExists(
 		website: config.website,
 	});
 
-	console.log(
-		`[persist] Auto-registered chain: ${config.name} (${config.slug})`,
-	);
+	log.info("Auto-registered chain", { phase: "persist", name: config.name, slug: config.slug });
 	return true;
 }
 
@@ -531,6 +538,8 @@ export async function ensureChainExists(
 export interface AutoRegisterStoreResult {
 	storeId: string;
 	status: "existing" | "pending" | "created";
+	/** True if store was newly created with address data and needs geocoding */
+	needsGeocoding?: boolean;
 }
 
 /**
@@ -594,9 +603,11 @@ export async function autoRegisterStore(
 			value: identifier,
 		});
 
-		console.log(
-			`[persist] Added identifier ${identifier} to existing physical store: ${physicalStore.name}`,
-		);
+		log.info("Added identifier to existing physical store", {
+			phase: "persist",
+			identifier,
+			storeName: physicalStore.name,
+		});
 		return { storeId: physicalStore.id, status: "existing" };
 	}
 
@@ -625,16 +636,26 @@ export async function autoRegisterStore(
 	});
 
 	if (isNational) {
-		console.log(
-			`[persist] Auto-registered national store: ${options.name} (${identifier}) for chain ${chainSlug}`,
-		);
-	} else {
-		console.log(
-			`[persist] Created pending store: "${options.name}" (${identifier}) for chain ${chainSlug} - awaiting approval`,
-		);
+		log.info("Auto-registered national store", {
+			phase: "persist",
+			name: options.name,
+			identifier,
+			chainSlug,
+		});
+		return { storeId, status: "created" };
 	}
 
-	return { storeId, status: isNational ? "created" : "pending" };
+	// Pending stores with address data should be geocoded
+	const hasAddressData = Boolean(options.address || options.city);
+	log.info("Created pending store", {
+		phase: "persist",
+		name: options.name,
+		identifier,
+		chainSlug,
+		hasAddressData,
+	});
+
+	return { storeId, status: "pending", needsGeocoding: hasAddressData };
 }
 
 // ============================================================================
@@ -818,16 +839,19 @@ export async function persistRows(
 	for (const rowChunk of chunks) {
 		chunkIndex++;
 		if (chunks.length > 10 && chunkIndex % 10 === 0) {
-			console.log(
-				`[persist] Processing batch ${chunkIndex}/${chunks.length} (${Math.round((chunkIndex / chunks.length) * 100)}%)`,
-			);
+			log.info("Processing batch", {
+				phase: "persist",
+				batch: chunkIndex,
+				total: chunks.length,
+				percent: Math.round((chunkIndex / chunks.length) * 100),
+			});
 		}
 		try {
 			const chunkResult = await persistRowChunkBatched(db, store, rowChunk);
 
 			// Log first batch completion
 			if (chunkIndex === 1) {
-				console.log(`[persist] First batch completed successfully`);
+				log.info("First batch completed successfully", { phase: "persist" });
 			}
 
 			// Update result statistics
@@ -838,9 +862,10 @@ export async function persistRows(
 			result.errors.push(...chunkResult.errors);
 		} catch (error) {
 			// If batch fails, fall back to individual processing for this chunk
-			console.warn(
-				`[persist] Batch failed, falling back to individual processing: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			log.warn("Batch failed, falling back to individual processing", {
+				phase: "persist",
+				error: error instanceof Error ? error.message : String(error),
+			});
 			for (const { row } of rowChunk) {
 				try {
 					const retailerItemId = await upsertRetailerItem(
@@ -1368,6 +1393,8 @@ export async function persistRowsForStore(
 	// Resolve store or auto-register if not found
 	let storeId: string | null = null;
 
+	let needsGeocoding = false;
+
 	if (autoRegister) {
 		// Use autoRegisterStore which handles both resolution and creation
 		const result = await autoRegisterStore(
@@ -1378,6 +1405,7 @@ export async function persistRowsForStore(
 			autoRegister,
 		);
 		storeId = result?.storeId ?? null;
+		needsGeocoding = result?.needsGeocoding ?? false;
 	} else {
 		// Just resolve without auto-registration
 		storeId = await resolveStoreId(
@@ -1412,6 +1440,7 @@ export async function persistRowsForStore(
 		longitude: storeData.longitude,
 	};
 
-	console.log(`[persist] Starting persist for ${rows.length} rows...`);
-	return persistRows(db, store, rows);
+	log.info("Starting persist", { phase: "persist", rowCount: rows.length });
+	const persistResult = await persistRows(db, store, rows);
+	return { ...persistResult, storeId, needsGeocoding };
 }
