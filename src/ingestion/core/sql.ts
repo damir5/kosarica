@@ -12,8 +12,7 @@ import type { Table } from "drizzle-orm";
 const D1_MAX_PARAMS = 80;
 
 /**
- * Generic database type that works with both D1 (production) and
- * BetterSQLite3 (CLI/local development).
+ * Database type for D1 operations.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDatabase = any;

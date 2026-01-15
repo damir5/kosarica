@@ -13,17 +13,9 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteRouteImport } from './routes/_admin/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
-import { Route as DemoTableRouteImport } from './routes/demo/table'
-import { Route as DemoOrpcTodoRouteImport } from './routes/demo/orpc-todo'
-import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
 import { Route as AdminAdminRouteImport } from './routes/_admin.admin'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index'
-import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
-import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
-import { Route as DemoApiTqTodosRouteImport } from './routes/demo/api.tq-todos'
-import { Route as DemoApiNamesRouteImport } from './routes/demo/api.names'
 import { Route as ApiRpcSplatRouteImport } from './routes/api.rpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users'
@@ -31,11 +23,9 @@ import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stor
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as AdminAdminIngestionRouteImport } from './routes/_admin.admin.ingestion'
 import { Route as AdminAdminCatalogPricesRouteImport } from './routes/_admin.admin.catalog-prices'
-import { Route as DemoStartSsrIndexRouteImport } from './routes/demo/start.ssr.index'
+import { Route as AdminAdminStoresIndexRouteImport } from './routes/_admin.admin.stores.index'
+import { Route as AdminAdminIngestionIndexRouteImport } from './routes/_admin.admin.ingestion.index'
 import { Route as AdminAdminConfigIndexRouteImport } from './routes/_admin.admin.config.index'
-import { Route as DemoStartSsrSpaModeRouteImport } from './routes/demo/start.ssr.spa-mode'
-import { Route as DemoStartSsrFullSsrRouteImport } from './routes/demo/start.ssr.full-ssr'
-import { Route as DemoStartSsrDataOnlyRouteImport } from './routes/demo/start.ssr.data-only'
 import { Route as AdminAdminStoresPendingRouteImport } from './routes/_admin.admin.stores.pending'
 import { Route as AdminAdminStoresStoreIdRouteImport } from './routes/_admin.admin.stores.$storeId'
 import { Route as AdminAdminIngestionRunIdRouteImport } from './routes/_admin.admin.ingestion.$runId'
@@ -60,26 +50,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
-  id: '/demo/tanstack-query',
-  path: '/demo/tanstack-query',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoTableRoute = DemoTableRouteImport.update({
-  id: '/demo/table',
-  path: '/demo/table',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoOrpcTodoRoute = DemoOrpcTodoRouteImport.update({
-  id: '/demo/orpc-todo',
-  path: '/demo/orpc-todo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoDrizzleRoute = DemoDrizzleRouteImport.update({
-  id: '/demo/drizzle',
-  path: '/demo/drizzle',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
@@ -94,26 +64,6 @@ const AdminAdminIndexRoute = AdminAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminAdminRoute,
-} as any)
-const DemoStartServerFuncsRoute = DemoStartServerFuncsRouteImport.update({
-  id: '/demo/start/server-funcs',
-  path: '/demo/start/server-funcs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoStartApiRequestRoute = DemoStartApiRequestRouteImport.update({
-  id: '/demo/start/api-request',
-  path: '/demo/start/api-request',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoApiTqTodosRoute = DemoApiTqTodosRouteImport.update({
-  id: '/demo/api/tq-todos',
-  path: '/demo/api/tq-todos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoApiNamesRoute = DemoApiNamesRouteImport.update({
-  id: '/demo/api/names',
-  path: '/demo/api/names',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
   id: '/api/rpc/$',
@@ -150,30 +100,21 @@ const AdminAdminCatalogPricesRoute = AdminAdminCatalogPricesRouteImport.update({
   path: '/catalog-prices',
   getParentRoute: () => AdminAdminRoute,
 } as any)
-const DemoStartSsrIndexRoute = DemoStartSsrIndexRouteImport.update({
-  id: '/demo/start/ssr/',
-  path: '/demo/start/ssr/',
-  getParentRoute: () => rootRouteImport,
+const AdminAdminStoresIndexRoute = AdminAdminStoresIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminAdminStoresRoute,
 } as any)
+const AdminAdminIngestionIndexRoute =
+  AdminAdminIngestionIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminAdminIngestionRoute,
+  } as any)
 const AdminAdminConfigIndexRoute = AdminAdminConfigIndexRouteImport.update({
   id: '/config/',
   path: '/config/',
   getParentRoute: () => AdminAdminRoute,
-} as any)
-const DemoStartSsrSpaModeRoute = DemoStartSsrSpaModeRouteImport.update({
-  id: '/demo/start/ssr/spa-mode',
-  path: '/demo/start/ssr/spa-mode',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoStartSsrFullSsrRoute = DemoStartSsrFullSsrRouteImport.update({
-  id: '/demo/start/ssr/full-ssr',
-  path: '/demo/start/ssr/full-ssr',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
-  id: '/demo/start/ssr/data-only',
-  path: '/demo/start/ssr/data-only',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminAdminStoresPendingRoute = AdminAdminStoresPendingRouteImport.update({
   id: '/pending',
@@ -204,10 +145,6 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/admin': typeof AdminAdminRouteWithChildren
   '/api/$': typeof ApiSplatRoute
-  '/demo/drizzle': typeof DemoDrizzleRoute
-  '/demo/orpc-todo': typeof DemoOrpcTodoRoute
-  '/demo/table': typeof DemoTableRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
@@ -215,19 +152,13 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/demo/api/names': typeof DemoApiNamesRoute
-  '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/admin/': typeof AdminAdminIndexRoute
   '/admin/ingestion/$runId': typeof AdminAdminIngestionRunIdRouteWithChildren
   '/admin/stores/$storeId': typeof AdminAdminStoresStoreIdRoute
   '/admin/stores/pending': typeof AdminAdminStoresPendingRoute
-  '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
-  '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
-  '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
   '/admin/config': typeof AdminAdminConfigIndexRoute
-  '/demo/start/ssr': typeof DemoStartSsrIndexRoute
+  '/admin/ingestion/': typeof AdminAdminIngestionIndexRoute
+  '/admin/stores/': typeof AdminAdminStoresIndexRoute
   '/admin/ingestion/$runId/$fileId': typeof AdminAdminIngestionRunIdFileIdRoute
 }
 export interface FileRoutesByTo {
@@ -235,30 +166,18 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/api/$': typeof ApiSplatRoute
-  '/demo/drizzle': typeof DemoDrizzleRoute
-  '/demo/orpc-todo': typeof DemoOrpcTodoRoute
-  '/demo/table': typeof DemoTableRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
-  '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
-  '/admin/stores': typeof AdminAdminStoresRouteWithChildren
   '/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/demo/api/names': typeof DemoApiNamesRoute
-  '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/admin': typeof AdminAdminIndexRoute
   '/admin/ingestion/$runId': typeof AdminAdminIngestionRunIdRouteWithChildren
   '/admin/stores/$storeId': typeof AdminAdminStoresStoreIdRoute
   '/admin/stores/pending': typeof AdminAdminStoresPendingRoute
-  '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
-  '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
-  '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
   '/admin/config': typeof AdminAdminConfigIndexRoute
-  '/demo/start/ssr': typeof DemoStartSsrIndexRoute
+  '/admin/ingestion': typeof AdminAdminIngestionIndexRoute
+  '/admin/stores': typeof AdminAdminStoresIndexRoute
   '/admin/ingestion/$runId/$fileId': typeof AdminAdminIngestionRunIdFileIdRoute
 }
 export interface FileRoutesById {
@@ -269,10 +188,6 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/_admin/admin': typeof AdminAdminRouteWithChildren
   '/api/$': typeof ApiSplatRoute
-  '/demo/drizzle': typeof DemoDrizzleRoute
-  '/demo/orpc-todo': typeof DemoOrpcTodoRoute
-  '/demo/table': typeof DemoTableRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/_admin/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/_admin/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
@@ -280,19 +195,13 @@ export interface FileRoutesById {
   '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/demo/api/names': typeof DemoApiNamesRoute
-  '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/_admin/admin/': typeof AdminAdminIndexRoute
   '/_admin/admin/ingestion/$runId': typeof AdminAdminIngestionRunIdRouteWithChildren
   '/_admin/admin/stores/$storeId': typeof AdminAdminStoresStoreIdRoute
   '/_admin/admin/stores/pending': typeof AdminAdminStoresPendingRoute
-  '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
-  '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
-  '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
   '/_admin/admin/config/': typeof AdminAdminConfigIndexRoute
-  '/demo/start/ssr/': typeof DemoStartSsrIndexRoute
+  '/_admin/admin/ingestion/': typeof AdminAdminIngestionIndexRoute
+  '/_admin/admin/stores/': typeof AdminAdminStoresIndexRoute
   '/_admin/admin/ingestion/$runId/$fileId': typeof AdminAdminIngestionRunIdFileIdRoute
 }
 export interface FileRouteTypes {
@@ -303,10 +212,6 @@ export interface FileRouteTypes {
     | '/setup'
     | '/admin'
     | '/api/$'
-    | '/demo/drizzle'
-    | '/demo/orpc-todo'
-    | '/demo/table'
-    | '/demo/tanstack-query'
     | '/admin/catalog-prices'
     | '/admin/ingestion'
     | '/admin/settings'
@@ -314,19 +219,13 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
-    | '/demo/api/names'
-    | '/demo/api/tq-todos'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
     | '/admin/'
     | '/admin/ingestion/$runId'
     | '/admin/stores/$storeId'
     | '/admin/stores/pending'
-    | '/demo/start/ssr/data-only'
-    | '/demo/start/ssr/full-ssr'
-    | '/demo/start/ssr/spa-mode'
     | '/admin/config'
-    | '/demo/start/ssr'
+    | '/admin/ingestion/'
+    | '/admin/stores/'
     | '/admin/ingestion/$runId/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -334,30 +233,18 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/api/$'
-    | '/demo/drizzle'
-    | '/demo/orpc-todo'
-    | '/demo/table'
-    | '/demo/tanstack-query'
     | '/admin/catalog-prices'
-    | '/admin/ingestion'
     | '/admin/settings'
-    | '/admin/stores'
     | '/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
-    | '/demo/api/names'
-    | '/demo/api/tq-todos'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
     | '/admin'
     | '/admin/ingestion/$runId'
     | '/admin/stores/$storeId'
     | '/admin/stores/pending'
-    | '/demo/start/ssr/data-only'
-    | '/demo/start/ssr/full-ssr'
-    | '/demo/start/ssr/spa-mode'
     | '/admin/config'
-    | '/demo/start/ssr'
+    | '/admin/ingestion'
+    | '/admin/stores'
     | '/admin/ingestion/$runId/$fileId'
   id:
     | '__root__'
@@ -367,10 +254,6 @@ export interface FileRouteTypes {
     | '/setup'
     | '/_admin/admin'
     | '/api/$'
-    | '/demo/drizzle'
-    | '/demo/orpc-todo'
-    | '/demo/table'
-    | '/demo/tanstack-query'
     | '/_admin/admin/catalog-prices'
     | '/_admin/admin/ingestion'
     | '/_admin/admin/settings'
@@ -378,19 +261,13 @@ export interface FileRouteTypes {
     | '/_admin/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
-    | '/demo/api/names'
-    | '/demo/api/tq-todos'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
     | '/_admin/admin/'
     | '/_admin/admin/ingestion/$runId'
     | '/_admin/admin/stores/$storeId'
     | '/_admin/admin/stores/pending'
-    | '/demo/start/ssr/data-only'
-    | '/demo/start/ssr/full-ssr'
-    | '/demo/start/ssr/spa-mode'
     | '/_admin/admin/config/'
-    | '/demo/start/ssr/'
+    | '/_admin/admin/ingestion/'
+    | '/_admin/admin/stores/'
     | '/_admin/admin/ingestion/$runId/$fileId'
   fileRoutesById: FileRoutesById
 }
@@ -400,20 +277,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
   ApiSplatRoute: typeof ApiSplatRoute
-  DemoDrizzleRoute: typeof DemoDrizzleRoute
-  DemoOrpcTodoRoute: typeof DemoOrpcTodoRoute
-  DemoTableRoute: typeof DemoTableRoute
-  DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute
-  DemoApiNamesRoute: typeof DemoApiNamesRoute
-  DemoApiTqTodosRoute: typeof DemoApiTqTodosRoute
-  DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
-  DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
-  DemoStartSsrDataOnlyRoute: typeof DemoStartSsrDataOnlyRoute
-  DemoStartSsrFullSsrRoute: typeof DemoStartSsrFullSsrRoute
-  DemoStartSsrSpaModeRoute: typeof DemoStartSsrSpaModeRoute
-  DemoStartSsrIndexRoute: typeof DemoStartSsrIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -446,34 +311,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/demo/tanstack-query': {
-      id: '/demo/tanstack-query'
-      path: '/demo/tanstack-query'
-      fullPath: '/demo/tanstack-query'
-      preLoaderRoute: typeof DemoTanstackQueryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/table': {
-      id: '/demo/table'
-      path: '/demo/table'
-      fullPath: '/demo/table'
-      preLoaderRoute: typeof DemoTableRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/orpc-todo': {
-      id: '/demo/orpc-todo'
-      path: '/demo/orpc-todo'
-      fullPath: '/demo/orpc-todo'
-      preLoaderRoute: typeof DemoOrpcTodoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/drizzle': {
-      id: '/demo/drizzle'
-      path: '/demo/drizzle'
-      fullPath: '/demo/drizzle'
-      preLoaderRoute: typeof DemoDrizzleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/$': {
       id: '/api/$'
       path: '/api/$'
@@ -494,34 +331,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminAdminIndexRouteImport
       parentRoute: typeof AdminAdminRoute
-    }
-    '/demo/start/server-funcs': {
-      id: '/demo/start/server-funcs'
-      path: '/demo/start/server-funcs'
-      fullPath: '/demo/start/server-funcs'
-      preLoaderRoute: typeof DemoStartServerFuncsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/start/api-request': {
-      id: '/demo/start/api-request'
-      path: '/demo/start/api-request'
-      fullPath: '/demo/start/api-request'
-      preLoaderRoute: typeof DemoStartApiRequestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/api/tq-todos': {
-      id: '/demo/api/tq-todos'
-      path: '/demo/api/tq-todos'
-      fullPath: '/demo/api/tq-todos'
-      preLoaderRoute: typeof DemoApiTqTodosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/api/names': {
-      id: '/demo/api/names'
-      path: '/demo/api/names'
-      fullPath: '/demo/api/names'
-      preLoaderRoute: typeof DemoApiNamesRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/api/rpc/$': {
       id: '/api/rpc/$'
@@ -572,12 +381,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminCatalogPricesRouteImport
       parentRoute: typeof AdminAdminRoute
     }
-    '/demo/start/ssr/': {
-      id: '/demo/start/ssr/'
-      path: '/demo/start/ssr'
-      fullPath: '/demo/start/ssr'
-      preLoaderRoute: typeof DemoStartSsrIndexRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_admin/admin/stores/': {
+      id: '/_admin/admin/stores/'
+      path: '/'
+      fullPath: '/admin/stores/'
+      preLoaderRoute: typeof AdminAdminStoresIndexRouteImport
+      parentRoute: typeof AdminAdminStoresRoute
+    }
+    '/_admin/admin/ingestion/': {
+      id: '/_admin/admin/ingestion/'
+      path: '/'
+      fullPath: '/admin/ingestion/'
+      preLoaderRoute: typeof AdminAdminIngestionIndexRouteImport
+      parentRoute: typeof AdminAdminIngestionRoute
     }
     '/_admin/admin/config/': {
       id: '/_admin/admin/config/'
@@ -585,27 +401,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/config'
       preLoaderRoute: typeof AdminAdminConfigIndexRouteImport
       parentRoute: typeof AdminAdminRoute
-    }
-    '/demo/start/ssr/spa-mode': {
-      id: '/demo/start/ssr/spa-mode'
-      path: '/demo/start/ssr/spa-mode'
-      fullPath: '/demo/start/ssr/spa-mode'
-      preLoaderRoute: typeof DemoStartSsrSpaModeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/start/ssr/full-ssr': {
-      id: '/demo/start/ssr/full-ssr'
-      path: '/demo/start/ssr/full-ssr'
-      fullPath: '/demo/start/ssr/full-ssr'
-      preLoaderRoute: typeof DemoStartSsrFullSsrRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/start/ssr/data-only': {
-      id: '/demo/start/ssr/data-only'
-      path: '/demo/start/ssr/data-only'
-      fullPath: '/demo/start/ssr/data-only'
-      preLoaderRoute: typeof DemoStartSsrDataOnlyRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/_admin/admin/stores/pending': {
       id: '/_admin/admin/stores/pending'
@@ -654,10 +449,12 @@ const AdminAdminIngestionRunIdRouteWithChildren =
 
 interface AdminAdminIngestionRouteChildren {
   AdminAdminIngestionRunIdRoute: typeof AdminAdminIngestionRunIdRouteWithChildren
+  AdminAdminIngestionIndexRoute: typeof AdminAdminIngestionIndexRoute
 }
 
 const AdminAdminIngestionRouteChildren: AdminAdminIngestionRouteChildren = {
   AdminAdminIngestionRunIdRoute: AdminAdminIngestionRunIdRouteWithChildren,
+  AdminAdminIngestionIndexRoute: AdminAdminIngestionIndexRoute,
 }
 
 const AdminAdminIngestionRouteWithChildren =
@@ -666,11 +463,13 @@ const AdminAdminIngestionRouteWithChildren =
 interface AdminAdminStoresRouteChildren {
   AdminAdminStoresStoreIdRoute: typeof AdminAdminStoresStoreIdRoute
   AdminAdminStoresPendingRoute: typeof AdminAdminStoresPendingRoute
+  AdminAdminStoresIndexRoute: typeof AdminAdminStoresIndexRoute
 }
 
 const AdminAdminStoresRouteChildren: AdminAdminStoresRouteChildren = {
   AdminAdminStoresStoreIdRoute: AdminAdminStoresStoreIdRoute,
   AdminAdminStoresPendingRoute: AdminAdminStoresPendingRoute,
+  AdminAdminStoresIndexRoute: AdminAdminStoresIndexRoute,
 }
 
 const AdminAdminStoresRouteWithChildren =
@@ -718,20 +517,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
   ApiSplatRoute: ApiSplatRoute,
-  DemoDrizzleRoute: DemoDrizzleRoute,
-  DemoOrpcTodoRoute: DemoOrpcTodoRoute,
-  DemoTableRoute: DemoTableRoute,
-  DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
-  DemoApiNamesRoute: DemoApiNamesRoute,
-  DemoApiTqTodosRoute: DemoApiTqTodosRoute,
-  DemoStartApiRequestRoute: DemoStartApiRequestRoute,
-  DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,
-  DemoStartSsrDataOnlyRoute: DemoStartSsrDataOnlyRoute,
-  DemoStartSsrFullSsrRoute: DemoStartSsrFullSsrRoute,
-  DemoStartSsrSpaModeRoute: DemoStartSsrSpaModeRoute,
-  DemoStartSsrIndexRoute: DemoStartSsrIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -214,19 +214,14 @@ function StoreDetailPage() {
 							</div>
 
 							<StoreLocationMap
-								latitude={
-									pendingCoordinates?.lat ??
-									store.latitude
-								}
-								longitude={
-									pendingCoordinates?.lng ??
-									store.longitude
-								}
+								latitude={store.latitude}
+								longitude={store.longitude}
 								onCoordinateChange={(lat, lng) => {
 									setPendingCoordinates({ lat, lng });
 									setHasUnsavedChanges(true);
 								}}
 								className="h-[400px] w-full"
+								mapKey={store.id}
 							/>
 
 							{/* Action Buttons */}

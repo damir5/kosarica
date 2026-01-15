@@ -25,6 +25,15 @@ import {
 } from "./chains";
 import { persistRowsForStore } from "./core/persist";
 import {
+	checkAndUpdateRunCompletion,
+	incrementErrorCount,
+	incrementProcessedEntries,
+	incrementProcessedFiles,
+	initializeRunStats,
+	markRunFailed,
+	recordTotalFiles,
+} from "./core/run-stats";
+import {
 	computeSha256,
 	generateStorageKey,
 	R2Storage,
@@ -196,6 +205,7 @@ async function handleDiscover(
 	message: DiscoverQueueMessage,
 	env: IngestionEnv,
 	_storage: Storage,
+	db: Database,
 ): Promise<void> {
 	const adapter = chainAdapterRegistry.getAdapter(message.chainSlug as ChainId);
 	if (!adapter) {
@@ -206,6 +216,12 @@ async function handleDiscover(
 
 	const files = await adapter.discover();
 	console.log(`[discover] Found ${files.length} file(s) for ${adapter.name}`);
+
+	// Initialize run stats and record total files
+	await initializeRunStats(db, message.runId);
+	if (files.length > 0) {
+		await recordTotalFiles(db, message.runId, files.length);
+	}
 
 	if (files.length === 0) {
 		return;
@@ -229,6 +245,7 @@ async function handleFetch(
 	message: FetchQueueMessage,
 	env: IngestionEnv,
 	storage: Storage,
+	_db: Database,
 ): Promise<void> {
 	const adapter = chainAdapterRegistry.getAdapter(message.chainSlug as ChainId);
 	if (!adapter) {
@@ -297,6 +314,7 @@ async function handleExpand(
 	message: ExpandQueueMessage,
 	env: IngestionEnv,
 	storage: Storage,
+	_db: Database,
 ): Promise<void> {
 	const { r2Key, file } = message;
 	console.log(`[expand] Expanding ${file.filename}`);
@@ -632,6 +650,9 @@ async function handleParseChunked(
 		await sendBatchChunked(env.INGESTION_QUEUE, persistMessages);
 	}
 
+	// Increment processed files count for chunked files
+	await incrementProcessedFiles(db, message.runId);
+
 	console.log(
 		`[parse_chunked] Created ${totalChunks} chunk(s), enqueued persist messages`,
 	);
@@ -740,6 +761,21 @@ async function handlePersistChunk(
 			.set({ status: "completed", processedAt: new Date() })
 			.where(eq(ingestionFiles.id, fileId));
 		console.log(`[persist_chunk] File ${fileId} completed all chunks`);
+
+		// Update processed entries count for run
+		await incrementProcessedEntries(db, message.runId, totalPersisted);
+
+		// Check if run is complete
+		try {
+			await checkAndUpdateRunCompletion(db, message.runId);
+		} catch (error) {
+			console.error(`[persist_chunk] Failed to check run completion:`, error);
+		}
+	}
+
+	// Increment run error count if there were errors
+	if (totalErrors > 0) {
+		await incrementErrorCount(db, message.runId, totalErrors);
 	}
 
 	console.log(
@@ -773,6 +809,9 @@ async function handleRerun(
 		rerunTargetId: targetId,
 	});
 
+	// Initialize run stats for rerun
+	await initializeRunStats(db, message.runId);
+
 	switch (targetType) {
 		case "run": {
 			// Re-run entire run - get all files and re-process
@@ -784,6 +823,11 @@ async function handleRerun(
 			console.log(
 				`[rerun] Re-running ${files.length} file(s) from run ${targetId}`,
 			);
+
+			// For "run" type reruns, record total files
+			if (files.length > 0) {
+				await recordTotalFiles(db, message.runId, files.length);
+			}
 
 			for (const file of files) {
 				if (file.metadata) {
@@ -1087,11 +1131,11 @@ async function processMessage(
 
 	try {
 		if (isDiscoverMessage(msg)) {
-			await handleDiscover(msg, env, storage);
+			await handleDiscover(msg, env, storage, db);
 		} else if (isFetchMessage(msg)) {
-			await handleFetch(msg, env, storage);
+			await handleFetch(msg, env, storage, db);
 		} else if (isExpandMessage(msg)) {
-			await handleExpand(msg, env, storage);
+			await handleExpand(msg, env, storage, db);
 		} else if (isParseMessage(msg)) {
 			await handleParse(msg, env, storage, db);
 		} else if (isPersistMessage(msg)) {
@@ -1119,6 +1163,18 @@ async function processMessage(
 		);
 
 		if (message.attempts >= maxRetries) {
+			// Mark run as failed if this is a critical failure
+			if (isDiscoverMessage(msg) || isParseMessage(msg) || isParseChunkedMessage(msg)) {
+				try {
+					await markRunFailed(
+						db,
+						msg.runId,
+						`Failed after ${message.attempts} attempts: ${errorMessage}`,
+					);
+				} catch (statsError) {
+					console.error(`[queue] Failed to mark run as failed:`, statsError);
+				}
+			}
 			// Send to dead letter queue if available
 			if (env.INGESTION_DLQ) {
 				await env.INGESTION_DLQ.send(msg);

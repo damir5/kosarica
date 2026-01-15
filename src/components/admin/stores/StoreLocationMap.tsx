@@ -7,7 +7,7 @@ import {
 	MapTileLayer,
 	MapZoomControl,
 } from "@/components/ui/map";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface StoreLocationMapProps {
 	latitude: string | null;
@@ -16,6 +16,7 @@ interface StoreLocationMapProps {
 	readOnly?: boolean;
 	className?: string;
 	defaultCenter?: [number, number];
+	mapKey: string; // Stable key based on store ID
 }
 
 export function StoreLocationMap({
@@ -25,6 +26,7 @@ export function StoreLocationMap({
 	readOnly = false,
 	className,
 	defaultCenter = [45.8150, 15.9819], // Zagreb
+	mapKey,
 }: StoreLocationMapProps) {
 	// State for map position and drag state
 	const [position, setPosition] = useState<[number, number]>(() => {
@@ -34,6 +36,13 @@ export function StoreLocationMap({
 		return defaultCenter;
 	});
 	const [isDragging, setIsDragging] = useState(false);
+
+	// Sync position when store coordinates change (after save)
+	useEffect(() => {
+		if (latitude && longitude) {
+			setPosition([parseFloat(latitude), parseFloat(longitude)]);
+		}
+	}, [latitude, longitude]);
 
 	// Coordinate validation
 	const isValidCoordinate = (lat: number, lng: number): boolean => {
@@ -64,6 +73,7 @@ export function StoreLocationMap({
 	return (
 		<div className={cn("relative overflow-hidden rounded-lg border", className)}>
 			<Map
+				key={mapKey}
 				center={position}
 				zoom={16}
 				className={cn(

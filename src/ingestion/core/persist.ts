@@ -41,12 +41,12 @@ type StoreItemStateSelect = InferSelectModel<typeof storeItemState>;
 // ============================================================================
 
 /**
- * Generic database type that works with both D1 (production) and
- * BetterSQLite3 (CLI/local development).
+ * Database type for D1 operations.
  *
- * Both database types share the same Drizzle query interface, so we use
- * a permissive type to accept either. Type safety is maintained by the
- * shared schema.
+ * D1 is used across all environments:
+ * - Production: Cloudflare D1 binding
+ * - Local CLI: Wrangler's local D1 instance
+ * - Tests: Miniflare in-memory D1
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDatabase = any;
