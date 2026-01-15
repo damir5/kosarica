@@ -17,22 +17,22 @@
  * @returns Hex-encoded SHA256 hash
  */
 export async function computeSha256(
-  data: string | ArrayBuffer | Uint8Array,
+	data: string | ArrayBuffer | Uint8Array,
 ): Promise<string> {
-  let buffer: ArrayBuffer
-  if (typeof data === 'string') {
-    buffer = new TextEncoder().encode(data).buffer as ArrayBuffer
-  } else if (data instanceof Uint8Array) {
-    buffer = data.buffer as ArrayBuffer
-  } else {
-    buffer = data
-  }
+	let buffer: ArrayBuffer;
+	if (typeof data === "string") {
+		buffer = new TextEncoder().encode(data).buffer as ArrayBuffer;
+	} else if (data instanceof Uint8Array) {
+		buffer = data.buffer as ArrayBuffer;
+	} else {
+		buffer = data;
+	}
 
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
-  const hashArray = new Uint8Array(hashBuffer)
-  return Array.from(hashArray)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+	const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+	const hashArray = new Uint8Array(hashBuffer);
+	return Array.from(hashArray)
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
 }
 
 // ============================================================================
@@ -43,36 +43,36 @@ export async function computeSha256(
  * Metadata for a stored object.
  */
 export interface StorageMetadata {
-  /** Object key */
-  key: string
-  /** Size in bytes */
-  size: number
-  /** Last modified timestamp */
-  lastModified: Date
-  /** Content SHA256 hash, if available */
-  sha256?: string
-  /** Custom metadata */
-  customMetadata?: Record<string, string>
+	/** Object key */
+	key: string;
+	/** Size in bytes */
+	size: number;
+	/** Last modified timestamp */
+	lastModified: Date;
+	/** Content SHA256 hash, if available */
+	sha256?: string;
+	/** Custom metadata */
+	customMetadata?: Record<string, string>;
 }
 
 /**
  * Options for put operations.
  */
 export interface PutOptions {
-  /** Custom metadata to attach */
-  customMetadata?: Record<string, string>
-  /** SHA256 hash to store with object */
-  sha256?: string
+	/** Custom metadata to attach */
+	customMetadata?: Record<string, string>;
+	/** SHA256 hash to store with object */
+	sha256?: string;
 }
 
 /**
  * Result of a get operation.
  */
 export interface GetResult {
-  /** Object content */
-  content: ArrayBuffer
-  /** Object metadata */
-  metadata: StorageMetadata
+	/** Object content */
+	content: ArrayBuffer;
+	/** Object metadata */
+	metadata: StorageMetadata;
 }
 
 /**
@@ -80,53 +80,53 @@ export interface GetResult {
  * Abstracts local filesystem and Cloudflare R2 operations.
  */
 export interface Storage {
-  /**
-   * Get an object by key.
-   * @param key - Object key
-   * @returns Object content and metadata, or null if not found
-   */
-  get(key: string): Promise<GetResult | null>
+	/**
+	 * Get an object by key.
+	 * @param key - Object key
+	 * @returns Object content and metadata, or null if not found
+	 */
+	get(key: string): Promise<GetResult | null>;
 
-  /**
-   * Put an object.
-   * @param key - Object key
-   * @param content - Object content
-   * @param options - Put options
-   * @returns Object metadata after storage
-   */
-  put(
-    key: string,
-    content: ArrayBuffer | Uint8Array | string,
-    options?: PutOptions,
-  ): Promise<StorageMetadata>
+	/**
+	 * Put an object.
+	 * @param key - Object key
+	 * @param content - Object content
+	 * @param options - Put options
+	 * @returns Object metadata after storage
+	 */
+	put(
+		key: string,
+		content: ArrayBuffer | Uint8Array | string,
+		options?: PutOptions,
+	): Promise<StorageMetadata>;
 
-  /**
-   * Delete an object.
-   * @param key - Object key
-   * @returns True if deleted, false if not found
-   */
-  delete(key: string): Promise<boolean>
+	/**
+	 * Delete an object.
+	 * @param key - Object key
+	 * @returns True if deleted, false if not found
+	 */
+	delete(key: string): Promise<boolean>;
 
-  /**
-   * Check if an object exists.
-   * @param key - Object key
-   * @returns True if exists
-   */
-  exists(key: string): Promise<boolean>
+	/**
+	 * Check if an object exists.
+	 * @param key - Object key
+	 * @returns True if exists
+	 */
+	exists(key: string): Promise<boolean>;
 
-  /**
-   * Get object metadata without fetching content.
-   * @param key - Object key
-   * @returns Object metadata, or null if not found
-   */
-  head(key: string): Promise<StorageMetadata | null>
+	/**
+	 * Get object metadata without fetching content.
+	 * @param key - Object key
+	 * @returns Object metadata, or null if not found
+	 */
+	head(key: string): Promise<StorageMetadata | null>;
 
-  /**
-   * List objects with a given prefix.
-   * @param prefix - Key prefix to filter by
-   * @returns List of object metadata
-   */
-  list(prefix: string): Promise<StorageMetadata[]>
+	/**
+	 * List objects with a given prefix.
+	 * @param prefix - Key prefix to filter by
+	 * @returns List of object metadata
+	 */
+	list(prefix: string): Promise<StorageMetadata[]>;
 }
 
 // ============================================================================
@@ -138,223 +138,223 @@ export interface Storage {
  * Used for CLI commands and local development.
  */
 export class LocalStorage implements Storage {
-  private basePath: string
-  private fs: typeof import('node:fs/promises') | null = null
-  private path: typeof import('node:path') | null = null
+	private basePath: string;
+	private fs: typeof import("node:fs/promises") | null = null;
+	private path: typeof import("node:path") | null = null;
 
-  constructor(basePath: string) {
-    this.basePath = basePath
-  }
+	constructor(basePath: string) {
+		this.basePath = basePath;
+	}
 
-  private async ensureModules(): Promise<{
-    fs: typeof import('node:fs/promises')
-    path: typeof import('node:path')
-  }> {
-    if (!this.fs || !this.path) {
-      // Dynamic import for Node.js modules (not available in Workers)
-      this.fs = await import('node:fs/promises')
-      this.path = await import('node:path')
-    }
-    return { fs: this.fs, path: this.path }
-  }
+	private async ensureModules(): Promise<{
+		fs: typeof import("node:fs/promises");
+		path: typeof import("node:path");
+	}> {
+		if (!this.fs || !this.path) {
+			// Dynamic import for Node.js modules (not available in Workers)
+			this.fs = await import("node:fs/promises");
+			this.path = await import("node:path");
+		}
+		return { fs: this.fs, path: this.path };
+	}
 
-  private async resolvePath(key: string): Promise<string> {
-    const { path } = await this.ensureModules()
-    return path.join(this.basePath, key)
-  }
+	private async resolvePath(key: string): Promise<string> {
+		const { path } = await this.ensureModules();
+		return path.join(this.basePath, key);
+	}
 
-  async get(key: string): Promise<GetResult | null> {
-    const { fs } = await this.ensureModules()
-    const filePath = await this.resolvePath(key)
+	async get(key: string): Promise<GetResult | null> {
+		const { fs } = await this.ensureModules();
+		const filePath = await this.resolvePath(key);
 
-    try {
-      const [content, stat] = await Promise.all([
-        fs.readFile(filePath),
-        fs.stat(filePath),
-      ])
+		try {
+			const [content, stat] = await Promise.all([
+				fs.readFile(filePath),
+				fs.stat(filePath),
+			]);
 
-      return {
-        content: content.buffer.slice(
-          content.byteOffset,
-          content.byteOffset + content.byteLength,
-        ) as ArrayBuffer,
-        metadata: {
-          key,
-          size: stat.size,
-          lastModified: stat.mtime,
-        },
-      }
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        return null
-      }
-      throw error
-    }
-  }
+			return {
+				content: content.buffer.slice(
+					content.byteOffset,
+					content.byteOffset + content.byteLength,
+				) as ArrayBuffer,
+				metadata: {
+					key,
+					size: stat.size,
+					lastModified: stat.mtime,
+				},
+			};
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				"code" in error &&
+				error.code === "ENOENT"
+			) {
+				return null;
+			}
+			throw error;
+		}
+	}
 
-  async put(
-    key: string,
-    content: ArrayBuffer | Uint8Array | string,
-    options?: PutOptions,
-  ): Promise<StorageMetadata> {
-    const { fs, path } = await this.ensureModules()
-    const filePath = await this.resolvePath(key)
+	async put(
+		key: string,
+		content: ArrayBuffer | Uint8Array | string,
+		options?: PutOptions,
+	): Promise<StorageMetadata> {
+		const { fs, path } = await this.ensureModules();
+		const filePath = await this.resolvePath(key);
 
-    // Ensure directory exists
-    const dir = path.dirname(filePath)
-    await fs.mkdir(dir, { recursive: true })
+		// Ensure directory exists
+		const dir = path.dirname(filePath);
+		await fs.mkdir(dir, { recursive: true });
 
-    // Convert content to Buffer
-    let buffer: Buffer
-    if (typeof content === 'string') {
-      buffer = Buffer.from(content, 'utf-8')
-    } else if (content instanceof Uint8Array) {
-      buffer = Buffer.from(content)
-    } else {
-      buffer = Buffer.from(content)
-    }
+		// Convert content to Buffer
+		let buffer: Buffer;
+		if (typeof content === "string") {
+			buffer = Buffer.from(content, "utf-8");
+		} else if (content instanceof Uint8Array) {
+			buffer = Buffer.from(content);
+		} else {
+			buffer = Buffer.from(content);
+		}
 
-    await fs.writeFile(filePath, buffer)
+		await fs.writeFile(filePath, buffer);
 
-    // Write metadata file if custom metadata provided
-    if (options?.customMetadata || options?.sha256) {
-      const metadataPath = `${filePath}.meta.json`
-      await fs.writeFile(
-        metadataPath,
-        JSON.stringify({
-          sha256: options.sha256,
-          customMetadata: options.customMetadata,
-        }),
-      )
-    }
+		// Write metadata file if custom metadata provided
+		if (options?.customMetadata || options?.sha256) {
+			const metadataPath = `${filePath}.meta.json`;
+			await fs.writeFile(
+				metadataPath,
+				JSON.stringify({
+					sha256: options.sha256,
+					customMetadata: options.customMetadata,
+				}),
+			);
+		}
 
-    const stat = await fs.stat(filePath)
-    return {
-      key,
-      size: stat.size,
-      lastModified: stat.mtime,
-      sha256: options?.sha256,
-      customMetadata: options?.customMetadata,
-    }
-  }
+		const stat = await fs.stat(filePath);
+		return {
+			key,
+			size: stat.size,
+			lastModified: stat.mtime,
+			sha256: options?.sha256,
+			customMetadata: options?.customMetadata,
+		};
+	}
 
-  async delete(key: string): Promise<boolean> {
-    const { fs } = await this.ensureModules()
-    const filePath = await this.resolvePath(key)
+	async delete(key: string): Promise<boolean> {
+		const { fs } = await this.ensureModules();
+		const filePath = await this.resolvePath(key);
 
-    try {
-      await fs.unlink(filePath)
-      // Also delete metadata file if exists
-      try {
-        await fs.unlink(`${filePath}.meta.json`)
-      } catch {
-        // Metadata file may not exist
-      }
-      return true
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        return false
-      }
-      throw error
-    }
-  }
+		try {
+			await fs.unlink(filePath);
+			// Also delete metadata file if exists
+			try {
+				await fs.unlink(`${filePath}.meta.json`);
+			} catch {
+				// Metadata file may not exist
+			}
+			return true;
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				"code" in error &&
+				error.code === "ENOENT"
+			) {
+				return false;
+			}
+			throw error;
+		}
+	}
 
-  async exists(key: string): Promise<boolean> {
-    const { fs } = await this.ensureModules()
-    const filePath = await this.resolvePath(key)
+	async exists(key: string): Promise<boolean> {
+		const { fs } = await this.ensureModules();
+		const filePath = await this.resolvePath(key);
 
-    try {
-      await fs.access(filePath)
-      return true
-    } catch {
-      return false
-    }
-  }
+		try {
+			await fs.access(filePath);
+			return true;
+		} catch {
+			return false;
+		}
+	}
 
-  async head(key: string): Promise<StorageMetadata | null> {
-    const { fs } = await this.ensureModules()
-    const filePath = await this.resolvePath(key)
+	async head(key: string): Promise<StorageMetadata | null> {
+		const { fs } = await this.ensureModules();
+		const filePath = await this.resolvePath(key);
 
-    try {
-      const stat = await fs.stat(filePath)
-      const metadata: StorageMetadata = {
-        key,
-        size: stat.size,
-        lastModified: stat.mtime,
-      }
+		try {
+			const stat = await fs.stat(filePath);
+			const metadata: StorageMetadata = {
+				key,
+				size: stat.size,
+				lastModified: stat.mtime,
+			};
 
-      // Try to read metadata file
-      try {
-        const metaContent = await fs.readFile(`${filePath}.meta.json`, 'utf-8')
-        const meta = JSON.parse(metaContent)
-        if (meta.sha256) metadata.sha256 = meta.sha256
-        if (meta.customMetadata) metadata.customMetadata = meta.customMetadata
-      } catch {
-        // Metadata file may not exist
-      }
+			// Try to read metadata file
+			try {
+				const metaContent = await fs.readFile(`${filePath}.meta.json`, "utf-8");
+				const meta = JSON.parse(metaContent);
+				if (meta.sha256) metadata.sha256 = meta.sha256;
+				if (meta.customMetadata) metadata.customMetadata = meta.customMetadata;
+			} catch {
+				// Metadata file may not exist
+			}
 
-      return metadata
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        return null
-      }
-      throw error
-    }
-  }
+			return metadata;
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				"code" in error &&
+				error.code === "ENOENT"
+			) {
+				return null;
+			}
+			throw error;
+		}
+	}
 
-  async list(prefix: string): Promise<StorageMetadata[]> {
-    const { fs, path } = await this.ensureModules()
-    const results: StorageMetadata[] = []
+	async list(prefix: string): Promise<StorageMetadata[]> {
+		const { fs, path } = await this.ensureModules();
+		const results: StorageMetadata[] = [];
 
-    const listDir = async (dir: string, keyPrefix: string): Promise<void> => {
-      try {
-        const entries = await fs.readdir(dir, { withFileTypes: true })
+		const listDir = async (dir: string, keyPrefix: string): Promise<void> => {
+			try {
+				const entries = await fs.readdir(dir, { withFileTypes: true });
 
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name)
-          const key = path.join(keyPrefix, entry.name)
+				for (const entry of entries) {
+					const fullPath = path.join(dir, entry.name);
+					const key = path.join(keyPrefix, entry.name);
 
-          if (entry.isDirectory()) {
-            await listDir(fullPath, key)
-          } else if (!entry.name.endsWith('.meta.json')) {
-            if (key.startsWith(prefix)) {
-              const stat = await fs.stat(fullPath)
-              results.push({
-                key,
-                size: stat.size,
-                lastModified: stat.mtime,
-              })
-            }
-          }
-        }
-      } catch (error) {
-        if (
-          !(
-            error instanceof Error &&
-            'code' in error &&
-            error.code === 'ENOENT'
-          )
-        ) {
-          throw error
-        }
-      }
-    }
+					if (entry.isDirectory()) {
+						await listDir(fullPath, key);
+					} else if (!entry.name.endsWith(".meta.json")) {
+						if (key.startsWith(prefix)) {
+							const stat = await fs.stat(fullPath);
+							results.push({
+								key,
+								size: stat.size,
+								lastModified: stat.mtime,
+							});
+						}
+					}
+				}
+			} catch (error) {
+				if (
+					!(
+						error instanceof Error &&
+						"code" in error &&
+						error.code === "ENOENT"
+					)
+				) {
+					throw error;
+				}
+			}
+		};
 
-    await listDir(this.basePath, '')
-    return results
-  }
+		await listDir(this.basePath, "");
+		return results;
+	}
 }
 
 // ============================================================================
@@ -366,40 +366,40 @@ export class LocalStorage implements Storage {
  * Defined here to avoid runtime dependency on the types package.
  */
 interface R2Bucket {
-  get(key: string): Promise<R2Object | null>
-  put(
-    key: string,
-    value: ArrayBuffer | string,
-    options?: R2PutOptions,
-  ): Promise<R2Object>
-  delete(key: string): Promise<void>
-  head(key: string): Promise<R2Object | null>
-  list(options?: R2ListOptions): Promise<R2Objects>
+	get(key: string): Promise<R2Object | null>;
+	put(
+		key: string,
+		value: ArrayBuffer | string,
+		options?: R2PutOptions,
+	): Promise<R2Object>;
+	delete(key: string): Promise<void>;
+	head(key: string): Promise<R2Object | null>;
+	list(options?: R2ListOptions): Promise<R2Objects>;
 }
 
 interface R2Object {
-  key: string
-  size: number
-  uploaded: Date
-  customMetadata?: Record<string, string>
-  arrayBuffer(): Promise<ArrayBuffer>
+	key: string;
+	size: number;
+	uploaded: Date;
+	customMetadata?: Record<string, string>;
+	arrayBuffer(): Promise<ArrayBuffer>;
 }
 
 interface R2PutOptions {
-  customMetadata?: Record<string, string>
-  sha256?: ArrayBuffer
+	customMetadata?: Record<string, string>;
+	sha256?: ArrayBuffer;
 }
 
 interface R2ListOptions {
-  prefix?: string
-  cursor?: string
-  limit?: number
+	prefix?: string;
+	cursor?: string;
+	limit?: number;
 }
 
 interface R2Objects {
-  objects: R2Object[]
-  truncated: boolean
-  cursor?: string
+	objects: R2Object[];
+	truncated: boolean;
+	cursor?: string;
 }
 
 /**
@@ -407,121 +407,121 @@ interface R2Objects {
  * Used in Cloudflare Workers.
  */
 export class R2Storage implements Storage {
-  private bucket: R2Bucket
+	private bucket: R2Bucket;
 
-  constructor(bucket: R2Bucket) {
-    this.bucket = bucket
-  }
+	constructor(bucket: R2Bucket) {
+		this.bucket = bucket;
+	}
 
-  async get(key: string): Promise<GetResult | null> {
-    const object = await this.bucket.get(key)
-    if (!object) return null
+	async get(key: string): Promise<GetResult | null> {
+		const object = await this.bucket.get(key);
+		if (!object) return null;
 
-    const content = await object.arrayBuffer()
-    return {
-      content,
-      metadata: {
-        key: object.key,
-        size: object.size,
-        lastModified: object.uploaded,
-        customMetadata: object.customMetadata,
-      },
-    }
-  }
+		const content = await object.arrayBuffer();
+		return {
+			content,
+			metadata: {
+				key: object.key,
+				size: object.size,
+				lastModified: object.uploaded,
+				customMetadata: object.customMetadata,
+			},
+		};
+	}
 
-  async put(
-    key: string,
-    content: ArrayBuffer | Uint8Array | string,
-    options?: PutOptions,
-  ): Promise<StorageMetadata> {
-    const r2Options: R2PutOptions = {}
+	async put(
+		key: string,
+		content: ArrayBuffer | Uint8Array | string,
+		options?: PutOptions,
+	): Promise<StorageMetadata> {
+		const r2Options: R2PutOptions = {};
 
-    if (options?.customMetadata) {
-      r2Options.customMetadata = options.customMetadata
-    }
+		if (options?.customMetadata) {
+			r2Options.customMetadata = options.customMetadata;
+		}
 
-    // R2 expects sha256 as ArrayBuffer, but we store it in customMetadata as hex
-    if (options?.sha256) {
-      r2Options.customMetadata = {
-        ...r2Options.customMetadata,
-        sha256: options.sha256,
-      }
-    }
+		// R2 expects sha256 as ArrayBuffer, but we store it in customMetadata as hex
+		if (options?.sha256) {
+			r2Options.customMetadata = {
+				...r2Options.customMetadata,
+				sha256: options.sha256,
+			};
+		}
 
-    // Convert Uint8Array to ArrayBuffer if needed
-    let data: ArrayBuffer | string
-    if (content instanceof Uint8Array) {
-      data = content.buffer.slice(
-        content.byteOffset,
-        content.byteOffset + content.byteLength,
-      ) as ArrayBuffer
-    } else {
-      data = content
-    }
+		// Convert Uint8Array to ArrayBuffer if needed
+		let data: ArrayBuffer | string;
+		if (content instanceof Uint8Array) {
+			data = content.buffer.slice(
+				content.byteOffset,
+				content.byteOffset + content.byteLength,
+			) as ArrayBuffer;
+		} else {
+			data = content;
+		}
 
-    const object = await this.bucket.put(key, data, r2Options)
+		const object = await this.bucket.put(key, data, r2Options);
 
-    return {
-      key: object.key,
-      size: object.size,
-      lastModified: object.uploaded,
-      sha256: options?.sha256,
-      customMetadata: object.customMetadata,
-    }
-  }
+		return {
+			key: object.key,
+			size: object.size,
+			lastModified: object.uploaded,
+			sha256: options?.sha256,
+			customMetadata: object.customMetadata,
+		};
+	}
 
-  async delete(key: string): Promise<boolean> {
-    const exists = await this.exists(key)
-    if (exists) {
-      await this.bucket.delete(key)
-      return true
-    }
-    return false
-  }
+	async delete(key: string): Promise<boolean> {
+		const exists = await this.exists(key);
+		if (exists) {
+			await this.bucket.delete(key);
+			return true;
+		}
+		return false;
+	}
 
-  async exists(key: string): Promise<boolean> {
-    const object = await this.bucket.head(key)
-    return object !== null
-  }
+	async exists(key: string): Promise<boolean> {
+		const object = await this.bucket.head(key);
+		return object !== null;
+	}
 
-  async head(key: string): Promise<StorageMetadata | null> {
-    const object = await this.bucket.head(key)
-    if (!object) return null
+	async head(key: string): Promise<StorageMetadata | null> {
+		const object = await this.bucket.head(key);
+		if (!object) return null;
 
-    return {
-      key: object.key,
-      size: object.size,
-      lastModified: object.uploaded,
-      sha256: object.customMetadata?.sha256,
-      customMetadata: object.customMetadata,
-    }
-  }
+		return {
+			key: object.key,
+			size: object.size,
+			lastModified: object.uploaded,
+			sha256: object.customMetadata?.sha256,
+			customMetadata: object.customMetadata,
+		};
+	}
 
-  async list(prefix: string): Promise<StorageMetadata[]> {
-    const results: StorageMetadata[] = []
-    let cursor: string | undefined
+	async list(prefix: string): Promise<StorageMetadata[]> {
+		const results: StorageMetadata[] = [];
+		let cursor: string | undefined;
 
-    do {
-      const response = await this.bucket.list({
-        prefix,
-        cursor,
-        limit: 1000,
-      })
+		do {
+			const response = await this.bucket.list({
+				prefix,
+				cursor,
+				limit: 1000,
+			});
 
-      for (const object of response.objects) {
-        results.push({
-          key: object.key,
-          size: object.size,
-          lastModified: object.uploaded,
-          customMetadata: object.customMetadata,
-        })
-      }
+			for (const object of response.objects) {
+				results.push({
+					key: object.key,
+					size: object.size,
+					lastModified: object.uploaded,
+					customMetadata: object.customMetadata,
+				});
+			}
 
-      cursor = response.truncated ? response.cursor : undefined
-    } while (cursor)
+			cursor = response.truncated ? response.cursor : undefined;
+		} while (cursor);
 
-    return results
-  }
+		return results;
+	}
 }
 
 // ============================================================================
@@ -538,16 +538,16 @@ export class R2Storage implements Storage {
  * @returns Storage key
  */
 export function generateStorageKey(
-  runId: string,
-  chainSlug: string,
-  filename: string,
-  suffix?: string,
+	runId: string,
+	chainSlug: string,
+	filename: string,
+	suffix?: string,
 ): string {
-  const parts = ['ingestion', runId, chainSlug, filename]
-  if (suffix) {
-    parts.push(suffix)
-  }
-  return parts.join('/')
+	const parts = ["ingestion", runId, chainSlug, filename];
+	if (suffix) {
+		parts.push(suffix);
+	}
+	return parts.join("/");
 }
 
 /**
@@ -559,18 +559,18 @@ export function generateStorageKey(
  * @returns Existing object metadata if found, null otherwise
  */
 export async function findByHash(
-  storage: Storage,
-  prefix: string,
-  sha256: string,
+	storage: Storage,
+	prefix: string,
+	sha256: string,
 ): Promise<StorageMetadata | null> {
-  const objects = await storage.list(prefix)
+	const objects = await storage.list(prefix);
 
-  for (const obj of objects) {
-    const metadata = await storage.head(obj.key)
-    if (metadata?.sha256 === sha256) {
-      return metadata
-    }
-  }
+	for (const obj of objects) {
+		const metadata = await storage.head(obj.key);
+		if (metadata?.sha256 === sha256) {
+			return metadata;
+		}
+	}
 
-  return null
+	return null;
 }

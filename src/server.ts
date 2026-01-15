@@ -7,36 +7,36 @@
  */
 
 import tanstackHandler, {
-  type ServerEntry,
-} from '@tanstack/react-start/server-entry'
+	type ServerEntry,
+} from "@tanstack/react-start/server-entry";
+import type { QueueMessage } from "@/ingestion/core/types";
 import {
-  queue as ingestionQueue,
-  scheduled as ingestionScheduled,
-  type IngestionEnv,
-} from '@/ingestion/worker'
-import type { QueueMessage } from '@/ingestion/core/types'
+	type IngestionEnv,
+	queue as ingestionQueue,
+	scheduled as ingestionScheduled,
+} from "@/ingestion/worker";
+import { createLogger } from "@/utils/logger";
 import {
-  ensureRequestContext,
-  extractRequestId,
-} from '@/utils/request-context'
-import { createLogger } from '@/utils/logger'
+	ensureRequestContext,
+	extractRequestId,
+} from "@/utils/request-context";
 
-const logger = createLogger('app')
+const logger = createLogger("app");
 
 /**
  * Extended ServerEntry to include Cloudflare Workers-specific handlers
  */
 interface CloudflareServerEntry extends ServerEntry {
-  scheduled?: (
-    controller: ScheduledController,
-    env: Env,
-    ctx: ExecutionContext
-  ) => void | Promise<void>
-  queue?: (
-    batch: MessageBatch<unknown>,
-    env: Env,
-    ctx: ExecutionContext
-  ) => void | Promise<void>
+	scheduled?: (
+		controller: ScheduledController,
+		env: Env,
+		ctx: ExecutionContext,
+	) => void | Promise<void>;
+	queue?: (
+		batch: MessageBatch<unknown>,
+		env: Env,
+		ctx: ExecutionContext,
+	) => void | Promise<void>;
 }
 
 /**
@@ -44,24 +44,24 @@ interface CloudflareServerEntry extends ServerEntry {
  * Delegates to ingestion worker's scheduled handler.
  */
 async function scheduled(
-  controller: ScheduledController,
-  env: Env,
-  ctx: ExecutionContext
+	controller: ScheduledController,
+	env: Env,
+	ctx: ExecutionContext,
 ): Promise<void> {
-  logger.info('Scheduled handler invoked', {
-    cron: controller.cron,
-    scheduledTime: new Date(controller.scheduledTime).toISOString(),
-  })
+	logger.info("Scheduled handler invoked", {
+		cron: controller.cron,
+		scheduledTime: new Date(controller.scheduledTime).toISOString(),
+	});
 
-  ctx.waitUntil(
-    (async () => {
-      try {
-        await ingestionScheduled(controller, env as IngestionEnv, ctx)
-      } catch (error) {
-        logger.error('Scheduled handler error', { error })
-      }
-    })()
-  )
+	ctx.waitUntil(
+		(async () => {
+			try {
+				await ingestionScheduled(controller, env as IngestionEnv, ctx);
+			} catch (error) {
+				logger.error("Scheduled handler error", { error });
+			}
+		})(),
+	);
 }
 
 /**
@@ -69,50 +69,50 @@ async function scheduled(
  * Delegates to ingestion worker's queue handler.
  */
 async function queue(
-  batch: MessageBatch<unknown>,
-  env: Env,
-  ctx: ExecutionContext
+	batch: MessageBatch<unknown>,
+	env: Env,
+	ctx: ExecutionContext,
 ): Promise<void> {
-  logger.info('Queue batch received', { messageCount: batch.messages.length })
+	logger.info("Queue batch received", { messageCount: batch.messages.length });
 
-  ctx.waitUntil(
-    (async () => {
-      try {
-        await ingestionQueue(
-          batch as MessageBatch<QueueMessage>,
-          env as IngestionEnv,
-          ctx
-        )
-      } catch (error) {
-        logger.error('Queue handler error', { error })
-      }
-    })()
-  )
+	ctx.waitUntil(
+		(async () => {
+			try {
+				await ingestionQueue(
+					batch as MessageBatch<QueueMessage>,
+					env as IngestionEnv,
+					ctx,
+				);
+			} catch (error) {
+				logger.error("Queue handler error", { error });
+			}
+		})(),
+	);
 }
 
 /**
  * Wrap the fetch handler with request context
  */
-type StartRequestOptions = Parameters<typeof tanstackHandler.fetch>[1]
+type StartRequestOptions = Parameters<typeof tanstackHandler.fetch>[1];
 
-const wrappedFetch: ServerEntry['fetch'] = async function (request, maybeOpts) {
-  let handlerOpts: StartRequestOptions | undefined
+const wrappedFetch: ServerEntry["fetch"] = async (request, maybeOpts) => {
+	let handlerOpts: StartRequestOptions | undefined;
 
-  if (maybeOpts && typeof maybeOpts === 'object' && 'context' in maybeOpts) {
-    handlerOpts = maybeOpts as StartRequestOptions
-  }
+	if (maybeOpts && typeof maybeOpts === "object" && "context" in maybeOpts) {
+		handlerOpts = maybeOpts as StartRequestOptions;
+	}
 
-  const requestId = extractRequestId(request)
-  return ensureRequestContext(requestId, () =>
-    tanstackHandler.fetch(request, handlerOpts)
-  )
-}
+	const requestId = extractRequestId(request);
+	return ensureRequestContext(requestId, () =>
+		tanstackHandler.fetch(request, handlerOpts),
+	);
+};
 
 /**
  * Export the worker with fetch, scheduled, and queue handlers
  */
 export default {
-  fetch: wrappedFetch,
-  scheduled,
-  queue,
-} satisfies CloudflareServerEntry
+	fetch: wrappedFetch,
+	scheduled,
+	queue,
+} satisfies CloudflareServerEntry;

@@ -15,8 +15,8 @@
  * - Do NOT have their own price data; they use the virtual store's prices
  */
 
-import { eq, and, inArray } from 'drizzle-orm'
-import { stores, storeItemState } from '../schema'
+import { and, eq, inArray } from "drizzle-orm";
+import { storeItemState, stores } from "../schema";
 
 // ============================================================================
 // Database Connection Types
@@ -31,7 +31,7 @@ import { stores, storeItemState } from '../schema'
  * shared schema.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyDatabase = any
+export type AnyDatabase = any;
 
 // ============================================================================
 // Store Types
@@ -41,43 +41,43 @@ export type AnyDatabase = any
  * Store record from the database.
  */
 export interface Store {
-  id: string
-  chainSlug: string
-  name: string
-  address: string | null
-  city: string | null
-  postalCode: string | null
-  latitude: string | null
-  longitude: string | null
-  isVirtual: boolean | null
-  priceSourceStoreId: string | null
-  status: string | null
-  createdAt: Date | null
-  updatedAt: Date | null
+	id: string;
+	chainSlug: string;
+	name: string;
+	address: string | null;
+	city: string | null;
+	postalCode: string | null;
+	latitude: string | null;
+	longitude: string | null;
+	isVirtual: boolean | null;
+	priceSourceStoreId: string | null;
+	status: string | null;
+	createdAt: Date | null;
+	updatedAt: Date | null;
 }
 
 /**
  * Store item state record from the database.
  */
 export interface StoreItemState {
-  id: string
-  storeId: string
-  retailerItemId: string
-  currentPrice: number | null
-  previousPrice: number | null
-  discountPrice: number | null
-  discountStart: Date | null
-  discountEnd: Date | null
-  inStock: boolean | null
-  unitPrice: number | null
-  unitPriceBaseQuantity: string | null
-  unitPriceBaseUnit: string | null
-  lowestPrice30d: number | null
-  anchorPrice: number | null
-  anchorPriceAsOf: Date | null
-  priceSignature: string | null
-  lastSeenAt: Date | null
-  updatedAt: Date | null
+	id: string;
+	storeId: string;
+	retailerItemId: string;
+	currentPrice: number | null;
+	previousPrice: number | null;
+	discountPrice: number | null;
+	discountStart: Date | null;
+	discountEnd: Date | null;
+	inStock: boolean | null;
+	unitPrice: number | null;
+	unitPriceBaseQuantity: string | null;
+	unitPriceBaseUnit: string | null;
+	lowestPrice30d: number | null;
+	anchorPrice: number | null;
+	anchorPriceAsOf: Date | null;
+	priceSignature: string | null;
+	lastSeenAt: Date | null;
+	updatedAt: Date | null;
 }
 
 // ============================================================================
@@ -103,22 +103,22 @@ export interface StoreItemState {
  * // Returns: 'sto_abc'
  */
 export function getEffectivePriceStoreId(store: {
-  id: string
-  priceSourceStoreId: string | null
+	id: string;
+	priceSourceStoreId: string | null;
 }): string {
-  return store.priceSourceStoreId ?? store.id
+	return store.priceSourceStoreId ?? store.id;
 }
 
 /**
  * Result of resolving a store with its price source.
  */
 export interface StoreWithPriceSource {
-  /** The original store that was queried */
-  store: Store
-  /** The store to use for price lookups (may be the same as store) */
-  priceStore: Store
-  /** Whether this store uses shared pricing from another store */
-  usesSharedPricing: boolean
+	/** The original store that was queried */
+	store: Store;
+	/** The store to use for price lookups (may be the same as store) */
+	priceStore: Store;
+	/** Whether this store uses shared pricing from another store */
+	usesSharedPricing: boolean;
 }
 
 /**
@@ -142,49 +142,49 @@ export interface StoreWithPriceSource {
  * }
  */
 export async function getStoreWithPriceSource(
-  db: AnyDatabase,
-  storeId: string
+	db: AnyDatabase,
+	storeId: string,
 ): Promise<StoreWithPriceSource | null> {
-  // Fetch the store
-  const store = await db.query.stores.findFirst({
-    where: eq(stores.id, storeId),
-  })
+	// Fetch the store
+	const store = await db.query.stores.findFirst({
+		where: eq(stores.id, storeId),
+	});
 
-  if (!store) {
-    return null
-  }
+	if (!store) {
+		return null;
+	}
 
-  // If no priceSourceStoreId, this store is its own price source
-  if (!store.priceSourceStoreId) {
-    return {
-      store: store as Store,
-      priceStore: store as Store,
-      usesSharedPricing: false,
-    }
-  }
+	// If no priceSourceStoreId, this store is its own price source
+	if (!store.priceSourceStoreId) {
+		return {
+			store: store as Store,
+			priceStore: store as Store,
+			usesSharedPricing: false,
+		};
+	}
 
-  // Fetch the price source store
-  const priceStore = await db.query.stores.findFirst({
-    where: eq(stores.id, store.priceSourceStoreId),
-  })
+	// Fetch the price source store
+	const priceStore = await db.query.stores.findFirst({
+		where: eq(stores.id, store.priceSourceStoreId),
+	});
 
-  // If price source store not found, fall back to the original store
-  if (!priceStore) {
-    console.warn(
-      `[stores] Price source store ${store.priceSourceStoreId} not found for store ${storeId}`
-    )
-    return {
-      store: store as Store,
-      priceStore: store as Store,
-      usesSharedPricing: false,
-    }
-  }
+	// If price source store not found, fall back to the original store
+	if (!priceStore) {
+		console.warn(
+			`[stores] Price source store ${store.priceSourceStoreId} not found for store ${storeId}`,
+		);
+		return {
+			store: store as Store,
+			priceStore: store as Store,
+			usesSharedPricing: false,
+		};
+	}
 
-  return {
-    store: store as Store,
-    priceStore: priceStore as Store,
-    usesSharedPricing: true,
-  }
+	return {
+		store: store as Store,
+		priceStore: priceStore as Store,
+		usesSharedPricing: true,
+	};
 }
 
 // ============================================================================
@@ -195,10 +195,10 @@ export async function getStoreWithPriceSource(
  * Options for querying prices.
  */
 export interface GetPricesOptions {
-  /** Maximum number of prices to return */
-  limit?: number
-  /** Filter by specific retailer item ID */
-  retailerItemId?: string
+	/** Maximum number of prices to return */
+	limit?: number;
+	/** Filter by specific retailer item ID */
+	retailerItemId?: string;
 }
 
 /**
@@ -228,36 +228,36 @@ export interface GetPricesOptions {
  * const prices = await getPricesForStore(db, 'sto_abc123', { limit: 10 })
  */
 export async function getPricesForStore(
-  db: AnyDatabase,
-  storeId: string,
-  options?: GetPricesOptions
+	db: AnyDatabase,
+	storeId: string,
+	options?: GetPricesOptions,
 ): Promise<StoreItemState[]> {
-  // First, get the store to check for priceSourceStoreId
-  const store = await db.query.stores.findFirst({
-    where: eq(stores.id, storeId),
-  })
+	// First, get the store to check for priceSourceStoreId
+	const store = await db.query.stores.findFirst({
+		where: eq(stores.id, storeId),
+	});
 
-  if (!store) {
-    return []
-  }
+	if (!store) {
+		return [];
+	}
 
-  // Determine which store to query for prices
-  const effectiveStoreId = getEffectivePriceStoreId(store)
+	// Determine which store to query for prices
+	const effectiveStoreId = getEffectivePriceStoreId(store);
 
-  // Build query conditions
-  const conditions = [eq(storeItemState.storeId, effectiveStoreId)]
+	// Build query conditions
+	const conditions = [eq(storeItemState.storeId, effectiveStoreId)];
 
-  if (options?.retailerItemId) {
-    conditions.push(eq(storeItemState.retailerItemId, options.retailerItemId))
-  }
+	if (options?.retailerItemId) {
+		conditions.push(eq(storeItemState.retailerItemId, options.retailerItemId));
+	}
 
-  // Query prices
-  const prices = await db.query.storeItemState.findMany({
-    where: and(...conditions),
-    limit: options?.limit,
-  })
+	// Query prices
+	const prices = await db.query.storeItemState.findMany({
+		where: and(...conditions),
+		limit: options?.limit,
+	});
 
-  return prices as StoreItemState[]
+	return prices as StoreItemState[];
 }
 
 /**
@@ -276,48 +276,48 @@ export async function getPricesForStore(
  * }
  */
 export async function getPricesForStores(
-  db: AnyDatabase,
-  storeIds: string[],
-  retailerItemId: string
+	db: AnyDatabase,
+	storeIds: string[],
+	retailerItemId: string,
 ): Promise<Map<string, StoreItemState>> {
-  if (storeIds.length === 0) {
-    return new Map()
-  }
+	if (storeIds.length === 0) {
+		return new Map();
+	}
 
-  // Fetch all stores to get their price sources
-  const storeList = await db.query.stores.findMany({
-    where: inArray(stores.id, storeIds),
-  })
+	// Fetch all stores to get their price sources
+	const storeList = await db.query.stores.findMany({
+		where: inArray(stores.id, storeIds),
+	});
 
-  // Build mapping: effectiveStoreId -> originalStoreIds
-  const effectiveToOriginal = new Map<string, string[]>()
-  for (const store of storeList) {
-    const effectiveId = getEffectivePriceStoreId(store)
-    if (!effectiveToOriginal.has(effectiveId)) {
-      effectiveToOriginal.set(effectiveId, [])
-    }
-    effectiveToOriginal.get(effectiveId)!.push(store.id)
-  }
+	// Build mapping: effectiveStoreId -> originalStoreIds
+	const effectiveToOriginal = new Map<string, string[]>();
+	for (const store of storeList) {
+		const effectiveId = getEffectivePriceStoreId(store);
+		if (!effectiveToOriginal.has(effectiveId)) {
+			effectiveToOriginal.set(effectiveId, []);
+		}
+		effectiveToOriginal.get(effectiveId)?.push(store.id);
+	}
 
-  // Query prices for all effective store IDs
-  const effectiveIds = Array.from(effectiveToOriginal.keys())
-  const prices = await db.query.storeItemState.findMany({
-    where: and(
-      inArray(storeItemState.storeId, effectiveIds),
-      eq(storeItemState.retailerItemId, retailerItemId)
-    ),
-  })
+	// Query prices for all effective store IDs
+	const effectiveIds = Array.from(effectiveToOriginal.keys());
+	const prices = await db.query.storeItemState.findMany({
+		where: and(
+			inArray(storeItemState.storeId, effectiveIds),
+			eq(storeItemState.retailerItemId, retailerItemId),
+		),
+	});
 
-  // Build result map: originalStoreId -> price
-  const result = new Map<string, StoreItemState>()
-  for (const price of prices) {
-    const originalIds = effectiveToOriginal.get(price.storeId) || []
-    for (const originalId of originalIds) {
-      result.set(originalId, price as StoreItemState)
-    }
-  }
+	// Build result map: originalStoreId -> price
+	const result = new Map<string, StoreItemState>();
+	for (const price of prices) {
+		const originalIds = effectiveToOriginal.get(price.storeId) || [];
+		for (const originalId of originalIds) {
+			result.set(originalId, price as StoreItemState);
+		}
+	}
 
-  return result
+	return result;
 }
 
 /**
@@ -330,13 +330,13 @@ export async function getPricesForStores(
  * @returns The price record, or null if not found
  */
 export async function getPriceForStoreItem(
-  db: AnyDatabase,
-  storeId: string,
-  retailerItemId: string
+	db: AnyDatabase,
+	storeId: string,
+	retailerItemId: string,
 ): Promise<StoreItemState | null> {
-  const prices = await getPricesForStore(db, storeId, {
-    retailerItemId,
-    limit: 1,
-  })
-  return prices.length > 0 ? prices[0] : null
+	const prices = await getPricesForStore(db, storeId, {
+		retailerItemId,
+		limit: 1,
+	});
+	return prices.length > 0 ? prices[0] : null;
 }

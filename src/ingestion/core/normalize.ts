@@ -20,27 +20,29 @@
  * @param value - The string value to normalize
  * @returns The parsed number, or null if invalid
  */
-export function normalizeDecimal(value: string | null | undefined): number | null {
-  if (value == null || value === '') return null
+export function normalizeDecimal(
+	value: string | null | undefined,
+): number | null {
+	if (value == null || value === "") return null;
 
-  let normalized = value.trim()
+	let normalized = value.trim();
 
-  // Handle leading comma: ",69" → "0.69"
-  if (normalized.startsWith(',')) {
-    normalized = '0' + normalized
-  }
+	// Handle leading comma: ",69" → "0.69"
+	if (normalized.startsWith(",")) {
+		normalized = `0${normalized}`;
+	}
 
-  // Check if this looks like Croatian format (comma as decimal separator)
-  // Pattern: optional digits, optional thousand separators (.), comma, decimal digits
-  const croatianPattern = /^-?[\d.]*,\d+$/
+	// Check if this looks like Croatian format (comma as decimal separator)
+	// Pattern: optional digits, optional thousand separators (.), comma, decimal digits
+	const croatianPattern = /^-?[\d.]*,\d+$/;
 
-  if (croatianPattern.test(normalized)) {
-    // Croatian format: remove thousand separators (.), replace comma with dot
-    normalized = normalized.replace(/\./g, '').replace(',', '.')
-  }
+	if (croatianPattern.test(normalized)) {
+		// Croatian format: remove thousand separators (.), replace comma with dot
+		normalized = normalized.replace(/\./g, "").replace(",", ".");
+	}
 
-  const result = parseFloat(normalized)
-  return isNaN(result) ? null : result
+	const result = parseFloat(normalized);
+	return Number.isNaN(result) ? null : result;
 }
 
 /**
@@ -50,9 +52,9 @@ export function normalizeDecimal(value: string | null | undefined): number | nul
  * @returns Price in cents/lipa, or null if invalid
  */
 export function priceToCents(value: string | null | undefined): number | null {
-  const decimal = normalizeDecimal(value)
-  if (decimal === null) return null
-  return Math.round(decimal * 100)
+	const decimal = normalizeDecimal(value);
+	if (decimal === null) return null;
+	return Math.round(decimal * 100);
 }
 
 // ============================================================================
@@ -63,40 +65,40 @@ export function priceToCents(value: string | null | undefined): number | null {
  * Parsed quantity with value and unit.
  */
 export interface ParsedQuantity {
-  value: number
-  unit: string
+	value: number;
+	unit: string;
 }
 
 /**
  * Common unit aliases to normalize.
  */
 const UNIT_ALIASES: Record<string, string> = {
-  g: 'G',
-  gr: 'G',
-  gram: 'G',
-  grama: 'G',
-  kg: 'KG',
-  kilogram: 'KG',
-  kilograma: 'KG',
-  ml: 'ML',
-  l: 'L',
-  lit: 'L',
-  litra: 'L',
-  litre: 'L',
-  liter: 'L',
-  kom: 'KOM',
-  komad: 'KOM',
-  komada: 'KOM',
-  pcs: 'KOM',
-  pc: 'KOM',
-  piece: 'KOM',
-  pieces: 'KOM',
-  pak: 'PAK',
-  pack: 'PAK',
-  m: 'M',
-  cm: 'CM',
-  mm: 'MM',
-}
+	g: "G",
+	gr: "G",
+	gram: "G",
+	grama: "G",
+	kg: "KG",
+	kilogram: "KG",
+	kilograma: "KG",
+	ml: "ML",
+	l: "L",
+	lit: "L",
+	litra: "L",
+	litre: "L",
+	liter: "L",
+	kom: "KOM",
+	komad: "KOM",
+	komada: "KOM",
+	pcs: "KOM",
+	pc: "KOM",
+	piece: "KOM",
+	pieces: "KOM",
+	pak: "PAK",
+	pack: "PAK",
+	m: "M",
+	cm: "CM",
+	mm: "MM",
+};
 
 /**
  * Normalizes a unit string to standard format.
@@ -105,8 +107,8 @@ const UNIT_ALIASES: Record<string, string> = {
  * @returns Normalized unit string
  */
 export function normalizeUnit(unit: string): string {
-  const lower = unit.toLowerCase().trim()
-  return UNIT_ALIASES[lower] ?? unit.toUpperCase().trim()
+	const lower = unit.toLowerCase().trim();
+	return UNIT_ALIASES[lower] ?? unit.toUpperCase().trim();
 }
 
 /**
@@ -120,25 +122,27 @@ export function normalizeUnit(unit: string): string {
  * @param value - The quantity string to parse
  * @returns Parsed quantity or null if invalid
  */
-export function parseQuantity(value: string | null | undefined): ParsedQuantity | null {
-  if (value == null || value === '') return null
+export function parseQuantity(
+	value: string | null | undefined,
+): ParsedQuantity | null {
+	if (value == null || value === "") return null;
 
-  const normalized = value.trim()
+	const normalized = value.trim();
 
-  // Pattern: number (with possible comma decimal) followed by optional space and unit
-  // Supports: "315 G", "1,5 kg", "500ml", "0.5L"
-  const pattern = /^(-?[\d.,]+)\s*([a-zA-Z]+)$/
+	// Pattern: number (with possible comma decimal) followed by optional space and unit
+	// Supports: "315 G", "1,5 kg", "500ml", "0.5L"
+	const pattern = /^(-?[\d.,]+)\s*([a-zA-Z]+)$/;
 
-  const match = normalized.match(pattern)
-  if (!match) return null
+	const match = normalized.match(pattern);
+	if (!match) return null;
 
-  const numericValue = normalizeDecimal(match[1])
-  if (numericValue === null) return null
+	const numericValue = normalizeDecimal(match[1]);
+	if (numericValue === null) return null;
 
-  return {
-    value: numericValue,
-    unit: normalizeUnit(match[2]),
-  }
+	return {
+		value: numericValue,
+		unit: normalizeUnit(match[2]),
+	};
 }
 
 // ============================================================================
@@ -149,9 +153,9 @@ export function parseQuantity(value: string | null | undefined): ParsedQuantity 
  * Parsed pack notation.
  */
 export interface ParsedPack {
-  packCount: number
-  packUnitValue: number
-  packUnitUnit: string
+	packCount: number;
+	packUnitValue: number;
+	packUnitUnit: string;
 }
 
 /**
@@ -164,30 +168,32 @@ export interface ParsedPack {
  * @param value - The pack notation string to parse
  * @returns Parsed pack or null if invalid
  */
-export function parsePackNotation(value: string | null | undefined): ParsedPack | null {
-  if (value == null || value === '') return null
+export function parsePackNotation(
+	value: string | null | undefined,
+): ParsedPack | null {
+	if (value == null || value === "") return null;
 
-  const normalized = value.trim()
+	const normalized = value.trim();
 
-  // Pattern: count "x" or "X" value unit
-  // Supports: "6x500ml", "4 x 1,5L", "12 X 0.33 l"
-  const pattern = /^(\d+)\s*[xX]\s*([\d.,]+)\s*([a-zA-Z]+)$/
+	// Pattern: count "x" or "X" value unit
+	// Supports: "6x500ml", "4 x 1,5L", "12 X 0.33 l"
+	const pattern = /^(\d+)\s*[xX]\s*([\d.,]+)\s*([a-zA-Z]+)$/;
 
-  const match = normalized.match(pattern)
-  if (!match) return null
+	const match = normalized.match(pattern);
+	if (!match) return null;
 
-  const packCount = parseInt(match[1], 10)
-  const packUnitValue = normalizeDecimal(match[2])
+	const packCount = parseInt(match[1], 10);
+	const packUnitValue = normalizeDecimal(match[2]);
 
-  if (isNaN(packCount) || packCount <= 0 || packUnitValue === null) {
-    return null
-  }
+	if (Number.isNaN(packCount) || packCount <= 0 || packUnitValue === null) {
+		return null;
+	}
 
-  return {
-    packCount,
-    packUnitValue,
-    packUnitUnit: normalizeUnit(match[3]),
-  }
+	return {
+		packCount,
+		packUnitValue,
+		packUnitUnit: normalizeUnit(match[3]),
+	};
 }
 
 // ============================================================================
@@ -206,35 +212,35 @@ export function parsePackNotation(value: string | null | undefined): ParsedPack 
  * @returns Cleaned barcode or null if empty/invalid
  */
 export function cleanBarcode(value: string | null | undefined): string | null {
-  if (value == null || value === '') return null
+	if (value == null || value === "") return null;
 
-  let cleaned = value.trim()
+	let cleaned = value.trim();
 
-  // Remove Excel formula quoting: ="1234567890123"
-  if (cleaned.startsWith('="') && cleaned.endsWith('"')) {
-    cleaned = cleaned.slice(2, -1)
-  }
+	// Remove Excel formula quoting: ="1234567890123"
+	if (cleaned.startsWith('="') && cleaned.endsWith('"')) {
+		cleaned = cleaned.slice(2, -1);
+	}
 
-  // Remove surrounding quotes
-  if (
-    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
-    (cleaned.startsWith("'") && cleaned.endsWith("'"))
-  ) {
-    cleaned = cleaned.slice(1, -1)
-  }
+	// Remove surrounding quotes
+	if (
+		(cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+		(cleaned.startsWith("'") && cleaned.endsWith("'"))
+	) {
+		cleaned = cleaned.slice(1, -1);
+	}
 
-  // Remove all spaces
-  cleaned = cleaned.replace(/\s/g, '')
+	// Remove all spaces
+	cleaned = cleaned.replace(/\s/g, "");
 
-  // Remove any remaining quotes
-  cleaned = cleaned.replace(/["']/g, '')
+	// Remove any remaining quotes
+	cleaned = cleaned.replace(/["']/g, "");
 
-  // Validate: barcodes should only contain digits (and possibly leading zeros)
-  if (!/^\d+$/.test(cleaned)) {
-    return null
-  }
+	// Validate: barcodes should only contain digits (and possibly leading zeros)
+	if (!/^\d+$/.test(cleaned)) {
+		return null;
+	}
 
-  return cleaned.length > 0 ? cleaned : null
+	return cleaned.length > 0 ? cleaned : null;
 }
 
 /**
@@ -248,20 +254,20 @@ export function cleanBarcode(value: string | null | undefined): string | null {
  * @returns Array of cleaned barcodes (empty if none valid)
  */
 export function parseBarcodes(value: string | null | undefined): string[] {
-  if (value == null || value === '') return []
+	if (value == null || value === "") return [];
 
-  // Split by common separators
-  const parts = value.split(/[,;|]/)
+	// Split by common separators
+	const parts = value.split(/[,;|]/);
 
-  const barcodes: string[] = []
-  for (const part of parts) {
-    const cleaned = cleanBarcode(part)
-    if (cleaned !== null) {
-      barcodes.push(cleaned)
-    }
-  }
+	const barcodes: string[] = [];
+	for (const part of parts) {
+		const cleaned = cleanBarcode(part);
+		if (cleaned !== null) {
+			barcodes.push(cleaned);
+		}
+	}
 
-  return barcodes
+	return barcodes;
 }
 
 // ============================================================================
@@ -278,10 +284,10 @@ export function parseBarcodes(value: string | null | undefined): string[] {
  * @returns Cleaned string or null if empty
  */
 export function cleanString(value: string | null | undefined): string | null {
-  if (value == null || value === '') return null
+	if (value == null || value === "") return null;
 
-  const cleaned = value.trim().replace(/\s+/g, ' ')
-  return cleaned.length > 0 ? cleaned : null
+	const cleaned = value.trim().replace(/\s+/g, " ");
+	return cleaned.length > 0 ? cleaned : null;
 }
 
 /**
@@ -292,9 +298,9 @@ export function cleanString(value: string | null | undefined): string | null {
  * @returns Cleaned name or null if empty
  */
 export function cleanName(value: string | null | undefined): string | null {
-  const cleaned = cleanString(value)
-  if (cleaned === null) return null
+	const cleaned = cleanString(value);
+	if (cleaned === null) return null;
 
-  // Don't change case - preserve original retailer formatting
-  return cleaned
+	// Don't change case - preserve original retailer formatting
+	return cleaned;
 }

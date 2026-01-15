@@ -1,9 +1,9 @@
-import { procedure } from "../base";
 import { and, count, desc, eq, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
+import { procedure } from "../base";
 
 // ============================================================================
 // Core Store Operations
@@ -428,7 +428,10 @@ export const listPhysicalStores = procedure
 					priceSourceName: priceSourceStore.name,
 				})
 				.from(stores)
-				.leftJoin(priceSourceStore, eq(stores.priceSourceStoreId, priceSourceStore.id))
+				.leftJoin(
+					priceSourceStore,
+					eq(stores.priceSourceStoreId, priceSourceStore.id),
+				)
 				.where(whereClause)
 				.orderBy(desc(stores.createdAt))
 				.limit(input.pageSize)

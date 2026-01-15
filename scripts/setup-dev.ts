@@ -31,14 +31,6 @@ function run(cmd: string, options?: { silent?: boolean }) {
   }
 }
 
-function runOutput(cmd: string): string {
-  try {
-    return execSync(cmd, { cwd: ROOT, encoding: 'utf-8' }).trim()
-  } catch {
-    return ''
-  }
-}
-
 // Hash password using scrypt (better-auth compatible)
 // Must match: N=16384, r=16, p=1, dkLen=64
 function hashPassword(password: string): string {

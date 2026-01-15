@@ -26,56 +26,56 @@
  * </DocumentElement>
  */
 
-import type { DiscoveredFile, StoreMetadata } from '../core/types'
-import type { XmlFieldMapping } from '../parsers/xml'
-import { BaseXmlAdapter } from './base'
-import { CHAIN_CONFIGS } from './config'
+import type { DiscoveredFile, StoreMetadata } from "../core/types";
+import type { XmlFieldMapping } from "../parsers/xml";
+import { BaseXmlAdapter } from "./base";
+import { CHAIN_CONFIGS } from "./config";
 
 /**
  * XML field mapping for Trgocentar files.
  * Maps Trgocentar's XML elements to NormalizedRow fields.
  */
 const TRGOCENTAR_FIELD_MAPPING: XmlFieldMapping = {
-  externalId: 'sif_art',
-  name: 'naziv_art',
-  category: 'naz_kat',
-  brand: 'marka',
-  unit: 'jmj',
-  unitQuantity: 'net_kol',
-  price: (item) => {
-    // Try regular price (mpc) first
-    const mpc = item['mpc']
-    if (typeof mpc === 'string' && mpc.trim() !== '') {
-      return mpc.trim()
-    }
-    // If regular price is empty, try discount price (mpc_pop)
-    // Some items only have discount price during special sales
-    const mpcPop = item['mpc_pop']
-    if (typeof mpcPop === 'string' && mpcPop.trim() !== '') {
-      return mpcPop.trim()
-    }
-    return null
-  },
-  discountPrice: 'mpc_pop',
-  barcodes: 'ean_kod',
-  // Croatian price transparency fields
-  unitPrice: 'c_jmj',
-  lowestPrice30d: 'c_najniza_30',
-  anchorPrice: (item) => {
-    // The anchor price field has a dynamic name based on date (e.g., c_020525 for 2025-05-02)
-    // Try to find any field starting with 'c_' followed by 6 digits
-    const keys = Object.keys(item)
-    for (const key of keys) {
-      if (key.startsWith('c_') && /^\d{6}$/.test(key.slice(2))) {
-        const value = item[key]
-        if (typeof value === 'string' && value.trim() !== '') {
-          return value.trim()
-        }
-      }
-    }
-    return null
-  },
-}
+	externalId: "sif_art",
+	name: "naziv_art",
+	category: "naz_kat",
+	brand: "marka",
+	unit: "jmj",
+	unitQuantity: "net_kol",
+	price: (item) => {
+		// Try regular price (mpc) first
+		const mpc = item.mpc;
+		if (typeof mpc === "string" && mpc.trim() !== "") {
+			return mpc.trim();
+		}
+		// If regular price is empty, try discount price (mpc_pop)
+		// Some items only have discount price during special sales
+		const mpcPop = item.mpc_pop;
+		if (typeof mpcPop === "string" && mpcPop.trim() !== "") {
+			return mpcPop.trim();
+		}
+		return null;
+	},
+	discountPrice: "mpc_pop",
+	barcodes: "ean_kod",
+	// Croatian price transparency fields
+	unitPrice: "c_jmj",
+	lowestPrice30d: "c_najniza_30",
+	anchorPrice: (item) => {
+		// The anchor price field has a dynamic name based on date (e.g., c_020525 for 2025-05-02)
+		// Try to find any field starting with 'c_' followed by 6 digits
+		const keys = Object.keys(item);
+		for (const key of keys) {
+			if (key.startsWith("c_") && /^\d{6}$/.test(key.slice(2))) {
+				const value = item[key];
+				if (typeof value === "string" && value.trim() !== "") {
+					return value.trim();
+				}
+			}
+		}
+		return null;
+	},
+};
 
 /**
  * Trgocentar chain adapter implementation.
@@ -84,208 +84,220 @@ const TRGOCENTAR_FIELD_MAPPING: XmlFieldMapping = {
  * Supports date-based discovery via setDiscoveryDate() method.
  */
 export class TrgocentarAdapter extends BaseXmlAdapter {
-  /** Date to discover files for (YYYY-MM-DD format, set by CLI before discovery) */
-  private discoveryDate: string | null = null
+	/** Date to discover files for (YYYY-MM-DD format, set by CLI before discovery) */
+	private discoveryDate: string | null = null;
 
-  constructor() {
-    super({
-      slug: 'trgocentar',
-      name: 'Trgocentar',
-      supportedTypes: ['xml'],
-      chainConfig: CHAIN_CONFIGS.trgocentar,
-      fieldMapping: TRGOCENTAR_FIELD_MAPPING,
-      defaultItemsPath: 'DocumentElement.cjenik',
-      itemPaths: ['DocumentElement.cjenik'],
-      filenamePrefixPatterns: [
-        /^Trgocentar[_-]?/i,
-        /^cjenik[_-]?/i,
-        /^SUPERMARKET[_-]?/i,
-      ],
-      rateLimitConfig: {
-        requestsPerSecond: 2,
-        maxRetries: 3,
-      },
-    })
-  }
+	constructor() {
+		super({
+			slug: "trgocentar",
+			name: "Trgocentar",
+			supportedTypes: ["xml"],
+			chainConfig: CHAIN_CONFIGS.trgocentar,
+			fieldMapping: TRGOCENTAR_FIELD_MAPPING,
+			defaultItemsPath: "DocumentElement.cjenik",
+			itemPaths: ["DocumentElement.cjenik"],
+			filenamePrefixPatterns: [
+				/^Trgocentar[_-]?/i,
+				/^cjenik[_-]?/i,
+				/^SUPERMARKET[_-]?/i,
+			],
+			rateLimitConfig: {
+				requestsPerSecond: 2,
+				maxRetries: 3,
+			},
+		});
+	}
 
-  /**
-   * Set the date to use for discovery.
-   * @param date - Date in YYYY-MM-DD format
-   */
-  setDiscoveryDate(date: string): void {
-    this.discoveryDate = date
-  }
+	/**
+	 * Set the date to use for discovery.
+	 * @param date - Date in YYYY-MM-DD format
+	 */
+	setDiscoveryDate(date: string): void {
+		this.discoveryDate = date;
+	}
 
-  /**
-   * Extract store identifier from Trgocentar filename.
-   * Trgocentar filenames contain store codes like P220, P195, P120, etc.
-   * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
-   * The store code is the PXXX pattern.
-   */
-  protected override extractStoreIdentifierFromFilename(filename: string): string {
-    // Remove file extension
-    const baseName = filename.replace(this.fileExtensionPattern, '')
+	/**
+	 * Extract store identifier from Trgocentar filename.
+	 * Trgocentar filenames contain store codes like P220, P195, P120, etc.
+	 * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
+	 * The store code is the PXXX pattern.
+	 */
+	protected override extractStoreIdentifierFromFilename(
+		filename: string,
+	): string {
+		// Remove file extension
+		const baseName = filename.replace(this.fileExtensionPattern, "");
 
-    // Remove common prefixes
-    let cleanName = baseName
-    for (const pattern of this.filenamePrefixPatterns) {
-      cleanName = cleanName.replace(pattern, '')
-    }
-    cleanName = cleanName.trim()
+		// Remove common prefixes
+		let cleanName = baseName;
+		for (const pattern of this.filenamePrefixPatterns) {
+			cleanName = cleanName.replace(pattern, "");
+		}
+		cleanName = cleanName.trim();
 
-    // Try to extract Trgocentar store code (P followed by 3 digits)
-    const storeCodeMatch = cleanName.match(/P(\d{3})/i)
-    if (storeCodeMatch) {
-      return `P${storeCodeMatch[1]}`
-    }
+		// Try to extract Trgocentar store code (P followed by 3 digits)
+		const storeCodeMatch = cleanName.match(/P(\d{3})/i);
+		if (storeCodeMatch) {
+			return `P${storeCodeMatch[1]}`;
+		}
 
-    // Fallback to the full clean name if no pattern matches
-    return cleanName || baseName
-  }
+		// Fallback to the full clean name if no pattern matches
+		return cleanName || baseName;
+	}
 
-  /**
-   * Extract date from Trgocentar filename.
-   * Trgocentar filenames contain dates in format: DDMMYYYYHHMM
-   * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
-   *                                                ^^^^^^^^^^
-   *                                                DD = 05, MM = 01, YYYY = 2026
-   */
-  private extractDateFromFilename(filename: string): string | null {
-    // Try DDMMYYYYHHMM pattern (Trgocentar specific format)
-    // The date appears at the end before .xml
-    const trgocentarMatch = filename.match(/(\d{2})(\d{2})(\d{4})\d{4}\.xml$/i)
-    if (trgocentarMatch) {
-      const day = trgocentarMatch[1]
-      const month = trgocentarMatch[2]
-      const year = trgocentarMatch[3]
-      return `${year}-${month}-${day}`
-    }
+	/**
+	 * Extract date from Trgocentar filename.
+	 * Trgocentar filenames contain dates in format: DDMMYYYYHHMM
+	 * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
+	 *                                                ^^^^^^^^^^
+	 *                                                DD = 05, MM = 01, YYYY = 2026
+	 */
+	private extractDateFromFilename(filename: string): string | null {
+		// Try DDMMYYYYHHMM pattern (Trgocentar specific format)
+		// The date appears at the end before .xml
+		const trgocentarMatch = filename.match(/(\d{2})(\d{2})(\d{4})\d{4}\.xml$/i);
+		if (trgocentarMatch) {
+			const day = trgocentarMatch[1];
+			const month = trgocentarMatch[2];
+			const year = trgocentarMatch[3];
+			return `${year}-${month}-${day}`;
+		}
 
-    // Try YYYY-MM-DD pattern
-    const isoMatch = filename.match(/(\d{4})-(\d{2})-(\d{2})/)
-    if (isoMatch) {
-      return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`
-    }
+		// Try YYYY-MM-DD pattern
+		const isoMatch = filename.match(/(\d{4})-(\d{2})-(\d{2})/);
+		if (isoMatch) {
+			return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+		}
 
-    // Try DD-MM-YYYY pattern
-    const euMatch = filename.match(/(\d{2})-(\d{2})-(\d{4})/)
-    if (euMatch) {
-      return `${euMatch[3]}-${euMatch[2]}-${euMatch[1]}`
-    }
+		// Try DD-MM-YYYY pattern
+		const euMatch = filename.match(/(\d{2})-(\d{2})-(\d{4})/);
+		if (euMatch) {
+			return `${euMatch[3]}-${euMatch[2]}-${euMatch[1]}`;
+		}
 
-    return null
-  }
+		return null;
+	}
 
-  /**
-   * Extract store metadata from Trgocentar filename.
-   * Trgocentar filenames contain location information between SUPERMARKET_ and _P{code}
-   * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
-   */
-  extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
-    // Extract location between SUPERMARKET_ and _P{code}
-    const match = file.filename.match(/^SUPERMARKET_(.+?)_P\d{3}/i)
-    if (!match) return super.extractStoreMetadata(file)
+	/**
+	 * Extract store metadata from Trgocentar filename.
+	 * Trgocentar filenames contain location information between SUPERMARKET_ and _P{code}
+	 * Example: SUPERMARKET_HUM_NA_SUTLI_185_P220_005_050120260747.xml
+	 */
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		// Extract location between SUPERMARKET_ and _P{code}
+		const match = file.filename.match(/^SUPERMARKET_(.+?)_P\d{3}/i);
+		if (!match) return super.extractStoreMetadata(file);
 
-    // Location might have a trailing number (street number)
-    const locationRaw = match[1] // "HUM_NA_SUTLI_185"
-    const location = locationRaw.replace(/_/g, ' ')
+		// Location might have a trailing number (street number)
+		const locationRaw = match[1]; // "HUM_NA_SUTLI_185"
+		const location = locationRaw.replace(/_/g, " ");
 
-    return {
-      name: `Trgocentar ${this.titleCase(location)}`,
-      address: this.titleCase(location),
-      storeType: 'SUPERMARKET',
-    }
-  }
+		return {
+			name: `Trgocentar ${this.titleCase(location)}`,
+			address: this.titleCase(location),
+			storeType: "SUPERMARKET",
+		};
+	}
 
-  /**
-   * Convert string to title case (first letter of each word capitalized).
-   */
-  private titleCase(str: string): string {
-    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-  }
+	/**
+	 * Convert string to title case (first letter of each word capitalized).
+	 */
+	private titleCase(str: string): string {
+		return str
+			.toLowerCase()
+			.split(" ")
+			.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+			.join(" ");
+	}
 
-  /**
-   * Discover available Trgocentar price files.
-   *
-   * Trgocentar's portal structure:
-   * - Fetches the portal HTML
-   * - Extracts XML file links
-   * - Filters by date if setDiscoveryDate was called
-   *
-   * @returns Array of discovered files (filtered by date if setDiscoveryDate was called)
-   */
-  async discover(): Promise<DiscoveredFile[]> {
-    const discoveredFiles: DiscoveredFile[] = []
-    const seenUrls = new Set<string>()
+	/**
+	 * Discover available Trgocentar price files.
+	 *
+	 * Trgocentar's portal structure:
+	 * - Fetches the portal HTML
+	 * - Extracts XML file links
+	 * - Filters by date if setDiscoveryDate was called
+	 *
+	 * @returns Array of discovered files (filtered by date if setDiscoveryDate was called)
+	 */
+	async discover(): Promise<DiscoveredFile[]> {
+		const discoveredFiles: DiscoveredFile[] = [];
+		const seenUrls = new Set<string>();
 
-    console.log(`[DEBUG] Fetching Trgocentar portal: ${this.config.baseUrl}`)
+		console.log(`[DEBUG] Fetching Trgocentar portal: ${this.config.baseUrl}`);
 
-    try {
-      const response = await fetch(this.config.baseUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PriceTracker/1.0)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
-      })
+		try {
+			const response = await fetch(this.config.baseUrl, {
+				headers: {
+					"User-Agent": "Mozilla/5.0 (compatible; PriceTracker/1.0)",
+					Accept:
+						"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+				},
+			});
 
-      if (!response.ok) {
-        console.error(`Failed to fetch Trgocentar portal: ${response.status} ${response.statusText}`)
-        console.error(`  URL: ${this.config.baseUrl}`)
-        return []
-      }
+			if (!response.ok) {
+				console.error(
+					`Failed to fetch Trgocentar portal: ${response.status} ${response.statusText}`,
+				);
+				console.error(`  URL: ${this.config.baseUrl}`);
+				return [];
+			}
 
-      const html = await response.text()
+			const html = await response.text();
 
-      // Extract XML file links
-      const xmlPattern = /href=["']([^"']*\.xml(?:\?[^"']*)?)["']/gi
+			// Extract XML file links
+			const xmlPattern = /href=["']([^"']*\.xml(?:\?[^"']*)?)["']/gi;
 
-      let match: RegExpExecArray | null
-      while ((match = xmlPattern.exec(html)) !== null) {
-        const href = match[1]
-        const fileUrl = href.startsWith('http') ? href : new URL(href, this.config.baseUrl).toString()
+			let match: RegExpExecArray | null;
+			while ((match = xmlPattern.exec(html)) !== null) {
+				const href = match[1];
+				const fileUrl = href.startsWith("http")
+					? href
+					: new URL(href, this.config.baseUrl).toString();
 
-        // Skip duplicates
-        if (seenUrls.has(fileUrl)) {
-          continue
-        }
-        seenUrls.add(fileUrl)
+				// Skip duplicates
+				if (seenUrls.has(fileUrl)) {
+					continue;
+				}
+				seenUrls.add(fileUrl);
 
-        // Extract filename from URL
-        const filename = this.extractFilenameFromUrl(fileUrl)
-        const fileDate = this.extractDateFromFilename(filename)
+				// Extract filename from URL
+				const filename = this.extractFilenameFromUrl(fileUrl);
+				const fileDate = this.extractDateFromFilename(filename);
 
-        // Filter by date if discoveryDate is set
-        if (this.discoveryDate && fileDate && fileDate !== this.discoveryDate) {
-          continue
-        }
+				// Filter by date if discoveryDate is set
+				if (this.discoveryDate && fileDate && fileDate !== this.discoveryDate) {
+					continue;
+				}
 
-        discoveredFiles.push({
-          url: fileUrl,
-          filename,
-          type: 'xml',
-          size: null,
-          lastModified: fileDate ? new Date(fileDate) : null,
-          metadata: {
-            source: 'trgocentar_portal',
-            discoveredAt: new Date().toISOString(),
-            ...(fileDate && { portalDate: fileDate }),
-          },
-        })
-      }
+				discoveredFiles.push({
+					url: fileUrl,
+					filename,
+					type: "xml",
+					size: null,
+					lastModified: fileDate ? new Date(fileDate) : null,
+					metadata: {
+						source: "trgocentar_portal",
+						discoveredAt: new Date().toISOString(),
+						...(fileDate && { portalDate: fileDate }),
+					},
+				});
+			}
 
-      return discoveredFiles
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error(`Error discovering Trgocentar files: ${errorMessage}`)
-      console.error(`  URL: ${this.config.baseUrl}`)
-      return []
-    }
-  }
+			return discoveredFiles;
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			console.error(`Error discovering Trgocentar files: ${errorMessage}`);
+			console.error(`  URL: ${this.config.baseUrl}`);
+			return [];
+		}
+	}
 }
 
 /**
  * Create a Trgocentar adapter instance.
  */
 export function createTrgocentarAdapter(): TrgocentarAdapter {
-  return new TrgocentarAdapter()
+	return new TrgocentarAdapter();
 }

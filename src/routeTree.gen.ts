@@ -30,6 +30,7 @@ import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users
 import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stores'
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as AdminAdminIngestionRouteImport } from './routes/_admin.admin.ingestion'
+import { Route as AdminAdminCatalogPricesRouteImport } from './routes/_admin.admin.catalog-prices'
 import { Route as DemoStartSsrIndexRouteImport } from './routes/demo/start.ssr.index'
 import { Route as AdminAdminConfigIndexRouteImport } from './routes/_admin.admin.config.index'
 import { Route as DemoStartSsrSpaModeRouteImport } from './routes/demo/start.ssr.spa-mode'
@@ -144,6 +145,11 @@ const AdminAdminIngestionRoute = AdminAdminIngestionRouteImport.update({
   path: '/ingestion',
   getParentRoute: () => AdminAdminRoute,
 } as any)
+const AdminAdminCatalogPricesRoute = AdminAdminCatalogPricesRouteImport.update({
+  id: '/catalog-prices',
+  path: '/catalog-prices',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
 const DemoStartSsrIndexRoute = DemoStartSsrIndexRouteImport.update({
   id: '/demo/start/ssr/',
   path: '/demo/start/ssr/',
@@ -202,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
@@ -265,6 +273,7 @@ export interface FileRoutesById {
   '/demo/orpc-todo': typeof DemoOrpcTodoRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/_admin/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/_admin/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
   '/_admin/admin/stores': typeof AdminAdminStoresRouteWithChildren
@@ -298,6 +307,7 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/admin/catalog-prices'
     | '/admin/ingestion'
     | '/admin/settings'
     | '/admin/stores'
@@ -328,6 +338,7 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/admin/catalog-prices'
     | '/admin/ingestion'
     | '/admin/settings'
     | '/admin/stores'
@@ -360,6 +371,7 @@ export interface FileRouteTypes {
     | '/demo/orpc-todo'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/_admin/admin/catalog-prices'
     | '/_admin/admin/ingestion'
     | '/_admin/admin/settings'
     | '/_admin/admin/stores'
@@ -553,6 +565,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminIngestionRouteImport
       parentRoute: typeof AdminAdminRoute
     }
+    '/_admin/admin/catalog-prices': {
+      id: '/_admin/admin/catalog-prices'
+      path: '/catalog-prices'
+      fullPath: '/admin/catalog-prices'
+      preLoaderRoute: typeof AdminAdminCatalogPricesRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
     '/demo/start/ssr/': {
       id: '/demo/start/ssr/'
       path: '/demo/start/ssr'
@@ -658,6 +677,7 @@ const AdminAdminStoresRouteWithChildren =
   AdminAdminStoresRoute._addFileChildren(AdminAdminStoresRouteChildren)
 
 interface AdminAdminRouteChildren {
+  AdminAdminCatalogPricesRoute: typeof AdminAdminCatalogPricesRoute
   AdminAdminIngestionRoute: typeof AdminAdminIngestionRouteWithChildren
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
   AdminAdminStoresRoute: typeof AdminAdminStoresRouteWithChildren
@@ -667,6 +687,7 @@ interface AdminAdminRouteChildren {
 }
 
 const AdminAdminRouteChildren: AdminAdminRouteChildren = {
+  AdminAdminCatalogPricesRoute: AdminAdminCatalogPricesRoute,
   AdminAdminIngestionRoute: AdminAdminIngestionRouteWithChildren,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,
   AdminAdminStoresRoute: AdminAdminStoresRouteWithChildren,

@@ -5,9 +5,9 @@
  * Supports CLI commands and Cloudflare Workers with Queue fanout.
  */
 
-export * from './core'
-export * from './parsers'
-export * from './chains'
+export * from "./chains";
+export * from "./core";
+export * from "./parsers";
 
 // Worker exports - use named export to avoid conflicts with core module
-export { default as IngestionWorker, type IngestionEnv } from './worker'
+export { default as IngestionWorker, type IngestionEnv } from "./worker";

@@ -1,5 +1,10 @@
 import { getConfigInfo } from "./admin";
 import {
+	getCategories,
+	getStoresByChain,
+	listCatalogPrices,
+} from "./catalog-prices";
+import {
 	deleteRun,
 	deleteRuns,
 	getChunk,
@@ -94,6 +99,11 @@ export default {
 			triggerEnrichment: triggerEnrichment,
 			getEnrichmentTasks: getEnrichmentTasks,
 			verifyEnrichment: verifyEnrichment,
+		},
+		catalogPrices: {
+			list: listCatalogPrices,
+			getStoresByChain: getStoresByChain,
+			getCategories: getCategories,
 		},
 	},
 };

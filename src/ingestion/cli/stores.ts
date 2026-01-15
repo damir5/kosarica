@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+
 /**
  * Stores CLI Command
  *
@@ -18,18 +19,17 @@
  *   pnpm ingest stores --import-csv ./stores.csv --chain=dm --price-source=dm_national
  */
 
-import * as fs from "fs";
-import * as readline from "readline";
-
+import * as fs from "node:fs";
+import * as readline from "node:readline";
 import { Command } from "commander";
-import { count, eq, sql, and } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { getPlatformProxy, type PlatformProxy } from "wrangler";
 
 import * as schema from "@/db/schema";
 import { chains, storeIdentifiers, storeItemState, stores } from "@/db/schema";
-import { CHAIN_IDS, isValidChainId } from "../chains";
 import { generatePrefixedId } from "@/utils/id";
+import { CHAIN_IDS, isValidChainId } from "../chains";
 
 // Platform proxy for accessing Cloudflare bindings in local dev
 let platformProxy: PlatformProxy<Env> | null = null;
@@ -516,9 +516,7 @@ async function linkStoreToPriceSource(
 		})
 		.where(eq(stores.id, storeId));
 
-	console.log(
-		`Linked ${store.name} to price source ${priceSourceStore?.name}`,
-	);
+	console.log(`Linked ${store.name} to price source ${priceSourceStore?.name}`);
 }
 
 /**
@@ -680,7 +678,9 @@ async function main(): Promise<void> {
 
 	program
 		.name("stores")
-		.description("Manage stores: list, approve, reject, add physical stores, and import from CSV")
+		.description(
+			"Manage stores: list, approve, reject, add physical stores, and import from CSV",
+		)
 		.option("--pending", "List all pending stores")
 		.option(
 			"--chain <chain>",
@@ -690,18 +690,30 @@ async function main(): Promise<void> {
 		.option("--reject <id>", "Reject and delete a store")
 		.option("--show <id>", "Show detailed store information")
 		// Physical store creation options
-		.option("--add", "Add a new physical store (requires --chain, --name, --price-source)")
+		.option(
+			"--add",
+			"Add a new physical store (requires --chain, --name, --price-source)",
+		)
 		.option("--name <name>", "Store name (for --add)")
 		.option("--address <address>", "Store address (for --add)")
 		.option("--city <city>", "Store city (for --add)")
 		.option("--postal-code <code>", "Store postal code (for --add)")
 		.option("--lat <latitude>", "Store latitude (for --add)", parseFloat)
 		.option("--lng <longitude>", "Store longitude (for --add)", parseFloat)
-		.option("--price-source <identifier>", "Price source store identifier (for --add, --link, --import-csv)")
+		.option(
+			"--price-source <identifier>",
+			"Price source store identifier (for --add, --link, --import-csv)",
+		)
 		// Link store to price source
-		.option("--link <store_id>", "Link an existing store to a price source (requires --price-source)")
+		.option(
+			"--link <store_id>",
+			"Link an existing store to a price source (requires --price-source)",
+		)
 		// CSV import
-		.option("--import-csv <path>", "Import physical stores from CSV (requires --chain, --price-source)")
+		.option(
+			"--import-csv <path>",
+			"Import physical stores from CSV (requires --chain, --price-source)",
+		)
 		.parse(process.argv);
 
 	const opts = program.opts<{

@@ -3,7 +3,7 @@
  * This file is required by @cloudflare/vitest-pool-workers.
  */
 export default {
-  async fetch(): Promise<Response> {
-    return new Response('Test worker')
-  },
-}
+	async fetch(): Promise<Response> {
+		return new Response("Test worker");
+	},
+};
