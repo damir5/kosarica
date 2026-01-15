@@ -64,6 +64,9 @@ import {
 	type RerunQueueMessage,
 } from "./core/types";
 import { geocodeAddress } from "./services/geocoding";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("ingestion");
 
 // ============================================================================
 // Worker Environment Types
@@ -212,18 +215,33 @@ async function handleDiscover(
 		throw new Error(`No adapter registered for chain "${message.chainSlug}"`);
 	}
 
-	console.log(`[discover] Starting discovery for ${adapter.name}`);
+	log.info("Starting discovery", { phase: "discover", adapter: adapter.name });
 
-	const files = await adapter.discover();
-	console.log(`[discover] Found ${files.length} file(s) for ${adapter.name}`);
-
-	// Initialize run stats and record total files
-	await initializeRunStats(db, message.runId);
-	if (files.length > 0) {
-		await recordTotalFiles(db, message.runId, files.length);
+	// Set discovery date if targetDate is provided and adapter supports it
+	if (message.targetDate && "setDiscoveryDate" in adapter && typeof adapter.setDiscoveryDate === "function") {
+		(adapter.setDiscoveryDate as (date: string) => void)(message.targetDate);
+		log.info("Set discovery date", { phase: "discover", targetDate: message.targetDate });
 	}
 
+	const files = await adapter.discover();
+	log.info("Discovery complete", { phase: "discover", count: files.length, adapter: adapter.name, runId: message.runId });
+
+	// Initialize run stats and record total files (including 0)
+	await initializeRunStats(db, message.runId);
+	await recordTotalFiles(db, message.runId, files.length);
+
 	if (files.length === 0) {
+		log.warn("No files discovered", { phase: "discover", adapter: adapter.name, reason: "no_files_available" });
+
+		// Mark run as completed with 0 files
+		await db.update(ingestionRuns)
+			.set({
+				status: "completed",
+				completedAt: new Date(),
+				totalFiles: 0,
+				processedFiles: 0,
+			})
+			.where(eq(ingestionRuns.id, message.runId));
 		return;
 	}
 
@@ -235,7 +253,7 @@ async function handleDiscover(
 
 	await sendBatchChunked(env.INGESTION_QUEUE, fetchMessages);
 
-	console.log(`[discover] Enqueued ${fetchMessages.length} fetch message(s)`);
+	log.info("Enqueued fetch messages", { phase: "discover", count: fetchMessages.length });
 }
 
 /**
@@ -253,7 +271,7 @@ async function handleFetch(
 	}
 
 	const { file } = message;
-	console.log(`[fetch] Fetching ${file.filename} from ${adapter.name}`);
+	log.info("Fetching file", { phase: "fetch", filename: file.filename, adapter: adapter.name });
 
 	const fetched = await adapter.fetch(file);
 	const r2Key = generateStorageKey(
@@ -265,7 +283,7 @@ async function handleFetch(
 	// Check for duplicate by hash
 	const existing = await storage.head(r2Key);
 	if (existing?.sha256 === fetched.hash) {
-		console.log(`[fetch] Skipped duplicate: ${file.filename}`);
+		log.info("Skipped duplicate file", { phase: "fetch", filename: file.filename });
 		return;
 	}
 
@@ -279,9 +297,11 @@ async function handleFetch(
 		},
 	});
 
-	console.log(
-		`[fetch] Stored ${file.filename} (${fetched.content.byteLength} bytes)`,
-	);
+	log.info("Stored file", {
+		phase: "fetch",
+		filename: file.filename,
+		bytes: fetched.content.byteLength,
+	});
 
 	// Determine next step based on file type
 	if (file.type === "zip") {
@@ -292,7 +312,7 @@ async function handleFetch(
 			file,
 		};
 		await env.INGESTION_QUEUE.send(expandMessage);
-		console.log(`[fetch] Enqueued expand message for ${file.filename}`);
+		log.info("Enqueued expand message", { phase: "fetch", filename: file.filename });
 	} else {
 		// Enqueue parse message for non-ZIP files
 		const parseMessage: ParseQueueMessage = {
@@ -303,7 +323,7 @@ async function handleFetch(
 			hash: fetched.hash,
 		};
 		await env.INGESTION_QUEUE.send(parseMessage);
-		console.log(`[fetch] Enqueued parse message for ${file.filename}`);
+		log.info("Enqueued parse message", { phase: "fetch", filename: file.filename });
 	}
 }
 
@@ -317,7 +337,7 @@ async function handleExpand(
 	_db: Database,
 ): Promise<void> {
 	const { r2Key, file } = message;
-	console.log(`[expand] Expanding ${file.filename}`);
+	log.info("Expanding file", { phase: "expand", filename: file.filename });
 
 	const result = await storage.get(r2Key);
 	if (!result) {
@@ -378,9 +398,11 @@ async function handleExpand(
 		await sendBatchChunked(env.INGESTION_QUEUE, parseMessages);
 	}
 
-	console.log(
-		`[expand] Expanded ${expandedCount} file(s), enqueued ${parseMessages.length} parse message(s)`,
-	);
+	log.info("Expanded files", {
+		phase: "expand",
+		expandedCount,
+		enqueuedCount: parseMessages.length,
+	});
 }
 
 /**
@@ -388,7 +410,7 @@ async function handleExpand(
  */
 async function handleParse(
 	message: ParseQueueMessage,
-	_env: IngestionEnv,
+	env: IngestionEnv,
 	storage: Storage,
 	db: Database,
 ): Promise<void> {
@@ -399,7 +421,7 @@ async function handleParse(
 
 	const { r2Key, file, innerFilename } = message;
 	const filename = innerFilename || file.filename;
-	console.log(`[parse] Parsing ${filename} from ${adapter.name}`);
+	log.info("Parsing file", { phase: "parse", filename, adapter: adapter.name });
 
 	const result = await storage.get(r2Key);
 	if (!result) {
@@ -407,16 +429,43 @@ async function handleParse(
 	}
 
 	const parseResult = await adapter.parse(result.content, filename);
-	console.log(
-		`[parse] Parsed ${parseResult.validRows}/${parseResult.totalRows} valid rows`,
-	);
+	log.info("Parsed rows", {
+		phase: "parse",
+		validRows: parseResult.validRows,
+		totalRows: parseResult.totalRows,
+	});
 
 	if (parseResult.errors.length > 0) {
-		console.warn(`[parse] ${parseResult.errors.length} parse error(s)`);
+		log.warn("Parse errors", { phase: "parse", errorCount: parseResult.errors.length });
 	}
 
+	// Create file record in database
+	const fileId = generatePrefixedId("igf");
+	const storeIdentifier =
+		adapter.extractStoreIdentifier?.(file)?.value || "unknown";
+
+	await db.insert(ingestionFiles).values({
+		id: fileId,
+		runId: message.runId,
+		filename: filename,
+		fileType: file.type,
+		fileSize: result.content.byteLength,
+		fileHash: message.hash,
+		status: "processing",
+		entryCount: parseResult.rows.length,
+		totalChunks: 1,
+		processedChunks: 0,
+		chunkSize: parseResult.rows.length,
+		metadata: JSON.stringify({ storeIdentifier }),
+	});
+
 	if (parseResult.rows.length === 0) {
-		console.log(`[parse] No rows to persist for ${filename}`);
+		log.info("No rows to persist", { phase: "parse", filename });
+		// Mark file as completed even with no rows
+		await db
+			.update(ingestionFiles)
+			.set({ status: "completed", processedChunks: 1, processedAt: new Date() })
+			.where(eq(ingestionFiles.id, fileId));
 		return;
 	}
 
@@ -460,23 +509,72 @@ async function handleParse(
 			);
 
 			if (persistResult === null) {
-				console.warn(`[parse] Failed to register store "${storeIdentifier}"`);
+				log.warn("Failed to register store", { phase: "parse", storeIdentifier });
 				continue;
 			}
 
 			totalPersisted += persistResult.persisted;
 			totalPriceChanges += persistResult.priceChanges;
+
+			// Auto-trigger geocoding for new pending stores with address data
+			if (persistResult.needsGeocoding && persistResult.storeId) {
+				const taskId = generatePrefixedId("set");
+				await db.insert(storeEnrichmentTasks).values({
+					id: taskId,
+					storeId: persistResult.storeId,
+					type: "geocode",
+					status: "pending",
+					inputData: JSON.stringify({
+						name: autoRegisterOptions.name,
+						address: autoRegisterOptions.address,
+						city: autoRegisterOptions.city,
+					}),
+				});
+
+				const enrichMessage: EnrichStoreQueueMessage = {
+					id: generatePrefixedId("msg"),
+					type: "enrich_store",
+					runId: message.runId,
+					chainSlug: message.chainSlug,
+					createdAt: new Date().toISOString(),
+					storeId: persistResult.storeId,
+					taskType: "geocode",
+					taskId,
+				};
+				await env.INGESTION_QUEUE.send(enrichMessage);
+				log.info("Queued geocoding for new store", { phase: "parse", storeIdentifier });
+			}
 		} catch (error) {
-			console.error(
-				`[parse] Failed to persist for store "${storeIdentifier}":`,
-				error,
-			);
+			log.error("Failed to persist for store", { phase: "parse", storeIdentifier }, error);
 		}
 	}
 
-	console.log(
-		`[parse] Persisted ${totalPersisted} rows, ${totalPriceChanges} price changes`,
-	);
+	log.info("Persisted rows", {
+		phase: "parse",
+		persisted: totalPersisted,
+		priceChanges: totalPriceChanges,
+	});
+
+	// Mark file as completed
+	await db
+		.update(ingestionFiles)
+		.set({
+			status: "completed",
+			processedChunks: 1,
+			processedAt: new Date(),
+		})
+		.where(eq(ingestionFiles.id, fileId));
+
+	// Update run progress
+	await incrementProcessedFiles(db, message.runId);
+	await incrementProcessedEntries(db, message.runId, totalPersisted);
+
+	// Check if run is complete
+	try {
+		await checkAndUpdateRunCompletion(db, message.runId);
+	} catch (error) {
+		log.error("Failed to check run completion", { phase: "parse" }, error);
+	}
 }
 
 /**
@@ -489,7 +587,7 @@ async function handlePersist(
 	db: Database,
 ): Promise<void> {
 	const { rowsR2Key, rowCount } = message;
-	console.log(`[persist] Persisting ${rowCount} rows from ${rowsR2Key}`);
+	log.info("Persisting rows", { phase: "persist", rowCount, r2Key: rowsR2Key });
 
 	const result = await storage.get(rowsR2Key);
 	if (!result) {
@@ -525,23 +623,22 @@ async function handlePersist(
 			);
 
 			if (persistResult === null) {
-				console.warn(`[persist] Store not found: "${storeIdentifier}"`);
+				log.warn("Store not found", { phase: "persist", storeIdentifier });
 				continue;
 			}
 
 			totalPersisted += persistResult.persisted;
 			totalPriceChanges += persistResult.priceChanges;
 		} catch (error) {
-			console.error(
-				`[persist] Failed to persist for store "${storeIdentifier}":`,
-				error,
-			);
+			log.error("Failed to persist for store", { phase: "persist", storeIdentifier }, error);
 		}
 	}
 
-	console.log(
-		`[persist] Completed: ${totalPersisted} persisted, ${totalPriceChanges} price changes`,
-	);
+	log.info("Completed persist", {
+		phase: "persist",
+		persisted: totalPersisted,
+		priceChanges: totalPriceChanges,
+	});
 }
 
 /**
@@ -560,9 +657,11 @@ async function handleParseChunked(
 
 	const { r2Key, file, innerFilename, chunkSize } = message;
 	const filename = innerFilename || file.filename;
-	console.log(
-		`[parse_chunked] Parsing ${filename} with chunk size ${chunkSize}`,
-	);
+	log.info("Parsing file with chunking", {
+		phase: "parse_chunked",
+		filename,
+		chunkSize,
+	});
 
 	const result = await storage.get(r2Key);
 	if (!result) {
@@ -570,12 +669,14 @@ async function handleParseChunked(
 	}
 
 	const parseResult = await adapter.parse(result.content, filename);
-	console.log(
-		`[parse_chunked] Parsed ${parseResult.validRows}/${parseResult.totalRows} valid rows`,
-	);
+	log.info("Parsed rows", {
+		phase: "parse_chunked",
+		validRows: parseResult.validRows,
+		totalRows: parseResult.totalRows,
+	});
 
 	if (parseResult.rows.length === 0) {
-		console.log(`[parse_chunked] No rows to persist for ${filename}`);
+		log.info("No rows to persist", { phase: "parse_chunked", filename });
 		return;
 	}
 
@@ -653,9 +754,11 @@ async function handleParseChunked(
 	// Increment processed files count for chunked files
 	await incrementProcessedFiles(db, message.runId);
 
-	console.log(
-		`[parse_chunked] Created ${totalChunks} chunk(s), enqueued persist messages`,
-	);
+	log.info("Created chunks", {
+		phase: "parse_chunked",
+		totalChunks,
+		enqueuedCount: persistMessages.length,
+	});
 }
 
 /**
@@ -668,9 +771,12 @@ async function handlePersistChunk(
 	db: Database,
 ): Promise<void> {
 	const { fileId, chunkId, chunkR2Key, chunkIndex, rowCount } = message;
-	console.log(
-		`[persist_chunk] Persisting chunk ${chunkIndex} (${rowCount} rows) from ${chunkR2Key}`,
-	);
+	log.info("Persisting chunk", {
+		phase: "persist_chunk",
+		chunkIndex,
+		rowCount,
+		r2Key: chunkR2Key,
+	});
 
 	// Update chunk status to processing
 	await db
@@ -716,17 +822,14 @@ async function handlePersistChunk(
 			);
 
 			if (persistResult === null) {
-				console.warn(`[persist_chunk] Store not found: "${storeIdentifier}"`);
+				log.warn("Store not found", { phase: "persist_chunk", storeIdentifier });
 				totalErrors += storeRows.length;
 				continue;
 			}
 
 			totalPersisted += persistResult.persisted;
 		} catch (error) {
-			console.error(
-				`[persist_chunk] Failed to persist for store "${storeIdentifier}":`,
-				error,
-			);
+			log.error("Failed to persist for store", { phase: "persist_chunk", storeIdentifier }, error);
 			totalErrors += storeRows.length;
 		}
 	}
@@ -760,7 +863,7 @@ async function handlePersistChunk(
 			.update(ingestionFiles)
 			.set({ status: "completed", processedAt: new Date() })
 			.where(eq(ingestionFiles.id, fileId));
-		console.log(`[persist_chunk] File ${fileId} completed all chunks`);
+		log.info("File completed all chunks", { phase: "persist_chunk", fileId });
 
 		// Update processed entries count for run
 		await incrementProcessedEntries(db, message.runId, totalPersisted);
@@ -769,7 +872,7 @@ async function handlePersistChunk(
 		try {
 			await checkAndUpdateRunCompletion(db, message.runId);
 		} catch (error) {
-			console.error(`[persist_chunk] Failed to check run completion:`, error);
+			log.error("Failed to check run completion", { phase: "persist_chunk" }, error);
 		}
 	}
 
@@ -778,9 +881,12 @@ async function handlePersistChunk(
 		await incrementErrorCount(db, message.runId, totalErrors);
 	}
 
-	console.log(
-		`[persist_chunk] Chunk ${chunkIndex} completed: ${totalPersisted} persisted, ${totalErrors} errors`,
-	);
+	log.info("Chunk completed", {
+		phase: "persist_chunk",
+		chunkIndex,
+		persisted: totalPersisted,
+		errors: totalErrors,
+	});
 }
 
 /**
@@ -793,9 +899,12 @@ async function handleRerun(
 	db: Database,
 ): Promise<void> {
 	const { originalRunId, targetType, targetId } = message;
-	console.log(
-		`[rerun] Re-running ${targetType} ${targetId} from run ${originalRunId}`,
-	);
+	log.info("Re-running ingestion", {
+		phase: "rerun",
+		targetType,
+		targetId,
+		originalRunId,
+	});
 
 	// Create new run record for the rerun
 	await db.insert(ingestionRuns).values({
@@ -820,9 +929,11 @@ async function handleRerun(
 				.from(ingestionFiles)
 				.where(eq(ingestionFiles.runId, targetId));
 
-			console.log(
-				`[rerun] Re-running ${files.length} file(s) from run ${targetId}`,
-			);
+			log.info("Re-running files", {
+				phase: "rerun",
+				count: files.length,
+				runId: targetId,
+			});
 
 			// For "run" type reruns, record total files
 			if (files.length > 0) {
@@ -841,7 +952,7 @@ async function handleRerun(
 					// Check if file still exists in R2
 					const exists = await storage.exists(r2Key);
 					if (!exists) {
-						console.warn(`[rerun] File not found in R2: ${r2Key}, skipping`);
+						log.warn("File not found in R2", { phase: "rerun", r2Key });
 						continue;
 					}
 
@@ -916,7 +1027,7 @@ async function handleRerun(
 			};
 			await env.INGESTION_QUEUE.send(parseMessage);
 
-			console.log(`[rerun] Enqueued parse for file ${targetId}`);
+			log.info("Enqueued parse for file", { phase: "rerun", targetId });
 			break;
 		}
 
@@ -956,7 +1067,7 @@ async function handleRerun(
 			};
 			await env.INGESTION_QUEUE.send(persistMessage);
 
-			console.log(`[rerun] Enqueued persist for chunk ${targetId}`);
+			log.info("Enqueued persist for chunk", { phase: "rerun", targetId });
 			break;
 		}
 
@@ -975,7 +1086,7 @@ async function handleEnrichStore(
 	db: Database,
 ): Promise<void> {
 	const { storeId, taskType, taskId } = message;
-	console.log(`[enrich_store] Enriching store ${storeId} with ${taskType}`);
+	log.info("Enriching store", { phase: "enrich_store", storeId, taskType });
 
 	// Update task status to processing
 	await db
@@ -1015,23 +1126,26 @@ async function handleEnrichStore(
 							updatedAt: new Date(),
 						})
 						.where(eq(storeEnrichmentTasks.id, taskId));
-					console.log(
-						`[enrich_store] No geocoding results for store ${storeId}`,
-					);
+					log.info("No geocoding results", { phase: "enrich_store", storeId });
 					return;
 				}
 
-				// Update store with geocoded coordinates
-				await db
-					.update(stores)
-					.set({
-						latitude: geocodeResult.latitude!,
-						longitude: geocodeResult.longitude!,
-						updatedAt: new Date(),
-					})
-					.where(eq(stores.id, storeId));
+				// Auto-verify high confidence results
+				const isHighConfidence = geocodeResult.confidence === "high";
 
-				// Update task as completed
+				if (isHighConfidence) {
+					// High confidence: apply coordinates directly to store
+					await db
+						.update(stores)
+						.set({
+							latitude: geocodeResult.latitude!,
+							longitude: geocodeResult.longitude!,
+							updatedAt: new Date(),
+						})
+						.where(eq(stores.id, storeId));
+				}
+
+				// Update task as completed (auto-verified if high confidence)
 				await db
 					.update(storeEnrichmentTasks)
 					.set({
@@ -1042,15 +1156,26 @@ async function handleEnrichStore(
 							lon: geocodeResult.longitude,
 							displayName: geocodeResult.displayName,
 							provider: geocodeResult.provider,
+							autoVerified: isHighConfidence,
 						}),
 						confidence: geocodeResult.confidence,
+						// Auto-verify high confidence results
+						...(isHighConfidence && {
+							verifiedAt: new Date(),
+							verifiedBy: "system",
+						}),
 						updatedAt: new Date(),
 					})
 					.where(eq(storeEnrichmentTasks.id, taskId));
 
-				console.log(
-					`[enrich_store] Geocoded store ${storeId} -> ${geocodeResult.latitude}, ${geocodeResult.longitude} (${geocodeResult.confidence} confidence)`,
-				);
+				log.info("Geocoded store", {
+					phase: "enrich_store",
+					storeId,
+					latitude: geocodeResult.latitude,
+					longitude: geocodeResult.longitude,
+					confidence: geocodeResult.confidence,
+					autoVerified: isHighConfidence,
+				});
 				break;
 			}
 
@@ -1072,9 +1197,7 @@ async function handleEnrichStore(
 					})
 					.where(eq(storeEnrichmentTasks.id, taskId));
 
-				console.log(
-					`[enrich_store] Address verification pending for store ${storeId}`,
-				);
+				log.info("Address verification pending", { phase: "enrich_store", storeId });
 				break;
 			}
 
@@ -1092,7 +1215,7 @@ async function handleEnrichStore(
 					})
 					.where(eq(storeEnrichmentTasks.id, taskId));
 
-				console.log(`[enrich_store] AI categorization not yet implemented`);
+				log.info("AI categorization not implemented", { phase: "enrich_store" });
 				break;
 			}
 
@@ -1127,7 +1250,7 @@ async function processMessage(
 	db: Database,
 ): Promise<void> {
 	const msg = message.body;
-	console.log(`[queue] Processing ${msg.type} message: ${msg.id}`);
+	log.info("Processing message", { phase: "queue", type: msg.type, messageId: msg.id });
 
 	try {
 		if (isDiscoverMessage(msg)) {
@@ -1153,14 +1276,18 @@ async function processMessage(
 		}
 
 		message.ack();
-		console.log(`[queue] Completed ${msg.type} message: ${msg.id}`);
+		log.info("Completed message", { phase: "queue", type: msg.type, messageId: msg.id });
 	} catch (error) {
 		const maxRetries = getMaxRetries(env);
 		const errorMessage = error instanceof Error ? error.message : String(error);
 
-		console.error(
-			`[queue] Failed ${msg.type} message (attempt ${message.attempts}/${maxRetries}): ${errorMessage}`,
-		);
+		log.error("Failed message", {
+			phase: "queue",
+			type: msg.type,
+			attempt: message.attempts,
+			maxRetries,
+			errorMessage,
+		});
 
 		if (message.attempts >= maxRetries) {
 			// Mark run as failed if this is a critical failure
@@ -1172,20 +1299,20 @@ async function processMessage(
 						`Failed after ${message.attempts} attempts: ${errorMessage}`,
 					);
 				} catch (statsError) {
-					console.error(`[queue] Failed to mark run as failed:`, statsError);
+					log.error("Failed to mark run as failed", { phase: "queue" }, statsError);
 				}
 			}
 			// Send to dead letter queue if available
 			if (env.INGESTION_DLQ) {
 				await env.INGESTION_DLQ.send(msg);
-				console.log(`[queue] Sent to DLQ: ${msg.id}`);
+				log.info("Sent to DLQ", { phase: "queue", messageId: msg.id });
 			}
 			message.ack(); // Don't retry anymore
 		} else {
 			// Retry with exponential backoff
 			const delaySeconds = Math.min(60 * 2 ** (message.attempts - 1), 3600);
 			message.retry({ delaySeconds });
-			console.log(`[queue] Retrying in ${delaySeconds}s: ${msg.id}`);
+			log.info("Retrying message", { phase: "queue", delaySeconds, messageId: msg.id });
 		}
 	}
 }
@@ -1206,9 +1333,11 @@ export async function queue(
 	const storage = new R2Storage(env.INGESTION_BUCKET as any);
 	const db = createDb(env.DB);
 
-	console.log(
-		`[queue] Processing batch of ${batch.messages.length} message(s) from ${batch.queue}`,
-	);
+	log.info("Processing batch", {
+		phase: "queue",
+		messageCount: batch.messages.length,
+		queue: batch.queue,
+	});
 
 	// Process messages in parallel with concurrency limit
 	const CONCURRENCY_LIMIT = 5;
@@ -1221,7 +1350,7 @@ export async function queue(
 		);
 	}
 
-	console.log(`[queue] Batch completed`);
+	log.info("Batch completed", { phase: "queue" });
 }
 
 // ============================================================================
@@ -1243,10 +1372,13 @@ export async function scheduled(
 	const chains = getConfiguredChains(env);
 	const date = getTodayDate();
 
-	console.log(
-		`[scheduled] Starting ingestion run ${runId} for ${chains.length} chain(s) on ${date}`,
-	);
-	console.log(`[scheduled] Cron: ${controller.cron}`);
+	log.info("Starting ingestion run", {
+		phase: "scheduled",
+		runId,
+		chainCount: chains.length,
+		date,
+		cron: controller.cron,
+	});
 
 	// Enqueue discover messages for each chain
 	const discoverMessages: DiscoverQueueMessage[] = chains.map((chainSlug) => ({
@@ -1255,9 +1387,10 @@ export async function scheduled(
 
 	await sendBatchChunked(env.INGESTION_QUEUE, discoverMessages);
 
-	console.log(
-		`[scheduled] Enqueued ${discoverMessages.length} discover message(s)`,
-	);
+	log.info("Enqueued discover messages", {
+		phase: "scheduled",
+		count: discoverMessages.length,
+	});
 }
 
 // ============================================================================
@@ -1295,9 +1428,11 @@ export async function fetch(
 			chains = getConfiguredChains(env);
 		}
 
-		console.log(
-			`[trigger] Manual trigger for ${chains.length} chain(s): ${chains.join(", ")}`,
-		);
+		log.info("Manual trigger", {
+			phase: "trigger",
+			chainCount: chains.length,
+			chains: chains.join(", "),
+		});
 
 		// Enqueue discover messages
 		const discoverMessages: DiscoverQueueMessage[] = chains.map(

@@ -107,10 +107,9 @@ export async function checkAndUpdateRunCompletion(
 
 	if (!run) return;
 
-	// Check if all files processed
+	// Check if all files processed (including the case where totalFiles is 0)
 	if (
 		run.totalFiles !== null &&
-		run.totalFiles > 0 &&
 		run.processedFiles !== null &&
 		run.processedFiles >= run.totalFiles
 	) {

@@ -151,49 +151,99 @@ export class PlodineAdapter extends BaseCsvAdapter {
 
 			const html = await response.text();
 
-			// Extract ZIP download links: href="https://www.plodine.hr/cjenici/cjenici_DD_MM_YYYY_HH_MM_SS.zip"
-			const zipPattern =
-				/href=["'](https?:\/\/[^"']*\/cjenici\/cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi;
+			// Try multiple patterns to find ZIP files (in case website structure changes)
+			const patterns = [
+				// Primary: /cjenici/ path with full timestamp
+				/href=["'](https?:\/\/[^"']*\/cjenici\/cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
+				// Alternative: any path with cjenici_ prefix
+				/href=["'](https?:\/\/[^"']*\/cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
+				// Alternative: relative URLs
+				/href=["']([^"']*cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
+			];
 
-			let match: RegExpExecArray | null;
-			while ((match = zipPattern.exec(html)) !== null) {
-				const fileUrl = match[1];
-				const fileDatePattern = match[2]; // DD_MM_YYYY
+			let htmlSnippet = "";
+			let totalMatches = 0;
 
-				// Filter by target date
-				if (fileDatePattern !== targetDatePattern) {
-					continue;
+			for (const zipPattern of patterns) {
+				zipPattern.lastIndex = 0; // Reset regex state
+				let match: RegExpExecArray | null;
+
+				while ((match = zipPattern.exec(html)) !== null) {
+					totalMatches++;
+
+					// Capture first match for debugging
+					if (htmlSnippet === "") {
+						const start = Math.max(0, match.index - 50);
+						const end = Math.min(html.length, match.index + 150);
+						htmlSnippet = html.substring(start, end);
+					}
+
+					// Different patterns capture different groups
+					// Patterns 1 & 2: full URL in group 1, date in group 2
+					// Pattern 3: relative URL in group 1, date in group 2
+					const fileUrl = match[1].startsWith("http")
+						? match[1]
+						: `https://www.plodine.hr${match[1]}`;
+					const fileDatePattern = match[2]; // DD_MM_YYYY
+
+					// Filter by target date
+					if (fileDatePattern !== targetDatePattern) {
+						continue;
+					}
+
+					// Skip duplicates
+					if (seenUrls.has(fileUrl)) {
+						continue;
+					}
+					seenUrls.add(fileUrl);
+
+					// Extract filename from URL
+					const filename =
+						fileUrl.split("/").pop() || `cjenici_${fileDatePattern}.zip`;
+
+					discoveredFiles.push({
+						url: fileUrl,
+						filename,
+						type: "zip",
+						size: null,
+						lastModified: new Date(targetDate),
+						metadata: {
+							source: "plodine_portal",
+							discoveredAt: new Date().toISOString(),
+							portalDate: targetDate,
+							fileDatePattern,
+						},
+					});
 				}
 
-				// Skip duplicates
-				if (seenUrls.has(fileUrl)) {
-					continue;
+				if (discoveredFiles.length > 0) {
+					break; // Stop if we found files for our target date
 				}
-				seenUrls.add(fileUrl);
-
-				// Extract filename from URL
-				const filename =
-					fileUrl.split("/").pop() || `cjenici_${fileDatePattern}.zip`;
-
-				discoveredFiles.push({
-					url: fileUrl,
-					filename,
-					type: "zip",
-					size: null,
-					lastModified: new Date(targetDate),
-					metadata: {
-						source: "plodine_portal",
-						discoveredAt: new Date().toISOString(),
-						portalDate: targetDate,
-						fileDatePattern,
-					},
-				});
 			}
 
 			if (discoveredFiles.length === 0) {
-				console.log(
-					`[DEBUG] No ZIP files found for date ${targetDate} (pattern: ${targetDatePattern})`,
-				);
+				console.warn(`[Plodine] No ZIP files found for date ${targetDate}`);
+				console.warn(`[Plodine] Target date pattern: ${targetDatePattern}`);
+				console.warn(`[Plodine] Page URL: ${pageUrl}`);
+				console.warn(`[Plodine] HTML length: ${html.length} chars`);
+				console.warn(`[Plodine] Total matches (all dates): ${totalMatches}`);
+
+				if (htmlSnippet) {
+					console.warn(`[Plodine] HTML snippet with match:`);
+					console.warn(htmlSnippet);
+				}
+
+				// Log sample of HTML around 'cjenici' for debugging
+				const sampleStart = html.toLowerCase().indexOf("cjenici");
+				if (sampleStart !== -1) {
+					const sampleEnd = Math.min(html.length, sampleStart + 500);
+					console.warn(`[Plodine] HTML sample around 'cjenici':`);
+					console.warn(html.substring(sampleStart, sampleEnd));
+				} else {
+					console.warn(
+						`[Plodine] No 'cjenici' found in HTML - website structure may have changed`,
+					);
+				}
 			}
 		} catch (error) {
 			const errorMessage =
