@@ -1,10 +1,21 @@
 /**
  * Structured JSONL logger compatible with Cloudflare Workers
- * Production: JSON formatted logs for structured parsing
+ * Uses pino-compatible log format for use with pino-pretty in development
  */
 
 import { serializeError } from 'serialize-error'
 import { getRequestId } from './request-context'
+
+/**
+ * Convert an error to a plain object with stack trace preserved.
+ * Use this to serialize errors for logging or API responses.
+ */
+export function errorToObject(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return serializeError(error)
+  }
+  return { message: String(error) }
+}
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 export type LoggerType = 'rpc' | 'http' | 'auth' | 'db' | 'app'
@@ -22,6 +33,57 @@ const LOG_LEVEL_ORDER: Record<LogLevel, number> = {
   info: 1,
   warn: 2,
   error: 3,
+}
+
+/**
+ * Pino-compatible numeric log levels
+ */
+const PINO_LEVELS: Record<LogLevel, number> = {
+  debug: 20,
+  info: 30,
+  warn: 40,
+  error: 50,
+}
+
+/**
+ * Check if running in development mode
+ */
+const isDev = process.env.NODE_ENV === 'development'
+
+/**
+ * Extract caller location from stack trace (dev only)
+ * Returns format: "src/utils/logger.ts:42:5"
+ */
+function getCallerLocation(): string | undefined {
+  if (!isDev) return undefined
+
+  const err = new Error()
+  const stack = err.stack
+  if (!stack) return undefined
+
+  // Stack format: Error\n    at fn (file:line:col)\n...
+  // We need to skip: Error, getCallerLocation, formatLogEntry, debug/info/warn/error
+  const lines = stack.split('\n')
+
+  // Find the first line that's not from logger.ts
+  for (const line of lines) {
+    if (line.includes('logger.ts')) continue
+    if (line.includes('Error')) continue
+
+    // Match file:line:col pattern
+    const match = line.match(/\((.+):(\d+):(\d+)\)$/) || line.match(/at (.+):(\d+):(\d+)$/)
+    if (match) {
+      let filePath = match[1]
+      // Clean up the path - remove everything before src/
+      const srcIndex = filePath.indexOf('src/')
+      if (srcIndex !== -1) {
+        filePath = filePath.slice(srcIndex)
+      }
+      return `${filePath}:${match[2]}:${match[3]}`
+    }
+  }
+
+  return undefined
 }
 
 /**
@@ -120,13 +182,17 @@ export interface LogContext {
   [key: string]: unknown
 }
 
-interface LogEntry {
-  timestamp: string
-  level: LogLevel
+/**
+ * Pino-compatible log entry structure
+ */
+interface PinoLogEntry {
+  level: number
+  time: number
+  msg: string
+  caller?: string
   loggerType?: LoggerType
   requestId?: string
-  message: string
-  context?: LogContext
+  [key: string]: unknown
 }
 
 /**
@@ -202,7 +268,8 @@ function mergeErrorIntoContext(
 }
 
 /**
- * Format log entry as JSON
+ * Format log entry as pino-compatible JSON
+ * Fields are at top level (not nested) for pino-pretty compatibility
  */
 function formatLogEntry(
   level: LogLevel,
@@ -211,10 +278,16 @@ function formatLogEntry(
   loggerType?: LoggerType,
   requestId?: string
 ): string {
-  const entry: LogEntry = {
-    timestamp: new Date().toISOString(),
-    level,
-    message,
+  const entry: PinoLogEntry = {
+    level: PINO_LEVELS[level],
+    time: Date.now(),
+    msg: message,
+  }
+
+  // Add caller location in dev mode
+  const caller = getCallerLocation()
+  if (caller) {
+    entry.caller = caller
   }
 
   if (loggerType) {
@@ -225,8 +298,10 @@ function formatLogEntry(
     entry.requestId = requestId
   }
 
+  // Spread context fields at top level for pino-pretty compatibility
   if (context && Object.keys(context).length > 0) {
-    entry.context = sanitize(context) as LogContext
+    const sanitized = sanitize(context) as LogContext
+    Object.assign(entry, sanitized)
   }
 
   return JSON.stringify(entry)

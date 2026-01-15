@@ -45,7 +45,7 @@ const config = defineConfig({
     strictPort: true,
   },
   plugins: [
-    devtools(),
+    devtools({ enhancedLogs: { enabled: false } }),
     cloudflare({ viteEnvironment: { name: 'ssr' }, configPath }),
     // this is the plugin that enables path aliases
     viteTsConfigPaths({
@@ -55,9 +55,20 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  build: {
+    rollupOptions: {
+      external: ['cloudflare:workers'],
+    },
+  },
   ssr: {
     optimizeDeps: {
-      exclude: ['@tanstack/react-query-devtools', '@tanstack/react-router-devtools'],
+      exclude: [
+        '@tanstack/react-query-devtools',
+        '@tanstack/react-router-devtools',
+        'drizzle-orm',
+        'drizzle-orm/d1',
+        'drizzle-orm/sqlite-core',
+      ],
       include: [
         '@orpc/server',
         '@orpc/client',
@@ -68,9 +79,6 @@ const config = defineConfig({
         '@orpc/json-schema',
         '@orpc/openapi/plugins',
         'zod',
-        'drizzle-orm',
-        'drizzle-orm/d1',
-        'drizzle-orm/sqlite-core',
         'lucide-react',
         'better-auth',
         'better-auth/adapters/drizzle',

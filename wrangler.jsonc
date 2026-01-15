@@ -57,7 +57,7 @@
 
   // Environment variables
   "vars": {
-    "BETTER_AUTH_URL": "http://localhost:3000",
+    "BETTER_AUTH_URL": "http://localhost:3002",
     // Comma-separated list of chains to process (empty = all chains)
     // Available: konzum, lidl, plodine, interspar, studenac, kaufland, eurospin, dm, ktc, metro, trgocentar
     "INGESTION_CHAINS": "",
