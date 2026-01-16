@@ -13,10 +13,12 @@
  * - Edge cases (empty files, missing columns, invalid data)
  */
 
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
+import {
+	sampleDataAvailable,
+	getSampleFiles,
+	readSampleFile,
+} from "../../test/utils/file-access";
 import type { DiscoveredFile, NormalizedRow } from "../core/types";
 import { createDmAdapter, type DmAdapter } from "./dm";
 import { createEurospinAdapter, type EurospinAdapter } from "./eurospin";
@@ -31,43 +33,17 @@ import { createPlodineAdapter, type PlodineAdapter } from "./plodine";
 import { createStudenacAdapter, type StudenacAdapter } from "./studenac";
 import { createTrgocentarAdapter, type TrgocentarAdapter } from "./trgocentar";
 
-// Sample data directory path - configurable via environment variable with fallback to relative path
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SAMPLE_DATA_DIR =
-	process.env.SAMPLE_DATA_DIR ||
-	path.resolve(__dirname, "../../../data/sample");
+// Check if sample data directory is available (done at runtime via service binding)
+let SAMPLE_DATA_AVAILABLE = false;
 
-// Check if sample data directory exists
-const SAMPLE_DATA_AVAILABLE = fs.existsSync(SAMPLE_DATA_DIR);
-if (!SAMPLE_DATA_AVAILABLE) {
-	console.warn(`Sample data directory not found at: ${SAMPLE_DATA_DIR}`);
-	console.warn("Tests requiring sample data will be skipped.");
-	console.warn(
-		"Set SAMPLE_DATA_DIR environment variable to specify a custom location.",
-	);
-}
-
-// Helper function to read sample file as ArrayBuffer
-function readSampleFile(chain: string, filename: string): ArrayBuffer {
-	const filePath = path.join(SAMPLE_DATA_DIR, chain, filename);
-	const buffer = fs.readFileSync(filePath);
-	return buffer.buffer.slice(
-		buffer.byteOffset,
-		buffer.byteOffset + buffer.byteLength,
-	);
-}
-
-// Helper function to list files in a sample directory
-function getSampleFiles(chain: string): string[] {
+// Root-level beforeAll to check sample data availability once
+beforeAll(async () => {
+	SAMPLE_DATA_AVAILABLE = await sampleDataAvailable();
 	if (!SAMPLE_DATA_AVAILABLE) {
-		return [];
+		console.warn("Sample data directory not found. Tests requiring sample data will be skipped.");
+		console.warn("Set SAMPLE_DATA_DIR environment variable to specify a custom location.");
 	}
-	const dirPath = path.join(SAMPLE_DATA_DIR, chain);
-	if (!fs.existsSync(dirPath)) {
-		return [];
-	}
-	return fs.readdirSync(dirPath).filter((f) => !f.startsWith("."));
-}
+});
 
 // Helper function to create a DiscoveredFile object for testing
 function createDiscoveredFile(
@@ -160,9 +136,9 @@ describe("KonzumAdapter", () => {
 	let adapter: KonzumAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createKonzumAdapter();
-		sampleFiles = getSampleFiles("konzum");
+		sampleFiles = await getSampleFiles("konzum");
 	});
 
 	describe("adapter properties", () => {
@@ -184,7 +160,7 @@ describe("KonzumAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("konzum", filename);
+			const content = await readSampleFile("konzum", filename);
 			const result = await adapter.parse(content, filename);
 
 			// The parser should complete without throwing
@@ -213,7 +189,7 @@ describe("KonzumAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("konzum", filename);
+			const content = await readSampleFile("konzum", filename);
 			const result = await adapter.parse(content, filename, { limit: 10 });
 
 			// Parser should complete without error
@@ -233,7 +209,7 @@ describe("KonzumAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("konzum", filename);
+			const content = await readSampleFile("konzum", filename);
 			const result = await adapter.parse(content, filename, { limit: 50 });
 
 			// Find rows with barcodes (if any were parsed)
@@ -254,7 +230,7 @@ describe("KonzumAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("konzum", filename);
+			const content = await readSampleFile("konzum", filename);
 			const result = await adapter.parse(content, filename, { limit: 10 });
 
 			for (const row of result.rows) {
@@ -499,9 +475,9 @@ describe("LidlAdapter", () => {
 	let adapter: LidlAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createLidlAdapter();
-		sampleFiles = getSampleFiles("lidl");
+		sampleFiles = await getSampleFiles("lidl");
 	});
 
 	describe("adapter properties", () => {
@@ -524,7 +500,7 @@ describe("LidlAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("lidl", filename);
+			const content = await readSampleFile("lidl", filename);
 			const result = await adapter.parse(content, filename);
 
 			// The parser should complete without throwing
@@ -543,7 +519,7 @@ describe("LidlAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("lidl", filename);
+			const content = await readSampleFile("lidl", filename);
 			const result = await adapter.parse(content, filename, { limit: 100 });
 
 			// Check for any row that might have multiple barcodes
@@ -650,9 +626,9 @@ describe("PlodineAdapter", () => {
 	let adapter: PlodineAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createPlodineAdapter();
-		sampleFiles = getSampleFiles("plodine");
+		sampleFiles = await getSampleFiles("plodine");
 	});
 
 	describe("adapter properties", () => {
@@ -674,7 +650,7 @@ describe("PlodineAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("plodine", filename);
+			const content = await readSampleFile("plodine", filename);
 			const result = await adapter.parse(content, filename);
 
 			// The parser should complete without throwing
@@ -694,7 +670,7 @@ describe("PlodineAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("plodine", filename);
+			const content = await readSampleFile("plodine", filename);
 			const result = await adapter.parse(content, filename, { limit: 10 });
 
 			// All prices should be valid positive numbers when parsed
@@ -710,7 +686,7 @@ describe("PlodineAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("plodine", filename);
+			const content = await readSampleFile("plodine", filename);
 			const result = await adapter.parse(content, filename, { limit: 10 });
 
 			// Check that names are properly decoded (no garbled characters) when parsed
@@ -775,9 +751,9 @@ describe("IntersparAdapter", () => {
 	let adapter: IntersparAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createIntersparAdapter();
-		sampleFiles = getSampleFiles("interspar");
+		sampleFiles = await getSampleFiles("interspar");
 	});
 
 	describe("adapter properties", () => {
@@ -799,7 +775,7 @@ describe("IntersparAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("interspar", filename);
+			const content = await readSampleFile("interspar", filename);
 			const result = await adapter.parse(content, filename);
 
 			// The parser should complete without throwing
@@ -818,7 +794,7 @@ describe("IntersparAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("interspar", filename);
+			const content = await readSampleFile("interspar", filename);
 			const result = await adapter.parse(content, filename, { limit: 10 });
 
 			// Verify structure for any parsed rows
@@ -893,9 +869,9 @@ describe("StudenacAdapter", () => {
 	let adapter: StudenacAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createStudenacAdapter();
-		sampleFiles = getSampleFiles("studenac");
+		sampleFiles = await getSampleFiles("studenac");
 	});
 
 	describe("adapter properties", () => {
@@ -922,7 +898,7 @@ describe("StudenacAdapter", () => {
 				return;
 			}
 
-			const content = readSampleFile("studenac", filename);
+			const content = await readSampleFile("studenac", filename);
 			const result = await adapter.parse(content, filename);
 
 			// The XML structure is: Proizvodi > ProdajniObjekt > Proizvodi > Proizvod
@@ -1000,9 +976,9 @@ describe("KauflandAdapter", () => {
 	let adapter: KauflandAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createKauflandAdapter();
-		sampleFiles = getSampleFiles("kaufland");
+		sampleFiles = await getSampleFiles("kaufland");
 	});
 
 	describe("adapter properties", () => {
@@ -1024,7 +1000,7 @@ describe("KauflandAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("kaufland", filename);
+			const content = await readSampleFile("kaufland", filename);
 			const result = await adapter.parse(content, filename);
 
 			// The parser should complete without throwing
@@ -1043,7 +1019,7 @@ describe("KauflandAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("kaufland", filename);
+			const content = await readSampleFile("kaufland", filename);
 			const result = await adapter.parse(content, filename, { limit: 10 });
 
 			// Verify structure for any parsed rows
@@ -1108,9 +1084,9 @@ describe("EurospinAdapter", () => {
 	let adapter: EurospinAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createEurospinAdapter();
-		sampleFiles = getSampleFiles("eurospin");
+		sampleFiles = await getSampleFiles("eurospin");
 	});
 
 	describe("adapter properties", () => {
@@ -1132,7 +1108,7 @@ describe("EurospinAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("eurospin", filename);
+			const content = await readSampleFile("eurospin", filename);
 			const result = await adapter.parse(content, filename);
 
 			// The parser should complete without throwing
@@ -1200,9 +1176,9 @@ describe("DmAdapter", () => {
 	let adapter: DmAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createDmAdapter();
-		sampleFiles = getSampleFiles("dm");
+		sampleFiles = await getSampleFiles("dm");
 	});
 
 	describe("adapter properties", () => {
@@ -1229,7 +1205,7 @@ describe("DmAdapter", () => {
 				return;
 			}
 
-			const content = readSampleFile("dm", filename);
+			const content = await readSampleFile("dm", filename);
 			const result = await adapter.parse(content, filename);
 
 			// DM files might have different structure
@@ -1307,9 +1283,9 @@ describe("KtcAdapter", () => {
 	let adapter: KtcAdapter;
 	let sampleFiles: string[];
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		adapter = createKtcAdapter();
-		sampleFiles = getSampleFiles("ktc");
+		sampleFiles = await getSampleFiles("ktc");
 	});
 
 	describe("adapter properties", () => {
@@ -1331,7 +1307,7 @@ describe("KtcAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("ktc", filename);
+			const content = await readSampleFile("ktc", filename);
 			const result = await adapter.parse(content, filename);
 
 			// The parser should complete without throwing
@@ -1350,7 +1326,7 @@ describe("KtcAdapter", () => {
 			}
 
 			const filename = sampleFiles[0];
-			const content = readSampleFile("ktc", filename);
+			const content = await readSampleFile("ktc", filename);
 			const result = await adapter.parse(content, filename, { limit: 10 });
 
 			// Verify names for any parsed rows
@@ -2025,14 +2001,14 @@ Test Product;123;Brand;1 kg;KOM;12,99;12,99;;;12,99;1234567890123;FOOD;`;
 
 describe("Performance Tests", () => {
 	it("should parse large file within reasonable time", async () => {
-		const sampleFiles = getSampleFiles("lidl");
+		const sampleFiles = await getSampleFiles("lidl");
 		if (sampleFiles.length === 0) {
 			return;
 		}
 
 		const adapter = createLidlAdapter();
 		const filename = sampleFiles[0];
-		const content = readSampleFile("lidl", filename);
+		const content = await readSampleFile("lidl", filename);
 
 		const startTime = Date.now();
 		const result = await adapter.parse(content, filename);
@@ -2048,14 +2024,14 @@ describe("Performance Tests", () => {
 	});
 
 	it("should handle limit option correctly", async () => {
-		const sampleFiles = getSampleFiles("konzum");
+		const sampleFiles = await getSampleFiles("konzum");
 		if (sampleFiles.length === 0) {
 			return;
 		}
 
 		const adapter = createKonzumAdapter();
 		const filename = sampleFiles[0];
-		const content = readSampleFile("konzum", filename);
+		const content = await readSampleFile("konzum", filename);
 
 		const result = await adapter.parse(content, filename, { limit: 5 });
 
