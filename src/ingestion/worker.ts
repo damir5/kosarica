@@ -314,16 +314,17 @@ async function handleFetch(
 		await env.INGESTION_QUEUE.send(expandMessage);
 		log.info("Enqueued expand message", { phase: "fetch", filename: file.filename });
 	} else {
-		// Enqueue parse message for non-ZIP files
-		const parseMessage: ParseQueueMessage = {
-			...createMessage("parse", message.runId, message.chainSlug),
+		// Enqueue parse_chunked message for non-ZIP files to prevent CPU timeout on large files
+		const parseChunkedMessage: ParseChunkedQueueMessage = {
+			...createMessage("parse_chunked", message.runId, message.chainSlug),
 			r2Key,
 			file,
 			innerFilename: null,
 			hash: fetched.hash,
+			chunkSize: 1000, // ~30 messages for 30K rows, each chunk under 30s
 		};
-		await env.INGESTION_QUEUE.send(parseMessage);
-		log.info("Enqueued parse message", { phase: "fetch", filename: file.filename });
+		await env.INGESTION_QUEUE.send(parseChunkedMessage);
+		log.info("Enqueued parse_chunked message", { phase: "fetch", filename: file.filename });
 	}
 }
 
@@ -347,7 +348,7 @@ async function handleExpand(
 	const uint8Content = new Uint8Array(result.content);
 	const unzipped = unzipSync(uint8Content);
 
-	const parseMessages: ParseQueueMessage[] = [];
+	const parseMessages: ParseChunkedQueueMessage[] = [];
 	let expandedCount = 0;
 
 	for (const [innerFilename, innerContent] of Object.entries(unzipped)) {
@@ -383,12 +384,14 @@ async function handleExpand(
 			size: innerContent.byteLength,
 		};
 
+		// Create parse_chunked message for expanded files to prevent CPU timeout
 		parseMessages.push({
-			...createMessage("parse", message.runId, message.chainSlug),
+			...createMessage("parse_chunked", message.runId, message.chainSlug),
 			r2Key: expandedKey,
 			file: expandedFile,
 			innerFilename,
 			hash: innerHash,
+			chunkSize: 1000, // ~30 messages for 30K rows, each chunk under 30s
 		});
 
 		expandedCount++;
