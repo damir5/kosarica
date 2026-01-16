@@ -3,7 +3,7 @@
   "name": "kosarica-prod",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry",
+  "main": "src/server.ts",
 
   // D1 Database binding
   "d1_databases": [
@@ -27,19 +27,19 @@
     "producers": [
       {
         "binding": "INGESTION_QUEUE",
-        "queue": "price-ingestion-prod"
+        "queue": "kosarica-ingestion-prod"
       },
       {
         "binding": "INGESTION_DLQ",
-        "queue": "price-ingestion-dlq-prod"
+        "queue": "kosarica-ingestion-dlq-prod"
       }
     ],
     "consumers": [
       {
-        "queue": "price-ingestion-prod",
+        "queue": "kosarica-ingestion-prod",
         "max_batch_size": 10,
         "max_retries": 3,
-        "dead_letter_queue": "price-ingestion-dlq-prod"
+        "dead_letter_queue": "kosarica-ingestion-dlq-prod"
       }
     ]
   },

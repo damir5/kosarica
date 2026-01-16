@@ -3,7 +3,7 @@
   "name": "kosarica-test",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "src/test/worker-entry.ts",
+  "main": "src/server.ts",
 
   // D1 Database binding
   "d1_databases": [
@@ -28,19 +28,19 @@
     "producers": [
       {
         "binding": "INGESTION_QUEUE",
-        "queue": "price-ingestion-test"
+        "queue": "kosarica-ingestion-test"
       },
       {
         "binding": "INGESTION_DLQ",
-        "queue": "price-ingestion-dlq-test"
+        "queue": "kosarica-ingestion-dlq-test"
       }
     ],
     "consumers": [
       {
-        "queue": "price-ingestion-test",
+        "queue": "kosarica-ingestion-test",
         "max_batch_size": 10,
         "max_retries": 3,
-        "dead_letter_queue": "price-ingestion-dlq-test"
+        "dead_letter_queue": "kosarica-ingestion-dlq-test"
       }
     ]
   },
