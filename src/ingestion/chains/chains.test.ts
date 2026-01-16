@@ -1423,24 +1423,23 @@ describe("MetroAdapter", () => {
 			expect(adapter.name).toBe("Metro");
 		});
 
-		it("should support XML file type", () => {
-			expect(adapter.supportedTypes).toContain("xml");
+		it("should support CSV file type", () => {
+			expect(adapter.supportedTypes).toContain("csv");
 		});
 	});
 
-	// Note: The sample file for Metro is actually CSV, not XML
-	// The adapter expects XML, so parsing the CSV sample will fail
-	// In production, Metro would provide XML files
+	// Note: Metro uses CSV format with semicolon delimiter
+	// Store codes (S10, S11, etc.) are extracted from filename
 
 	describe("extractStoreIdentifier()", () => {
-		it("should extract store identifier from metadata", () => {
+		it("should extract store code from filename", () => {
 			const file: DiscoveredFile = {
-				url: "https://metro.hr/file.xml",
-				filename: "metro_store.xml",
-				type: "xml",
+				url: "https://metrocjenik.com.hr/file.csv",
+				filename: "cash_and_carry_prodavaonica_METRO_20260105T0630_S10_JANKOMIR_31,ZAGREB.csv",
+				type: "csv",
 				size: null,
 				lastModified: null,
-				metadata: { storeId: "S10" },
+				metadata: {},
 			};
 			const result = adapter.extractStoreIdentifier(file);
 
@@ -1449,12 +1448,20 @@ describe("MetroAdapter", () => {
 			expect(result?.value).toBe("S10");
 		});
 
-		it("should extract from filename as fallback", () => {
-			const file = createDiscoveredFile("Metro_poslovnica_123.xml", "xml");
+		it("should extract store code with multiple digits", () => {
+			const file = createDiscoveredFile("cash_and_carry_prodavaonica_METRO_20260105T0630_S123_ZAGREB.csv", "csv");
 			const result = adapter.extractStoreIdentifier(file);
 
 			expect(result).not.toBeNull();
-			expect(result?.type).toBe("filename_code");
+			expect(result?.type).toBe("portal_id");
+			expect(result?.value).toBe("S123");
+		});
+
+		it("should return null when no store code found", () => {
+			const file = createDiscoveredFile("metro_file_without_code.csv", "csv");
+			const result = adapter.extractStoreIdentifier(file);
+
+			expect(result).toBeNull();
 		});
 	});
 
@@ -1509,18 +1516,18 @@ describe("TrgocentarAdapter", () => {
 			expect(adapter.name).toBe("Trgocentar");
 		});
 
-		it("should support CSV file type", () => {
-			expect(adapter.supportedTypes).toContain("csv");
+		it("should support XML file type", () => {
+			expect(adapter.supportedTypes).toContain("xml");
 		});
 	});
 
-	// Note: The sample file for Trgocentar is XML but the adapter expects CSV
-	// This is a mismatch that would need to be resolved in the actual implementation
+	// Note: Trgocentar uses XML format with Croatian field names
+	// Store codes (P220, P195, etc.) are extracted from filename
 
 	describe("extractStoreIdentifier()", () => {
 		it("should extract store identifier from filename", () => {
 			const file = createDiscoveredFile(
-				"SUPERMARKET_HUM_NA_SUTLI_185_HUM_NA_SUTLI_P220_209_291220250746.csv",
+				"SUPERMARKET_HUM_NA_SUTLI_185_HUM_NA_SUTLI_P220_209_291220250746.xml",
 			);
 			const result = adapter.extractStoreIdentifier(file);
 
@@ -1529,7 +1536,7 @@ describe("TrgocentarAdapter", () => {
 		});
 
 		it("should remove Trgocentar prefix", () => {
-			const file = createDiscoveredFile("Trgocentar_Zagreb_Store.csv");
+			const file = createDiscoveredFile("Trgocentar_Zagreb_Store.xml");
 			const result = adapter.extractStoreIdentifier(file);
 			expect(result?.value).not.toContain("Trgocentar");
 		});

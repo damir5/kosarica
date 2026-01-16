@@ -226,7 +226,7 @@ const testIdentifiers: MockStoreIdentifier[] = [
 		id: "sid_9",
 		storeId: "sto_test_metro_1",
 		type: "portal_id",
-		value: "MET001",
+		value: "S10",
 	},
 	// Unresolved fallback identifier (for testing fallback behavior)
 	{
@@ -480,20 +480,27 @@ describe("Registry Lookup Fallback", () => {
 	describe("Metro portal_id resolution", () => {
 		const adapter = new MetroAdapter();
 
-		it("extracts portal_id from metadata", () => {
-			const file = createDiscoveredFile("metro_prices.xml", {
-				storeId: "MET001",
-			});
+		it("extracts portal_id from filename", () => {
+			const file = createDiscoveredFile(
+				"cash_and_carry_prodavaonica_METRO_20260105T0630_S10_JANKOMIR_31,ZAGREB.csv",
+			);
 			const identifier = adapter.extractStoreIdentifier(file);
 
 			expect(identifier).not.toBeNull();
 			expect(identifier?.type).toBe("portal_id");
-			expect(identifier?.value).toBe("MET001");
+			expect(identifier?.value).toBe("S10");
+		});
+
+		it("returns null when no store code in filename", () => {
+			const file = createDiscoveredFile("metro_prices.csv");
+			const identifier = adapter.extractStoreIdentifier(file);
+
+			expect(identifier).toBeNull();
 		});
 
 		it("resolves store using portal_id", () => {
 			const { resolveStore } = createTestDb(testStores, testIdentifiers);
-			const storeId = resolveStore("metro", "MET001", "portal_id");
+			const storeId = resolveStore("metro", "S10", "portal_id");
 
 			expect(storeId).toBe("sto_test_metro_1");
 		});
@@ -904,12 +911,15 @@ describe("Integration with Chain Adapters", () => {
 			expect(identifier?.type).toBe("filename_code");
 		});
 
-		it("Metro adapter uses portal_id type when metadata present", () => {
+		it("Metro adapter uses portal_id type extracted from filename", () => {
 			const adapter = new MetroAdapter();
-			const file = createDiscoveredFile("metro.xml", { storeId: "MET001" });
+			const file = createDiscoveredFile(
+				"cash_and_carry_prodavaonica_METRO_20260105T0630_S10_JANKOMIR_31,ZAGREB.csv",
+			);
 			const identifier = adapter.extractStoreIdentifier(file);
 
 			expect(identifier?.type).toBe("portal_id");
+			expect(identifier?.value).toBe("S10");
 		});
 	});
 });
