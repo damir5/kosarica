@@ -1,94 +1,71 @@
 /**
- * Custom server entry point for TanStack Start
+ * Server entry point for TanStack Start with Node.js
  *
- * Combines TanStack's fetch handler with Cloudflare Workers queue/scheduled handlers.
- * This allows the application to handle HTTP requests via TanStack Router while also
- * processing queue messages and scheduled cron triggers.
+ * Handles HTTP requests via TanStack Router and manages
+ * the Bree job scheduler for background tasks.
  */
 
 import tanstackHandler, {
 	type ServerEntry,
 } from "@tanstack/react-start/server-entry";
-import type { QueueMessage } from "@/ingestion/core/types";
-import {
-	type IngestionEnv,
-	queue as ingestionQueue,
-	scheduled as ingestionScheduled,
-} from "@/ingestion/worker";
 import { createLogger } from "@/utils/logger";
 import {
 	ensureRequestContext,
 	extractRequestId,
 } from "@/utils/request-context";
+import { startScheduler, stopScheduler } from "@/jobs/scheduler";
+import { closeDatabase } from "@/db";
 
 const logger = createLogger("app");
 
 /**
- * Extended ServerEntry to include Cloudflare Workers-specific handlers
+ * Initialize the server and start background services.
  */
-interface CloudflareServerEntry extends ServerEntry {
-	scheduled?: (
-		controller: ScheduledController,
-		env: Env,
-		ctx: ExecutionContext,
-	) => void | Promise<void>;
-	queue?: (
-		batch: MessageBatch<unknown>,
-		env: Env,
-		ctx: ExecutionContext,
-	) => void | Promise<void>;
+async function initServer(): Promise<void> {
+	logger.info("Initializing server...");
+
+	// Start the job scheduler
+	try {
+		await startScheduler();
+		logger.info("Job scheduler started");
+	} catch (error) {
+		logger.error("Failed to start job scheduler", { error });
+	}
 }
 
 /**
- * Scheduled handler for cron triggers.
- * Delegates to ingestion worker's scheduled handler.
+ * Graceful shutdown handler.
+ * Stops the scheduler and closes database connections.
  */
-async function scheduled(
-	controller: ScheduledController,
-	env: Env,
-	ctx: ExecutionContext,
-): Promise<void> {
-	logger.info("Scheduled handler invoked", {
-		cron: controller.cron,
-		scheduledTime: new Date(controller.scheduledTime).toISOString(),
-	});
+async function shutdown(signal: string): Promise<void> {
+	logger.info(`Received ${signal}, shutting down gracefully...`);
 
-	ctx.waitUntil(
-		(async () => {
-			try {
-				await ingestionScheduled(controller, env as IngestionEnv, ctx);
-			} catch (error) {
-				logger.error("Scheduled handler error", { error });
-			}
-		})(),
-	);
+	try {
+		await stopScheduler();
+		logger.info("Job scheduler stopped");
+	} catch (error) {
+		logger.error("Error stopping scheduler", { error });
+	}
+
+	try {
+		closeDatabase();
+		logger.info("Database connection closed");
+	} catch (error) {
+		logger.error("Error closing database", { error });
+	}
+
+	process.exit(0);
 }
 
-/**
- * Queue handler for processing messages.
- * Delegates to ingestion worker's queue handler.
- */
-async function queue(
-	batch: MessageBatch<unknown>,
-	env: Env,
-	ctx: ExecutionContext,
-): Promise<void> {
-	logger.info("Queue batch received", { messageCount: batch.messages.length });
+// Register shutdown handlers
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
-	ctx.waitUntil(
-		(async () => {
-			try {
-				await ingestionQueue(
-					batch as MessageBatch<QueueMessage>,
-					env as IngestionEnv,
-					ctx,
-				);
-			} catch (error) {
-				logger.error("Queue handler error", { error });
-			}
-		})(),
-	);
-}
+// Initialize on module load
+initServer().catch((error) => {
+	logger.error("Server initialization failed", { error });
+	process.exit(1);
+});
 
 /**
  * Wrap the fetch handler with request context
@@ -109,10 +86,8 @@ const wrappedFetch: ServerEntry["fetch"] = async (request, maybeOpts) => {
 };
 
 /**
- * Export the worker with fetch, scheduled, and queue handlers
+ * Export the server handler
  */
 export default {
 	fetch: wrappedFetch,
-	scheduled,
-	queue,
-} satisfies CloudflareServerEntry;
+} satisfies ServerEntry;

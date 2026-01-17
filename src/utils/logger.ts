@@ -1,5 +1,5 @@
 /**
- * Structured JSONL logger compatible with Cloudflare Workers
+ * Structured JSONL logger for Node.js
  * Uses pino-compatible log format for use with pino-pretty in development
  */
 
@@ -23,7 +23,7 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
  * All available logger types for filtering
  * Source of truth for LoggerType - add new types here
  */
-const ALL_LOGGER_TYPES = ["rpc", "http", "auth", "db", "app", "ingestion"] as const;
+const ALL_LOGGER_TYPES = ["rpc", "http", "auth", "db", "app", "ingestion", "scheduler", "daily-ingestion"] as const;
 export type LoggerType = (typeof ALL_LOGGER_TYPES)[number];
 
 /**

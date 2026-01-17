@@ -11,10 +11,9 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { Command } from "commander";
-import { drizzle } from "drizzle-orm/d1";
 import { unzipSync } from "fflate";
-import { getPlatformProxy, type PlatformProxy } from "wrangler";
 
+import { createDb, type DatabaseType } from "@/db";
 import {
 	CHAIN_IDS,
 	type ChainId,
@@ -50,13 +49,8 @@ interface StoreMetadata {
 	city?: string;
 }
 
-import * as schema from "@/db/schema";
-
 // Note: Adapters are automatically registered when importing from '../chains'.
 // No manual registration is required.
-
-// Platform proxy for accessing Cloudflare bindings in local dev
-let platformProxy: PlatformProxy<Env> | null = null;
 
 // ============================================================================
 // Types
@@ -240,37 +234,19 @@ function detectFileType(filename: string): FileType {
 	}
 }
 
-/**
- * Initialize the platform proxy for accessing Cloudflare bindings.
- * Uses wrangler's getPlatformProxy to connect to local D1.
- */
-async function initPlatformProxy(): Promise<PlatformProxy<Env>> {
-	if (!platformProxy) {
-		platformProxy = await getPlatformProxy<Env>({
-			configPath: "./wrangler.jsonc",
-			persist: true,
-		});
-	}
-	return platformProxy;
-}
-
-/**
- * Cleanup platform proxy on exit.
- */
-async function disposePlatformProxy(): Promise<void> {
-	if (platformProxy) {
-		await platformProxy.dispose();
-		platformProxy = null;
-	}
-}
+// Database instance for CLI
+let dbInstance: DatabaseType | null = null;
 
 /**
  * Create a Drizzle database instance for CLI usage.
- * Uses wrangler's getPlatformProxy to access D1 bindings.
+ * Uses the DATABASE_PATH environment variable or default path.
  */
-async function createCliDatabase() {
-	const proxy = await initPlatformProxy();
-	return drizzle(proxy.env.DB, { schema });
+async function createCliDatabase(): Promise<DatabaseType> {
+	if (!dbInstance) {
+		const dbPath = process.env.DATABASE_PATH || "./data/app.db";
+		dbInstance = createDb(dbPath);
+	}
+	return dbInstance;
 }
 
 // ============================================================================
@@ -953,9 +929,6 @@ async function main(): Promise<void> {
 		// Print summary
 		printSummary(stats, logger);
 
-		// Cleanup platform proxy
-		await disposePlatformProxy();
-
 		// Exit with appropriate code
 		if (stats.errors.length > 0) {
 			process.exit(2);
@@ -968,16 +941,12 @@ async function main(): Promise<void> {
 		}
 		printSummary(stats, logger);
 
-		// Cleanup platform proxy
-		await disposePlatformProxy();
-
 		process.exit(1);
 	}
 }
 
 // Run the CLI
-main().catch(async (error) => {
+main().catch((error) => {
 	console.error("Unexpected error:", error);
-	await disposePlatformProxy();
 	process.exit(1);
 });

@@ -1,91 +1,25 @@
 /**
- * File access utilities for Cloudflare Workers tests.
+ * File access utilities for tests.
  *
- * These functions bridge the gap between the workers sandbox and Node.js filesystem
- * via a service binding that runs in Node.js (where fs is available).
+ * Provides direct filesystem access using Node.js fs module.
  */
 
-import { env } from "cloudflare:test";
+import * as fs from "node:fs/promises";
+import * as fsSync from "node:fs";
+import * as path from "node:path";
 
-/**
- * Service binding request/response interface for file operations.
- */
-interface FileAccessRequest {
-	method: "exists" | "readdir" | "read";
-	path: string;
-}
-
-interface FileAccessResponse {
-	success: boolean;
-	data?: any;
-	error?: string;
-}
-
-/**
- * The FILE_ACCESS service binding from the test environment.
- * This is provided by vitest.config.ts via serviceBindings.
- */
-declare module "cloudflare:test" {
-	interface ProvidedEnv extends Env {
-		FILE_ACCESS?: Fetcher;
-	}
-}
-
-let CACHED_SAMPLE_DATA_DIR: string | null = null;
-
-/**
- * Get the sample data directory path from the service binding.
- * The path is computed in Node.js context where process.cwd() is available.
- *
- * Returns empty string if binding is not available (graceful degradation).
- */
-async function getSampleDataDirPath(): Promise<string> {
-	if (CACHED_SAMPLE_DATA_DIR) {
-		return CACHED_SAMPLE_DATA_DIR;
-	}
-
-	const binding = env.FILE_ACCESS;
-	if (!binding) {
-		// Binding not available - use empty string to signal no sample data
-		return "";
-	}
-
-	const url = "http://file-access/?method=getSampleDataDir";
-	try {
-		const response = await binding.fetch(url);
-		const result = (await response.json()) as FileAccessResponse;
-		if (result.success && typeof result.data === "string") {
-			CACHED_SAMPLE_DATA_DIR = result.data;
-			return result.data;
-		}
-		return "";
-	} catch {
-		return "";
-	}
-}
-
-const SAMPLE_DATA_DIR =
-	process.env.SAMPLE_DATA_DIR || "";
+const SAMPLE_DATA_DIR = process.env.SAMPLE_DATA_DIR || path.join(process.cwd(), "sample-data");
 
 /**
  * Check if a file or directory exists.
  *
- * @param env - The test environment with FILE_ACCESS binding
  * @param filePath - Absolute path to check
  * @returns Promise<boolean> - true if path exists, false otherwise
  */
 export async function exists(filePath: string): Promise<boolean> {
-	const binding = env.FILE_ACCESS;
-	if (!binding) {
-		// Fallback: assume sample data is not available if no binding
-		return false;
-	}
-
-	const url = `http://file-access/?method=exists&path=${encodeURIComponent(filePath)}`;
 	try {
-		const response = await binding.fetch(url);
-		const result = (await response.json()) as FileAccessResponse;
-		return result.success && result.data === true;
+		await fs.access(filePath);
+		return true;
 	} catch {
 		return false;
 	}
@@ -97,12 +31,7 @@ export async function exists(filePath: string): Promise<boolean> {
  * @returns Promise<boolean> - true if sample data directory exists
  */
 export async function sampleDataAvailable(): Promise<boolean> {
-	const binding = env.FILE_ACCESS;
-	if (!binding) {
-		return false;
-	}
-	const dir = SAMPLE_DATA_DIR || (await getSampleDataDirPath());
-	return exists(dir);
+	return exists(SAMPLE_DATA_DIR);
 }
 
 /**
@@ -112,19 +41,9 @@ export async function sampleDataAvailable(): Promise<boolean> {
  * @returns Promise<string[]> - Array of filenames (excludes dotfiles)
  */
 export async function readdir(dirPath: string): Promise<string[]> {
-	const binding = env.FILE_ACCESS;
-	if (!binding) {
-		return [];
-	}
-
-	const url = `http://file-access/?method=readdir&path=${encodeURIComponent(dirPath)}`;
 	try {
-		const response = await binding.fetch(url);
-		const result = (await response.json()) as FileAccessResponse;
-		if (result.success && Array.isArray(result.data)) {
-			return result.data.filter((f: string) => !f.startsWith("."));
-		}
-		return [];
+		const entries = await fs.readdir(dirPath);
+		return entries.filter((f) => !f.startsWith("."));
 	} catch {
 		return [];
 	}
@@ -138,20 +57,8 @@ export async function readdir(dirPath: string): Promise<string[]> {
  * @throws Error if file cannot be read
  */
 export async function readFile(filePath: string): Promise<ArrayBuffer> {
-	const binding = env.FILE_ACCESS;
-	if (!binding) {
-		throw new Error("FILE_ACCESS binding not available");
-	}
-
-	const url = `http://file-access/?method=read&path=${encodeURIComponent(filePath)}`;
-	const response = await binding.fetch(url);
-
-	if (!response.ok) {
-		throw new Error(`Failed to read file: ${filePath}`);
-	}
-
-	const buffer = await response.arrayBuffer();
-	return buffer;
+	const buffer = await fs.readFile(filePath);
+	return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
 
 /**
@@ -165,26 +72,9 @@ export async function readSampleFile(
 	chain: string,
 	filename: string,
 ): Promise<ArrayBuffer> {
-	const dir = SAMPLE_DATA_DIR || (await getSampleDataDirPath());
-	if (!dir) {
-		// Sample data directory not available, return empty ArrayBuffer
-		return new ArrayBuffer(0);
-	}
-	const filePath = `${dir}/${chain}/${filename}`;
-
-	const binding = env.FILE_ACCESS;
-	if (!binding) {
-		return new ArrayBuffer(0);
-	}
-
-	const url = `http://file-access/?method=read&path=${encodeURIComponent(filePath)}`;
+	const filePath = path.join(SAMPLE_DATA_DIR, chain, filename);
 	try {
-		const response = await binding.fetch(url);
-		if (!response.ok) {
-			return new ArrayBuffer(0);
-		}
-		const buffer = await response.arrayBuffer();
-		return buffer;
+		return await readFile(filePath);
 	} catch {
 		return new ArrayBuffer(0);
 	}
@@ -197,8 +87,7 @@ export async function readSampleFile(
  * @returns Promise<boolean> - true if chain directory exists
  */
 export async function chainDirectoryExists(chain: string): Promise<boolean> {
-	const dir = SAMPLE_DATA_DIR || (await getSampleDataDirPath());
-	return exists(`${dir}/${chain}`);
+	return exists(path.join(SAMPLE_DATA_DIR, chain));
 }
 
 /**
@@ -208,12 +97,7 @@ export async function chainDirectoryExists(chain: string): Promise<boolean> {
  * @returns Promise<string[]> - Array of filenames in the chain's sample directory
  */
 export async function getSampleFiles(chain: string): Promise<string[]> {
-	const dir = SAMPLE_DATA_DIR || (await getSampleDataDirPath());
-	if (!dir) {
-		// Sample data directory not available
-		return [];
-	}
-	const dirPath = `${dir}/${chain}`;
+	const dirPath = path.join(SAMPLE_DATA_DIR, chain);
 	const dirExists = await exists(dirPath);
 	if (!dirExists) {
 		return [];

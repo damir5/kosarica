@@ -23,46 +23,25 @@ import * as fs from "node:fs";
 import * as readline from "node:readline";
 import { Command } from "commander";
 import { and, count, eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
-import { getPlatformProxy, type PlatformProxy } from "wrangler";
 
-import * as schema from "@/db/schema";
+import { createDb, type DatabaseType } from "@/db";
 import { chains, storeIdentifiers, storeItemState, stores } from "@/db/schema";
 import { generatePrefixedId } from "@/utils/id";
 import { CHAIN_IDS, isValidChainId } from "../chains";
 
-// Platform proxy for accessing Cloudflare bindings in local dev
-let platformProxy: PlatformProxy<Env> | null = null;
-
-/**
- * Initialize the platform proxy for accessing Cloudflare bindings.
- */
-async function initPlatformProxy(): Promise<PlatformProxy<Env>> {
-	if (!platformProxy) {
-		platformProxy = await getPlatformProxy<Env>({
-			configPath: "./wrangler.jsonc",
-			persist: true,
-		});
-	}
-	return platformProxy;
-}
-
-/**
- * Cleanup platform proxy on exit.
- */
-async function disposePlatformProxy(): Promise<void> {
-	if (platformProxy) {
-		await platformProxy.dispose();
-		platformProxy = null;
-	}
-}
+// Database instance for CLI
+let dbInstance: DatabaseType | null = null;
 
 /**
  * Create a Drizzle database instance for CLI usage.
+ * Uses the DATABASE_PATH environment variable or default path.
  */
-async function createCliDatabase() {
-	const proxy = await initPlatformProxy();
-	return drizzle(proxy.env.DB, { schema });
+async function createCliDatabase(): Promise<DatabaseType> {
+	if (!dbInstance) {
+		const dbPath = process.env.DATABASE_PATH || "./data/app.db";
+		dbInstance = createDb(dbPath);
+	}
+	return dbInstance;
 }
 
 /**
@@ -835,14 +814,14 @@ async function main(): Promise<void> {
 		} else if (opts.show) {
 			await showStore(opts.show);
 		}
-	} finally {
-		await disposePlatformProxy();
+	} catch (error) {
+		console.error("Error:", error instanceof Error ? error.message : String(error));
+		process.exit(1);
 	}
 }
 
 // Run the CLI
-main().catch(async (error) => {
+main().catch((error) => {
 	console.error("Error:", error.message);
-	await disposePlatformProxy();
 	process.exit(1);
 });

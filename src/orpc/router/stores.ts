@@ -1,8 +1,9 @@
 import { and, count, desc, eq, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
-import type { EnrichStoreQueueMessage } from "@/ingestion/core/types";
-import { getDb, getEnv } from "@/utils/bindings";
+import { processEnrichStore, type IngestionContext } from "@/ingestion/processor";
+import { createStorage } from "@/ingestion/core/storage";
+import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 import { procedure } from "../base";
 
@@ -496,9 +497,11 @@ export const triggerEnrichment = procedure
 		}
 
 		// Create enrichment task
-		const [task] = await db
+		const taskId = generatePrefixedId("set");
+		await db
 			.insert(storeEnrichmentTasks)
 			.values({
+				id: taskId,
 				storeId: input.storeId,
 				type: input.type,
 				status: "pending",
@@ -510,22 +513,17 @@ export const triggerEnrichment = procedure
 					latitude: store[0].latitude,
 					longitude: store[0].longitude,
 				}),
-			})
-			.returning();
+			});
 
-		// Send message to queue for processing
-		const env = getEnv();
-		const enrichMessage: EnrichStoreQueueMessage = {
-			id: generatePrefixedId("msg"),
-			type: "enrich_store",
-			runId: "enrichment",
-			chainSlug: store[0].chainSlug,
-			createdAt: new Date().toISOString(),
-			storeId: input.storeId,
-			taskType: input.type,
-			taskId: task.id,
-		};
-		await env.INGESTION_QUEUE.send(enrichMessage);
+		// Process enrichment directly
+		const ctx: IngestionContext = { db, storage: createStorage() };
+		await processEnrichStore(input.storeId, input.type, taskId, ctx);
+
+		// Get the updated task
+		const [task] = await db
+			.select()
+			.from(storeEnrichmentTasks)
+			.where(eq(storeEnrichmentTasks.id, taskId));
 
 		return { task };
 	});

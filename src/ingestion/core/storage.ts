@@ -1,8 +1,9 @@
 /**
  * Storage Abstraction for Ingestion Pipeline
  *
- * Provides a unified interface for storing and retrieving files,
- * with implementations for local filesystem (CLI) and Cloudflare R2 (Workers).
+ * Provides a unified interface for storing and retrieving files.
+ * Currently uses local filesystem storage. Can be extended with
+ * S3-compatible storage in the future.
  */
 
 // ============================================================================
@@ -358,170 +359,18 @@ export class LocalStorage implements Storage {
 }
 
 // ============================================================================
-// Cloudflare R2 Storage
+// Storage Factory
 // ============================================================================
 
 /**
- * R2Bucket interface (from @cloudflare/workers-types).
- * Defined here to avoid runtime dependency on the types package.
+ * Create a storage instance using environment configuration.
+ * Uses STORAGE_PATH environment variable for the base directory.
+ *
+ * @returns LocalStorage instance configured for the environment
  */
-interface R2Bucket {
-	get(key: string): Promise<R2Object | null>;
-	put(
-		key: string,
-		value: ArrayBuffer | string,
-		options?: R2PutOptions,
-	): Promise<R2Object>;
-	delete(key: string): Promise<void>;
-	head(key: string): Promise<R2Object | null>;
-	list(options?: R2ListOptions): Promise<R2Objects>;
-}
-
-interface R2Object {
-	key: string;
-	size: number;
-	uploaded: Date;
-	customMetadata?: Record<string, string>;
-	arrayBuffer(): Promise<ArrayBuffer>;
-}
-
-interface R2PutOptions {
-	customMetadata?: Record<string, string>;
-	sha256?: ArrayBuffer;
-}
-
-interface R2ListOptions {
-	prefix?: string;
-	cursor?: string;
-	limit?: number;
-}
-
-interface R2Objects {
-	objects: R2Object[];
-	truncated: boolean;
-	cursor?: string;
-}
-
-/**
- * Cloudflare R2 storage implementation.
- * Used in Cloudflare Workers.
- */
-export class R2Storage implements Storage {
-	private bucket: R2Bucket;
-
-	constructor(bucket: R2Bucket) {
-		this.bucket = bucket;
-	}
-
-	async get(key: string): Promise<GetResult | null> {
-		const object = await this.bucket.get(key);
-		if (!object) return null;
-
-		const content = await object.arrayBuffer();
-		return {
-			content,
-			metadata: {
-				key: object.key,
-				size: object.size,
-				lastModified: object.uploaded,
-				customMetadata: object.customMetadata,
-			},
-		};
-	}
-
-	async put(
-		key: string,
-		content: ArrayBuffer | Uint8Array | string,
-		options?: PutOptions,
-	): Promise<StorageMetadata> {
-		const r2Options: R2PutOptions = {};
-
-		if (options?.customMetadata) {
-			r2Options.customMetadata = options.customMetadata;
-		}
-
-		// R2 expects sha256 as ArrayBuffer, but we store it in customMetadata as hex
-		if (options?.sha256) {
-			r2Options.customMetadata = {
-				...r2Options.customMetadata,
-				sha256: options.sha256,
-			};
-		}
-
-		// Convert Uint8Array to ArrayBuffer if needed
-		let data: ArrayBuffer | string;
-		if (content instanceof Uint8Array) {
-			data = content.buffer.slice(
-				content.byteOffset,
-				content.byteOffset + content.byteLength,
-			) as ArrayBuffer;
-		} else {
-			data = content;
-		}
-
-		const object = await this.bucket.put(key, data, r2Options);
-
-		return {
-			key: object.key,
-			size: object.size,
-			lastModified: object.uploaded,
-			sha256: options?.sha256,
-			customMetadata: object.customMetadata,
-		};
-	}
-
-	async delete(key: string): Promise<boolean> {
-		const exists = await this.exists(key);
-		if (exists) {
-			await this.bucket.delete(key);
-			return true;
-		}
-		return false;
-	}
-
-	async exists(key: string): Promise<boolean> {
-		const object = await this.bucket.head(key);
-		return object !== null;
-	}
-
-	async head(key: string): Promise<StorageMetadata | null> {
-		const object = await this.bucket.head(key);
-		if (!object) return null;
-
-		return {
-			key: object.key,
-			size: object.size,
-			lastModified: object.uploaded,
-			sha256: object.customMetadata?.sha256,
-			customMetadata: object.customMetadata,
-		};
-	}
-
-	async list(prefix: string): Promise<StorageMetadata[]> {
-		const results: StorageMetadata[] = [];
-		let cursor: string | undefined;
-
-		do {
-			const response = await this.bucket.list({
-				prefix,
-				cursor,
-				limit: 1000,
-			});
-
-			for (const object of response.objects) {
-				results.push({
-					key: object.key,
-					size: object.size,
-					lastModified: object.uploaded,
-					customMetadata: object.customMetadata,
-				});
-			}
-
-			cursor = response.truncated ? response.cursor : undefined;
-		} while (cursor);
-
-		return results;
-	}
+export function createStorage(): Storage {
+	const basePath = process.env.STORAGE_PATH || "./data/storage";
+	return new LocalStorage(basePath);
 }
 
 // ============================================================================

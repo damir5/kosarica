@@ -8,8 +8,8 @@ import {
 	ingestionRuns,
 } from "@/db/schema";
 import { CHAIN_CONFIGS, isValidChainId } from "@/ingestion/chains/config";
-import type { DiscoverQueueMessage } from "@/ingestion/core/types";
-import { getDb, getEnv } from "@/utils/bindings";
+import { triggerIngestion } from "@/ingestion/processor";
+import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 import { procedure } from "../base";
 
@@ -569,36 +569,15 @@ export const triggerChain = procedure
 			})
 			.onConflictDoNothing();
 
-		// Create a new run for manual trigger
-		const newRunId = generatePrefixedId("igr");
-		await db.insert(ingestionRuns).values({
-			id: newRunId,
-			chainSlug: input.chainSlug,
-			source: "manual",
-			status: "pending",
-			totalFiles: 0,
-			processedFiles: 0,
-			totalEntries: 0,
-			processedEntries: 0,
-			errorCount: 0,
-		});
-
-		// Enqueue discover message to start the ingestion pipeline
-		const env = getEnv();
-		const discoverMessage: DiscoverQueueMessage = {
-			id: generatePrefixedId("msg"),
-			type: "discover",
-			runId: newRunId,
-			chainSlug: input.chainSlug,
-			targetDate: input.date,
-			createdAt: new Date().toISOString(),
-		};
-
-		await env.INGESTION_QUEUE.send(discoverMessage);
+		// Trigger ingestion directly (runs asynchronously in background)
+		// Note: In a production setup, this could be moved to a worker thread
+		const result = await triggerIngestion(input.chainSlug, input.date);
 
 		return {
-			success: true,
-			runId: newRunId,
-			message: `Ingestion started for chain ${input.chainSlug}${input.date ? ` for date ${input.date}` : ""}`,
+			success: result.success,
+			runId: result.runId,
+			message: result.success
+				? `Ingestion completed for chain ${input.chainSlug}${input.date ? ` for date ${input.date}` : ""}: ${result.filesProcessed} files, ${result.entriesPersisted} entries`
+				: `Ingestion failed for chain ${input.chainSlug}: ${result.errors.join(", ")}`,
 		};
 	});
