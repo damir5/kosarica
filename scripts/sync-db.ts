@@ -59,8 +59,7 @@ function parseWranglerConfig(configPath: string): { databaseName: string; databa
   }
 
   const content = readFileSync(fullPath, "utf-8");
-  // Strip single-line comments (// ...) and multi-line comments (/* ... */)
-  const jsonContent = content.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  const jsonContent = stripJsonc(content);
 
   const config = JSON.parse(jsonContent);
   const d1Databases = config.d1_databases;
@@ -74,6 +73,90 @@ function parseWranglerConfig(configPath: string): { databaseName: string; databa
     databaseName: db.database_name,
     databaseId: db.database_id,
   };
+}
+
+/**
+ * Strip JSONC comments (// and /* *\/) and trailing commas, without breaking
+ * strings like "http://..." that contain //.
+ */
+function stripJsonc(input: string): string {
+  let out = "";
+  let inString = false;
+  let stringQuote: '"' | "'" | null = null;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i]!;
+    const next = input[i + 1];
+
+    if (inString) {
+      out += ch;
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (stringQuote && ch === stringQuote) {
+        inString = false;
+        stringQuote = null;
+      }
+      continue;
+    }
+
+    // Enter string
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringQuote = ch;
+      out += ch;
+      continue;
+    }
+
+    // Line comment
+    if (ch === "/" && next === "/") {
+      i += 1;
+      while (i + 1 < input.length && input[i + 1] !== "\n") i += 1;
+      continue;
+    }
+
+    // Block comment
+    if (ch === "/" && next === "*") {
+      i += 1;
+      while (i + 1 < input.length) {
+        if (input[i] === "*" && input[i + 1] === "/") {
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+
+    // Strip trailing commas: if we see a comma and the next non-ws char is } or ]
+    if (ch === ",") {
+      let j = i + 1;
+      while (j < input.length) {
+        const c = input[j]!;
+        if (c === " " || c === "\t" || c === "\r" || c === "\n") {
+          j += 1;
+          continue;
+        }
+        if (c === "}" || c === "]") {
+          // omit comma
+          break;
+        }
+        out += ch;
+        break;
+      }
+      continue;
+    }
+
+    out += ch;
+  }
+
+  return out;
 }
 
 /**

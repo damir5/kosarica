@@ -29,21 +29,21 @@
     "producers": [
       {
         "binding": "INGESTION_QUEUE",
-        "queue": "price-ingestion"
+        "queue": "kosarica-ingestion"
       },
       {
         // Optional: Dead letter queue for failed messages
         "binding": "INGESTION_DLQ",
-        "queue": "price-ingestion-dlq"
+        "queue": "kosarica-ingestion-dlq"
       }
     ],
     "consumers": [
       {
-        "queue": "price-ingestion",
+        "queue": "kosarica-ingestion",
         "max_batch_size": 10,
         "max_retries": 3,
         // Dead letter queue configuration
-        "dead_letter_queue": "price-ingestion-dlq"
+        "dead_letter_queue": "kosarica-ingestion-dlq"
       }
     ]
   },
