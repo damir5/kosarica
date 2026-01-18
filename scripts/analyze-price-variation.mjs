@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 /**
- * Analyze price variation + change rates from a local D1 SQLite database.
- *
- * Prereq: sync remote D1 into local sqlite first (optional but recommended):
- *   pnpm db:sync-test
- *   pnpm db:sync-prod
+ * Analyze price variation + change rates from a local SQLite database.
  *
  * Usage:
  *   node scripts/analyze-price-variation.mjs
  *   node scripts/analyze-price-variation.mjs --since-days=180 --stores=60 --items=250
  *   node scripts/analyze-price-variation.mjs --chains=konzum,lidl
- *   node scripts/analyze-price-variation.mjs --db=.wrangler/state/v3/d1/.../xxxx.sqlite
+ *   node scripts/analyze-price-variation.mjs --db=./data/app.db
  */
 import { spawnSync } from "node:child_process";
-import { createHash, createHmac } from "node:crypto";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -49,31 +45,6 @@ function formatPct(value) {
 
 function shortHash(input) {
 	return createHash("sha256").update(input).digest("hex").slice(0, 10);
-}
-
-function computeSqliteFilename(databaseId) {
-	const uniqueKey = "miniflare-D1DatabaseObject";
-	const key = createHash("sha256").update(uniqueKey).digest();
-	const nameHmac = createHmac("sha256", key).update(databaseId).digest().subarray(0, 16);
-	const hmac = createHmac("sha256", key).update(nameHmac).digest().subarray(0, 16);
-	return Buffer.concat([nameHmac, hmac]).toString("hex");
-}
-
-function parseWranglerConfig(configPath) {
-	const fullPath = resolve(process.cwd(), configPath);
-	if (!existsSync(fullPath)) throw new Error(`${configPath} not found`);
-
-	const content = readFileSync(fullPath, "utf-8");
-	const jsonContent = content.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
-	const config = JSON.parse(jsonContent);
-	const d1Databases = config.d1_databases;
-
-	if (!d1Databases || d1Databases.length === 0) {
-		throw new Error(`No d1_databases found in ${configPath}`);
-	}
-
-	const db = d1Databases[0];
-	return { databaseName: db.database_name, databaseId: db.database_id };
 }
 
 function runSqliteJson(sqlitePath, sql) {
@@ -113,11 +84,33 @@ function normalizeInt(value) {
 	return null;
 }
 
+/**
+ * Get database path from .env file or environment variable.
+ */
+function getDatabasePath() {
+	// Check environment variable first
+	if (process.env.DATABASE_PATH) {
+		return resolve(process.cwd(), process.env.DATABASE_PATH);
+	}
+
+	// Try to read from .env file
+	const envPath = resolve(process.cwd(), ".env");
+	if (existsSync(envPath)) {
+		const content = readFileSync(envPath, "utf-8");
+		const match = content.match(/^DATABASE_PATH=(.*)$/m);
+		if (match && match[1]) {
+			return resolve(process.cwd(), match[1].trim());
+		}
+	}
+
+	// Default path
+	return resolve(process.cwd(), "./data/app.db");
+}
+
 async function main() {
 	const { values } = parseArgs({
 		options: {
 			db: { type: "string" },
-			config: { type: "string" },
 			chains: { type: "string" },
 			"since-days": { type: "string" },
 			stores: { type: "string" },
@@ -138,20 +131,15 @@ async function main() {
 	if (!Number.isFinite(itemSample) || itemSample <= 0) throw new Error("--items must be > 0");
 	if (!Number.isFinite(stateSample) || stateSample <= 0) throw new Error("--state-sample must be > 0");
 
-	const configPath = String(values.config ?? "wrangler.jsonc");
 	const sqlitePath =
 		typeof values.db === "string" && values.db.length > 0
 			? resolve(process.cwd(), values.db)
-			: resolve(
-					process.cwd(),
-					".wrangler/state/v3/d1/miniflare-D1DatabaseObject",
-					`${computeSqliteFilename(parseWranglerConfig(configPath).databaseId)}.sqlite`,
-				);
+			: getDatabasePath();
 
 	if (!existsSync(sqlitePath)) {
 		throw new Error(
 			`Local sqlite DB not found at ${sqlitePath}\n` +
-				`Hint: run pnpm db:sync-test or pnpm db:sync-prod (or pass --db=PATH)`,
+				`Hint: ensure database exists at DATABASE_PATH or pass --db=PATH`,
 		);
 	}
 
@@ -172,7 +160,6 @@ async function main() {
 			{
 				startedAt: new Date().toISOString(),
 				sqlitePath,
-				configPath: typeof values.db === "string" ? null : configPath,
 				sinceDays,
 				sinceEpoch,
 				chains: chainSlugs,
@@ -215,7 +202,7 @@ async function main() {
          AND last_seen_at >= ${sinceEpoch}`,
 		);
 
-		console.log(`Matrix rows (store×item observed within window): ${matrix.length}`);
+		console.log(`Matrix rows (store x item observed within window): ${matrix.length}`);
 
 		// Store coverage
 		const rowsByStore = new Map();
@@ -361,4 +348,3 @@ main().catch((err) => {
 	console.error(err instanceof Error ? err.message : String(err));
 	process.exit(1);
 });
-

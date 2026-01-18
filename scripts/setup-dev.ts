@@ -1,15 +1,16 @@
 #!/usr/bin/env tsx
 /**
  * Development setup script
- * - Initializes .dev.vars from example if missing
+ * - Initializes .env from example if missing
  * - Runs database migrations
  * - Seeds default admin user if database is empty
  */
 
 import { execSync } from 'node:child_process'
-import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, copyFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { randomBytes, scryptSync } from 'node:crypto'
+import Database from 'better-sqlite3'
 import { generatePrefixedId } from '../src/utils/id'
 
 const ROOT = resolve(import.meta.dirname, '..')
@@ -49,71 +50,92 @@ function hashPassword(password: string): string {
 async function main() {
   log('Starting development setup...')
 
-  // 1. Initialize .dev.vars from example
-  const devVarsPath = resolve(ROOT, '.dev.vars')
-  const devVarsExamplePath = resolve(ROOT, '.dev.vars.example')
+  // 1. Initialize .env from example
+  const envPath = resolve(ROOT, '.env')
+  const envExamplePath = resolve(ROOT, '.env.example')
 
-  if (!existsSync(devVarsPath)) {
-    if (existsSync(devVarsExamplePath)) {
-      copyFileSync(devVarsExamplePath, devVarsPath)
-      log('Created .dev.vars from .dev.vars.example')
+  if (!existsSync(envPath)) {
+    if (existsSync(envExamplePath)) {
+      copyFileSync(envExamplePath, envPath)
+      log('Created .env from .env.example')
 
       // Generate a random secret
       const secret = randomBytes(32).toString('hex')
-      const content = readFileSync(devVarsPath, 'utf-8')
+      const content = readFileSync(envPath, 'utf-8')
       const updated = content.replace(
-        'your-secret-key-min-32-chars-here',
-        secret
+        /^BETTER_AUTH_SECRET=.*$/m,
+        `BETTER_AUTH_SECRET=${secret}`
       )
-      writeFileSync(devVarsPath, updated)
+      writeFileSync(envPath, updated)
       log('Generated random BETTER_AUTH_SECRET')
     } else {
-      error('.dev.vars.example not found, please create it first')
+      error('.env.example not found, please create it first')
       process.exit(1)
     }
   } else {
-    log('.dev.vars already exists, skipping')
+    log('.env already exists, skipping')
   }
 
-  // 2. Check if D1 database exists locally
-  const wranglerDir = resolve(ROOT, '.wrangler')
-  const d1Dir = resolve(wranglerDir, 'state', 'v3', 'd1')
-  const dbExists = existsSync(d1Dir)
+  // 2. Determine database path from .env
+  const envContent = readFileSync(envPath, 'utf-8')
+  const dbPathMatch = envContent.match(/^DATABASE_PATH=(.*)$/m)
+  const dbPath = dbPathMatch ? dbPathMatch[1].trim() : './data/app.db'
+  const fullDbPath = resolve(ROOT, dbPath)
+
+  // Ensure data directory exists
+  const dataDir = dirname(fullDbPath)
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true })
+    log(`Created data directory: ${dataDir}`)
+  }
+
+  const dbExists = existsSync(fullDbPath)
 
   // 3. Run migrations
   log('Running database migrations...')
-  run('pnpm db:migrate:local')
+  run('pnpm db:migrate')
 
   // 4. Seed default admin if this is a fresh database
   if (!dbExists) {
     log('Fresh database detected, seeding default admin user...')
 
-    const now = Math.floor(Date.now() / 1000)
-    const userId = generatePrefixedId('usr')
-    const accountId = generatePrefixedId('acc')
-    const passwordHash = hashPassword('admin123')
+    const db = new Database(fullDbPath)
 
-    // Create superadmin user
-    const userSql = `INSERT INTO user (id, name, email, emailVerified, role, createdAt, updatedAt) VALUES ('${userId}', 'Admin', 'admin@local.dev', 1, 'superadmin', ${now}, ${now});`
+    try {
+      const now = Math.floor(Date.now() / 1000)
+      const userId = generatePrefixedId('usr')
+      const accountId = generatePrefixedId('acc')
+      const passwordHash = hashPassword('admin123')
 
-    // Create credential account for password login
-    const accountSql = `INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt) VALUES ('${accountId}', '${userId}', 'credential', '${userId}', '${passwordHash}', ${now}, ${now});`
+      // Create superadmin user
+      db.prepare(`
+        INSERT INTO user (id, name, email, emailVerified, role, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(userId, 'Admin', 'admin@local.dev', 1, 'superadmin', now, now)
 
-    // Create default app settings
-    const settingsId = generatePrefixedId('cfg')
-    const settingsSql = `INSERT OR IGNORE INTO app_settings (id, appName, updatedAt) VALUES ('${settingsId}', 'Kosarica', ${now});`
+      // Create credential account for password login
+      db.prepare(`
+        INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(accountId, userId, 'credential', userId, passwordHash, now, now)
 
-    run(`wrangler d1 execute kosarica-db --local --command "${userSql}"`)
-    run(`wrangler d1 execute kosarica-db --local --command "${accountSql}"`)
-    run(`wrangler d1 execute kosarica-db --local --command "${settingsSql}"`)
+      // Create default app settings
+      const settingsId = generatePrefixedId('cfg')
+      db.prepare(`
+        INSERT OR IGNORE INTO app_settings (id, appName, updatedAt)
+        VALUES (?, ?, ?)
+      `).run(settingsId, 'Kosarica', now)
 
-    log('')
-    log('='.repeat(50))
-    log('Default superadmin user created:')
-    log('  Email:    admin@local.dev')
-    log('  Password: admin123')
-    log('='.repeat(50))
-    log('')
+      log('')
+      log('='.repeat(50))
+      log('Default superadmin user created:')
+      log('  Email:    admin@local.dev')
+      log('  Password: admin123')
+      log('='.repeat(50))
+      log('')
+    } finally {
+      db.close()
+    }
   } else {
     log('Database already exists, skipping seed')
   }

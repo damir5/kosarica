@@ -6,12 +6,9 @@ dist-ssr
 count.txt
 .env
 .env.*
-.dev.vars
-.dev.vars.*
-!.dev.vars.example
+!.env.example
 .nitro
 .tanstack
-.wrangler
 .output
 .vinxi
 todos.json
