@@ -1,7 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export function getContext() {
-	const queryClient = new QueryClient();
+	const queryClient = new QueryClient({
+		defaultOptions: {
+			queries: {
+				// Aggressive garbage collection for SSR to prevent memory leaks
+				gcTime: 0,
+				staleTime: 0,
+			},
+		},
+	});
 	return {
 		queryClient,
 	};

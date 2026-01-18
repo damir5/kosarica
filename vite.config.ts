@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
-import { devtools } from '@tanstack/devtools-vite'
+// import { devtools } from '@tanstack/devtools-vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
@@ -40,9 +40,13 @@ const config = defineConfig({
   server: {
     port: 3002,
     strictPort: true,
+    watch: {
+      ignored: ['**/sample/**', '**/data/**', '**/.pnpm-store/**', '**/node_modules/**'],
+    },
   },
   plugins: [
-    devtools({ enhancedLogs: { enabled: false } }),
+    // Disabled devtools to reduce memory usage - re-enable if needed
+    // devtools({ enhancedLogs: { enabled: false } }),
     // this is the plugin that enables path aliases
     viteTsConfigPaths({
       projects: ['./tsconfig.json'],
@@ -54,32 +58,6 @@ const config = defineConfig({
   ssr: {
     // Externalize native Node.js modules
     external: ['better-sqlite3', 'bree'],
-    optimizeDeps: {
-      exclude: [
-        '@tanstack/react-query-devtools',
-        '@tanstack/react-router-devtools',
-        'drizzle-orm',
-        'drizzle-orm/better-sqlite3',
-        'drizzle-orm/sqlite-core',
-        'better-sqlite3',
-        'bree',
-      ],
-      include: [
-        '@orpc/server',
-        '@orpc/client',
-        '@orpc/client/fetch',
-        '@orpc/tanstack-query',
-        '@orpc/openapi/fetch',
-        '@orpc/zod/zod4',
-        '@orpc/json-schema',
-        '@orpc/openapi/plugins',
-        'zod',
-        'lucide-react',
-        'better-auth',
-        'better-auth/adapters/drizzle',
-        '@better-auth/passkey',
-      ],
-    },
   },
 })
 
