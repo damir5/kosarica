@@ -104,6 +104,90 @@ git push                # Push to remote
 
 ---
 
+## ACE Labels for Automated Execution
+
+When converting plans to epics, apply ACE labels to enable the Ralph automation loop.
+
+### Required Structure
+
+An ACE epic requires:
+1. **Epic** with `ace:epic` label
+2. **Test tasks** with `ace:test` label (one per feature, TDD - write failing tests first)
+3. **Code tasks** with `ace:code` label (one per feature, depends on its test)
+4. **Review task** with `ace:review` label (exactly one, gates completion)
+
+### Labels
+
+| Label | Applied To | Purpose |
+|-------|-----------|---------|
+| `ace:epic` | Epic | Marks epic as ACE-managed |
+| `ace:test` | Task | Write failing tests first (TDD) |
+| `ace:code` | Task | Implement code to pass tests |
+| `ace:review` | Task | Final review gate |
+
+### Workflow Order (TDD)
+
+```
+ace:test (open) → ace:code (blocked) → ace:review (blocked)
+     ↓                   ↓                    ↓
+  write tests    implement code         review & merge
+     ↓                   ↓                    ↓
+   (close)      (depends on test)      (depends on all code)
+```
+
+### Commands to Apply
+
+```bash
+# 1. Label the epic
+bd update <epic-id> --add-label ace:epic
+
+# 2. Create test tasks (children of epic)
+bd create --title="Test: <feature>" --type=task --parent=<epic-id> --labels=ace:test
+
+# 3. Create code tasks (children of epic, depend on tests)
+bd create --title="Implement: <feature>" --type=task --parent=<epic-id> --labels=ace:code
+bd dep add <code-task-id> <test-task-id>
+
+# 4. Create review gate (child of epic)
+bd create --title="Review: <epic-name>" --type=task --parent=<epic-id> --labels=ace:review
+```
+
+### Converting Plans to Epics
+
+**IMPORTANT: Ask the user before creating epic structure:**
+
+> "Should this be a single epic with phases as tasks, or one epic per phase?"
+
+**Single epic** (simpler, fewer beads):
+- One `ace:epic` containing all phases
+- Good for cohesive features that ship together
+
+**Epic per phase** (more granular):
+- Each phase becomes its own `ace:epic`
+- Good for large migrations where phases can ship independently
+- Allows parallel work on different phases
+
+### Phase Detection Logic
+
+Ralph detects phases in this priority:
+
+1. **L1-Micro**: Code task `in_progress` + last run failed → iterate on failing tests
+2. **L2-Task (test)**: Any test task open → write failing tests
+3. **L2-Task (code)**: Code task open + its test closed → implement code
+4. **L3-Epic**: All code closed + review open → review gate
+5. **Complete**: Review closed + all tasks closed
+6. **Stuck**: No actionable work (missing labels or structure)
+
+### Validation
+
+```bash
+bd show <epic-id>           # Verify ace:epic label
+bd list --parent=<epic-id>  # List children, verify labels
+bd blocked                  # See dependency structure
+```
+
+---
+
 ## Chain Price List Sources
 
 | Chain | Price List URL | Format | Status |
