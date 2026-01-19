@@ -239,12 +239,15 @@ let dbInstance: DatabaseType | null = null;
 
 /**
  * Create a Drizzle database instance for CLI usage.
- * Uses the DATABASE_PATH environment variable or default path.
+ * Uses the DATABASE_URL environment variable.
  */
 async function createCliDatabase(): Promise<DatabaseType> {
 	if (!dbInstance) {
-		const dbPath = process.env.DATABASE_PATH || "./data/app.db";
-		dbInstance = createDb(dbPath);
+		const databaseUrl = process.env.DATABASE_URL;
+		if (!databaseUrl) {
+			throw new Error("DATABASE_URL environment variable is required");
+		}
+		dbInstance = createDb(databaseUrl);
 	}
 	return dbInstance;
 }

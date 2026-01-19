@@ -57,7 +57,7 @@ const config = defineConfig({
   ],
   ssr: {
     // Externalize native Node.js modules
-    external: ['better-sqlite3', 'bree'],
+    external: ['bree'],
   },
 })
 

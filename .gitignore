@@ -5,8 +5,10 @@ dist-ssr
 *.local
 count.txt
 .env
-.env.*
+.env.local
+.env.*.local
 !.env.example
+!.env.development
 .nitro
 .tanstack
 .output
@@ -21,3 +23,7 @@ todos.json
 data/
 # bd worktree
 main-fgy/
+
+# Postgres
+*.postgres.conf
+

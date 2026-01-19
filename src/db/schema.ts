@@ -1,45 +1,44 @@
 import { sql } from "drizzle-orm";
 import {
-	type AnySQLiteColumn,
+	type AnyPgColumn,
+	boolean,
 	index,
 	integer,
-	sqliteTable,
+	pgTable,
+	serial,
 	text,
+	timestamp,
 	uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 import { cuid2 } from "./custom-types";
 
-export const todos = sqliteTable("todos", {
-	id: integer({ mode: "number" }).primaryKey({
-		autoIncrement: true,
-	}),
+export const todos = pgTable("todos", {
+	id: serial().primaryKey(),
 	title: text().notNull(),
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Better Auth tables
-export const user = sqliteTable("user", {
+export const user = pgTable("user", {
 	id: text("id").primaryKey(),
 	name: text("name").notNull(),
 	email: text("email").notNull().unique(),
-	emailVerified: integer("emailVerified", { mode: "boolean" }).notNull(),
+	emailVerified: boolean("emailVerified").notNull(),
 	image: text("image"),
 	role: text("role").default("user"),
-	banned: integer("banned", { mode: "boolean" }).default(false),
-	bannedAt: integer("bannedAt", { mode: "timestamp" }),
+	banned: boolean("banned").default(false),
+	bannedAt: timestamp("bannedAt"),
 	bannedReason: text("bannedReason"),
-	createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
-	updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull(),
+	createdAt: timestamp("createdAt").notNull(),
+	updatedAt: timestamp("updatedAt").notNull(),
 });
 
-export const session = sqliteTable("session", {
+export const session = pgTable("session", {
 	id: text("id").primaryKey(),
-	expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
+	expiresAt: timestamp("expiresAt").notNull(),
 	token: text("token").notNull().unique(),
-	createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
-	updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull(),
+	createdAt: timestamp("createdAt").notNull(),
+	updatedAt: timestamp("updatedAt").notNull(),
 	ipAddress: text("ipAddress"),
 	userAgent: text("userAgent"),
 	userId: text("userId")
@@ -47,7 +46,7 @@ export const session = sqliteTable("session", {
 		.references(() => user.id, { onDelete: "cascade" }),
 });
 
-export const account = sqliteTable("account", {
+export const account = pgTable("account", {
 	id: text("id").primaryKey(),
 	accountId: text("accountId").notNull(),
 	providerId: text("providerId").notNull(),
@@ -57,26 +56,24 @@ export const account = sqliteTable("account", {
 	accessToken: text("accessToken"),
 	refreshToken: text("refreshToken"),
 	idToken: text("idToken"),
-	accessTokenExpiresAt: integer("accessTokenExpiresAt", { mode: "timestamp" }),
-	refreshTokenExpiresAt: integer("refreshTokenExpiresAt", {
-		mode: "timestamp",
-	}),
+	accessTokenExpiresAt: timestamp("accessTokenExpiresAt"),
+	refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt"),
 	scope: text("scope"),
 	password: text("password"),
-	createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
-	updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull(),
+	createdAt: timestamp("createdAt").notNull(),
+	updatedAt: timestamp("updatedAt").notNull(),
 });
 
-export const verification = sqliteTable("verification", {
+export const verification = pgTable("verification", {
 	id: text("id").primaryKey(),
 	identifier: text("identifier").notNull(),
 	value: text("value").notNull(),
-	expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
-	createdAt: integer("createdAt", { mode: "timestamp" }),
-	updatedAt: integer("updatedAt", { mode: "timestamp" }),
+	expiresAt: timestamp("expiresAt").notNull(),
+	createdAt: timestamp("createdAt"),
+	updatedAt: timestamp("updatedAt"),
 });
 
-export const passkey = sqliteTable("passkey", {
+export const passkey = pgTable("passkey", {
 	id: text("id").primaryKey(),
 	name: text("name"),
 	publicKey: text("publicKey").notNull(),
@@ -86,39 +83,35 @@ export const passkey = sqliteTable("passkey", {
 	credentialID: text("credentialID").notNull().unique(),
 	counter: integer("counter").notNull(),
 	deviceType: text("deviceType").notNull(),
-	backedUp: integer("backedUp", { mode: "boolean" }).notNull(),
+	backedUp: boolean("backedUp").notNull(),
 	transports: text("transports"),
-	createdAt: integer("createdAt", { mode: "timestamp" }),
+	createdAt: timestamp("createdAt"),
 });
 
 // App Settings table
-export const appSettings = sqliteTable("app_settings", {
+export const appSettings = pgTable("app_settings", {
 	id: cuid2("cfg").primaryKey(),
 	appName: text("appName").default("Kosarica"),
-	requireEmailVerification: integer("requireEmailVerification", {
-		mode: "boolean",
-	}).default(false),
+	requireEmailVerification: boolean("requireEmailVerification").default(false),
 	minPasswordLength: integer("minPasswordLength").default(8),
 	maxPasswordLength: integer("maxPasswordLength").default(128),
-	passkeyEnabled: integer("passkeyEnabled", { mode: "boolean" }).default(true),
-	updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull(),
+	passkeyEnabled: boolean("passkeyEnabled").default(true),
+	updatedAt: timestamp("updatedAt").notNull(),
 });
 
 // ============================================================================
 // Retail World: chains, stores, store_identifiers, retailer_items, retailer_item_barcodes
 // ============================================================================
 
-export const chains = sqliteTable("chains", {
+export const chains = pgTable("chains", {
 	slug: text("slug").primaryKey(), // konzum, lidl, plodine, etc.
 	name: text("name").notNull(),
 	website: text("website"),
 	logoUrl: text("logo_url"),
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const stores = sqliteTable(
+export const stores = pgTable(
 	"stores",
 	{
 		id: cuid2("sto").primaryKey(),
@@ -132,17 +125,13 @@ export const stores = sqliteTable(
 		latitude: text("latitude"), // stored as text for precision
 		longitude: text("longitude"),
 		// Virtual store support
-		isVirtual: integer("is_virtual", { mode: "boolean" }).default(true),
+		isVirtual: boolean("is_virtual").default(true),
 		priceSourceStoreId: text("price_source_store_id").references(
-			(): AnySQLiteColumn => stores.id,
+			(): AnyPgColumn => stores.id,
 		),
 		status: text("status").default("active"), // 'active' | 'pending'
-		createdAt: integer("created_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
-		updatedAt: integer("updated_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
 	},
 	(table) => ({
 		chainSlugIdx: index("stores_chain_slug_idx").on(table.chainSlug),
@@ -154,7 +143,7 @@ export const stores = sqliteTable(
 	}),
 );
 
-export const storeIdentifiers = sqliteTable(
+export const storeIdentifiers = pgTable(
 	"store_identifiers",
 	{
 		id: cuid2("sid").primaryKey(),
@@ -163,9 +152,7 @@ export const storeIdentifiers = sqliteTable(
 			.references(() => stores.id, { onDelete: "cascade" }),
 		type: text("type").notNull(), // 'filename_code', 'portal_id', 'internal_id', etc.
 		value: text("value").notNull(),
-		createdAt: integer("created_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => ({
 		storeTypeValueUnique: uniqueIndex(
@@ -178,7 +165,7 @@ export const storeIdentifiers = sqliteTable(
 	}),
 );
 
-export const retailerItems = sqliteTable(
+export const retailerItems = pgTable(
 	"retailer_items",
 	{
 		id: cuid2("rit").primaryKey(),
@@ -194,12 +181,8 @@ export const retailerItems = sqliteTable(
 		unit: text("unit"), // kg, l, kom, etc.
 		unitQuantity: text("unit_quantity"), // "1", "0.5", "500g", etc.
 		imageUrl: text("image_url"),
-		createdAt: integer("created_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
-		updatedAt: integer("updated_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
 	},
 	(table) => ({
 		chainExternalIdIdx: index("retailer_items_chain_external_id_idx").on(
@@ -213,7 +196,7 @@ export const retailerItems = sqliteTable(
 	}),
 );
 
-export const retailerItemBarcodes = sqliteTable(
+export const retailerItemBarcodes = pgTable(
 	"retailer_item_barcodes",
 	{
 		id: cuid2("rib").primaryKey(),
@@ -221,10 +204,8 @@ export const retailerItemBarcodes = sqliteTable(
 			.notNull()
 			.references(() => retailerItems.id, { onDelete: "cascade" }),
 		barcode: text("barcode").notNull(), // EAN-13, EAN-8, etc.
-		isPrimary: integer("is_primary", { mode: "boolean" }).default(false),
-		createdAt: integer("created_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		isPrimary: boolean("is_primary").default(false),
+		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => ({
 		barcodeIdx: index("retailer_item_barcodes_barcode_idx").on(table.barcode),
@@ -235,7 +216,7 @@ export const retailerItemBarcodes = sqliteTable(
 // Canonical Catalog: products, product_aliases, product_links, product_relations
 // ============================================================================
 
-export const products = sqliteTable("products", {
+export const products = pgTable("products", {
 	id: cuid2("prd").primaryKey(),
 	name: text("name").notNull(),
 	description: text("description"),
@@ -245,27 +226,21 @@ export const products = sqliteTable("products", {
 	unit: text("unit"),
 	unitQuantity: text("unit_quantity"),
 	imageUrl: text("image_url"),
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
-	updatedAt: integer("updated_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
+	updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const productAliases = sqliteTable("product_aliases", {
+export const productAliases = pgTable("product_aliases", {
 	id: cuid2("pal").primaryKey(),
 	productId: text("product_id")
 		.notNull()
 		.references(() => products.id, { onDelete: "cascade" }),
 	alias: text("alias").notNull(), // alternative name/variant
 	source: text("source"), // where this alias came from
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const productLinks = sqliteTable(
+export const productLinks = pgTable(
 	"product_links",
 	{
 		id: cuid2("plk").primaryKey(),
@@ -276,9 +251,7 @@ export const productLinks = sqliteTable(
 			.notNull()
 			.references(() => retailerItems.id, { onDelete: "cascade" }),
 		confidence: text("confidence"), // 'auto', 'manual', 'verified'
-		createdAt: integer("created_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => ({
 		productRetailerItemUnique: uniqueIndex(
@@ -287,7 +260,7 @@ export const productLinks = sqliteTable(
 	}),
 );
 
-export const productRelations = sqliteTable("product_relations", {
+export const productRelations = pgTable("product_relations", {
 	id: cuid2("prl").primaryKey(),
 	productId: text("product_id")
 		.notNull()
@@ -296,16 +269,14 @@ export const productRelations = sqliteTable("product_relations", {
 		.notNull()
 		.references(() => products.id, { onDelete: "cascade" }),
 	relationType: text("relation_type").notNull(), // 'variant', 'substitute', 'bundle', etc.
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
 });
 
 // ============================================================================
 // Prices: store_item_state, store_item_price_periods
 // ============================================================================
 
-export const storeItemState = sqliteTable(
+export const storeItemState = pgTable(
 	"store_item_state",
 	{
 		id: cuid2("sis").primaryKey(),
@@ -318,23 +289,19 @@ export const storeItemState = sqliteTable(
 		currentPrice: integer("current_price"), // price in cents/lipa
 		previousPrice: integer("previous_price"), // for comparison
 		discountPrice: integer("discount_price"), // promotional price if active
-		discountStart: integer("discount_start", { mode: "timestamp" }),
-		discountEnd: integer("discount_end", { mode: "timestamp" }),
-		inStock: integer("in_stock", { mode: "boolean" }).default(true),
+		discountStart: timestamp("discount_start"),
+		discountEnd: timestamp("discount_end"),
+		inStock: boolean("in_stock").default(true),
 		// Price transparency fields (Croatian regulation)
 		unitPrice: integer("unit_price"), // price per unit in cents (e.g., per kg/l)
 		unitPriceBaseQuantity: text("unit_price_base_quantity"), // base quantity for unit price (e.g., "1", "100")
 		unitPriceBaseUnit: text("unit_price_base_unit"), // unit for unit price (e.g., "kg", "l", "kom")
 		lowestPrice30d: integer("lowest_price_30d"), // lowest price in last 30 days, in cents
 		anchorPrice: integer("anchor_price"), // "sidrena cijena" anchor/reference price in cents
-		anchorPriceAsOf: integer("anchor_price_as_of", { mode: "timestamp" }), // date when anchor price was set
+		anchorPriceAsOf: timestamp("anchor_price_as_of"), // date when anchor price was set
 		priceSignature: text("price_signature"), // hash for deduplication (excludes lowestPrice30d to avoid churn)
-		lastSeenAt: integer("last_seen_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
-		updatedAt: integer("updated_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		lastSeenAt: timestamp("last_seen_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
 	},
 	(table) => ({
 		storeRetailerIdx: index("store_item_state_store_retailer_idx").on(
@@ -348,7 +315,7 @@ export const storeItemState = sqliteTable(
 	}),
 );
 
-export const storeItemPricePeriods = sqliteTable(
+export const storeItemPricePeriods = pgTable(
 	"store_item_price_periods",
 	{
 		id: cuid2("sip").primaryKey(),
@@ -357,11 +324,9 @@ export const storeItemPricePeriods = sqliteTable(
 			.references(() => storeItemState.id, { onDelete: "cascade" }),
 		price: integer("price").notNull(), // price in cents/lipa
 		discountPrice: integer("discount_price"),
-		startedAt: integer("started_at", { mode: "timestamp" }).notNull(),
-		endedAt: integer("ended_at", { mode: "timestamp" }),
-		createdAt: integer("created_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		startedAt: timestamp("started_at").notNull(),
+		endedAt: timestamp("ended_at"),
+		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => ({
 		storeItemStateIdx: index("store_item_price_periods_state_idx").on(
@@ -378,15 +343,15 @@ export const storeItemPricePeriods = sqliteTable(
 // Ingestion: ingestion_runs, ingestion_files, ingestion_file_entries, ingestion_errors
 // ============================================================================
 
-export const ingestionRuns = sqliteTable("ingestion_runs", {
+export const ingestionRuns = pgTable("ingestion_runs", {
 	id: cuid2("igr").primaryKey(),
 	chainSlug: text("chain_slug")
 		.notNull()
 		.references(() => chains.slug, { onDelete: "cascade" }),
 	source: text("source").notNull(), // 'cli', 'worker', 'scheduled'
 	status: text("status").notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
-	startedAt: integer("started_at", { mode: "timestamp" }),
-	completedAt: integer("completed_at", { mode: "timestamp" }),
+	startedAt: timestamp("started_at"),
+	completedAt: timestamp("completed_at"),
 	totalFiles: integer("total_files").default(0),
 	processedFiles: integer("processed_files").default(0),
 	totalEntries: integer("total_entries").default(0),
@@ -397,12 +362,10 @@ export const ingestionRuns = sqliteTable("ingestion_runs", {
 	parentRunId: text("parent_run_id"), // FK to ingestionRuns.id for rerun tracking
 	rerunType: text("rerun_type"), // 'file', 'chunk', 'entry', null for original runs
 	rerunTargetId: text("rerun_target_id"), // ID of the file/chunk/entry being rerun
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const ingestionFiles = sqliteTable("ingestion_files", {
+export const ingestionFiles = pgTable("ingestion_files", {
 	id: cuid2("igf").primaryKey(),
 	runId: text("run_id")
 		.notNull()
@@ -413,18 +376,16 @@ export const ingestionFiles = sqliteTable("ingestion_files", {
 	fileHash: text("file_hash"), // for deduplication
 	status: text("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
 	entryCount: integer("entry_count").default(0),
-	processedAt: integer("processed_at", { mode: "timestamp" }),
+	processedAt: timestamp("processed_at"),
 	metadata: text("metadata"), // JSON for file-specific info
 	// Chunking support
 	totalChunks: integer("total_chunks").default(0),
 	processedChunks: integer("processed_chunks").default(0),
 	chunkSize: integer("chunk_size"), // rows per chunk
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const ingestionChunks = sqliteTable(
+export const ingestionChunks = pgTable(
 	"ingestion_chunks",
 	{
 		id: cuid2("igc").primaryKey(),
@@ -439,10 +400,8 @@ export const ingestionChunks = sqliteTable(
 		r2Key: text("r2_key"), // R2 object key for chunk JSON
 		persistedCount: integer("persisted_count").default(0),
 		errorCount: integer("error_count").default(0),
-		processedAt: integer("processed_at", { mode: "timestamp" }),
-		createdAt: integer("created_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		processedAt: timestamp("processed_at"),
+		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => ({
 		fileChunkIdx: index("ingestion_chunks_file_chunk_idx").on(
@@ -453,7 +412,7 @@ export const ingestionChunks = sqliteTable(
 	}),
 );
 
-export const ingestionFileEntries = sqliteTable("ingestion_file_entries", {
+export const ingestionFileEntries = pgTable("ingestion_file_entries", {
 	id: cuid2("ige").primaryKey(),
 	fileId: text("file_id")
 		.notNull()
@@ -467,12 +426,10 @@ export const ingestionFileEntries = sqliteTable("ingestion_file_entries", {
 	barcode: text("barcode"),
 	rawData: text("raw_data"), // JSON of original row
 	status: text("status").notNull().default("pending"), // 'pending', 'processed', 'skipped', 'failed'
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const ingestionErrors = sqliteTable("ingestion_errors", {
+export const ingestionErrors = pgTable("ingestion_errors", {
 	id: cuid2("ier").primaryKey(),
 	runId: text("run_id")
 		.notNull()
@@ -490,16 +447,14 @@ export const ingestionErrors = sqliteTable("ingestion_errors", {
 	errorMessage: text("error_message").notNull(),
 	errorDetails: text("error_details"), // JSON with stack trace, context, etc.
 	severity: text("severity").notNull().default("error"), // 'warning', 'error', 'critical'
-	createdAt: integer("created_at", { mode: "timestamp" }).default(
-		sql`(unixepoch())`,
-	),
+	createdAt: timestamp("created_at").defaultNow(),
 });
 
 // ============================================================================
 // Store Enrichment: store_enrichment_tasks
 // ============================================================================
 
-export const storeEnrichmentTasks = sqliteTable(
+export const storeEnrichmentTasks = pgTable(
 	"store_enrichment_tasks",
 	{
 		id: cuid2("set").primaryKey(),
@@ -514,14 +469,10 @@ export const storeEnrichmentTasks = sqliteTable(
 		verifiedBy: text("verified_by").references(() => user.id, {
 			onDelete: "set null",
 		}),
-		verifiedAt: integer("verified_at", { mode: "timestamp" }),
+		verifiedAt: timestamp("verified_at"),
 		errorMessage: text("error_message"),
-		createdAt: integer("created_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
-		updatedAt: integer("updated_at", { mode: "timestamp" }).default(
-			sql`(unixepoch())`,
-		),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
 	},
 	(table) => ({
 		storeTypeIdx: index("store_enrichment_tasks_store_type_idx").on(
