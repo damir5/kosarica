@@ -93,11 +93,8 @@ func Decode(data []byte, enc Encoding) (string, error) {
 
 // decodeWindows1250 decodes Windows-1250 encoded bytes to UTF-8
 func decodeWindows1250(data []byte) (string, error) {
-	// First try using the standard charmap decoder
-	decoder := charmap.Windows1252.NewDecoder()
-	// Windows1252 doesn't have all Croatian chars, so we need custom handling
-
 	// Use a custom transformer for full Windows-1250 support
+	// Windows1252 doesn't have all Croatian chars, so we need custom handling
 	result := make([]byte, len(data)*4) // Worst case: 4 bytes per rune
 	out := 0
 
@@ -106,10 +103,9 @@ func decodeWindows1250(data []byte) (string, error) {
 			n := utf8.EncodeRune(result[out:], r)
 			out += n
 		} else {
-			// Use Windows-1252 as fallback for most characters
-			r, _ := charmap.Windows1252.DecodeRune(b)
-			n := utf8.EncodeRune(result[out:], r)
-			out += n
+			// For ASCII and other characters, use as-is
+			result[out] = b
+			out++
 		}
 	}
 

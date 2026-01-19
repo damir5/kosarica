@@ -67,7 +67,7 @@ func CalculateRateLimitBackoff(attempt int, config Config, retryAfterHeader *str
 }
 
 // Sleep blocks for the specified duration in milliseconds
-func Sleep(ms int) {
+func Sleep(ms int64) {
 	time.Sleep(time.Duration(ms) * time.Millisecond)
 }
 

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kosarica/price-service/internal/adapters/config"
+	_ "github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/xml"
 	"github.com/kosarica/price-service/internal/types"
 )

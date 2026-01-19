@@ -2,7 +2,7 @@ package csv
 
 import (
 	"strings"
-	"unicode"
+	"unicode/utf8"
 )
 
 // DetectDelimiter detects the CSV delimiter by analyzing the first few lines
@@ -128,6 +128,3 @@ func SplitCSVLine(line string, delimiter rune, quoteChar rune) []string {
 
 	return fields
 }
-
-// utf8.DecodeRuneInString is a helper for UTF-8 decoding from string
-import "unicode/utf8"

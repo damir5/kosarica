@@ -65,6 +65,17 @@ func main() {
 	// Register routes
 	router.GET("/health", handlers.HealthCheck)
 
+	// Ingestion routes (internal admin API)
+	// Note: More specific routes must come before generic ones
+	internal := router.Group("/internal/admin")
+	{
+		// Status endpoint must come before :chain to avoid :runId/:chain conflict
+		internal.GET("/ingest/runs/:chain", handlers.ListIngestionRuns)
+		internal.GET("/ingest/runs", handlers.ListIngestionRuns) // List all runs
+		internal.POST("/ingest/:chain", handlers.IngestChain)
+		internal.GET("/ingest/status/:runId", handlers.GetIngestionStatus)
+	}
+
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{

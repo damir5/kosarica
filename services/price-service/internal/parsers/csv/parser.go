@@ -3,7 +3,6 @@ package csv
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -46,11 +45,11 @@ func (p *Parser) ParseWithStoreID(content []byte, storeID string) (*types.ParseR
 	// Detect encoding if not set
 	if opts.Encoding == "" {
 		detected := charset.DetectEncoding(content)
-		opts.Encoding = detected
+		opts.Encoding = CsvEncoding(detected)
 	}
 
 	// Decode content to UTF-8
-	decoded, err := charset.Decode(content, opts.Encoding)
+	decoded, err := charset.Decode(content, charset.Encoding(opts.Encoding))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode content: %w", err)
 	}

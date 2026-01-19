@@ -1,7 +1,5 @@
 package csv
 
-import "time"
-
 // CsvDelimiter represents supported CSV delimiters
 type CsvDelimiter string
 

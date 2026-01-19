@@ -57,7 +57,7 @@ type LoggingConfig struct {
 
 var globalConfig *Config
 
-// Load loads the configuration from file and environment variables
+// Load loads the configuration from file, .env, and environment variables
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
 
@@ -74,9 +74,18 @@ func Load(configPath string) (*Config, error) {
 		v.AddConfigPath(".")
 	}
 
+	// Load .env file using godotenv
+	if err := loadEnvFile(v); err != nil {
+		// .env is optional, log but don't fail
+		fmt.Printf("Warning: .env file not loaded: %v\n", err)
+	}
+
 	// Enable environment variable override
 	v.AutomaticEnv()
 	v.SetEnvPrefix("PRICE_SERVICE")
+
+	// Bind env keys for nested config
+	bindEnvVars(v)
 
 	// Read config file (optional)
 	if err := v.ReadInConfig(); err != nil {
@@ -93,6 +102,44 @@ func Load(configPath string) (*Config, error) {
 
 	globalConfig = &cfg
 	return &cfg, nil
+}
+
+// loadEnvFile loads .env file using viper's automatic env detection
+func loadEnvFile(v *viper.Viper) error {
+	// Try to load .env file from various locations
+	envPaths := []string{
+		".",
+		"../../..", // From services/price-service to workspace root
+		"./config",
+	}
+
+	for _, path := range envPaths {
+		envFile := fmt.Sprintf("%s/.env", path)
+		if _, err := os.Stat(envFile); err == nil {
+			v.SetConfigFile(envFile)
+			v.SetConfigType("env")
+			if err := v.ReadInConfig(); err == nil {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("no .env file found")
+}
+
+// bindEnvVars binds environment variables to config keys
+func bindEnvVars(v *viper.Viper) {
+	// Database
+	v.BindEnv("database.url", "DATABASE_URL")
+
+	// Server
+	v.BindEnv("server.port", "PORT")
+	v.BindEnv("server.host", "HOST")
+
+	// Logging
+	v.BindEnv("logging.level", "LOG_LEVEL")
+
+	// Storage
+	v.BindEnv("storage.base_path", "STORAGE_PATH")
 }
 
 // setDefaults sets default configuration values

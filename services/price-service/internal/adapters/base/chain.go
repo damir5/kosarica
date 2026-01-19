@@ -31,7 +31,7 @@ type ChainAdapter interface {
 	Slug() string
 	Name() string
 	SupportedTypes() []types.FileType
-	Discover() ([]types.DiscoveredFile, error)
+	Discover(targetDate string) ([]types.DiscoveredFile, error)
 	Fetch(file types.DiscoveredFile) (*types.FetchedFile, error)
 	Parse(content []byte, filename string, options *types.ParseOptions) (*types.ParseResult, error)
 	ExtractStoreIdentifier(file types.DiscoveredFile) *types.StoreIdentifier
@@ -123,8 +123,19 @@ func (a *BaseChainAdapter) SupportedTypes() []types.FileType {
 	return a.supportedTypes
 }
 
+// BaseURL returns the base URL for the chain's portal
+func (a *BaseChainAdapter) BaseURL() string {
+	return a.config.BaseURL
+}
+
+// HTTPClient returns the HTTP client for making requests
+func (a *BaseChainAdapter) HTTPClient() *httpclient.Client {
+	return a.httpClient
+}
+
 // Discover discovers available price files from the chain's portal
-func (a *BaseChainAdapter) Discover() ([]types.DiscoveredFile, error) {
+// targetDate is optional (can be empty string) - subclasses may use it for date-specific discovery
+func (a *BaseChainAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) {
 	baseURL := a.config.BaseURL
 	discoveredFiles := make([]types.DiscoveredFile, 0)
 

@@ -1,0 +1,47 @@
+# Binaries
+/server
+/price-service
+/price-service-cli
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Configuration overrides (optional local config)
+config.local.yaml
+
+# Data directories
+data/
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/

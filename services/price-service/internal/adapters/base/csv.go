@@ -3,7 +3,7 @@ package base
 import (
 	"regexp"
 
-	"github.com/kosarica/price-service/internal/adapters/config"
+	_ "github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/csv"
 	"github.com/kosarica/price-service/internal/types"
 )
