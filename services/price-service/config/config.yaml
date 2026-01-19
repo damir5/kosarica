@@ -1,0 +1,29 @@
+# Price Service Configuration
+
+server:
+  port: 3003
+  host: "0.0.0.0"
+  read_timeout: 30s
+  write_timeout: 30s
+
+database:
+  url: ${DATABASE_URL}
+  max_connections: 25
+  min_connections: 5
+  max_conn_lifetime: 1h
+  max_conn_idle_time: 30m
+
+rate_limit:
+  requests_per_second: 2
+  max_retries: 3
+  initial_backoff_ms: 100
+  max_backoff_ms: 30000
+
+storage:
+  type: "local"
+  base_path: "./data/archives"
+
+logging:
+  level: "info"
+  format: "json"
+  no_color: false

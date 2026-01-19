@@ -42,3 +42,20 @@ main-ugi/
 
 # Postgres
 *.postgres.conf
+
+# Go build binaries
+/server
+/price-service
+/services/price-service/server
+/services/price-service/price-service-cli
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
