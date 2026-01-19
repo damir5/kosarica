@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/rs/zerolog v1.31.0
 	github.com/spf13/viper v1.18.2
+	github.com/xuri/excelize/v2 v2.8.1
 	golang.org/x/text v0.14.0
 )
 
