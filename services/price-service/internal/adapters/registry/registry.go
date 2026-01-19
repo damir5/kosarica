@@ -70,9 +70,8 @@ func (r *Registry) GetOrInit(chainID config.ChainID) (ChainAdapter, error) {
 	switch chainID {
 	case config.ChainKonzum:
 		adapter, err = chains.NewKonzumAdapter()
-	// Future chains will be added here
-	// case config.ChainLidl:
-	// 	adapter, err = chains.NewLidlAdapter()
+	case config.ChainLidl:
+		adapter, err = chains.NewLidlAdapter()
 	default:
 		return nil, fmt.Errorf("no adapter implementation for chain: %s", chainID)
 	}
@@ -131,6 +130,13 @@ func InitializeDefaultAdapters() error {
 		return fmt.Errorf("failed to initialize Konzum adapter: %w", err)
 	}
 	DefaultRegistry.Register(config.ChainKonzum, konzumAdapter)
+
+	// Register Lidl
+	lidlAdapter, err := chains.NewLidlAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Lidl adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainLidl, lidlAdapter)
 
 	// Future chains will be initialized here as they are implemented
 	return nil
