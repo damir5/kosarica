@@ -113,12 +113,24 @@ func (a *BaseXmlAdapter) Parse(content []byte, filename string, options *types.P
 
 // parseWithItemsPath attempts to parse XML with specific items path and field mapping
 func (a *BaseXmlAdapter) parseWithItemsPath(content []byte, itemsPath string, fieldMapping xml.XmlFieldMapping, storeIdentifier string) (*types.ParseResult, error) {
-	// XML parsing will be fully implemented in Phase 7
-	// For now, return a not-implemented error to avoid silent success
-	return nil, &AdapterError{
-		Chain: a.name,
-		Msg:   "XML parsing not yet implemented - see Phase 7",
+	// Create parser with options
+	parserOpts := xml.XmlParserOptions{
+		ItemsPath:              itemsPath,
+		FieldMapping:           fieldMapping,
+		DefaultStoreIdentifier: storeIdentifier,
+		AttributePrefix:        "@_",
+		Encoding:               "auto",
 	}
+
+	parser := xml.NewParser(parserOpts)
+
+	// Parse with the specified items path and mapping
+	result, err := parser.ParseWithItemsPath(content, itemsPath, fieldMapping, storeIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // ExtractStoreIdentifier extracts store identifier from XML file
