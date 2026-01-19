@@ -15,11 +15,15 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     // Use standard Node.js environment
     environment: "node",
-    // Enable threading for performance
+    // Run tests sequentially to avoid migration conflicts
     pool: "threads",
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
     // Set environment variables for tests
     env: {
-      DATABASE_PATH: ":memory:",
       STORAGE_PATH: "./test-data/storage",
       SAMPLE_DATA_DIR: path.join(process.cwd(), "sample-data"),
     },

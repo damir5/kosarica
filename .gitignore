@@ -5,8 +5,10 @@ dist-ssr
 *.local
 count.txt
 .env
-.env.*
+.env.local
+.env.*.local
 !.env.example
+!.env.development
 .nitro
 .tanstack
 .output
@@ -37,3 +39,6 @@ main-c8l/
 main-bqm/
 # bd worktree
 main-ugi/
+
+# Postgres
+*.postgres.conf

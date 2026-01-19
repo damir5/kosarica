@@ -5,8 +5,8 @@ import { getDatabase, type DatabaseType } from "@/db";
  * Loaded from process.env at runtime.
  */
 export interface AppEnv {
-	/** Path to SQLite database file */
-	DATABASE_PATH: string;
+	/** Postgres connection string */
+	DATABASE_URL: string;
 	/** Path to file storage directory */
 	STORAGE_PATH: string;
 	/** Better Auth secret */
@@ -28,8 +28,12 @@ export interface AppEnv {
  * Returns a typed object with all environment variables.
  */
 export function getEnv(): AppEnv {
+	const DATABASE_URL = process.env.DATABASE_URL;
+	if (!DATABASE_URL) {
+		throw new Error("DATABASE_URL environment variable is required");
+	}
 	return {
-		DATABASE_PATH: process.env.DATABASE_PATH || "./data/app.db",
+		DATABASE_URL,
 		STORAGE_PATH: process.env.STORAGE_PATH || "./data/storage",
 		BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || "",
 		BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || "http://localhost:3002",

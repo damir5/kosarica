@@ -1,4 +1,4 @@
-import { text } from "drizzle-orm/sqlite-core";
+import { text } from "drizzle-orm/pg-core";
 import { generatePrefixedId } from "@/utils/id";
 
 /**
@@ -17,7 +17,7 @@ export interface Cuid2Options {
  * Uses native crypto APIs for Cloudflare Workers compatibility.
  *
  * By default, generates time-sortable IDs (6-char timestamp + 18-char random)
- * for better B-tree index locality in SQLite.
+ * for better B-tree index locality.
  *
  * @param prefix - The prefix to prepend to the ID (e.g., 'usr', 'ses', 'cfg')
  * @param options - Optional configuration (timeSortable defaults to true)

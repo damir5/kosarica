@@ -156,7 +156,7 @@ export interface FileRoutesByFullPath {
   '/admin/ingestion/$runId': typeof AdminAdminIngestionRunIdRouteWithChildren
   '/admin/stores/$storeId': typeof AdminAdminStoresStoreIdRoute
   '/admin/stores/pending': typeof AdminAdminStoresPendingRoute
-  '/admin/config': typeof AdminAdminConfigIndexRoute
+  '/admin/config/': typeof AdminAdminConfigIndexRoute
   '/admin/ingestion/': typeof AdminAdminIngestionIndexRoute
   '/admin/stores/': typeof AdminAdminStoresIndexRoute
   '/admin/ingestion/$runId/$fileId': typeof AdminAdminIngestionRunIdFileIdRoute
@@ -223,7 +223,7 @@ export interface FileRouteTypes {
     | '/admin/ingestion/$runId'
     | '/admin/stores/$storeId'
     | '/admin/stores/pending'
-    | '/admin/config'
+    | '/admin/config/'
     | '/admin/ingestion/'
     | '/admin/stores/'
     | '/admin/ingestion/$runId/$fileId'
@@ -300,7 +300,7 @@ declare module '@tanstack/react-router' {
     '/_admin': {
       id: '/_admin'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof AdminRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -398,7 +398,7 @@ declare module '@tanstack/react-router' {
     '/_admin/admin/config/': {
       id: '/_admin/admin/config/'
       path: '/config'
-      fullPath: '/admin/config'
+      fullPath: '/admin/config/'
       preLoaderRoute: typeof AdminAdminConfigIndexRouteImport
       parentRoute: typeof AdminAdminRoute
     }

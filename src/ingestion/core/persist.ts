@@ -44,12 +44,12 @@ type StoreItemStateSelect = InferSelectModel<typeof storeItemState>;
 // ============================================================================
 
 /**
- * Database type for D1 operations.
+ * Database type for database operations.
  *
- * D1 is used across all environments:
- * - Production: Cloudflare D1 binding
- * - Local CLI: Wrangler's local D1 instance
- * - Tests: Miniflare in-memory D1
+ * PostgreSQL is used across all environments:
+ * - Production: PostgreSQL database
+ * - Local CLI: Local PostgreSQL instance
+ * - Tests: PostgreSQL test database
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDatabase = any;
@@ -66,78 +66,17 @@ type DatabaseConnection = any;
 // Constants
 // ============================================================================
 
-/** Default batch size for batch operations - reduced to stay under D1's 100 bound parameter limit */
+/** Default batch size for batch operations */
 const DEFAULT_BATCH_SIZE = 50;
 
 /**
  * Dynamic batch sizes computed based on column counts.
- * D1 has a limit of 100 bound params per query; we use 80 for safety.
+ * Configured to stay under database bound parameter limits.
  */
 const BATCH_SIZE_RETAILER_ITEMS = computeBatchSize(11); // 11 columns → 7 rows
 const BATCH_SIZE_BARCODES = computeBatchSize(4); // 4 columns → 20 rows
 const BATCH_SIZE_STORE_ITEM_STATE = computeBatchSize(18); // 18 columns → 4 rows
 const BATCH_SIZE_PRICE_PERIODS = computeBatchSize(5); // 5 columns → 16 rows
-
-/** Maximum retry attempts for SQLITE_BUSY errors */
-const MAX_BUSY_RETRIES = 10;
-
-/** Base delay in ms for SQLITE_BUSY retry backoff (exponential) */
-const BUSY_RETRY_DELAY_MS = 100;
-
-/**
- * Retry a database operation on SQLITE_BUSY errors with exponential backoff.
- *
- * @param operation - The async operation to retry
- * @param operationName - Name of the operation for error messages
- * @returns Result of the operation
- */
-async function retryOnBusy<T>(
-	operation: () => Promise<T>,
-	operationName: string = "database operation",
-): Promise<T> {
-	let lastError: Error | undefined;
-	for (let attempt = 0; attempt < MAX_BUSY_RETRIES; attempt++) {
-		try {
-			return await operation();
-		} catch (error) {
-			const err = error as Error;
-			lastError = err;
-
-			// Check if it's a SQLITE_BUSY error
-			const isBusyError =
-				err.message.includes("SQLITE_BUSY") ||
-				err.message.includes("database is locked") ||
-				err.message.includes("database is locked: SQLITE_BUSY");
-
-			if (!isBusyError) {
-				// Not a busy error, rethrow immediately
-				throw err;
-			}
-
-			// Calculate exponential backoff delay
-			const delay = BUSY_RETRY_DELAY_MS * 2 ** attempt;
-
-			// Log retry (only on first attempt and every 3rd attempt to reduce noise)
-			if (attempt === 0 || (attempt + 1) % 3 === 0) {
-				log.info("Database busy, retrying", {
-					phase: "retry",
-					operation: operationName,
-					attempt: attempt + 1,
-					maxRetries: MAX_BUSY_RETRIES,
-					delay,
-				});
-			}
-
-			// Wait before retrying
-			await new Promise((resolve) => setTimeout(resolve, delay));
-		}
-	}
-
-	// All retries exhausted
-	throw new Error(
-		`Failed after ${MAX_BUSY_RETRIES} retries: ${lastError?.message || "unknown error"}`,
-	);
-}
 
 // ============================================================================
 // Price Signature
@@ -800,7 +739,7 @@ export async function persistPrice(
 
 /**
  * Persist a batch of normalized rows for a store.
- * Uses db.batch() to minimize network round-trips to D1.
+ * Uses db.batch() to minimize network round-trips to the database.
  *
  * Two-phase approach:
  * 1. Phase 1: Batch all lookups in single call
@@ -964,11 +903,8 @@ async function persistRowChunkBatched(
 		}),
 	);
 
-	// Execute all lookups in single batch (with retry for SQLITE_BUSY)
-	const lookupResults = (await retryOnBusy(
-		() => db.batch(lookupQueries),
-		"lookup batch",
-	)) as unknown[][];
+	// Execute all lookups in single batch
+	const lookupResults = (await db.batch(lookupQueries)) as unknown[][];
 
 	// Parse lookup results
 	let queryIndex = 0;
@@ -1082,10 +1018,7 @@ async function persistRowChunkBatched(
 
 	const lookupResults2 =
 		lookupQueries2.length > 0
-			? ((await retryOnBusy(
-					() => db.batch(lookupQueries2),
-					"barcode/state lookup batch",
-				)) as unknown[][])
+			? ((await db.batch(lookupQueries2)) as unknown[][])
 			: ([] as unknown[][]);
 
 	// Parse barcode lookup results
@@ -1356,9 +1289,9 @@ async function persistRowChunkBatched(
 		);
 	}
 
-	// Execute all writes in a single batch (with retry for SQLITE_BUSY)
+	// Execute all writes in a single batch
 	if (writeQueries.length > 0) {
-		await retryOnBusy(() => db.batch(writeQueries), "write batch");
+		await db.batch(writeQueries);
 	}
 
 	// Calculate results
