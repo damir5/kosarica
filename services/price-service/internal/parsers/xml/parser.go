@@ -127,7 +127,7 @@ func (p *Parser) decodeContent(content []byte) (string, error) {
 	if enc == "" || enc == "auto" {
 		enc = p.detectEncodingFromDeclaration(content)
 		if enc == "" {
-			enc = charset.DetectEncoding(content)
+			enc = string(charset.DetectEncoding(content))
 		}
 	}
 

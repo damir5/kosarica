@@ -72,8 +72,24 @@ func (r *Registry) GetOrInit(chainID config.ChainID) (ChainAdapter, error) {
 		adapter, err = chains.NewKonzumAdapter()
 	case config.ChainLidl:
 		adapter, err = chains.NewLidlAdapter()
+	case config.ChainPlodine:
+		adapter, err = chains.NewPlodineAdapter()
+	case config.ChainInterspar:
+		adapter, err = chains.NewIntersparAdapter()
+	case config.ChainStudenac:
+		adapter, err = chains.NewStudenacAdapter()
+	case config.ChainKaufland:
+		adapter, err = chains.NewKauflandAdapter()
+	case config.ChainEurospin:
+		adapter, err = chains.NewEurospinAdapter()
 	case config.ChainDm:
 		adapter, err = chains.NewDmAdapter()
+	case config.ChainKtc:
+		adapter, err = chains.NewKtcAdapter()
+	case config.ChainMetro:
+		adapter, err = chains.NewMetroAdapter()
+	case config.ChainTrgocentar:
+		adapter, err = chains.NewTrgocentarAdapter()
 	default:
 		return nil, fmt.Errorf("no adapter implementation for chain: %s", chainID)
 	}
@@ -140,6 +156,41 @@ func InitializeDefaultAdapters() error {
 	}
 	DefaultRegistry.Register(config.ChainLidl, lidlAdapter)
 
+	// Register Plodine
+	plodineAdapter, err := chains.NewPlodineAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Plodine adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainPlodine, plodineAdapter)
+
+	// Register Interspar
+	intersparAdapter, err := chains.NewIntersparAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Interspar adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainInterspar, intersparAdapter)
+
+	// Register Studenac
+	studenacAdapter, err := chains.NewStudenacAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Studenac adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainStudenac, studenacAdapter)
+
+	// Register Kaufland
+	kauflandAdapter, err := chains.NewKauflandAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Kaufland adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainKaufland, kauflandAdapter)
+
+	// Register Eurospin
+	eurospinAdapter, err := chains.NewEurospinAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Eurospin adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainEurospin, eurospinAdapter)
+
 	// Register DM
 	dmAdapter, err := chains.NewDmAdapter()
 	if err != nil {
@@ -147,6 +198,26 @@ func InitializeDefaultAdapters() error {
 	}
 	DefaultRegistry.Register(config.ChainDm, dmAdapter)
 
-	// Future chains will be initialized here as they are implemented
+	// Register KTC
+	ktcAdapter, err := chains.NewKtcAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize KTC adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainKtc, ktcAdapter)
+
+	// Register Metro
+	metroAdapter, err := chains.NewMetroAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Metro adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainMetro, metroAdapter)
+
+	// Register Trgocentar
+	trgocentarAdapter, err := chains.NewTrgocentarAdapter()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Trgocentar adapter: %w", err)
+	}
+	DefaultRegistry.Register(config.ChainTrgocentar, trgocentarAdapter)
+
 	return nil
 }

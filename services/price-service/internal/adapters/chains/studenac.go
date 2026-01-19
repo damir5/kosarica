@@ -368,16 +368,16 @@ func (a *StudenacAdapter) ExtractStoreMetadata(file types.DiscoveredFile) *types
 		city := lastWord
 		address := strings.Join(words[:len(words)-1], " ")
 		return &types.StoreMetadata{
-			Name:      fmt.Sprintf("Studenac %s", titleCase(city)),
-			Address:   titleCase(address),
-			City:      titleCase(city),
+			Name:      fmt.Sprintf("Studenac %s", strings.Title(strings.ToLower(city))),
+			Address:   strings.Title(strings.ToLower(address)),
+			City:      strings.Title(strings.ToLower(city)),
 			StoreType: storeType,
 		}
 	}
 
 	return &types.StoreMetadata{
-		Name:      fmt.Sprintf("Studenac %s", titleCase(location)),
-		Address:   titleCase(location),
+		Name:      fmt.Sprintf("Studenac %s", strings.Title(strings.ToLower(location))),
+		Address:   strings.Title(strings.ToLower(location)),
 		StoreType: storeType,
 	}
 }
@@ -409,15 +409,4 @@ func isAllUpper(s string) bool {
 		}
 	}
 	return true
-}
-
-// titleCase converts string to title case
-func titleCase(s string) string {
-	words := strings.Split(strings.ToLower(s), " ")
-	for i, word := range words {
-		if len(word) > 0 {
-			words[i] = strings.ToUpper(string(word[0])) + word[1:]
-		}
-	}
-	return strings.Join(words, " ")
 }

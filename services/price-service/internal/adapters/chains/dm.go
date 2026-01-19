@@ -176,9 +176,11 @@ func (a *DmAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) 
 	// Primary: Try to discover from web
 	fmt.Printf("[INFO] Discovering DM price list from web portal...\n")
 
-	resp, err := a.HTTPClient().Head(dmPriceListURL)
+	resp, err := a.HTTPClient().Get(dmPriceListURL)
 	if err == nil && resp.StatusCode == 200 {
 		defer resp.Body.Close()
+		// Discard body since we only need headers
+		_, _ = io.Copy(io.Discard, resp.Body)
 
 		contentLength := resp.Header.Get("Content-Length")
 		lastModified := resp.Header.Get("Last-Modified")
