@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/storage"
 	"github.com/kosarica/price-service/internal/types"
 )
 
@@ -19,11 +21,12 @@ type FetchResult struct {
 	Hash       string
 	Content    []byte
 	IsZip      bool
+	ArchiveID  string // ID of the archive record
 }
 
 // FetchPhase executes the fetch phase of the ingestion pipeline
-// It downloads files from the discovered URLs
-func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile) (*FetchResult, error) {
+// It downloads files from the discovered URLs and stores them in archive storage
+func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, storageBackend storage.Storage) (*FetchResult, error) {
 	// Get adapter from registry
 	adapter, err := registry.GetAdapter(config.ChainID(chainID))
 	if err != nil {
@@ -41,23 +44,66 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile) 
 	// Compute hash
 	hash := computeSha256(fetched.Content)
 
-	// Check for duplicate by hash in storage
-	if isDuplicateFile(ctx, file.Filename, hash) {
-		fmt.Printf("[INFO] Skipping duplicate file: %s (hash: %s)\n", file.Filename, hash)
-		return nil, nil
+	// Check for duplicate by checksum in archives table
+	existingArchive, err := database.GetArchiveByChecksum(ctx, hash)
+	if err != nil && err != pgx.ErrNoRows {
+		return nil, fmt.Errorf("failed to check archive: %w", err)
+	}
+	if existingArchive != nil {
+		fmt.Printf("[INFO] Skipping duplicate file: %s (existing archive: %s)\n", file.Filename, existingArchive.ID)
+		return &FetchResult{
+			ArchiveID: existingArchive.ID,
+			Content:   fetched.Content,
+			IsZip:     file.Type == types.FileTypeZIP,
+		}, nil
 	}
 
-	// Store file in storage (for now, we'll just keep in memory)
-	// In Phase 10, we'll implement proper storage abstraction
-	storageKey := fmt.Sprintf("runs/%s/files/%s", time.Now().Format("20060102"), file.Filename)
+	// Generate archive ID
+	archiveID := database.GenerateArchiveID()
 
-	fmt.Printf("[INFO] Fetched file: %s (%d bytes, hash: %s)\n", file.Filename, len(fetched.Content), hash)
+	// Build storage key
+	storageKey := buildArchiveKey(chainID, file.Filename, time.Now())
+
+	// Store file in archive storage
+	metadata := &storage.Metadata{
+		OriginalName:  file.Filename,
+		ChainSlug:     chainID,
+		SourceURL:     file.URL,
+		DownloadedAt:  time.Now(),
+	}
+
+	if err := storageBackend.Put(ctx, storageKey, fetched.Content, metadata); err != nil {
+		return nil, fmt.Errorf("failed to store file: %w", err)
+	}
+
+	// Create archive record in database
+	fileSize := int64(len(fetched.Content))
+	archive := &database.Archive{
+		ID:             archiveID,
+		ChainSlug:      chainID,
+		SourceURL:      file.URL,
+		Filename:       file.Filename,
+		OriginalFormat: string(file.Type),
+		ArchivePath:    storageKey,
+		ArchiveType:    "local",
+		FileSize:       &fileSize,
+		Checksum:       hash,
+		DownloadedAt:   time.Now(),
+	}
+
+	if err := database.CreateArchive(ctx, archive); err != nil {
+		fmt.Printf("[WARN] Failed to create archive record: %v\n", err)
+		// Continue anyway - file is stored
+	}
+
+	fmt.Printf("[INFO] Archived file: %s (%d bytes, hash: %s, key: %s)\n", file.Filename, fileSize, hash, storageKey)
 
 	return &FetchResult{
 		StorageKey: storageKey,
 		Hash:       hash,
 		Content:    fetched.Content,
 		IsZip:      file.Type == types.FileTypeZIP,
+		ArchiveID:  archiveID,
 	}, nil
 }
 
@@ -67,19 +113,9 @@ func computeSha256(data []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-// isDuplicateFile checks if a file with the same hash already exists
-func isDuplicateFile(ctx context.Context, filename string, hash string) bool {
-	pool := database.Pool()
-
-	var exists bool
-	err := pool.QueryRow(ctx, `
-		SELECT EXISTS(
-			SELECT 1 FROM ingestion_files
-			WHERE file_hash = $1
-			LIMIT 1
-		)
-	`, hash).Scan(&exists)
-
-	return err == nil && exists
+// buildArchiveKey builds a storage key for an archive file
+func buildArchiveKey(chainSlug, filename string, downloadedAt time.Time) string {
+	datePrefix := downloadedAt.Format("2006/01/02")
+	return fmt.Sprintf("archives/%s/%s/%s", chainSlug, datePrefix, filename)
 }
 

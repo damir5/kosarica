@@ -9,6 +9,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/storage"
 )
 
 // IngestionResult represents the result of an ingestion run
@@ -31,6 +32,12 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 	// Initialize chain registry
 	if err := registry.InitializeDefaultAdapters(); err != nil {
 		return nil, fmt.Errorf("failed to initialize chain registry: %w", err)
+	}
+
+	// Initialize storage backend
+	storageBackend, err := storage.NewLocalStorage("./data/archives")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
 
 	// Create ingestion run
@@ -64,12 +71,14 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 
 	fmt.Printf("[INFO] Discovered %d files\n", len(discoveredFiles))
 
+	var firstArchiveID string
+
 	// Process each file through fetch, parse, persist phases
 	for _, file := range discoveredFiles {
 		fmt.Printf("[INFO] Processing file: %s\n", file.Filename)
 
-		// Phase 2: Fetch
-		fetchResult, err := FetchPhase(ctx, chainID, file)
+		// Phase 2: Fetch (with storage backend)
+		fetchResult, err := FetchPhase(ctx, chainID, file, storageBackend)
 		if err != nil {
 			errMsg := fmt.Sprintf("Fetch failed for %s: %v", file.Filename, err)
 			result.Errors = append(result.Errors, errMsg)
@@ -80,6 +89,11 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 		if fetchResult == nil {
 			// Duplicate file, skip
 			continue
+		}
+
+		// Store first archive ID for linking to run
+		if firstArchiveID == "" && fetchResult.ArchiveID != "" {
+			firstArchiveID = fetchResult.ArchiveID
 		}
 
 		// Phase 3: Parse
@@ -101,8 +115,8 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 			continue
 		}
 
-		// Phase 4: Persist
-		persistResult, err := PersistPhase(ctx, chainID, parseResult, file, runID)
+		// Phase 4: Persist (with archive ID)
+		persistResult, err := PersistPhase(ctx, chainID, parseResult, file, runID, fetchResult.ArchiveID)
 		if err != nil {
 			errMsg := fmt.Sprintf("Persist failed for %s: %v", file.Filename, err)
 			result.Errors = append(result.Errors, errMsg)
@@ -112,6 +126,15 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 
 		result.FilesProcessed++
 		result.EntriesPersisted += persistResult.Persisted
+	}
+
+	// Link first archive to ingestion run
+	if firstArchiveID != "" {
+		if err := database.LinkArchiveToIngestionRun(ctx, firstArchiveID, runID); err != nil {
+			fmt.Printf("[WARN] Failed to link archive to run: %v\n", err)
+		} else {
+			fmt.Printf("[INFO] Linked archive %s to run %s\n", firstArchiveID, runID)
+		}
 	}
 
 	// Mark run as completed

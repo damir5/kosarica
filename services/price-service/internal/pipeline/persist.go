@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -20,8 +21,8 @@ type PersistResult struct {
 }
 
 // PersistPhase executes the persist phase of the ingestion pipeline
-// It persists normalized rows to the database
-func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult, file types.DiscoveredFile, runID string) (*PersistResult, error) {
+// It persists normalized rows to the database and links them to the archive
+func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult, file types.DiscoveredFile, runID string, archiveID string) (*PersistResult, error) {
 	// Get adapter from registry
 	adapter, err := registry.GetAdapter(config.ChainID(chainID))
 	if err != nil {
@@ -33,6 +34,7 @@ func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult,
 
 	totalPersisted := 0
 	totalPriceChanges := 0
+	var allItemIDs []string
 
 	for storeIdentifier, rows := range parseResult.RowsByStore {
 		// Resolve or register store
@@ -43,7 +45,7 @@ func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult,
 		}
 
 		// Persist rows for this store
-		persisted, priceChanges, err := persistRowsForStore(ctx, chainID, storeID, storeIdentifier, rows)
+		persisted, priceChanges, itemIDs, err := persistRowsForStore(ctx, chainID, storeID, storeIdentifier, rows, archiveID)
 		if err != nil {
 			fmt.Printf("[ERROR] Failed to persist rows for store %s: %v\n", storeIdentifier, err)
 			continue
@@ -51,26 +53,46 @@ func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult,
 
 		totalPersisted += persisted
 		totalPriceChanges += priceChanges
+		allItemIDs = append(allItemIDs, itemIDs...)
+	}
+
+	// Link retailer items to archive
+	if archiveID != "" && len(allItemIDs) > 0 {
+		if err := database.UpdateRetailerItemArchiveID(ctx, allItemIDs, archiveID); err != nil {
+			fmt.Printf("[WARN] Failed to link items to archive: %v\n", err)
+		} else {
+			fmt.Printf("[INFO] Linked %d items to archive %s\n", len(allItemIDs), archiveID)
+		}
 	}
 
 	fmt.Printf("[INFO] Persisted %d rows (%d price changes) for %s\n", totalPersisted, totalPriceChanges, file.Filename)
 
+	// Collect cleanup errors
+	var persistErrors []error
+
 	// Mark file as completed
 	if err := markFileCompleted(ctx, parseResult.FileID, 1); err != nil {
-		fmt.Printf("[WARN] Failed to mark file as completed: %v\n", err)
+		persistErrors = append(persistErrors, fmt.Errorf("failed to mark file as completed: %w", err))
 	}
 
 	// Update run progress
 	if err := incrementProcessedFiles(ctx, runID); err != nil {
-		fmt.Printf("[WARN] Failed to increment processed files: %v\n", err)
+		persistErrors = append(persistErrors, fmt.Errorf("failed to increment processed files: %w", err))
 	}
 	if err := incrementProcessedEntries(ctx, runID, totalPersisted); err != nil {
-		fmt.Printf("[WARN] Failed to increment processed entries: %v\n", err)
+		persistErrors = append(persistErrors, fmt.Errorf("failed to increment processed entries: %w", err))
 	}
 
 	// Check if run is complete
 	if _, err := checkAndUpdateRunCompletion(ctx, runID); err != nil {
-		fmt.Printf("[WARN] Failed to check run completion: %v\n", err)
+		persistErrors = append(persistErrors, fmt.Errorf("failed to check run completion: %w", err))
+	}
+
+	if len(persistErrors) > 0 {
+		return &PersistResult{
+			Persisted:    totalPersisted,
+			PriceChanges: totalPriceChanges,
+		}, fmt.Errorf("encountered %d error(s) during cleanup: %w", len(persistErrors), errors.Join(persistErrors...))
 	}
 
 	return &PersistResult{
@@ -166,11 +188,19 @@ func createStore(ctx context.Context, chainID string, storeIdentifier string, me
 }
 
 // persistRowsForStore persists normalized rows for a specific store
-func persistRowsForStore(ctx context.Context, chainID string, storeID string, storeIdentifier string, rows []types.NormalizedRow) (int, int, error) {
+func persistRowsForStore(ctx context.Context, chainID string, storeID string, storeIdentifier string, rows []types.NormalizedRow, archiveID string) (int, int, []string, error) {
 	pool := database.Pool()
+
+	// Begin transaction
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return 0, 0, nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
 	persisted := 0
 	priceChanges := 0
+	itemIDs := make([]string, 0, len(rows))
 
 	for _, row := range rows {
 		// Validate row
@@ -180,18 +210,20 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 			continue
 		}
 
-		// Find or create retailer item
-		retailerItemID, err := findOrCreateRetailerItem(ctx, chainID, row)
+		// Find or create retailer item (pass transaction)
+		retailerItemID, err := findOrCreateRetailerItemTx(ctx, tx, chainID, row, archiveID)
 		if err != nil {
 			fmt.Printf("[WARN] Failed to find/create retailer item for row %d: %v\n", row.RowNumber, err)
 			continue
 		}
 
+		itemIDs = append(itemIDs, retailerItemID)
+
 		// Check for price change
 		priceChanged := false
 		var previousPrice *int
 
-		if err := pool.QueryRow(ctx, `
+		if err := tx.QueryRow(ctx, `
 			SELECT current_price
 			FROM store_item_state
 			WHERE store_id = $1 AND retailer_item_id = $2
@@ -204,7 +236,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		// Upsert store item state
 		priceSignature := computePriceSignature(row)
 
-		_, err = pool.Exec(ctx, `
+		_, err = tx.Exec(ctx, `
 			INSERT INTO store_item_state (
 				id, store_id, retailer_item_id, current_price, previous_price,
 				discount_price, discount_start, discount_end, in_stock,
@@ -247,7 +279,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 				continue
 			}
 			barcodeID := uuid.New().String()
-			_, err = pool.Exec(ctx, `
+			_, err = tx.Exec(ctx, `
 				INSERT INTO retailer_item_barcodes (id, retailer_item_id, barcode, is_primary, created_at)
 				VALUES ($1, $2, $3, true, NOW())
 				ON CONFLICT DO NOTHING
@@ -260,11 +292,16 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		}
 	}
 
-	return persisted, priceChanges, nil
+	// Commit transaction
+	if err := tx.Commit(ctx); err != nil {
+		return 0, 0, nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return persisted, priceChanges, itemIDs, nil
 }
 
 // findOrCreateRetailerItem finds or creates a retailer item
-func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.NormalizedRow) (string, error) {
+func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.NormalizedRow, archiveID string) (string, error) {
 	pool := database.Pool()
 
 	// Try to find by external ID first
@@ -276,7 +313,7 @@ func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.Nor
 			LIMIT 1
 		`, chainID, *row.ExternalID).Scan(&itemID)
 		if err == nil {
-			// Update the item
+			// Update the item (also update archive_id if provided)
 			_, err = pool.Exec(ctx, `
 				UPDATE retailer_items
 				SET name = $1, description = $2, category = $3, subcategory = $4,
@@ -293,9 +330,9 @@ func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.Nor
 	_, err := pool.Exec(ctx, `
 		INSERT INTO retailer_items (
 			id, chain_slug, external_id, name, description, category, subcategory,
-			brand, unit, unit_quantity, image_url, created_at, updated_at
+			brand, unit, unit_quantity, image_url, archive_id, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW()
 		)
 		ON CONFLICT (chain_slug, external_id) DO UPDATE SET
 			name = EXCLUDED.name,
@@ -306,9 +343,59 @@ func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.Nor
 			unit = EXCLUDED.unit,
 			unit_quantity = EXCLUDED.unit_quantity,
 			image_url = EXCLUDED.image_url,
+			archive_id = EXCLUDED.archive_id,
 			updated_at = NOW()
 	`, itemID, chainID, row.ExternalID, row.Name, row.Description, row.Category,
-		row.Subcategory, row.Brand, row.Unit, row.UnitQuantity, row.ImageURL)
+		row.Subcategory, row.Brand, row.Unit, row.UnitQuantity, row.ImageURL, archiveID)
+
+	return itemID, err
+}
+
+// findOrCreateRetailerItemTx finds or creates a retailer item within a transaction
+func findOrCreateRetailerItemTx(ctx context.Context, tx pgx.Tx, chainID string, row types.NormalizedRow, archiveID string) (string, error) {
+	// Try to find by external ID first
+	if row.ExternalID != nil && *row.ExternalID != "" {
+		var itemID string
+		err := tx.QueryRow(ctx, `
+			SELECT id FROM retailer_items
+			WHERE chain_slug = $1 AND external_id = $2
+			LIMIT 1
+		`, chainID, *row.ExternalID).Scan(&itemID)
+		if err == nil {
+			// Update the item (also update archive_id if provided)
+			_, err = tx.Exec(ctx, `
+				UPDATE retailer_items
+				SET name = $1, description = $2, category = $3, subcategory = $4,
+				    brand = $5, unit = $6, unit_quantity = $7, image_url = $8, updated_at = NOW()
+				WHERE id = $9
+			`, row.Name, row.Description, row.Category, row.Subcategory, row.Brand,
+				row.Unit, row.UnitQuantity, row.ImageURL, itemID)
+			return itemID, err
+		}
+	}
+
+	// Create new item
+	itemID := uuid.New().String()
+	_, err := tx.Exec(ctx, `
+		INSERT INTO retailer_items (
+			id, chain_slug, external_id, name, description, category, subcategory,
+			brand, unit, unit_quantity, image_url, archive_id, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW()
+		)
+		ON CONFLICT (chain_slug, external_id) DO UPDATE SET
+			name = EXCLUDED.name,
+			description = EXCLUDED.description,
+			category = EXCLUDED.category,
+			subcategory = EXCLUDED.subcategory,
+			brand = EXCLUDED.brand,
+			unit = EXCLUDED.unit,
+			unit_quantity = EXCLUDED.unit_quantity,
+			image_url = EXCLUDED.image_url,
+			archive_id = EXCLUDED.archive_id,
+			updated_at = NOW()
+	`, itemID, chainID, row.ExternalID, row.Name, row.Description, row.Category,
+		row.Subcategory, row.Brand, row.Unit, row.UnitQuantity, row.ImageURL, archiveID)
 
 	return itemID, err
 }
