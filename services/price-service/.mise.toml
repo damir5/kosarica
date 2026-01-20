@@ -1,2 +1,50 @@
 [tools]
 go = "latest"
+
+[tasks.build]
+description = "Build the Go service"
+run = "go build -o ./cli ./cmd/main.go"
+
+[tasks.run]
+description = "Run the Go service directly"
+run = "go run ./cmd/main.go"
+
+[tasks.test]
+description = "Run all Go tests"
+run = "go test ./..."
+
+[tasks.test:unit]
+description = "Run unit tests only"
+run = "go test ./tests/unit/..."
+
+[tasks.test:integration]
+description = "Run integration tests"
+run = "go test ./tests/integration/..."
+
+[tasks.test:e2e]
+description = "Run e2e tests (requires Docker)"
+run = "go test ./tests/e2e/..."
+
+[tasks.test:short]
+description = "Run quick tests (skip e2e)"
+run = "go test -short ./..."
+
+[tasks.test:verbose]
+description = "Run tests with verbose output"
+run = "go test -v ./..."
+
+[tasks.test:coverage]
+description = "Run tests with coverage"
+run = "go test -cover ./..."
+
+[tasks.mod]
+description = "Tidy go modules"
+run = "go mod tidy"
+
+[tasks.mod:download]
+description = "Download go module dependencies"
+run = "go mod download"
+
+[tasks.lint]
+description = "Run golangci-lint if available"
+run = "golangci-lint run || echo 'golangci-lint not installed'"

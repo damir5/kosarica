@@ -1,3 +1,43 @@
 [tools]
 node = "24"
 go = "latest"
+
+[tasks.dev]
+description = "Start dev server (Node.js)"
+run = "pnpm dev"
+
+[tasks.build]
+description = "Build the project (Node.js)"
+run = "pnpm build"
+
+[tasks.start]
+description = "Start production server (Node.js)"
+run = "pnpm start"
+
+[tasks.test]
+description = "Run tests (Node.js vitest)"
+run = "pnpm test"
+
+[tasks.test:watch]
+description = "Run tests in watch mode (Node.js)"
+run = "pnpm test:watch"
+
+[tasks.lint]
+description = "Run linter (Node.js biome)"
+run = "pnpm lint"
+
+[tasks.format]
+description = "Format code (Node.js biome)"
+run = "pnpm format"
+
+[tasks.db:generate]
+description = "Generate DB migrations (Node.js)"
+run = "pnpm db:generate"
+
+[tasks.db:migrate]
+description = "Run DB migrations (Node.js)"
+run = "pnpm db:migrate"
+
+[tasks.db:studio]
+description = "Open Drizzle Studio (Node.js)"
+run = "pnpm db:studio"

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
@@ -43,6 +44,7 @@ func TestE2EPipeline(t *testing.T) {
 		0,
 		0,
 	))
+	defer database.Close() // Clean up connection pool after test
 
 	// Run migrations (simplified - in real test, run actual migration files)
 	setupTestSchema(ctx, t)
@@ -102,6 +104,7 @@ func TestE2EPipelineWithMockData(t *testing.T) {
 
 	// Connect and setup
 	require.NoError(t, database.Connect(ctx, connStr, 10, 2, 0, 0))
+	defer database.Close() // Clean up connection pool after test
 	setupTestSchema(ctx, t)
 
 	// Create mock ingestion run
@@ -158,9 +161,15 @@ func setupTestDatabase(ctx context.Context) (*postgres.PostgresContainer, error)
 		postgres.WithUsername("test"),
 		postgres.WithPassword("test"),
 		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(30)),
+			// Use multiple wait strategies for better reliability
+			wait.ForAll(
+				wait.ForListeningPort("5432/tcp").
+					WithStartupTimeout(60*time.Second),
+				wait.ForLog("database system is ready to accept connections").
+					WithOccurrence(1).
+					WithStartupTimeout(60*time.Second),
+			),
+		),
 	)
 }
 
@@ -231,7 +240,9 @@ func setupTestSchema(ctx context.Context, t *testing.T) {
 		CREATE TABLE IF NOT EXISTS ingestion_runs (
 			id text PRIMARY KEY,
 			chain_slug text NOT NULL,
+			source text,
 			status text NOT NULL,
+			created_at timestamp,
 			archive_id text REFERENCES archives(id)
 		);
 
@@ -312,6 +323,7 @@ func TestE2EArchiveTracking(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, database.Connect(ctx, connStr, 10, 2, 0, 0))
+	defer database.Close() // Clean up connection pool after test
 	setupTestSchema(ctx, t)
 
 	t.Run("ArchiveCreation", func(t *testing.T) {
@@ -373,6 +385,7 @@ func TestE2EConcurrency(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, database.Connect(ctx, connStr, 10, 2, 0, 0))
+	defer database.Close() // Clean up connection pool after test
 	setupTestSchema(ctx, t)
 
 	t.Run("ConcurrentRuns", func(t *testing.T) {
