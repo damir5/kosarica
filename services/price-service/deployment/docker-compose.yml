@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: kosarica-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kosarica
+      POSTGRES_PASSWORD: kosarica_password
+      POSTGRES_DB: kosarica
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Mount migrations directory
+      - ../../migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kosarica -d kosarica"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kosarica-network
+
+  # Price Service
+  price-service:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    container_name: price-service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Database
+      DATABASE_URL: postgres://kosarica:kosarica_password@postgres:5432/kosarica?sslmode=disable
+
+      # Server
+      PORT: 3000
+      HOST: "0.0.0.0"
+
+      # Logging
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+
+      # Rate Limiting
+      PRICE_SERVICE_RATE_LIMIT_REQUESTS_PER_SECOND: 2
+      PRICE_SERVICE_RATE_LIMIT_MAX_RETRIES: 3
+      PRICE_SERVICE_RATE_LIMIT_INITIAL_BACKOFF_MS: 100
+      PRICE_SERVICE_RATE_LIMIT_MAX_BACKOFF_MS: 30000
+
+      # Storage
+      STORAGE_PATH: /app/data/archives
+    volumes:
+      # Archive storage
+      - price_service_data:/app/data/archives
+      # Config override (optional)
+      - ../config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - kosarica-network
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: kosarica-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@kosarica.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - kosarica-network
+    profiles:
+      - admin  # Only start with --profile admin
+
+  # Optional: Adminer (lighter database UI)
+  adminer:
+    image: adminer:latest
+    container_name: kosarica-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: nette
+    depends_on:
+      - postgres
+    networks:
+      - kosarica-network
+    profiles:
+      - admin  # Only start with --profile admin
+
+volumes:
+  postgres_data:
+    driver: local
+  price_service_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  kosarica-network:
+    driver: bridge

@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"math"
+	"math/rand/v2"
 	"strconv"
 	"time"
 )
@@ -72,8 +73,7 @@ func Sleep(ms int64) {
 }
 
 // math_rand is a helper to get a random float between 0 and 1
+// Uses math/rand/v2 for better randomness without manual seeding
 func math_rand() float64 {
-	// Use the current time nanoseconds as a simple seed
-	// In production, you'd want to use math/rand properly seeded
-	return float64(time.Now().UnixNano()%1000) / 1000.0
+	return rand.Float64()
 }

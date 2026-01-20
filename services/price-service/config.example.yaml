@@ -1,0 +1,98 @@
+# Price Service Configuration Example
+# Copy this file to config/config.yaml and modify as needed
+# Environment variables take precedence over this file
+
+server:
+  # HTTP server port
+  port: 3000
+  # HTTP server host (0.0.0.0 for all interfaces)
+  host: "0.0.0.0"
+  # Maximum time to read a request
+  read_timeout: 30s
+  # Maximum time to write a response
+  write_timeout: 30s
+
+database:
+  # PostgreSQL connection URL
+  # Format: postgres://user:password@host:port/database?sslmode=mode
+  # Can also be set via DATABASE_URL environment variable
+  url: "postgres://kosarica:password@localhost:5432/kosarica?sslmode=disable"
+
+  # Connection pool settings
+  max_connections: 25      # Maximum open connections
+  min_connections: 5       # Minimum idle connections
+  max_conn_lifetime: 1h    # Maximum time a connection can be reused
+  max_conn_idle_time: 30m  # Maximum time a connection can be idle
+
+rate_limit:
+  # Default requests per second (can be overridden per chain)
+  requests_per_second: 2
+
+  # Retry settings
+  max_retries: 3               # Maximum number of retry attempts
+  initial_backoff_ms: 100      # Initial backoff in milliseconds
+  max_backoff_ms: 30000        # Maximum backoff in milliseconds
+
+storage:
+  # Storage type: "local" or "s3" (S3 not yet implemented)
+  type: "local"
+
+  # Base path for archive storage
+  # For local: filesystem path
+  # For S3: bucket prefix
+  base_path: "./data/archives"
+
+logging:
+  # Log level: "debug", "info", "warn", "error"
+  level: "info"
+
+  # Log format: "json" or "console"
+  format: "json"
+
+  # Disable colors in console output
+  no_color: false
+
+# Chain-specific overrides (optional)
+chains:
+  konzum:
+    base_url: "https://www.konzum.hr"
+    rate_limit:
+      requests_per_second: 2  # Override default for this chain
+
+  lidl:
+    base_url: "https://tvrtka.lidl.hr"
+    rate_limit:
+      requests_per_second: 1  # Lidl is more restrictive
+
+  studenac:
+    base_url: "https://www.studenac.hr"
+
+  dm:
+    base_url: "https://www.dm.hr"
+
+  plodine:
+    base_url: "https://www.plodine.hr"
+
+  interspar:
+    base_url: "https://www.interspar.hr"
+
+  kaufland:
+    base_url: "https://www.kaufland.hr"
+
+  eurospin:
+    base_url: "https://www.eurospin.hr"
+
+  ktc:
+    base_url: "https://www.ktc.hr"
+
+  metro:
+    base_url: "https://www.metro.hr"
+
+  trgocentar:
+    base_url: "https://www.trgocentar.hr"
+
+# Note: Environment variables override these values
+# Prefix with PRICE_SERVICE_ for nested values, e.g.:
+# PRICE_SERVICE_SERVER_PORT=3000
+# PRICE_SERVICE_DATABASE_URL=postgres://...
+# PRICE_SERVICE_LOG_LEVEL=debug

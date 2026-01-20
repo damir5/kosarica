@@ -145,7 +145,7 @@ func bindEnvVars(v *viper.Viper) {
 // setDefaults sets default configuration values
 func setDefaults(v *viper.Viper) {
 	// Server defaults
-	v.SetDefault("server.port", 3003)
+	v.SetDefault("server.port", 3000)
 	v.SetDefault("server.host", "0.0.0.0")
 	v.SetDefault("server.read_timeout", 30*time.Second)
 	v.SetDefault("server.write_timeout", 30*time.Second)
