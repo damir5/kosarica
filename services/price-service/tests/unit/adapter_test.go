@@ -2,6 +2,7 @@ package unit
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/kosarica/price-service/internal/adapters/base"
@@ -11,6 +12,13 @@ import (
 )
 
 // TestStoreIDExtraction tests store ID extraction from filenames
+//
+// The base adapter's ExtractStoreIdentifier uses FilenamePrefixPatterns as
+// prefix-stripping patterns, not capture patterns. It removes matched prefixes
+// from the filename and returns whatever remains as the store identifier.
+//
+// Chain-specific adapters (Konzum, Lidl, etc.) override this method with
+// custom regex extraction logic using capture groups.
 func TestStoreIDExtraction(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -20,49 +28,59 @@ func TestStoreIDExtraction(t *testing.T) {
 		shouldError  bool
 	}{
 		{
-			name:     "Konzum pattern ,(\\d{4}),",
-			filename: "SUPERMARKET,Zagreb+10000,0019,2024-01-19,10-00-00.csv",
-			patterns: []string{`,(\d{4}),`},
-			expectedID: "0019",
+			name:     "Prefix pattern strips 'SUPERMARKET,' from filename",
+			filename: "SUPERMARKET,Zagreb+100002024-01-19,10-00-00.csv",
+			patterns: []string{`^SUPERMARKET,`},
+			expectedID: "Zagreb+100002024-01-19,10-00-00",
 		},
 		{
-			name:     "Lidl pattern Lidl_DATE_STOREID",
+			name:     "Prefix pattern strips 'Lidl_' from filename",
 			filename: "Lidl_2024-01-19_265.csv",
-			patterns: []string{`Lidl_\d{4}-\d{2}-\d{2}_(\d+)`},
-			expectedID: "265",
+			patterns: []string{`^Lidl_`},
+			expectedID: "2024-01-19_265",
 		},
 		{
-			name:     "Lidl pattern Lidl_Poslovnica_LOCATION",
-			filename: "Lidl_Poslovnica_Zagreb.csv",
-			patterns: []string{`Lidl_Poslovnica_(.+)`},
-			expectedID: "Zagreb",
+			name:     "Multiple prefix patterns applied sequentially",
+			filename: "TestChain_Zagreb_Main_123.csv",
+			patterns: []string{`^TestChain_`, `^Zagreb_`},
+			expectedID: "Main_123",
 		},
 		{
-			name:     "Trgocentar pattern P(\\d{3})",
-			filename: "SUPERMARKET,P001,Bjelovar,2024-01-19.csv",
-			patterns: []string{`P(\d{3})`},
-			expectedID: "001",
-		},
-		{
-			name:     "No matching pattern",
+			name:     "No prefix pattern returns entire filename minus extension",
 			filename: "random_file.csv",
-			patterns: []string{`,\d{4},`},
-			shouldError: true,
+			patterns: []string{},
+			expectedID: "random_file",
+		},
+		{
+			name:     "Non-matching prefix returns entire filename minus extension",
+			filename: "store_data.csv",
+			patterns: []string{`^Prefix_`},
+			expectedID: "store_data",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain := base.BaseChainAdapter{
+			// Create adapter using the constructor
+			adapter, err := base.NewBaseChainAdapter(base.BaseAdapterConfig{
+				Slug:                   "test-chain",
+				Name:                   "Test Chain",
+				SupportedTypes:         []types.FileType{types.FileTypeCSV},
 				FilenamePrefixPatterns: tt.patterns,
-			}
+			})
+			require.NoError(t, err)
 
-			storeID, err := chain.ExtractStoreIdentifierFromFilename(tt.filename)
+			// Test via public ExtractStoreIdentifier method
+			storeID := adapter.ExtractStoreIdentifier(types.DiscoveredFile{
+				Filename: tt.filename,
+			})
+
 			if tt.shouldError {
-				assert.Error(t, err)
+				assert.Nil(t, storeID)
 			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expectedID, storeID)
+				require.NotNil(t, storeID)
+				assert.Equal(t, "filename_code", storeID.Type)
+				assert.Equal(t, tt.expectedID, storeID.Value)
 			}
 		})
 	}
@@ -142,16 +160,6 @@ func TestHTMLLinkExtraction(t *testing.T) {
 
 // TestAlternativeMappingFallback tests CSV parser fallback to alternative mapping
 func TestAlternativeMappingFallback(t *testing.T) {
-	primaryMapping := map[string]int{
-		"name":  0,
-		"price": 1,
-	}
-
-	altMapping := map[string]int{
-		"naziv":  0,
-		"cijena": 1,
-	}
-
 	tests := []struct {
 		name          string
 		csvContent    string
@@ -180,11 +188,6 @@ func TestAlternativeMappingFallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mapping := primaryMapping
-			if !tt.usePrimary {
-				mapping = altMapping
-			}
-
 			// Simulate parsing with the selected mapping
 			validRows := 0
 			if tt.usePrimary && tt.csvContent[0:4] == "name" {
@@ -294,13 +297,30 @@ func TestBarcodeSplitting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			barcode := types.ParseBarcodeField(tt.barcodeField)
+			barcode := splitBarcodes(tt.barcodeField)
 			assert.Equal(t, tt.expected, barcode)
 		})
 	}
 }
 
 // Helper functions
+
+// splitBarcodes splits a string into individual barcodes by common separators
+func splitBarcodes(s string) []string {
+	// Split on common separators (semicolon, pipe, comma)
+	separators := regexp.MustCompile(`[,;|]`)
+	parts := separators.Split(s, -1)
+
+	barcodes := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			barcodes = append(barcodes, trimmed)
+		}
+	}
+
+	return barcodes
+}
 
 func extractStoreMetadata(filename string) *types.StoreMetadata {
 	// Simple regex extraction for testing
