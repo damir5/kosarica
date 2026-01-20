@@ -185,12 +185,16 @@ func GetArchivesByChain(ctx context.Context, chainSlug string, limit, offset int
 }
 
 // LinkArchiveToIngestionRun associates an archive with an ingestion run
+// It also sets the source_url from the archive's source_url
 func LinkArchiveToIngestionRun(ctx context.Context, archiveID, runID string) error {
 	pool := Pool()
 
 	query := `
 		UPDATE ingestion_runs
-		SET archive_id = $1
+		SET archive_id = $1,
+		    source_url = (
+		        SELECT source_url FROM archives WHERE id = $1
+		    )
 		WHERE id = $2
 	`
 
