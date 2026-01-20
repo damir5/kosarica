@@ -366,3 +366,50 @@ Per Croatian law, retailers must display:
 5. **Webhooks** - Notify on completion
 6. **Distributed Tracing** - OpenTelemetry integration
 7. **Metrics** - Prometheus endpoints
+
+## Architecture Decision Records
+
+### ADR-001: Hand-Written SQL with pgx Instead of sqlc
+
+**Status:** Accepted
+
+**Context:**
+The original go2.md plan specified using [sqlc](https://sqlc.dev/) for type-safe SQL generation. sqlc parses SQL queries and generates Go code with types matching the database schema.
+
+**Decision:**
+Use hand-written SQL with pgx/v5 parameterized queries instead of sqlc.
+
+**Rationale:**
+
+| Factor | sqlc | Hand-written pgx | Choice |
+|--------|------|------------------|--------|
+| Type safety | Generated types from SQL | Manual type definitions | pgx acceptable |
+| SQL injection protection | Yes (generated) | Yes (parameterized) | Tie |
+| Build complexity | Requires code generation step | Standard Go build | pgx simpler |
+| Query flexibility | Requires regeneration for changes | Immediate | pgx faster dev |
+| Learning curve | New tool for team | Familiar to Go devs | pgx easier |
+| Dynamic queries | Difficult | Fully supported | pgx better |
+
+**Key Benefits of Hand-Written Approach:**
+1. **Simpler build process** - No code generation step required
+2. **Faster iteration** - Changes don't require regeneration
+3. **Dynamic query support** - Complex conditional queries easier to write
+4. **Familiar patterns** - pgx is standard Go database practice
+
+**Security Considerations:**
+- All queries use pgx parameterized queries (`$1`, `$2`, etc.)
+- No string concatenation in SQL construction
+- Equivalent protection against SQL injection
+
+**Example:**
+```go
+// Hand-written (current implementation)
+query := `
+    INSERT INTO archives (id, chain_slug, source_url, ...)
+    VALUES ($1, $2, $3, ...)
+`
+_, err := pool.Exec(ctx, query, archive.ID, archive.ChainSlug, archive.SourceURL, ...)
+```
+
+**Reversal:**
+If type safety becomes a significant issue (e.g., frequent bugs from type mismatches), reconsider sqlc or similar (sqlc, xo, gobuffalo/pop).

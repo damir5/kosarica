@@ -1,13 +1,13 @@
 package integration
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/types"
 	"github.com/stretchr/testify/assert"
@@ -20,13 +20,11 @@ func TestKonzumChainIntegration(t *testing.T) {
 	server := setupKonzumMockServer(t)
 	defer server.Close()
 
-	ctx := context.Background()
-
 	// Initialize registry
 	require.NoError(t, registry.InitializeDefaultAdapters())
 
 	// Get adapter
-	adapter, err := registry.GetAdapter("konzum")
+	adapter, err := registry.GetAdapter(config.ChainID("konzum"))
 	require.NoError(t, err)
 
 	// Test discovery
@@ -54,13 +52,11 @@ func TestLidlChainIntegration(t *testing.T) {
 	server := setupLidlMockServer(t)
 	defer server.Close()
 
-	ctx := context.Background()
-
 	// Initialize registry
 	require.NoError(t, registry.InitializeDefaultAdapters())
 
 	// Get adapter
-	adapter, err := registry.GetAdapter("lidl")
+	adapter, err := registry.GetAdapter(config.ChainID("lidl"))
 	require.NoError(t, err)
 
 	// Test discovery
@@ -80,13 +76,11 @@ func TestStudenacChainIntegration(t *testing.T) {
 	server := setupStudenacMockServer(t)
 	defer server.Close()
 
-	ctx := context.Background()
-
 	// Initialize registry
 	require.NoError(t, registry.InitializeDefaultAdapters())
 
 	// Get adapter
-	adapter, err := registry.GetAdapter("studenac")
+	adapter, err := registry.GetAdapter(config.ChainID("studenac"))
 	require.NoError(t, err)
 
 	// Test discovery
@@ -97,7 +91,7 @@ func TestStudenacChainIntegration(t *testing.T) {
 	if len(files) > 0 {
 		// Mock fetch would return XML content
 		xmlContent := createMockXMLContent()
-		parseResult, err := adapter.Parse(xmlContent, files[0].Filename, &types.ParseOptions{})
+		parseResult, err := adapter.Parse([]byte(xmlContent), files[0].Filename, &types.ParseOptions{})
 		require.NoError(t, err)
 		assert.Greater(t, parseResult.ValidRows, 0)
 	}
@@ -134,7 +128,7 @@ func TestStoreIDExtraction(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.NoError(t, registry.InitializeDefaultAdapters())
-			adapter, err := registry.GetAdapter(tt.chain)
+			adapter, err := registry.GetAdapter(config.ChainID(tt.chain))
 			require.NoError(t, err)
 
 			// Store ID is extracted by the adapter
@@ -172,7 +166,7 @@ func TestMultipleGTINSupports(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.NoError(t, registry.InitializeDefaultAdapters())
-			adapter, err := registry.GetAdapter(tt.chain)
+			adapter, err := registry.GetAdapter(config.ChainID(tt.chain))
 			require.NoError(t, err)
 			assert.NotNil(t, adapter)
 		})
@@ -246,7 +240,7 @@ func TestParseLocalFile(t *testing.T) {
 			require.NoError(t, err)
 
 			// Try parsing with konzum adapter as default
-			adapter, err := registry.GetAdapter("konzum")
+			adapter, err := registry.GetAdapter(config.ChainID("konzum"))
 			require.NoError(t, err)
 
 			result, err := adapter.Parse(content, filepath.Base(file), &types.ParseOptions{})
