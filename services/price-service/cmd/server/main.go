@@ -15,6 +15,7 @@ import (
 	"github.com/kosarica/price-service/config"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/handlers"
+	"github.com/kosarica/price-service/internal/middleware"
 	"github.com/rs/zerolog"
 )
 
@@ -66,14 +67,47 @@ func main() {
 	router.GET("/health", handlers.HealthCheck)
 
 	// Ingestion routes (internal admin API)
+	// Apply auth middleware to all /internal routes, then rate limiting
 	// Note: More specific routes must come before generic ones
-	internal := router.Group("/internal/admin")
+	internal := router.Group("/internal")
+	internal.Use(middleware.InternalAuthMiddleware())
+	internal.Use(middleware.ServiceRateLimitMiddleware(50, 100)) // 50 req/s, burst 100
 	{
-		// Status endpoint must come before :chain to avoid :runId/:chain conflict
-		internal.GET("/ingest/runs/:chain", handlers.ListIngestionRuns)
-		internal.GET("/ingest/runs", handlers.ListIngestionRuns) // List all runs
-		internal.POST("/ingest/:chain", handlers.IngestChain)
-		internal.GET("/ingest/status/:runId", handlers.GetIngestionStatus)
+		// Health check endpoint
+		internal.GET("/health", handlers.HealthCheck)
+
+		// List valid chains
+		internal.GET("/chains", handlers.ListChains)
+
+		// Admin endpoints
+		admin := internal.Group("/admin")
+		{
+			admin.POST("/ingest/:chain", handlers.IngestChain)
+		}
+
+		// Ingestion runs endpoints
+		ingestion := internal.Group("/ingestion")
+		{
+			ingestion.GET("/runs", handlers.ListRuns)           // List all runs with filters
+			ingestion.GET("/runs/:runId", handlers.GetRun)      // Get single run
+			ingestion.GET("/runs/:runId/files", handlers.ListFiles)
+			ingestion.GET("/runs/:runId/errors", handlers.ListErrors)
+			ingestion.GET("/stats", handlers.GetStats)
+			ingestion.POST("/runs/:runId/rerun", handlers.RerunRun)
+			ingestion.DELETE("/runs/:runId", handlers.DeleteRun)
+		}
+
+		// Prices endpoints
+		prices := internal.Group("/prices")
+		{
+			prices.GET("/:chainSlug/:storeId", handlers.GetStorePrices)
+		}
+
+		// Items search endpoint
+		items := internal.Group("/items")
+		{
+			items.GET("/search", handlers.SearchItems)
+		}
 	}
 
 	// Start server

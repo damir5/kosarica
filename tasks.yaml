@@ -1,0 +1,601 @@
+# Combined Task List
+# Phase 4: Price Groups (Go Only) + Phase 6: Store Enrichment UI
+
+# =============================================================================
+# PHASE 4: Price Groups (Go Only)
+# Content-addressable price storage with immutable price groups for 50%+ storage reduction
+# =============================================================================
+
+tasks:
+  # --- Phase 4: Step 1 - Schema (parallel_group: 1) ---
+  - title: Create database schema migration for price groups
+    completed: false
+    parallel_group: 1
+    description: |
+      Create the SQL migration file for price groups tables.
+
+      File to create:
+      - `services/price-service/migrations/0003_add_price_groups.sql`
+
+      Tables to add:
+      1. `price_groups` - Content-addressable groups (immutable)
+         - id UUID PRIMARY KEY (app-generated)
+         - chain_slug VARCHAR(32) NOT NULL REFERENCES chains(slug)
+         - price_hash VARCHAR(64) NOT NULL (SHA-256 hex)
+         - hash_version SMALLINT NOT NULL DEFAULT 1
+         - UNIQUE(chain_slug, price_hash, hash_version)
+
+      2. `group_prices` - Prices stored at group level
+         - (price_group_id, retailer_item_id) composite PK
+         - price INTEGER NOT NULL (cents/lipa)
+         - discount_price INTEGER (NULL = no discount, distinct from 0!)
+
+      3. `store_group_history` - Temporal store→group mapping
+         - id UUID PRIMARY KEY (app-generated)
+         - store_id, price_group_id, valid_from, valid_to
+         - GiST exclusion constraint to prevent overlapping time ranges
+         - Partial unique index WHERE valid_to IS NULL
+
+      4. `store_price_exceptions` - Rare overrides that must expire
+         - (store_id, retailer_item_id) PK
+         - price, reason, expires_at (NOT NULL)
+
+      Critical: Enable btree_gist extension first.
+
+  - title: Update Drizzle schema for price groups
+    completed: false
+    parallel_group: 1
+    description: |
+      Add table definitions to Drizzle ORM for the 4 new tables.
+
+      File to modify:
+      - `src/db/schema.ts`
+
+      Add Drizzle table definitions for:
+      - priceGroups
+      - groupPrices
+      - storeGroupHistory
+      - storePriceExceptions
+
+      Follow existing patterns in the schema file for relations and indexes.
+
+  # --- Phase 4: Step 2 - Go Models & Functions (parallel_group: 2) ---
+  - title: Create Go models for price groups
+    completed: false
+    parallel_group: 2
+    description: |
+      Create Go struct definitions for price group entities.
+
+      File to create:
+      - `services/price-service/internal/database/models_price_groups.go`
+
+      Models to define:
+      ```go
+      type PriceGroup struct {
+          ID           string
+          ChainSlug    string
+          PriceHash    string
+          HashVersion  int
+          StoreCount   int
+          ItemCount    int
+          FirstSeenAt  time.Time
+          LastSeenAt   time.Time
+      }
+
+      type GroupPrice struct {
+          PriceGroupID   string
+          RetailerItemID string
+          Price          int
+          DiscountPrice  *int
+          UnitPrice      *int
+          AnchorPrice    *int
+      }
+
+      type StoreGroupHistory struct {
+          ID           string
+          StoreID      string
+          PriceGroupID string
+          ValidFrom    time.Time
+          ValidTo      *time.Time
+      }
+
+      type StorePriceException struct {
+          StoreID        string
+          RetailerItemID string
+          Price          int
+          DiscountPrice  *int
+          Reason         string
+          ExpiresAt      time.Time
+      }
+      ```
+
+  - title: Create database CRUD functions for price groups
+    completed: false
+    parallel_group: 2
+    description: |
+      Implement database functions for price group operations.
+
+      File to create:
+      - `services/price-service/internal/database/price_groups.go`
+
+      Functions to implement:
+
+      1. `FindOrCreatePriceGroup(ctx, chainSlug, priceHash) (PriceGroup, created bool, error)`
+         - Use INSERT ON CONFLICT DO NOTHING pattern for race condition safety
+         - Generate UUID in Go using github.com/google/uuid
+
+      2. `BulkInsertGroupPrices(ctx, groupID, []GroupPrice) error`
+
+      3. `AssignStoreToGroup(ctx, storeID, groupID) error`
+         - Closes previous membership (sets valid_to = NOW())
+         - Opens new membership (valid_from = NOW(), valid_to = NULL)
+
+      4. `GetCurrentPriceForStore(ctx, storeID, itemID) (price, discountPrice, isException, error)`
+
+      5. `GetHistoricalPriceForStore(ctx, storeID, itemID, asOf time.Time) (price, error)`
+
+      6. `UpdateGroupLastSeen(ctx, groupID) error`
+
+      7. `CleanupExpiredExceptions(ctx) (deleted int, error)`
+
+  - title: Implement price hash function
+    completed: false
+    parallel_group: 2
+    description: |
+      Create the CRITICAL hash function for price group identification.
+
+      File to create:
+      - `services/price-service/internal/pricegroups/hash.go`
+
+      Implementation:
+      ```go
+      const HashVersion = 1
+
+      type ItemPrice struct {
+          ItemID        string  // UUID in canonical format (lowercase, hyphens)
+          Price         int     // cents, NOT NULL
+          DiscountPrice *int    // cents, nullable (NULL ≠ 0!)
+      }
+
+      func ComputePriceHash(prices []ItemPrice) string {
+          // 1. Sort by ItemID (lexicographic for UUIDs)
+          sort.Slice(prices, func(i, j int) bool {
+              return prices[i].ItemID < prices[j].ItemID
+          })
+
+          // 2. Build canonical string: "item_id:price:discount\n"
+          //    CRITICAL: Use "N" for NULL discount, integer for actual value
+          var buf bytes.Buffer
+          for _, p := range prices {
+              var discountStr string
+              if p.DiscountPrice == nil {
+                  discountStr = "N"  // NULL sentinel
+              } else {
+                  discountStr = strconv.Itoa(*p.DiscountPrice)
+              }
+              fmt.Fprintf(&buf, "%s:%d:%s\n", p.ItemID, p.Price, discountStr)
+          }
+
+          // 3. SHA256, hex-encoded (lowercase)
+          hash := sha256.Sum256(buf.Bytes())
+          return hex.EncodeToString(hash[:])
+      }
+      ```
+
+      CRITICAL: NULL discount must produce different hash than 0 discount!
+
+  - title: Create hash function tests
+    completed: false
+    parallel_group: 2
+    description: |
+      Create comprehensive tests for hash function invariants.
+
+      File to create:
+      - `services/price-service/internal/pricegroups/hash_test.go`
+
+      Test invariants (P0 priority):
+      - HASH-1: Same prices, 1000 iterations = same hash (determinism)
+      - HASH-2: Different order = same hash (order independence)
+      - HASH-3: NULL discount ≠ 0 discount (distinct hashes!)
+      - HASH-4: Any price difference = different hash (sensitivity)
+      - HASH-5: Consistent across goroutines (thread safety)
+      - HASH-6: UUID formatting consistency (lowercase, hyphens)
+
+  # --- Phase 4: Step 3 - Persist Phase (parallel_group: 3) ---
+  - title: Modify persist phase for group-based storage
+    completed: false
+    parallel_group: 3
+    description: |
+      Update the persist phase to use price groups instead of direct price storage.
+
+      File to modify:
+      - `services/price-service/internal/pipeline/persist.go`
+
+      New flow:
+      ```
+      For each store:
+        Step 1: Collect all items with prices → []ItemPrice
+        Step 2: Compute price hash: pricegroups.ComputePriceHash(prices)
+        Step 3: Find or create price group by hash
+        Step 4: If new group:
+                  - Bulk insert group_prices
+                Else:
+                  - Verify prices match (safety check)
+                  - Update last_seen_at
+        Step 5: Assign store to group (closes previous membership)
+        Step 6: Update group stats (store_count, item_count)
+      ```
+
+  # --- Phase 4: Step 4 - APIs (parallel_group: 4) ---
+  - title: Update price query API handlers
+    completed: false
+    parallel_group: 4
+    description: |
+      Update API handlers to query prices via price groups.
+
+      File to modify:
+      - `services/price-service/internal/handlers/prices.go`
+
+      New endpoints to add:
+      - GET /internal/prices/:storeId - List all prices for store (via group)
+      - GET /internal/prices/:storeId/history?asOf= - Historical price lookup
+      - GET /internal/price-groups/:chainSlug - List groups for chain (admin)
+
+  - title: Update Node.js oRPC proxy for price groups
+    completed: false
+    parallel_group: 4
+    description: |
+      Add new oRPC procedures to proxy price group endpoints.
+
+      File to modify:
+      - `src/orpc/router/price-service.ts`
+
+      New procedures: getStorePrices, getHistoricalPrice, listPriceGroups
+
+  - title: Create background cleanup jobs
+    completed: false
+    parallel_group: 4
+    description: |
+      Implement background jobs for maintenance tasks.
+
+      File to create:
+      - `services/price-service/internal/jobs/cleanup_exceptions.go`
+
+      Jobs: Expire exceptions, Garbage collect orphan groups
+
+  # --- Phase 4: Step 5 - Tests (parallel_group: 5) ---
+  - title: Run Go tests and verify build
+    completed: false
+    parallel_group: 5
+    description: |
+      Run all tests and verify the build compiles.
+
+      Commands:
+      ```bash
+      cd services/price-service
+      go test ./internal/pricegroups/... -v
+      go test ./... -v
+      go build ./cmd/server
+      ```
+
+  - title: Run Phase 4 integration tests
+    completed: false
+    parallel_group: 6
+    description: |
+      Run integration tests to verify price groups work end-to-end.
+
+      Tests to verify:
+      - Group created on first store ingestion
+      - Group reused on second store with same prices
+      - Store membership updated when prices change
+      - Historical query returns correct group for date
+      - Exceptions override group prices
+
+  # --- Phase 4: Code Review (parallel_group: 7) ---
+  - title: Phase 4 code review with claude-cli
+    completed: false
+    parallel_group: 7
+    description: |
+      Review all Phase 4 implementation code using claude-cli.
+
+      Focus: Hash function, database schema, race conditions, persist phase, query performance
+
+  - title: Phase 4 code review with OpenCode Codex
+    completed: false
+    parallel_group: 7
+    description: |
+      Review Phase 4 using OpenCode with gpt-5.2-codex model.
+
+      Focus: Database constraints, hash determinism, race safety, bulk operations
+
+  - title: Phase 4 code review with OpenCode Gemini
+    completed: false
+    parallel_group: 7
+    description: |
+      Review Phase 4 using OpenCode with gemini-3-pro-preview model.
+
+      Focus: Test coverage, edge cases, error handling, Go idioms
+
+  - title: Phase 4 code review with OpenCode Grok
+    completed: false
+    parallel_group: 7
+    description: |
+      Review Phase 4 using OpenCode with grok-code-fast-1 model.
+
+      Focus: Control flow, query correctness, deadlocks, memory efficiency
+
+  # =============================================================================
+  # PHASE 6: Store Enrichment UI
+  # Admin UI for pending store approval with human workflow and enrichment integration
+  # =============================================================================
+
+  # --- Phase 6: Step 1 - Backend Hardening (parallel_group: 8) ---
+  - title: Add authorization middleware to store mutations
+    completed: false
+    parallel_group: 8
+    description: |
+      Add server-side role checks on ALL store mutations in oRPC handlers.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+
+      Add `requireSuperadminSession(context)` at the start of each mutation handler.
+
+  - title: Add optimistic locking to store mutations
+    completed: false
+    parallel_group: 8
+    description: |
+      Add `expectedUpdatedAt` parameter to all mutations for version checking.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+
+      Apply to: approveStore, rejectStore, mergeStores
+
+  - title: Add getStoreDetail endpoint
+    completed: false
+    parallel_group: 8
+    description: |
+      Split full store data from list endpoint for performance.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+
+      Return full store data including enrichment tasks, similar stores, linked stores.
+
+  - title: Update triggerEnrichment for synchronous execution
+    completed: false
+    parallel_group: 8
+    description: |
+      Make enrichment run inline during the API call (no background jobs).
+
+      Files to modify:
+      - src/orpc/router/stores.ts
+      - src/lib/store-enrichment.ts
+
+      Benefits: Simpler architecture, immediate feedback, Photon API is fast (~200-500ms)
+
+  # --- Phase 6: Step 2 - Schema Update (parallel_group: 9) ---
+  - title: Update stores table schema for approval workflow
+    completed: false
+    parallel_group: 9
+    description: |
+      Add new status values and approval tracking columns.
+
+      File to modify:
+      - src/db/schema.ts
+
+      Add columns: status (pending/enriched/needs_review/approved/rejected/merged/failed),
+      approvalNotes, approvedBy, approvedAt
+
+  - title: Run Phase 6 database migration
+    completed: false
+    parallel_group: 9
+    description: |
+      Generate and run migration for schema changes.
+
+      Commands:
+      ```bash
+      pnpm drizzle-kit generate
+      pnpm drizzle-kit migrate
+      ```
+
+  # --- Phase 6: Step 3 - Frontend Page & Filters (parallel_group: 10) ---
+  - title: Create pending stores route
+    completed: false
+    parallel_group: 10
+    description: |
+      Create the admin route for pending stores page.
+
+      File to create:
+      - src/routes/_admin.admin.stores.pending.tsx
+
+  - title: Implement PendingStoresFilters component
+    completed: false
+    parallel_group: 10
+    description: |
+      Create filter controls for the pending stores queue.
+
+      File to create:
+      - src/components/admin/stores/PendingStoresFilters.tsx
+
+      Features: Chain dropdown, status filter, search, sort options
+
+  - title: Implement PendingStoreQueue component
+    completed: false
+    parallel_group: 10
+    description: |
+      Create the list view with selection support.
+
+      File to create:
+      - src/components/admin/stores/PendingStoreQueue.tsx
+
+      Features: List of cards, multi-select, empty/loading states, pagination
+
+  # --- Phase 6: Step 4 - Frontend Detail Drawer (parallel_group: 11) ---
+  - title: Implement StoreDetailDrawer component
+    completed: false
+    parallel_group: 11
+    description: |
+      Create slide-out panel for full store details.
+
+      File to create:
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+      Sections: Store info, location with map, enrichment tasks, similar stores, notes, actions
+
+  - title: Implement StoreStatusBadge component
+    completed: false
+    parallel_group: 11
+    description: |
+      Create status badge display component.
+
+      File to create:
+      - src/components/admin/stores/StoreStatusBadge.tsx
+
+  - title: Update PendingStoreCard with status badge and selection
+    completed: false
+    parallel_group: 11
+    description: |
+      Enhance existing card component.
+
+      File to modify:
+      - src/components/admin/stores/PendingStoreCard.tsx
+
+  - title: Update StoreApprovalModal with notes and version check
+    completed: false
+    parallel_group: 11
+    description: |
+      Enhance approval modal.
+
+      File to modify:
+      - src/components/admin/stores/StoreApprovalModal.tsx
+
+  # --- Phase 6: Step 5 - Bulk Operations (parallel_group: 12) ---
+  - title: Implement BulkActionsBar component
+    completed: false
+    parallel_group: 12
+    description: |
+      Create bulk actions UI.
+
+      File to create:
+      - src/components/admin/stores/BulkActionsBar.tsx
+
+      Features: Bulk Approve, Bulk Reject, Clear selection, Selected count
+
+  - title: Add bulk approve/reject endpoints
+    completed: false
+    parallel_group: 12
+    description: |
+      Add bulk operation endpoints.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+
+      New endpoints: bulkApproveStores, bulkRejectStores
+
+  # --- Phase 6: Step 6 - Error Handling & Polish (parallel_group: 13) ---
+  - title: Add concurrency conflict UI
+    completed: false
+    parallel_group: 13
+    description: |
+      Handle "someone changed this" errors gracefully.
+
+      Files to modify:
+      - src/components/admin/stores/StoreApprovalModal.tsx
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+  - title: Add enrichment retry UI
+    completed: false
+    parallel_group: 13
+    description: |
+      Allow retrying failed enrichment.
+
+      File to modify:
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+  - title: Add force-approve with justification
+    completed: false
+    parallel_group: 13
+    description: |
+      Allow skipping enrichment with documented reason.
+
+      Files to modify:
+      - src/orpc/router/stores.ts
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+  - title: Add loading, empty, and error states
+    completed: false
+    parallel_group: 13
+    description: |
+      Polish UI with proper state handling.
+
+      Files to modify:
+      - src/routes/_admin.admin.stores.pending.tsx
+      - src/components/admin/stores/PendingStoreQueue.tsx
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+  # --- Phase 6: Testing (parallel_group: 14-15) ---
+  - title: Write unit tests for store mutations
+    completed: false
+    parallel_group: 14
+    description: |
+      Test backend logic.
+
+      File to create:
+      - src/orpc/router/__tests__/stores-mutations.test.ts
+
+      Test: State transitions, authorization, optimistic locking, enrichment
+
+  - title: Write integration tests for approval workflow
+    completed: false
+    parallel_group: 14
+    description: |
+      Test full workflow.
+
+      File to create:
+      - src/orpc/router/__tests__/stores-integration.test.ts
+
+      Test: Full workflow, concurrent conflicts, merge integrity, bulk ops
+
+  - title: Write E2E tests with Playwright
+    completed: false
+    parallel_group: 15
+    description: |
+      Test UI flows.
+
+      File to create:
+      - e2e/admin-stores-pending.spec.ts
+
+      Test: Approve, reject, retry enrichment, concurrent edit, bulk approve
+
+  # --- Phase 6: Verification & Review (parallel_group: 16-17) ---
+  - title: Manual verification of store approval workflow
+    completed: false
+    parallel_group: 16
+    description: |
+      Verify implementation end-to-end.
+
+      Steps:
+      1. Create test store with `status='pending'`
+      2. Navigate to `/admin/stores/pending`
+      3. Trigger geocoding enrichment
+      4. Verify location on map
+      5. Approve store with notes
+      6. Confirm store appears in active list
+      7. Check audit trail (approvedBy, approvedAt, notes)
+
+  - title: Phase 6 code review with multiple AI models
+    completed: false
+    parallel_group: 17
+    description: |
+      Review Phase 6 implementation with multiple AI models.
+
+      Run code reviews using:
+      1. Claude CLI
+      2. OpenCode Codex
+      3. OpenCode Gemini
+      4. Grok Code
+
+      Focus: Security, state machine correctness, concurrency, error handling,
+      code quality, TypeScript types, React best practices

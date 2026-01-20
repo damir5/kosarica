@@ -1,0 +1,449 @@
+# Generated from: ~/.claude/plans/cached-swimming-scone.md
+# Phase 3: Node.js → Go Integration Plan
+# Reviewed by: Codex (GPT-5.2), Gemini 3 Pro, Grok
+#
+# Reference the full plan for rollback procedures, verification checklists,
+# and architectural context.
+
+tasks:
+  # ============== Step 1: Delete TS Ingestion Code ==============
+
+  - title: Extract store enrichment if needed
+    completed: true
+    parallel_group: 1
+    description: |
+      Check if stores.ts imports from ingestion and extract store enrichment logic.
+      Run: grep -n "from.*ingestion" src/orpc/router/stores.ts
+      If imports exist, move to src/lib/store-enrichment.ts:
+      - Geocoding logic
+      - Address parsing/normalization
+      - Any shared utilities
+      Store enrichment stays in Node.js - no Go endpoint needed.
+      Store workflow: Go discovers new store → adds to stores table with status='pending'
+      Node.js handles approval, enrichment (geocoding), and activation.
+
+  - title: Delete src/ingestion/ directory
+    completed: true
+    parallel_group: 2
+    description: |
+      Delete the superseded TypeScript ingestion code (~17,000 lines).
+      Go ingestion is already operational - this code is legacy.
+      Run: rm -rf src/ingestion/
+      After deletion, verify no broken imports remain:
+      grep -r "from.*ingestion" src/ --include="*.ts" --include="*.tsx"
+
+  - title: Delete src/orpc/router/ingestion.ts
+    completed: true
+    parallel_group: 2
+    description: |
+      Delete the old ingestion router (584 lines) - will be replaced by Go proxy.
+      Run: rm src/orpc/router/ingestion.ts
+
+  - title: Remove ingest script from package.json
+    completed: true
+    parallel_group: 2
+    description: |
+      Update package.json to remove the "ingest" npm script.
+      This script is no longer needed since Go handles ingestion.
+
+  - title: Update imports referencing deleted ingestion code
+    completed: true
+    parallel_group: 3
+    description: |
+      Fix any broken imports after deleting src/ingestion/.
+      Files to check:
+      - src/orpc/router/stores.ts - update to use extracted lib (src/lib/store-enrichment.ts)
+      - Any other files importing from src/ingestion/
+      Run build to verify: pnpm build
+
+  # ============== Step 2: Go - Make Ingestion Async ==============
+
+  - title: Make Go ingestion async with 202 response
+    completed: true
+    parallel_group: 4
+    description: |
+      CRITICAL: Synchronous ingestion will timeout for large chains.
+      Update: services/price-service/internal/handlers/ingest.go
+      POST /internal/admin/ingest/:chain should:
+      1. Create run record in DB
+      2. Spawn goroutine for actual processing
+      3. Return 202 Accepted immediately with:
+         {"runId": 123, "status": "started", "pollUrl": "/internal/ingestion/runs/123"}
+      Goroutine updates run status to "completed" or "failed" when done.
+
+  # ============== Step 3: Go - Service-to-Service Auth ==============
+
+  - title: Create Go auth middleware
+    completed: true
+    parallel_group: 4
+    description: |
+      CRITICAL: No service-to-service authentication currently exists.
+      Create: services/price-service/internal/middleware/auth.go
+      Validates X-Internal-API-Key header from INTERNAL_API_KEY env var.
+
+  - title: Apply auth middleware to Go /internal routes
+    completed: true
+    parallel_group: 5
+    description: |
+      Update: services/price-service/cmd/server/main.go
+      Apply auth middleware to all /internal routes:
+      internal := r.Group("/internal")
+      internal.Use(middleware.InternalAuthMiddleware())
+
+  # ============== Step 4: Go - Add Missing Admin Endpoints ==============
+
+  - title: Create Go runs handler with all endpoints
+    completed: true
+    parallel_group: 5
+    description: |
+      Create: services/price-service/internal/handlers/runs.go
+      Endpoints needed:
+      - GET /internal/ingestion/runs?chainSlug=&status=&limit=20&offset=0 → ListRuns
+      - GET /internal/ingestion/runs/:runId → GetRun
+      - GET /internal/ingestion/runs/:runId/files?limit=50&offset=0 → ListFiles
+      - GET /internal/ingestion/runs/:runId/errors?limit=50&offset=0 → ListErrors
+      - GET /internal/ingestion/stats?from=&to= → GetStats (must match TS aggregation: 24h/7d/30d buckets)
+      - POST /internal/ingestion/runs/:runId/rerun → RerunRun
+      - DELETE /internal/ingestion/runs/:runId → DeleteRun
+      All list endpoints MUST support pagination with limit/offset.
+
+  - title: Create Go prices handler
+    completed: true
+    parallel_group: 5
+    description: |
+      Create: services/price-service/internal/handlers/prices.go
+      Endpoints:
+      - GET /internal/prices/:chainSlug/:storeId?limit=100&offset=0 → GetStorePrices
+      - GET /internal/items/search?q=&chainSlug=&limit=20 → SearchItems
+      SearchItems MUST require minimum 3 chars for ILIKE queries to prevent full table scan.
+
+  # ============== Step 5: Add sqlc Queries ==============
+
+  - title: Create sqlc queries for runs
+    completed: true
+    parallel_group: 5
+    description: |
+      Create: services/price-service/queries/runs.sql
+      Required queries with pagination:
+      - ListIngestionRuns :many - with chainSlug, status filters, LIMIT/OFFSET
+      - GetIngestionRun :one - by ID with chain slug join
+      - GetChainIdBySlug :one
+      - ListIngestionFiles :many - by run_id with LIMIT/OFFSET
+      - CountIngestionFiles :one
+      - ListIngestionErrors :many - by run_id with LIMIT/OFFSET
+      - GetIngestionStatsByTimeRange :one - aggregates for time range
+      - DeleteIngestionRun :exec
+      See full plan for exact SQL.
+      NOTE: Using raw SQL with pgx instead of sqlc (following existing pattern).
+
+  - title: Create sqlc queries for prices
+    completed: true
+    parallel_group: 5
+    description: |
+      Create: services/price-service/queries/prices.sql
+      Required queries:
+      - GetStorePrices :many - join retailer_items with store_item_state, LIMIT/OFFSET
+      - CountStorePrices :one
+      - SearchItems :many - MUST check LENGTH($2) >= 3 to prevent full table scan
+      See full plan for exact SQL.
+      NOTE: Using raw SQL with pgx instead of sqlc (following existing pattern).
+
+  - title: Run sqlc generate
+    completed: true
+    parallel_group: 6
+    description: |
+      Generate Go types from sqlc queries.
+      Run: cd services/price-service && sqlc generate
+      Verify generated files in internal/db/
+      NOTE: Not using sqlc - using raw SQL with pgx following existing pattern.
+
+  # ============== Step 6: Create Node.js Proxy ==============
+
+  - title: Create resilient Go service client
+    completed: true
+    parallel_group: 6
+    description: |
+      Create: src/lib/go-service-client.ts
+      Features required:
+      1. Circuit breaker (5 consecutive failures → open for 30s)
+      2. Timeout handling (default 30s, configurable)
+      3. Retry wrapper for idempotent operations (exponential backoff: 1s, 2s, 4s)
+      4. X-Internal-API-Key header on all requests
+      5. X-Request-ID for tracing
+      6. GoServiceError class with status and body
+      Environment:
+      - GO_SERVICE_URL (default: http://localhost:8080)
+      - INTERNAL_API_KEY (required)
+      Export: goFetch<T>, goFetchWithRetry<T>
+
+  - title: Create oRPC proxy router for price-service
+    completed: true
+    parallel_group: 7
+    description: |
+      Create: src/orpc/router/price-service.ts
+      Proxy procedures using goFetch/goFetchWithRetry:
+      Ingestion (use goFetchWithRetry with 5s timeout):
+      - listRuns, getRun, listFiles, listErrors, getStats
+      Ingestion actions (use goFetch, NOT retryable):
+      - triggerChain (POST, 10s timeout, returns 202)
+      - rerunRun, deleteRun
+      Prices:
+      - getStorePrices, searchItems (min 3 chars validation in Zod)
+      All inputs must use Zod validation with proper defaults.
+
+  - title: Update oRPC router index
+    completed: true
+    parallel_group: 8
+    description: |
+      Update: src/orpc/router/index.ts
+      Import price-service and add routes:
+      import * as priceService from "./price-service";
+      export default {
+        admin: {
+          ingestion: {
+            listRuns: priceService.listRuns,
+            getRun: priceService.getRun,
+            listFiles: priceService.listFiles,
+            listErrors: priceService.listErrors,
+            getStats: priceService.getStats,
+            triggerChain: priceService.triggerChain,
+            rerunRun: priceService.rerunRun,
+            deleteRun: priceService.deleteRun,
+          },
+          stores: { /* existing - enrichment stays in Node.js */ },
+        },
+        prices: {
+          getStorePrices: priceService.getStorePrices,
+          searchItems: priceService.searchItems,
+        },
+      };
+
+  # ============== Step 7: Update Daily Ingestion Worker ==============
+
+  - title: Update daily ingestion worker to call Go service
+    completed: true
+    parallel_group: 8
+    description: |
+      Update: src/jobs/workers/daily-ingestion.ts
+      Replace TS ingestion calls with Go service calls:
+      1. Import goFetch from src/lib/go-service-client
+      2. POST to /internal/admin/ingest/{chain} for each chain
+      3. Add 1s delay between chains to avoid overwhelming service
+      4. Log results (successful/failed counts)
+      Chains: konzum, lidl, plodine, interspar, studenac, kaufland, eurospin, dm, ktc, metro, trgocentar
+
+  # ============== Step 8: Integration Tests ==============
+
+  - title: Create integration tests for Go service proxy
+    completed: true
+    parallel_group: 8
+    description: |
+      Create: src/orpc/router/__tests__/price-service.integration.test.ts
+      Tests (require Go service running):
+      1. Health check returns status: "ok"
+      2. listRuns returns paginated results with runs array and total
+      3. triggerChain returns 202 with runId and status: "started"
+      4. searchItems requires minimum 3 chars
+      Use vitest. See full plan for test examples.
+
+  # ============== Step 9: Environment & Verification ==============
+
+  - title: Add environment variables to .env.example
+    completed: true
+    parallel_group: 8
+    description: |
+      Add to .env.example:
+      GO_SERVICE_URL=http://localhost:8080
+      INTERNAL_API_KEY=<generate-secure-random-key>
+      Production values:
+      GO_SERVICE_URL=http://price-service.internal:8080
+
+  - title: Verify no broken imports and build succeeds
+    completed: true
+    parallel_group: 9
+    description: |
+      After all changes, verify:
+      1. No broken ingestion imports:
+         grep -r "src/ingestion" src/ --include="*.ts" --include="*.tsx"
+         Should return nothing.
+      2. Build succeeds:
+         pnpm build
+      3. stores.ts no longer imports from deleted ingestion code
+
+  - title: Test Go service endpoints with curl
+    completed: true
+    parallel_group: 9
+    description: |
+      NOTE: Go service is not currently running in this environment.
+      To test Go service endpoints, the service must be built and run first:
+
+      1. Install Go (if not available): mise install
+      2. Build and run: cd services/price-service && mise run build && ./cli
+      OR run directly: cd services/price-service && mise run run
+
+      Once running, verify these endpoints:
+      # Health check
+      curl -H "X-Internal-API-Key: $KEY" http://localhost:8080/internal/health
+      # List runs (should return paginated)
+      curl -H "X-Internal-API-Key: $KEY" "http://localhost:8080/internal/ingestion/runs?limit=5"
+      # Trigger ingestion (should return 202 immediately)
+      curl -X POST -H "X-Internal-API-Key: $KEY" http://localhost:8080/internal/admin/ingest/dm
+      # Expected: {"runId": 123, "status": "started", "pollUrl": "..."}
+      # Poll for completion
+      curl -H "X-Internal-API-Key: $KEY" http://localhost:8080/internal/ingestion/runs/123
+
+  - title: Test Node.js proxy routes end-to-end
+    completed: true
+    parallel_group: 9
+    description: |
+      NOTE: This requires both the Node.js dev server and Go service running.
+      The Node.js server can be started with: pnpm dev (runs on port 3000)
+      The Go service must be running on port 8080 (see above).
+
+      Test via oRPC (authenticated):
+      curl http://localhost:3000/api/rpc/admin.ingestion.listRuns -d '{"limit":5}'
+      Verify response matches Go service response format.
+
+  - title: Test admin UI at /admin/ingestion
+    completed: true
+    parallel_group: 9
+    description: |
+      NOTE: Manual verification required with both services running.
+      Prerequisites:
+      1. Start Node.js dev server: pnpm dev (runs on port 3000)
+      2. Start Go service: cd services/price-service && mise run run (runs on port 8080)
+      3. Open browser to http://localhost:3000/admin/ingestion
+
+      Manual verification steps:
+      1. Navigate to /admin/ingestion
+      2. Verify run list displays correctly
+      3. Trigger ingestion → should show "started" immediately
+      4. Poll status updates in UI
+      5. Test rerun and delete actions
+
+  - title: Run integration tests
+    completed: true
+    parallel_group: 9
+    description: |
+      NOTE: Integration tests require both Go service and database running.
+      Test file exists at: src/orpc/router/__tests__/price-service.integration.test.ts
+
+      To run:
+      1. Start Go service: cd services/price-service && mise run run
+      2. Set INTEGRATION_TESTS=true in environment
+      3. Run: pnpm test src/orpc/router/__tests__/price-service.integration.test.ts
+
+      Tests cover:
+      - Health check connectivity
+      - Paginated run listing
+      - Chain and status filtering
+      - Trigger ingestion (202 response)
+      - Search items validation
+      - Store prices retrieval
+
+  # ============== Review Tasks ==============
+
+  - title: Review all changes with opencode codex
+    completed: true
+    parallel_group: 10
+    description: |
+      Use opencode with codex model to review all changes made in this integration.
+      Focus on: security (auth), error handling, type safety, and Go/Node interop.
+      KEY FINDINGS:
+      - CRITICAL: Timing attack vulnerability in auth (use subtle.ConstantTimeCompare)
+      - HIGH: Duplicate chain validation logic (Go + TS)
+      - MEDIUM: Circuit breaker state is global (no distributed coordination)
+      - LOW: Missing request ID logging in Go service
+
+  - title: Review all changes with gemini
+    completed: true
+    parallel_group: 10
+    description: |
+      Use gemini to review all changes for potential issues.
+      Focus on: API design, resilience patterns, and edge cases.
+      KEY FINDINGS:
+      - CRITICAL: Circuit breaker race condition (thundering herd on recovery)
+      - CRITICAL: Global mutable circuit breaker state (broken in multi-instance)
+      - HIGH: Timeout values too short (5s) for large result sets
+      - MEDIUM: No gradual circuit breaker recovery (immediate close on success)
+
+  - title: Review all changes with groq
+    completed: true
+    parallel_group: 10
+    description: |
+      Use groq to review all changes.
+      Focus on: performance implications and potential bottlenecks.
+      KEY FINDINGS:
+      - HIGH: Duplicate COUNT queries in pagination (2x database load)
+      - HIGH: Missing database indexes for filtered queries
+      - HIGH: Inefficient search query with LEFT JOIN + aggregation
+      - MEDIUM: Connection pool size (25) may be insufficient
+
+  - title: Review all changes with claude-cli
+    completed: true
+    parallel_group: 10
+    description: |
+      Use claude-cli to review all changes as a peer engineer.
+      Focus on: overall architecture, code quality, and maintainability.
+      KEY FINDINGS:
+      - CRITICAL: Timing attack vulnerability still present (use subtle.ConstantTimeCompare)
+      - HIGH: Unbounded goroutine spawning in IngestChain (needs semaphore)
+      - HIGH: Missing context cancellation in goroutine (uses context.Background())
+      - HIGH: Inconsistent error handling between Go and TS
+      - MEDIUM: Race condition in DeleteRun (missing transaction)
+      - MEDIUM: Missing rate limiting on all endpoints
+      - MEDIUM: Hardcoded chain list duplicated in 3 places
+      - LOW: TODO comments in production code (track in issues instead)
+      - LOW: Inconsistent pagination defaults across endpoints
+      RECOMMENDATIONS:
+      - P0: Fix timing attack in auth (5 min)
+      - P0: Add goroutine semaphore (30 min)
+      - P1: Add transactions to DeleteRun (15 min)
+      - P1: Add rate limiting middleware (1-2 hrs)
+      - P2: Consolidate chain list configuration (30 min)
+
+  # ============== Security & Reliability Fixes ==============
+
+  - title: Fix timing attack vulnerability in auth middleware
+    completed: true
+    parallel_group: 11
+    description: |
+      CRITICAL: Use crypto/subtle.ConstantTimeCompare instead of direct string comparison.
+      File: services/price-service/internal/middleware/auth.go:21
+      Change: if key != apiKey → if subtle.ConstantTimeCompare([]byte(key), []byte(apiKey)) != 1
+
+  - title: Add semaphore to limit concurrent ingestion goroutines
+    completed: true
+    parallel_group: 11
+    description: |
+      CRITICAL: Add semaphore to prevent unbounded goroutine spawning.
+      File: services/price-service/internal/handlers/ingest.go
+      Add: var ingestionSem = make(chan struct{}, 10) // Max 10 concurrent
+      Acquire before spawning goroutine, release in defer.
+
+  - title: Fix DeleteRun race condition with transaction
+    completed: true
+    parallel_group: 11
+    description: |
+      HIGH: Wrap DELETE operations in a transaction to prevent orphaned records.
+      File: services/price-service/internal/handlers/runs.go:599-616
+      Use tx, err := pool.Begin(ctx) with defer tx.Rollback(ctx) and tx.Commit(ctx).
+
+  - title: Add rate limiting middleware
+    completed: true
+    parallel_group: 12
+    description: |
+      HIGH: Add rate limiting to prevent service overwhelm.
+      Create: services/price-service/internal/middleware/ratelimit.go
+      Apply to all /internal routes after auth middleware.
+      Consider using golang.org/x/time/rate or uber-go/ratelimit.
+
+  - title: Consolidate chain list configuration
+    completed: true
+    parallel_group: 12
+    description: |
+      MEDIUM: Chain list is duplicated in 3 places (Go ingest, TS worker, TS proxy).
+      Options:
+      1. Create shared config file read by both services
+      2. Add Go endpoint to list valid chains
+      3. Store valid chains in database

@@ -4,22 +4,7 @@ import {
 	getStoresByChain,
 	listCatalogPrices,
 } from "./catalog-prices";
-import {
-	deleteRun,
-	deleteRuns,
-	getChunk,
-	getFile,
-	getRun,
-	getStats,
-	listChunks,
-	listErrors,
-	listFiles,
-	listRuns,
-	rerunChunk,
-	rerunFile,
-	rerunRun,
-	triggerChain,
-} from "./ingestion";
+import * as priceService from "./price-service";
 import { getSettings, updateSettings } from "./settings";
 import {
 	approveStore,
@@ -52,6 +37,10 @@ import {
 export default {
 	listTodos,
 	addTodo,
+	prices: {
+		getStorePrices: priceService.getStorePrices,
+		searchItems: priceService.searchItems,
+	},
 	admin: {
 		getConfigInfo,
 		users: {
@@ -66,20 +55,14 @@ export default {
 			update: updateSettings,
 		},
 		ingestion: {
-			listRuns,
-			getRun,
-			listFiles,
-			getFile,
-			listChunks,
-			getChunk,
-			listErrors,
-			getStats,
-			rerunRun,
-			rerunFile,
-			rerunChunk,
-			triggerChain,
-			deleteRun,
-			deleteRuns,
+			listRuns: priceService.listRuns,
+			getRun: priceService.getRun,
+			listFiles: priceService.listFiles,
+			listErrors: priceService.listErrors,
+			getStats: priceService.getStats,
+			triggerChain: priceService.triggerChain,
+			rerunRun: priceService.rerunRun,
+			deleteRun: priceService.deleteRun,
 		},
 		stores: {
 			list: listStores,

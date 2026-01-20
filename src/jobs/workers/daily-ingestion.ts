@@ -1,12 +1,13 @@
 /**
  * Daily Ingestion Worker
  *
- * Bree worker that runs the ingestion pipeline for all configured chains.
+ * Bree worker that triggers ingestion for all configured chains via the Go service.
+ * The Go service handles the actual ingestion asynchronously.
  * Executed via cron schedule (6 AM daily) or manual trigger.
  */
 
 import { parentPort } from "node:worker_threads";
-import { runIngestionPipeline } from "@/ingestion/processor";
+import { goFetch } from "@/lib/go-service-client";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("daily-ingestion");
@@ -14,38 +15,68 @@ const log = createLogger("daily-ingestion");
 async function main(): Promise<void> {
 	log.info("Starting daily ingestion job");
 
+	// Fetch chains dynamically from Go service
+	let chains: string[];
 	try {
-		const results = await runIngestionPipeline();
-
-		const summary = {
-			totalChains: results.length,
-			successful: results.filter((r) => r.success).length,
-			failed: results.filter((r) => !r.success).length,
-			totalFiles: results.reduce((sum, r) => sum + r.filesProcessed, 0),
-			totalEntries: results.reduce((sum, r) => sum + r.entriesPersisted, 0),
-		};
-
-		log.info("Daily ingestion completed", summary);
-
-		// Send completion message to parent
-		if (parentPort) {
-			parentPort.postMessage({
-				type: "completed",
-				summary,
-			});
-		}
+		const response = await goFetch<{ chains: string[] }>("/internal/chains", {
+			timeout: 5000,
+		});
+		chains = response.chains;
+		log.info(`Fetched ${chains.length} chains from Go service`);
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		log.error("Daily ingestion failed", { error: message });
+		log.error("Failed to fetch chains from Go service", { error });
+		throw error;
+	}
 
-		if (parentPort) {
-			parentPort.postMessage({
-				type: "error",
-				error: message,
+	let successful = 0;
+	let failed = 0;
+
+	for (const chain of chains) {
+		try {
+			log.info(`Triggering ingestion for chain: ${chain}`);
+
+			// Trigger ingestion via Go service (returns 202 immediately)
+			const result = await goFetch<{
+				runId: string;
+				status: string;
+				pollUrl: string;
+			}>(`/internal/admin/ingest/${chain}`, {
+				method: "POST",
+				timeout: 10000, // 10 second timeout
 			});
-		}
 
-		process.exit(1);
+			log.info(`Ingestion triggered for ${chain}`, {
+				runId: result.runId,
+				status: result.status,
+			});
+
+			successful++;
+
+			// Add 1 second delay between chains to avoid overwhelming the service
+			if (chain !== chains[chains.length - 1]) {
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+			}
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			log.error(`Failed to trigger ingestion for ${chain}`, { error: message });
+			failed++;
+		}
+	}
+
+	const summary = {
+		totalChains: chains.length,
+		successful,
+		failed,
+	};
+
+	log.info("Daily ingestion triggers completed", summary);
+
+	// Send completion message to parent
+	if (parentPort) {
+		parentPort.postMessage({
+			type: "completed",
+			summary,
+		});
 	}
 }
 

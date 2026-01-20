@@ -18,7 +18,7 @@ run = "pnpm start"
 description = "Run tests (Node.js vitest)"
 run = "pnpm test"
 
-[tasks.test:watch]
+[tasks.test-watch]
 description = "Run tests in watch mode (Node.js)"
 run = "pnpm test:watch"
 
@@ -30,14 +30,14 @@ run = "pnpm lint"
 description = "Format code (Node.js biome)"
 run = "pnpm format"
 
-[tasks.db:generate]
+[tasks.db-generate]
 description = "Generate DB migrations (Node.js)"
 run = "pnpm db:generate"
 
-[tasks.db:migrate]
+[tasks.db-migrate]
 description = "Run DB migrations (Node.js)"
 run = "pnpm db:migrate"
 
-[tasks.db:studio]
+[tasks.db-studio]
 description = "Open Drizzle Studio (Node.js)"
 run = "pnpm db:studio"

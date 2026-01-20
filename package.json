@@ -15,8 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "analyze:price-variation": "node scripts/analyze-price-variation.mjs",
-    "ingest": "tsx src/ingestion/cli/index.ts"
+    "analyze:price-variation": "node scripts/analyze-price-variation.mjs"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.4.13",

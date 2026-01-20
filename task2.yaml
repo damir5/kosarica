@@ -1,0 +1,491 @@
+# Generated from: ~/.claude/plans/silly-growing-glacier.md
+# Phase 4 Implementation Plan: Price Groups (Go Only)
+# Content-addressable price storage with immutable price groups for 50%+ storage reduction
+
+tasks:
+  - title: Create database schema migration
+    completed: false
+    parallel_group: 1
+    description: |
+      Create the SQL migration file for price groups tables.
+
+      File to create:
+      - `services/price-service/migrations/0003_add_price_groups.sql`
+
+      Tables to add:
+      1. `price_groups` - Content-addressable groups (immutable)
+         - id UUID PRIMARY KEY (app-generated)
+         - chain_slug VARCHAR(32) NOT NULL REFERENCES chains(slug)
+         - price_hash VARCHAR(64) NOT NULL (SHA-256 hex)
+         - hash_version SMALLINT NOT NULL DEFAULT 1
+         - UNIQUE(chain_slug, price_hash, hash_version)
+
+      2. `group_prices` - Prices stored at group level
+         - (price_group_id, retailer_item_id) composite PK
+         - price INTEGER NOT NULL (cents/lipa)
+         - discount_price INTEGER (NULL = no discount, distinct from 0!)
+
+      3. `store_group_history` - Temporal store→group mapping
+         - id UUID PRIMARY KEY (app-generated)
+         - store_id, price_group_id, valid_from, valid_to
+         - GiST exclusion constraint to prevent overlapping time ranges
+         - Partial unique index WHERE valid_to IS NULL
+
+      4. `store_price_exceptions` - Rare overrides that must expire
+         - (store_id, retailer_item_id) PK
+         - price, reason, expires_at (NOT NULL)
+
+      Critical: Enable btree_gist extension first.
+
+  - title: Update Drizzle schema definitions
+    completed: false
+    parallel_group: 1
+    description: |
+      Add table definitions to Drizzle ORM for the 4 new tables.
+
+      File to modify:
+      - `src/db/schema.ts`
+
+      Add Drizzle table definitions for:
+      - priceGroups
+      - groupPrices
+      - storeGroupHistory
+      - storePriceExceptions
+
+      Follow existing patterns in the schema file for relations and indexes.
+
+  - title: Create Go models for price groups
+    completed: false
+    parallel_group: 2
+    description: |
+      Create Go struct definitions for price group entities.
+
+      File to create:
+      - `services/price-service/internal/database/models_price_groups.go`
+
+      Models to define:
+      ```go
+      type PriceGroup struct {
+          ID           string
+          ChainSlug    string
+          PriceHash    string
+          HashVersion  int
+          StoreCount   int
+          ItemCount    int
+          FirstSeenAt  time.Time
+          LastSeenAt   time.Time
+      }
+
+      type GroupPrice struct {
+          PriceGroupID   string
+          RetailerItemID string
+          Price          int
+          DiscountPrice  *int
+          UnitPrice      *int
+          AnchorPrice    *int
+      }
+
+      type StoreGroupHistory struct {
+          ID           string
+          StoreID      string
+          PriceGroupID string
+          ValidFrom    time.Time
+          ValidTo      *time.Time
+      }
+
+      type StorePriceException struct {
+          StoreID        string
+          RetailerItemID string
+          Price          int
+          DiscountPrice  *int
+          Reason         string
+          ExpiresAt      time.Time
+      }
+      ```
+
+  - title: Create database CRUD functions for price groups
+    completed: false
+    parallel_group: 2
+    description: |
+      Implement database functions for price group operations.
+
+      File to create:
+      - `services/price-service/internal/database/price_groups.go`
+
+      Functions to implement:
+
+      1. `FindOrCreatePriceGroup(ctx, chainSlug, priceHash) (PriceGroup, created bool, error)`
+         - Use INSERT ON CONFLICT DO NOTHING pattern for race condition safety
+         - Generate UUID in Go using github.com/google/uuid
+         ```go
+         id := uuid.New().String()
+         _, err := tx.Exec(ctx, `
+             INSERT INTO price_groups (id, chain_slug, price_hash, hash_version)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (chain_slug, price_hash, hash_version) DO NOTHING`,
+             id, chainSlug, priceHash, HashVersion)
+         // If conflict, SELECT existing group
+         ```
+
+      2. `BulkInsertGroupPrices(ctx, groupID, []GroupPrice) error`
+
+      3. `AssignStoreToGroup(ctx, storeID, groupID) error`
+         - Closes previous membership (sets valid_to = NOW())
+         - Opens new membership (valid_from = NOW(), valid_to = NULL)
+
+      4. `GetCurrentPriceForStore(ctx, storeID, itemID) (price, discountPrice, isException, error)`
+
+      5. `GetHistoricalPriceForStore(ctx, storeID, itemID, asOf time.Time) (price, error)`
+
+      6. `UpdateGroupLastSeen(ctx, groupID) error`
+
+      7. `CleanupExpiredExceptions(ctx) (deleted int, error)`
+
+  - title: Implement price hash function
+    completed: false
+    parallel_group: 2
+    description: |
+      Create the CRITICAL hash function for price group identification.
+
+      File to create:
+      - `services/price-service/internal/pricegroups/hash.go`
+
+      Implementation:
+      ```go
+      const HashVersion = 1
+
+      type ItemPrice struct {
+          ItemID        string  // UUID in canonical format (lowercase, hyphens)
+          Price         int     // cents, NOT NULL
+          DiscountPrice *int    // cents, nullable (NULL ≠ 0!)
+      }
+
+      func ComputePriceHash(prices []ItemPrice) string {
+          // 1. Sort by ItemID (lexicographic for UUIDs)
+          sort.Slice(prices, func(i, j int) bool {
+              return prices[i].ItemID < prices[j].ItemID
+          })
+
+          // 2. Build canonical string: "item_id:price:discount\n"
+          //    CRITICAL: Use "N" for NULL discount, integer for actual value
+          var buf bytes.Buffer
+          for _, p := range prices {
+              var discountStr string
+              if p.DiscountPrice == nil {
+                  discountStr = "N"  // NULL sentinel
+              } else {
+                  discountStr = strconv.Itoa(*p.DiscountPrice)
+              }
+              fmt.Fprintf(&buf, "%s:%d:%s\n", p.ItemID, p.Price, discountStr)
+          }
+
+          // 3. SHA256, hex-encoded (lowercase)
+          hash := sha256.Sum256(buf.Bytes())
+          return hex.EncodeToString(hash[:])
+      }
+      ```
+
+      CRITICAL: NULL discount must produce different hash than 0 discount!
+
+  - title: Create hash function tests
+    completed: false
+    parallel_group: 2
+    description: |
+      Create comprehensive tests for hash function invariants.
+
+      File to create:
+      - `services/price-service/internal/pricegroups/hash_test.go`
+
+      Test invariants (P0 priority):
+      - HASH-1: Same prices, 1000 iterations = same hash (determinism)
+      - HASH-2: Different order = same hash (order independence)
+      - HASH-3: NULL discount ≠ 0 discount (distinct hashes!)
+      - HASH-4: Any price difference = different hash (sensitivity)
+      - HASH-5: Consistent across goroutines (thread safety)
+      - HASH-6: UUID formatting consistency (lowercase, hyphens)
+
+      Example test:
+      ```go
+      func TestHashDeterminism(t *testing.T) {
+          prices := []ItemPrice{
+              {ItemID: "550e8400-e29b-41d4-a716-446655440000", Price: 1299, DiscountPrice: ptr(999)},
+              {ItemID: "550e8400-e29b-41d4-a716-446655440001", Price: 500, DiscountPrice: nil},
+          }
+          hash1 := ComputePriceHash(prices)
+          for i := 0; i < 1000; i++ {
+              assert.Equal(t, hash1, ComputePriceHash(prices))
+          }
+      }
+
+      func TestNullVsZeroDiscount(t *testing.T) {
+          withNull := []ItemPrice{{ItemID: "abc", Price: 100, DiscountPrice: nil}}
+          withZero := []ItemPrice{{ItemID: "abc", Price: 100, DiscountPrice: ptr(0)}}
+          assert.NotEqual(t, ComputePriceHash(withNull), ComputePriceHash(withZero))
+      }
+      ```
+
+  - title: Modify persist phase for group-based storage
+    completed: false
+    parallel_group: 3
+    description: |
+      Update the persist phase to use price groups instead of direct price storage.
+
+      File to modify:
+      - `services/price-service/internal/pipeline/persist.go`
+
+      Current flow to replace:
+      ```
+      For each store:
+        For each row:
+          Find/create retailer item
+          UPSERT store_item_state
+      ```
+
+      New flow:
+      ```
+      For each store:
+        Step 1: Collect all items with prices → []ItemPrice
+        Step 2: Compute price hash: pricegroups.ComputePriceHash(prices)
+        Step 3: Find or create price group by hash
+        Step 4: If new group:
+                  - Bulk insert group_prices
+                Else:
+                  - Verify prices match (safety check)
+                  - Update last_seen_at
+        Step 5: Assign store to group (closes previous membership)
+        Step 6: Update group stats (store_count, item_count)
+      ```
+
+      Key changes to `persistRowsForStore()`:
+      1. First pass: collect all ItemPrice structs from normalized rows
+      2. Compute hash
+      3. Find/create group
+      4. If new group, bulk insert prices
+      5. Link store to group
+
+  - title: Update price query API handlers
+    completed: false
+    parallel_group: 4
+    description: |
+      Update API handlers to query prices via price groups.
+
+      File to modify:
+      - `services/price-service/internal/handlers/prices.go`
+
+      New query pattern for current price:
+      ```sql
+      SELECT
+          COALESCE(e.price, gp.price) as price,
+          COALESCE(e.discount_price, gp.discount_price) as discount_price,
+          e.price IS NOT NULL as is_exception
+      FROM store_group_history sgh
+      JOIN group_prices gp ON gp.price_group_id = sgh.price_group_id
+      LEFT JOIN store_price_exceptions e
+          ON e.store_id = sgh.store_id AND e.retailer_item_id = gp.retailer_item_id
+      WHERE sgh.store_id = $1
+        AND gp.retailer_item_id = $2
+        AND sgh.valid_to IS NULL
+        AND (e.expires_at IS NULL OR e.expires_at > NOW());
+      ```
+
+      New endpoints to add:
+      - GET /internal/prices/:storeId - List all prices for store (via group)
+      - GET /internal/prices/:storeId/history?asOf= - Historical price lookup
+      - GET /internal/price-groups/:chainSlug - List groups for chain (admin)
+
+  - title: Update Node.js oRPC proxy
+    completed: false
+    parallel_group: 4
+    description: |
+      Add new oRPC procedures to proxy price group endpoints.
+
+      File to modify:
+      - `src/orpc/router/price-service.ts`
+
+      New procedures to add:
+      ```typescript
+      getStorePrices: publicProcedure
+        .input(z.object({ storeId: z.string() }))
+        .query(async ({ input }) => {
+          return goFetchWithRetry(`/internal/prices/${input.storeId}`);
+        }),
+
+      getHistoricalPrice: publicProcedure
+        .input(z.object({
+          storeId: z.string(),
+          itemId: z.string(),
+          asOf: z.string()
+        }))
+        .query(async ({ input }) => {
+          return goFetchWithRetry(
+            `/internal/prices/${input.storeId}/history?asOf=${input.asOf}&itemId=${input.itemId}`
+          );
+        }),
+
+      listPriceGroups: publicProcedure
+        .input(z.object({ chainSlug: z.string() }))
+        .query(async ({ input }) => {
+          return goFetchWithRetry(`/internal/price-groups/${input.chainSlug}`);
+        }),
+      ```
+
+  - title: Create background cleanup jobs
+    completed: false
+    parallel_group: 4
+    description: |
+      Implement background jobs for maintenance tasks.
+
+      File to create:
+      - `services/price-service/internal/jobs/cleanup_exceptions.go`
+
+      Jobs to implement:
+
+      1. **Expire exceptions**
+         ```go
+         func CleanupExpiredExceptions(ctx context.Context, db *pgxpool.Pool) (int, error) {
+             result, err := db.Exec(ctx,
+                 `DELETE FROM store_price_exceptions WHERE expires_at < NOW()`)
+             return int(result.RowsAffected()), err
+         }
+         ```
+
+      2. **Garbage collect orphan groups** (future)
+         - Groups with no store memberships
+         - Run weekly, log before deleting
+
+      3. **Compute Omnibus stats** (future)
+         - lowest_30d, highest_30d into item_price_stats
+         - Run nightly after ingestion
+
+  - title: Run Go tests and verify build
+    completed: false
+    parallel_group: 5
+    description: |
+      Run all tests and verify the build compiles.
+
+      Commands to run:
+      ```bash
+      cd services/price-service
+
+      # Run unit tests
+      go test ./internal/pricegroups/... -v
+
+      # Run all tests
+      go test ./... -v
+
+      # Build to verify compilation
+      go build ./cmd/server
+      ```
+
+      Verify:
+      - Hash invariant tests pass
+      - No compilation errors
+      - All existing tests still pass
+
+  - title: Run integration tests
+    completed: false
+    parallel_group: 6
+    description: |
+      Run integration tests to verify price groups work end-to-end.
+
+      Tests to verify:
+      - [ ] Group created on first store ingestion
+      - [ ] Group reused on second store with same prices
+      - [ ] Store membership updated when prices change
+      - [ ] Historical query returns correct group for date
+      - [ ] Exceptions override group prices
+
+      Storage verification query:
+      ```sql
+      SELECT
+          (SELECT COUNT(*) FROM group_prices) as group_price_rows,
+          (SELECT COUNT(*) FROM store_item_state) as old_state_rows,
+          (SELECT COUNT(*) FROM price_groups) as total_groups,
+          (SELECT COUNT(DISTINCT store_id) FROM store_group_history WHERE valid_to IS NULL) as active_stores;
+      ```
+
+      Expected: group_price_rows < old_state_rows (storage reduction)
+
+  - title: Code review with claude-cli
+    completed: false
+    parallel_group: 7
+    description: |
+      Review all Phase 4 implementation code using claude-cli.
+
+      Use the dev:claude-cli skill to get a second opinion on:
+      1. Hash function correctness and edge cases
+      2. Database schema design and constraints
+      3. Race condition handling in FindOrCreatePriceGroup
+      4. Persist phase flow changes
+      5. Query performance with new JOINs
+
+      Focus areas:
+      - Security: SQL injection, data validation
+      - Correctness: Hash invariants, temporal queries
+      - Performance: Index usage, bulk operations
+
+  - title: Code review with OpenCode Codex
+    completed: false
+    parallel_group: 7
+    description: |
+      Review Phase 4 implementation using OpenCode with Codex model.
+
+      Command:
+      ```bash
+      opencode run -m github-copilot/gpt-5.2-codex "Review the Phase 4 price groups implementation:
+
+      Files to review:
+      - services/price-service/migrations/0003_add_price_groups.sql
+      - services/price-service/internal/pricegroups/hash.go
+      - services/price-service/internal/database/price_groups.go
+      - services/price-service/internal/pipeline/persist.go
+
+      Focus on:
+      1. Database constraint correctness (GiST exclusion, partial unique)
+      2. Hash function determinism and NULL handling
+      3. Race condition safety in group creation
+      4. Performance of bulk operations"
+      ```
+
+  - title: Code review with OpenCode Gemini
+    completed: false
+    parallel_group: 7
+    description: |
+      Review Phase 4 implementation using OpenCode with Gemini Pro model.
+
+      Command:
+      ```bash
+      opencode run -m github-copilot/gemini-3-pro-preview "Review the Phase 4 price groups implementation:
+
+      Files to review:
+      - services/price-service/internal/pricegroups/hash.go
+      - services/price-service/internal/pricegroups/hash_test.go
+      - services/price-service/internal/database/price_groups.go
+
+      Focus on:
+      1. Test coverage completeness
+      2. Edge cases in hash function
+      3. Error handling patterns
+      4. Go idioms and best practices"
+      ```
+
+  - title: Code review with OpenCode Grok
+    completed: false
+    parallel_group: 7
+    description: |
+      Review Phase 4 implementation using OpenCode with Grok Code model.
+
+      Command:
+      ```bash
+      opencode run -m github-copilot/grok-code-fast-1 "Review the Phase 4 price groups implementation:
+
+      Files to review:
+      - services/price-service/internal/pipeline/persist.go
+      - services/price-service/internal/handlers/prices.go
+
+      Focus on:
+      1. Control flow correctness in persist phase
+      2. Query correctness with exception overlay
+      3. Potential deadlocks or race conditions
+      4. Memory efficiency with large price sets"
+      ```

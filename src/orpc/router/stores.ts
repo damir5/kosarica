@@ -1,8 +1,7 @@
 import { and, count, desc, eq, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
-import { processEnrichStore, type IngestionContext } from "@/ingestion/processor";
-import { createStorage } from "@/ingestion/core/storage";
+import { processEnrichStore, type EnrichmentContext } from "@/lib/store-enrichment";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 import { procedure } from "../base";
@@ -516,7 +515,7 @@ export const triggerEnrichment = procedure
 			});
 
 		// Process enrichment directly
-		const ctx: IngestionContext = { db, storage: createStorage() };
+		const ctx: EnrichmentContext = { db };
 		await processEnrichStore(input.storeId, input.type, taskId, ctx);
 
 		// Get the updated task

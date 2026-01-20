@@ -1,0 +1,468 @@
+# Generated from: ~/.claude/plans/gleaming-mixing-dusk.md
+# Phase 6: Store Enrichment UI - Build admin UI for pending store approval with human workflow, enrichment integration (geocoding), and proper state management.
+
+tasks:
+  # Step 1: Backend Hardening
+  - title: Add authorization middleware to store mutations
+    completed: false
+    parallel_group: 1
+    description: |
+      Add server-side role checks on ALL store mutations in oRPC handlers.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+
+      Implementation:
+      ```typescript
+      // Add to each mutation handler
+      const session = await requireSuperadminSession(context);
+      ```
+
+      Critical: Currently only client-side `requireSuperadmin()` exists.
+      Fix: Add authorization check at the start of each mutation handler.
+
+  - title: Add optimistic locking to store mutations
+    completed: false
+    parallel_group: 1
+    description: |
+      Add `expectedUpdatedAt` parameter to all mutations for version checking.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+
+      Implementation:
+      ```typescript
+      export const approveStore = procedure
+        .input(z.object({
+          storeId: z.string(),
+          expectedUpdatedAt: z.string(), // ISO timestamp for version check
+          notes: z.string().optional(),
+        }))
+        .handler(async ({ input }) => {
+          const store = await getStore(input.storeId);
+          if (store.updatedAt.toISOString() !== input.expectedUpdatedAt) {
+            throw new Error('Store was modified by another user. Please refresh.');
+          }
+          // ... proceed with update
+        });
+      ```
+
+      Apply to: approveStore, rejectStore, mergeStores
+
+  - title: Add getStoreDetail endpoint
+    completed: false
+    parallel_group: 1
+    description: |
+      Split full store data from list endpoint for performance.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+
+      New endpoint:
+      ```typescript
+      export const getStoreDetail = procedure
+        .input(z.object({ storeId: z.string() }))
+        .handler(async ({ input }) => {
+          // Return full store data including:
+          // - Store fields
+          // - Enrichment tasks
+          // - Similar stores for merge candidates
+          // - Linked physical stores (if virtual)
+        });
+      ```
+
+  - title: Update triggerEnrichment for synchronous execution
+    completed: false
+    parallel_group: 1
+    description: |
+      Make enrichment run inline during the API call (no background jobs).
+
+      File to modify:
+      - src/orpc/router/stores.ts
+      - src/lib/store-enrichment.ts
+
+      Implementation:
+      - `triggerEnrichment` blocks until geocoding completes
+      - Returns results directly in response
+      - Update store status based on confidence: enriched, needs_review, or failed
+
+      Benefits:
+      - Simpler architecture - no job queue, no polling
+      - Immediate feedback to admin
+      - Geocoding via Photon API is fast (~200-500ms)
+
+  # Step 2: Schema Update
+  - title: Update stores table schema
+    completed: false
+    parallel_group: 2
+    description: |
+      Add new status values and approval tracking columns.
+
+      File to modify:
+      - src/db/schema.ts
+
+      Add columns:
+      ```typescript
+      status: text("status").default("pending"),
+      // Values: pending, enriched, needs_review, approved, rejected, merged, failed
+      approvalNotes: text("approval_notes"),
+      approvedBy: text("approved_by").references(() => user.id),
+      approvedAt: timestamp("approved_at"),
+      ```
+
+      Status transitions:
+      - pending → enriched | needs_review | failed (trigger enrichment)
+      - enriched → approved | rejected | merged
+      - needs_review → enriched | failed (retry) | approved (force) | rejected
+      - failed → enriched | needs_review (retry) | rejected
+
+  - title: Run database migration
+    completed: false
+    parallel_group: 2
+    description: |
+      Generate and run migration for schema changes.
+
+      Commands:
+      ```bash
+      pnpm drizzle-kit generate
+      pnpm drizzle-kit migrate
+      ```
+
+  # Step 3: Frontend - Page & Filters
+  - title: Create pending stores route
+    completed: false
+    parallel_group: 3
+    description: |
+      Create the admin route for pending stores page.
+
+      File to create:
+      - src/routes/_admin.admin.stores.pending.tsx
+
+      Implementation:
+      - Use TanStack Router file-based routing
+      - Page displays pending stores queue with filters
+      - Follow existing admin page patterns from _admin.admin.stores.index.tsx
+
+  - title: Implement PendingStoresFilters component
+    completed: false
+    parallel_group: 3
+    description: |
+      Create filter controls for the pending stores queue.
+
+      File to create:
+      - src/components/admin/stores/PendingStoresFilters.tsx
+
+      Features:
+      - Chain dropdown filter
+      - Status filter (pending, enriched, needs_review, failed)
+      - Search by store name
+      - Sort options (newest first, chain)
+
+      Follow existing patterns from _admin.admin.stores.index.tsx filters.
+
+  - title: Implement PendingStoreQueue component
+    completed: false
+    parallel_group: 3
+    description: |
+      Create the list view with selection support.
+
+      File to create:
+      - src/components/admin/stores/PendingStoreQueue.tsx
+
+      Features:
+      - Renders list of PendingStoreCard components
+      - Multi-select checkboxes
+      - Empty state handling
+      - Loading state
+      - Pagination
+
+      Wire to `getPendingStores` oRPC endpoint.
+
+  # Step 4: Frontend - Detail Drawer
+  - title: Implement StoreDetailDrawer component
+    completed: false
+    parallel_group: 4
+    description: |
+      Create slide-out panel for full store details.
+
+      File to create:
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+      Sections:
+      1. Store info (name, chain, status, created date)
+      2. Location (address, coordinates, map preview, confidence)
+      3. Enrichment tasks with retry buttons
+      4. Similar stores for merge candidates
+      5. Notes input
+      6. Action buttons (Approve, Merge Into..., Reject)
+
+      Integrate existing components:
+      - StoreEnrichmentSection
+      - StoreLocationMapClient
+
+  - title: Implement StoreStatusBadge component
+    completed: false
+    parallel_group: 4
+    description: |
+      Create status badge display component.
+
+      File to create:
+      - src/components/admin/stores/StoreStatusBadge.tsx
+
+      Status colors:
+      - pending: gray
+      - enriched: blue
+      - needs_review: yellow
+      - approved: green
+      - rejected: red
+      - merged: purple
+      - failed: red
+
+  - title: Update PendingStoreCard with status badge and selection
+    completed: false
+    parallel_group: 4
+    description: |
+      Enhance existing card component.
+
+      File to modify:
+      - src/components/admin/stores/PendingStoreCard.tsx
+
+      Add:
+      - StoreStatusBadge display
+      - Selection checkbox
+      - onViewDetails callback prop
+
+  - title: Update StoreApprovalModal with notes and version check
+    completed: false
+    parallel_group: 4
+    description: |
+      Enhance approval modal.
+
+      File to modify:
+      - src/components/admin/stores/StoreApprovalModal.tsx
+
+      Add:
+      - Notes textarea field
+      - Pass expectedUpdatedAt to mutation
+      - Handle concurrency conflict error
+
+  # Step 5: Bulk Operations
+  - title: Implement BulkActionsBar component
+    completed: false
+    parallel_group: 5
+    description: |
+      Create bulk actions UI.
+
+      File to create:
+      - src/components/admin/stores/BulkActionsBar.tsx
+
+      Features:
+      - Shows when items selected
+      - Bulk Approve button
+      - Bulk Reject button
+      - Clear selection button
+      - Selected count display
+
+  - title: Add bulk approve/reject endpoints
+    completed: false
+    parallel_group: 5
+    description: |
+      Add bulk operation endpoints.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+
+      New endpoints:
+      ```typescript
+      export const bulkApproveStores = procedure
+        .input(z.object({
+          storeIds: z.array(z.string()),
+          notes: z.string().optional(),
+        }))
+        .handler(async ({ input }) => {
+          // Validate all stores are in approvable state
+          // Update all in transaction
+          // Return success/failure per store
+        });
+
+      export const bulkRejectStores = procedure
+        .input(z.object({
+          storeIds: z.array(z.string()),
+          reason: z.string(),
+        }))
+        .handler(async ({ input }) => {
+          // Similar pattern
+        });
+      ```
+
+  # Step 6: Error Handling & Polish
+  - title: Add concurrency conflict UI
+    completed: false
+    parallel_group: 6
+    description: |
+      Handle "someone changed this" errors gracefully.
+
+      Files to modify:
+      - src/components/admin/stores/StoreApprovalModal.tsx
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+      Implementation:
+      - Catch concurrency error from mutations
+      - Show toast/alert with refresh option
+      - Auto-refresh store data on conflict
+
+  - title: Add enrichment retry UI
+    completed: false
+    parallel_group: 6
+    description: |
+      Allow retrying failed enrichment.
+
+      Files to modify:
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+      Add:
+      - Retry button for failed/needs_review status
+      - Loading state during retry
+      - Success/error feedback
+
+  - title: Add force-approve with justification
+    completed: false
+    parallel_group: 6
+    description: |
+      Allow skipping enrichment with documented reason.
+
+      File to modify:
+      - src/orpc/router/stores.ts
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+      New endpoint:
+      ```typescript
+      export const forceApprove = procedure
+        .input(z.object({
+          storeId: z.string(),
+          justification: z.string().min(10),
+        }))
+        .handler(async ({ input }) => {
+          // Require justification
+          // Store justification in approvalNotes
+          // Update status to approved
+        });
+      ```
+
+  - title: Add loading, empty, and error states
+    completed: false
+    parallel_group: 6
+    description: |
+      Polish UI with proper state handling.
+
+      Files to modify:
+      - src/routes/_admin.admin.stores.pending.tsx
+      - src/components/admin/stores/PendingStoreQueue.tsx
+      - src/components/admin/stores/StoreDetailDrawer.tsx
+
+      Add:
+      - Loading skeletons
+      - Empty state messages
+      - Error boundaries
+      - Toast notifications for actions
+
+  # Testing
+  - title: Write unit tests for store mutations
+    completed: false
+    parallel_group: 7
+    description: |
+      Test backend logic.
+
+      File to create:
+      - src/orpc/router/__tests__/stores-mutations.test.ts
+
+      Test cases:
+      - State transition validation
+      - Authorization checks
+      - Optimistic locking behavior
+      - Synchronous enrichment (success/failure/low-confidence)
+
+  - title: Write integration tests for approval workflow
+    completed: false
+    parallel_group: 7
+    description: |
+      Test full workflow.
+
+      File to create:
+      - src/orpc/router/__tests__/stores-integration.test.ts
+
+      Test cases:
+      - Full workflow: pending → enrich → approve
+      - Concurrent approval conflict
+      - Merge with referential integrity
+      - Bulk operations
+
+  - title: Write E2E tests with Playwright
+    completed: false
+    parallel_group: 8
+    description: |
+      Test UI flows.
+
+      File to create:
+      - e2e/admin-stores-pending.spec.ts
+
+      Test cases:
+      - Admin approves pending store
+      - Admin rejects with reason
+      - Enrichment retry after failure
+      - Concurrent edit conflict resolution
+      - Bulk approve multiple stores
+
+  # Verification
+  - title: Manual verification of complete workflow
+    completed: false
+    parallel_group: 9
+    description: |
+      Verify implementation end-to-end.
+
+      Steps:
+      1. Create test store with `status='pending'`
+      2. Navigate to `/admin/stores/pending`
+      3. Trigger geocoding enrichment
+      4. Verify location on map
+      5. Approve store with notes
+      6. Confirm store appears in active list
+      7. Check audit trail (approvedBy, approvedAt, notes)
+
+  # Code Review
+  - title: Code review with multiple AI models
+    completed: false
+    parallel_group: 10
+    description: |
+      Review implementation with multiple AI models for quality assurance.
+
+      Run code reviews using:
+
+      1. Claude CLI:
+      ```bash
+      claude-cli review --files "src/orpc/router/stores.ts,src/components/admin/stores/*.tsx"
+      ```
+
+      2. OpenCode Codex:
+      ```bash
+      opencode --model codex review @src/orpc/router/stores.ts @src/components/admin/stores/
+      ```
+
+      3. OpenCode Gemini:
+      ```bash
+      opencode --model gemini review @src/orpc/router/stores.ts @src/components/admin/stores/
+      ```
+
+      4. Grok Code:
+      ```bash
+      opencode --model grok review @src/orpc/router/stores.ts @src/components/admin/stores/
+      ```
+
+      Focus areas:
+      - Security (authorization, input validation)
+      - State machine correctness
+      - Concurrency handling
+      - Error handling
+      - Code quality and patterns
+      - TypeScript types
+      - React best practices
