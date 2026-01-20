@@ -1,8 +1,10 @@
 package chains
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -243,4 +245,105 @@ func (a *TrgocentarAdapter) ExtractStoreMetadata(file types.DiscoveredFile) *typ
 		Address:   strings.Title(strings.ToLower(location)),
 		StoreType: "SUPERMARKET",
 	}
+}
+
+// Parse overrides the base Parse to extract dynamic anchor price fields
+// Trgocentar XML files have fields like c_020525 (anchor price as of specific date)
+// where the field name is dynamic based on date: c_YYMMDD
+func (a *TrgocentarAdapter) Parse(content []byte, filename string, options *types.ParseOptions) (*types.ParseResult, error) {
+	// First, use the base parser to get initial results
+	result, err := a.BaseXmlAdapter.Parse(content, filename, options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Post-process rows to extract dynamic anchor price fields
+	for i := range result.Rows {
+		anchorPrice := a.extractDynamicAnchorPrice(result.Rows[i].RawData)
+		if anchorPrice != nil {
+			result.Rows[i].AnchorPrice = anchorPrice
+		}
+	}
+
+	return result, nil
+}
+
+// extractDynamicAnchorPrice extracts anchor price from raw XML data
+// Looks for fields matching pattern c_YYMMDD (6 digits after c_)
+func (a *TrgocentarAdapter) extractDynamicAnchorPrice(rawData string) *int {
+	// Parse the raw JSON data back to a map
+	var rawDataMap map[string]interface{}
+	if err := json.Unmarshal([]byte(rawData), &rawDataMap); err != nil {
+		return nil
+	}
+
+	// Look for fields matching c_ followed by exactly 6 digits
+	dynamicFieldPattern := regexp.MustCompile(`^c_(\d{6})$`)
+
+	for key, value := range rawDataMap {
+		if dynamicFieldPattern.MatchString(key) {
+			// Found a potential anchor price field
+			if strValue, ok := value.(string); ok && strings.TrimSpace(strValue) != "" {
+				// Parse the price value to cents
+				trimmed := strings.TrimSpace(strValue)
+				// Use the same price parsing logic as the parser
+				price, err := parsePriceFromString(trimmed)
+				if err == nil {
+					return &price
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// parsePriceFromString parses a price string to cents
+// Copied from xml/parser.go logic to avoid circular dependency
+func parsePriceFromString(value string) (int, error) {
+	if value == "" {
+		return 0, fmt.Errorf("empty price value")
+	}
+
+	// Remove currency symbols and whitespace
+	cleaned := strings.TrimSpace(value)
+	for _, r := range cleaned {
+		if r == '€' || r == '$' || r == '£' || r == '₹' ||
+			r == '¥' || r == '¢' || r == '\u00A0' {
+			cleaned = strings.ReplaceAll(cleaned, string(r), "")
+		}
+	}
+
+	// Remove common currency text
+	cleaned = strings.ToUpper(cleaned)
+	cleaned = regexp.MustCompile(`\s*(KN|KUNA|HRK|EUR|USD)\s*$`).ReplaceAllString(cleaned, "")
+	cleaned = strings.TrimSpace(cleaned)
+
+	if cleaned == "" {
+		return 0, fmt.Errorf("no numeric value found")
+	}
+
+	// Determine decimal separator
+	lastDot := strings.LastIndex(cleaned, ".")
+	lastComma := strings.LastIndex(cleaned, ",")
+
+	if lastComma > lastDot {
+		// European format: 1.234,56 -> comma is decimal
+		cleaned = strings.ReplaceAll(cleaned, ".", "")
+		cleaned = strings.ReplaceAll(cleaned, ",", ".")
+	} else if lastDot > lastComma {
+		// US format: 1,234.56 -> just remove commas
+		cleaned = strings.ReplaceAll(cleaned, ",", "")
+	}
+
+	// Parse the float
+	var result float64
+	n, err := fmt.Sscanf(cleaned, "%f", &result)
+	if err != nil || n != 1 {
+		return 0, fmt.Errorf("invalid price format: %w", err)
+	}
+
+	// Convert to cents
+	cents := math.Round(result * 100)
+	return int(cents), nil
 }

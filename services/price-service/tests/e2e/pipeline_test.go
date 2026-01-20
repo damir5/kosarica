@@ -7,11 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
-	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,7 +62,6 @@ func TestE2EPipeline(t *testing.T) {
 		// For now, we'll test the pipeline structure
 
 		chainID := "konzum"
-		targetDate := ""
 
 		// Verify chain ID is valid
 		assert.True(t, config.IsValidChainID(chainID))
@@ -73,6 +70,7 @@ func TestE2EPipeline(t *testing.T) {
 		adapter, err := registry.GetAdapter(config.ChainID(chainID))
 		require.NoError(t, err)
 		assert.NotNil(t, adapter)
+		_ = adapter // Use in future tests
 	})
 
 	// Test database operations
@@ -132,8 +130,6 @@ func TestE2EPipelineWithMockData(t *testing.T) {
 
 // TestE2EAllChainsRegistry verifies all chains can be registered
 func TestE2EAllChainsRegistry(t *testing.T) {
-	ctx := context.Background()
-
 	require.NoError(t, registry.InitializeDefaultAdapters())
 
 	// Verify all 11 chains are registered
