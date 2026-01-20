@@ -27,3 +27,9 @@ https://www.reddit.com/r/ClaudeAI/comments/1qgdg6v/finally_get_1500_users_on_my_
 - post short about JAR akcija
 - investigate on net and post content about prices in IT/SLO/AT/DE
 
+[user features]
+- price watch - set watch to item and get notified on discounts - set limits/allow mail or (?)
+  - mail/whatsapp/telegram/firebase push/...
+- slikaj kosaricu - ocr - cijena kosarice/split u drugima
+- slikaj barcode
+
