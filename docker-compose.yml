@@ -1,0 +1,60 @@
+# Local development Docker Compose configuration
+# Run with: docker compose up -d
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: kosarica-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kosarica
+      POSTGRES_PASSWORD: kosarica
+      POSTGRES_DB: kosarica
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kosarica"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - kosarica-dev
+
+  # Go Price Service (development mode)
+  price-service:
+    build:
+      context: ./services/price-service
+      dockerfile: deployment/Dockerfile
+    image: kosarica/price-service:dev
+    container_name: kosarica-price-service-dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgresql://kosarica:kosarica@postgres:5432/kosarica
+      LOG_LEVEL: debug
+      LOG_FORMAT: console
+      LOG_NO_COLOR: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - kosarica-dev
+
+networks:
+  kosarica-dev:
+    driver: bridge
+
+volumes:
+  postgres_dev_data:
+    name: kosarica_postgres_dev_data
