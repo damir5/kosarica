@@ -16,6 +16,7 @@ import (
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/handlers"
 	"github.com/kosarica/price-service/internal/middleware"
+	"github.com/kosarica/price-service/internal/telemetry"
 	"github.com/rs/zerolog"
 )
 
@@ -28,6 +29,17 @@ func main() {
 
 	// Initialize logger
 	logger := initLogger(cfg.Logging)
+
+	// Initialize OpenTelemetry
+	ctx := context.Background()
+	otelCfg := telemetry.GetConfigFromEnv()
+	cleanup, err := telemetry.Init(ctx, otelCfg)
+	if err != nil {
+		logger.Warn().Err(err).Msg("Failed to initialize OpenTelemetry, continuing without telemetry")
+	} else {
+		defer cleanup(ctx)
+		logger.Info().Str("endpoint", otelCfg.Endpoint).Msg("OpenTelemetry initialized")
+	}
 
 	logger.Info().Msg("Starting Price Service...")
 
@@ -157,7 +169,7 @@ func initLogger(cfg config.LoggingConfig) *zerolog.Logger {
 		output = zerolog.ConsoleWriter{Out: os.Stdout, NoColor: cfg.NoColor}
 	}
 
-	logger := zerolog.New(output).Level(level).With().Timestamp().Logger()
+	logger := zerolog.New(output).Level(level).With().Timestamp().Str("service", "price-service").Logger()
 
 	return &logger
 }

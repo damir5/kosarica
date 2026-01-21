@@ -1,0 +1,214 @@
+# Production Docker Compose configuration for Kosarica
+# This includes all services: PostgreSQL, Node.js app, Go price service,
+# OpenTelemetry Collector, and OpenObserve observability platform
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: kosarica-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kosarica}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-kosarica}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kosarica}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - kosarica-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Node.js Application (Frontend + API)
+  nodejs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TIME: ${BUILD_TIME}
+        GIT_COMMIT: ${GIT_COMMIT}
+        BUILD_ENV: production
+    image: kosarica/nodejs:latest
+    container_name: kosarica-nodejs
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kosarica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kosarica}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      INTERNAL_API_URL: http://price-service:8080
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      PASSKEY_RP_ID: ${PASSKEY_RP_ID}
+      PASSKEY_RP_NAME: ${PASSKEY_RP_NAME:-Kosarica}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector:4317
+      OTEL_SERVICE_NAME: kosarica-nodejs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      price-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - kosarica-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Go Price Service
+  price-service:
+    build:
+      context: ./services/price-service
+      dockerfile: deployment/Dockerfile
+      args:
+        BUILD_TIME: ${BUILD_TIME}
+        GIT_COMMIT: ${GIT_COMMIT}
+        VERSION: 1.0.0
+    image: kosarica/price-service:latest
+    container_name: kosarica-price-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kosarica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kosarica}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: json
+      STORAGE_PATH: /app/data/archives
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector:4317
+      OTEL_SERVICE_NAME: price-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - kosarica-network
+    volumes:
+      - price_service_data:/app/data/archives
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # OpenTelemetry Collector
+  opentelemetry-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: kosarica-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-config.yaml"]
+    environment:
+      - ZO_BASIC_AUTH=${ZO_BASIC_AUTH}
+      - ZO_ORG_ID=${ZO_ORG_ID:-default}
+    volumes:
+      - ./deployment/otel-collector-config.yaml:/etc/otelcol-config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics
+      - "8889:8889"   # Prometheus exporter metrics
+    depends_on:
+      openobserve:
+        condition: service_started
+    networks:
+      - kosarica-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # OpenObserve - Unified observability platform (logs, metrics, traces)
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: kosarica-openobserve
+    restart: unless-stopped
+    ports:
+      - "5080:5080"
+    environment:
+      # Root user credentials
+      ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL:-admin@kosarica.local}
+      ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD}
+      # Reduce memory usage
+      ZO_MEMORY_CACHE_ENABLED: "false"
+      ZO_COMPACT_ENABLED: "true"
+      ZO_COMPACT_INTERVAL: "3600"
+      ZO_METRICS_DELETION_ENABLED: "true"
+      ZO_GRPC_EXIT_ON_ERROR: "true"
+    volumes:
+      - openobserve_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - kosarica-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  kosarica-network:
+    driver: bridge
+    name: kosarica-network
+
+volumes:
+  postgres_data:
+    name: kosarica_postgres_data
+  price_service_data:
+    name: kosarica_price_service_data
+  openobserve_data:
+    name: kosarica_openobserve_data

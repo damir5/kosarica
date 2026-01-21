@@ -16,12 +16,16 @@ import {
 } from "@/utils/request-context";
 import { startScheduler, stopScheduler } from "@/jobs/scheduler";
 import { closeDatabase } from "@/db";
+import { initTelemetry, shutdownTelemetry } from "@/telemetry";
 
 // Load environment variables from .env files
 // Priority: .env.development -> .env (later files override)
 const nodeEnv = process.env.NODE_ENV || "development";
 config({ path: `.env.${nodeEnv}` }); // Load .env.development first
 config(); // Then load .env (defaults)
+
+// Initialize OpenTelemetry first, before any other imports
+const telemetrySdk = initTelemetry();
 
 const logger = createLogger("app");
 
@@ -42,7 +46,7 @@ async function initServer(): Promise<void> {
 
 /**
  * Graceful shutdown handler.
- * Stops the scheduler and closes database connections.
+ * Stops the scheduler, closes database connections, and shuts down OpenTelemetry.
  */
 async function shutdown(signal: string): Promise<void> {
 	logger.info(`Received ${signal}, shutting down gracefully...`);
@@ -59,6 +63,12 @@ async function shutdown(signal: string): Promise<void> {
 		logger.info("Database connection closed");
 	} catch (error) {
 		logger.error("Error closing database", { error });
+	}
+
+	try {
+		await shutdownTelemetry(telemetrySdk);
+	} catch (error) {
+		logger.error("Error shutting down telemetry", { error });
 	}
 
 	process.exit(0);

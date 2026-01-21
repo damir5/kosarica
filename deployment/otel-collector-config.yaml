@@ -1,0 +1,149 @@
+# OpenTelemetry Collector Configuration for Kosarica
+# Receives logs and metrics from Node.js and Go services, sends to OpenObserve
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    check_interval: 10s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+receivers:
+  # OTLP receiver for application telemetry (gRPC)
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Host metrics receiver
+  hostmetrics:
+    collection_interval: 60s
+    scrapers:
+      cpu:
+      load:
+      memory:
+      disk:
+      filesystem:
+      network:
+      processes:
+
+  # Docker container stats
+  # Note: This requires the container to run with Docker socket access
+  # docker_stats:
+  #   endpoint: /var/run/docker.sock
+  #   container_ids: []
+  #   timeout: 10s
+
+processors:
+  # Batch telemetry for better performance
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+    send_batch_max_size: 1024
+
+  # Memory limiter processor
+  memory_limiter:
+    check_interval: 10s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  # Resource processor to add common attributes
+  resource:
+    attributes:
+      - key: environment
+        value: production
+        action: upsert
+      - key: deployment.type
+        value: docker
+        action: upsert
+
+  # Filter processor to drop unwanted metrics
+  # Uncomment and adjust as needed
+  # filter/metrics:
+  #   metrics:
+  #     include:
+  #       match_type: regexp
+  #       metric_names: [".*"]
+
+exporters:
+  # OpenObserve exporter for logs
+  otlphttp/openobserve_logs:
+    endpoint: http://openobserve:5080/api/${ZO_ORG_ID:-default}/logs
+    headers:
+      Authorization: "Basic ${ZO_BASIC_AUTH}"
+      stream-name: "kosarica-logs"
+      stream-type: "logs"
+    tls:
+      insecure: true
+    encoding: json
+
+  # OpenObserve exporter for metrics
+  otlphttp/openobserve_metrics:
+    endpoint: http://openobserve:5080/api/${ZO_ORG_ID:-default}/metrics
+    headers:
+      Authorization: "Basic ${ZO_BASIC_AUTH}"
+      stream-name: "kosarica-metrics"
+      stream-type: "metrics"
+    tls:
+      insecure: true
+    encoding: json
+
+  # OpenObserve exporter for traces
+  otlphttp/openobserve_traces:
+    endpoint: http://openobserve:5080/api/${ZO_ORG_ID:-default}/traces
+    headers:
+      Authorization: "Basic ${ZO_BASIC_AUTH}"
+      stream-name: "kosarica-traces"
+      stream-type: "traces"
+    tls:
+      insecure: true
+
+  # Debug exporter (for troubleshooting, disable in production)
+  # logging:
+  #   verbosity: detailed
+
+service:
+  extensions:
+    - health_check
+    - memory_limiter
+
+  pipelines:
+    # Logs pipeline
+    logs:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - resource
+        - batch
+      exporters:
+        - otlphttp/openobserve_logs
+
+    # Metrics pipeline
+    metrics:
+      receivers:
+        - otlp
+        - hostmetrics
+      processors:
+        - memory_limiter
+        - resource
+        - batch
+      exporters:
+        - otlphttp/openobserve_metrics
+
+    # Traces pipeline
+    traces:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - resource
+        - batch
+      exporters:
+        - otlphttp/openobserve_traces
