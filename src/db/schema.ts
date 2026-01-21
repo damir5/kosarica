@@ -6,6 +6,7 @@ import {
 	integer,
 	pgTable,
 	serial,
+	smallint,
 	text,
 	timestamp,
 	uniqueIndex,
@@ -264,6 +265,9 @@ export const productLinks = pgTable(
 		productRetailerItemUnique: uniqueIndex(
 			"product_links_product_retailer_item_unique",
 		).on(table.productId, table.retailerItemId),
+		// Unique constraint on retailer_item_id ensures 1:1 mapping
+		// (each retailer item -> exactly one product)
+		itemUniq: uniqueIndex("product_links_item_uniq").on(table.retailerItemId),
 	}),
 );
 
@@ -618,5 +622,128 @@ export const storePriceExceptions = pgTable(
 		expiresAtIdx: index("store_price_exceptions_expires_at_idx").on(
 			table.expiresAt,
 		),
+	}),
+);
+
+// ============================================================================
+// Product Matching: Match candidates, review queue, rejections, audit
+// ============================================================================
+
+// Product match candidates - supports top-N suggestions per item with versioning
+export const productMatchCandidates = pgTable(
+	"product_match_candidates",
+	{
+		id: cuid2("pmc").primaryKey(),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		candidateProductId: text("candidate_product_id").references(() => products.id, {
+			onDelete: "cascade",
+		}),
+		similarity: text("similarity"), // stored as text to match real type in Go
+		matchType: text("match_type").notNull(), // 'barcode', 'ai', 'trgm', 'heuristic'
+		rank: smallint("rank").default(1), // 1 = best candidate
+		flags: text("flags"), // 'suspicious_barcode', 'private_label', etc.
+		// Versioning for invalidation
+		matchingRunId: text("matching_run_id"), // Which run generated this
+		modelVersion: text("model_version"), // e.g., 'text-embedding-3-small-v1'
+		normalizedTextHash: text("normalized_text_hash"), // Hash of input text for cache invalidation
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		itemIdx: index("pmc_item_idx").on(table.retailerItemId),
+		typeIdx: index("pmc_type_idx").on(table.matchType),
+		// Prevent duplicate candidates per item
+		itemCandidateUniq: uniqueIndex("pmc_item_candidate_uniq").on(
+			table.retailerItemId,
+			table.candidateProductId,
+		),
+		// Unique rank per item
+		itemRankUniq: uniqueIndex("pmc_item_rank_uniq").on(
+			table.retailerItemId,
+			table.rank,
+		),
+	}),
+);
+
+// Review queue with audit trail
+export const productMatchQueue = pgTable(
+	"product_match_queue",
+	{
+		id: cuid2("pmq").primaryKey(),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		status: text("status").default("pending"), // pending, approved, rejected, skipped
+		decision: text("decision"), // 'linked', 'new_product', 'no_match'
+		linkedProductId: text("linked_product_id").references(() => products.id),
+		reviewedBy: text("reviewed_by").references(() => user.id),
+		reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+		reviewNotes: text("review_notes"),
+		// Version for optimistic locking (prevents concurrent review conflicts)
+		version: integer("version").default(1),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		statusIdx: index("pmq_status_idx").on(table.status),
+		itemUniq: uniqueIndex("pmq_item_uniq").on(table.retailerItemId),
+	}),
+);
+
+// Scoped rejections - reject specific candidates, not global block
+export const productMatchRejections = pgTable(
+	"product_match_rejections",
+	{
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		rejectedProductId: text("rejected_product_id")
+			.notNull()
+			.references(() => products.id, { onDelete: "cascade" }),
+		reason: text("reason"), // 'wrong_product', 'different_size', 'private_label', etc.
+		rejectedBy: text("rejected_by").references(() => user.id),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		// Composite primary key on (retailerItemId, rejectedProductId)
+		pk: uniqueIndex("product_match_rejections_pk").on(
+			table.retailerItemId,
+			table.rejectedProductId,
+		),
+	}),
+);
+
+// Audit log - with proper FK
+export const productMatchAudit = pgTable(
+	"product_match_audit",
+	{
+		id: cuid2("pma").primaryKey(),
+		queueId: text("queue_id")
+			.notNull()
+			.references(() => productMatchQueue.id, { onDelete: "cascade" }), // FK!
+		action: text("action").notNull(), // 'approved', 'rejected', 'created', 'unlinked'
+		userId: text("user_id").references(() => user.id),
+		previousState: text("previous_state"), // JSON stored as text
+		newState: text("new_state"), // JSON stored as text
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		queueIdIdx: index("product_match_audit_queue_id_idx").on(table.queueId),
+		actionIdx: index("product_match_audit_action_idx").on(table.action),
+	}),
+);
+
+// Canonical barcodes - with nullable product_id for race-safe creation
+export const canonicalBarcodes = pgTable(
+	"canonical_barcodes",
+	{
+		barcode: text("barcode").primaryKey(),
+		productId: text("product_id").references(() => products.id, {
+			onDelete: "cascade",
+		}), // NULLABLE for placeholder pattern
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		productIdIdx: index("canonical_barcodes_product_id_idx").on(table.productId),
 	}),
 );

@@ -26,155 +26,121 @@ The Price Service is part of the Kosarica project - a price transparency platfor
 - **Alternative mappings**: Fallback column mappings for varying data formats
 - **Store auto-registration**: Extract store metadata from filenames
 - **Croatian transparency fields**: Unit price, 30-day low, anchor price
-- **Archive tracking**: Deduplication and historical analysis
-- **HTTP API**: Trigger ingestion programmatically
-- **CLI tool**: Manual operations and debugging
+- **Price groups**: Content-addressable deduplication (~50% storage reduction)
+- **HTTP API**: Internal endpoints for Node.js integration
+- **Basket optimization**: Single and multi-store algorithms
+- **Product matching**: Barcode-based product linking
 
 ## Architecture
 
 ```
 price-service/
 ├── cmd/
-│   ├── server/          # HTTP server (port 3000)
-│   └── cli/             # CLI tool
+│   └── server/          # HTTP server (port 8080)
 ├── internal/
 │   ├── adapters/        # Chain-specific adapters
-│   │   ├── base/        # Base adapter classes
 │   │   └── chains/      # 11 chain implementations
 │   ├── database/        # PostgreSQL layer (pgx)
 │   ├── handlers/        # HTTP handlers
 │   ├── http/            # HTTP client + rate limiting
-│   ├── parsers/         # CSV, XML, XLSX parsers
+│   ├── jobs/            # Background cleanup jobs
+│   ├── matching/        # Product matching
+│   ├── middleware/      # HTTP middleware
+│   ├── optimizer/       # Basket algorithms
 │   ├── pipeline/        # Discovery, fetch, parse, persist
-│   ├── storage/         # Local/S3 storage abstraction
+│   ├── pricegroups/     # Hash computation
 │   └── types/           # Core types
-├── config/              # Configuration
-├── deployment/          # Docker files
-└── docs/                # Documentation
+├── migrations/          # Go-specific migrations (rarely used)
+└── go.mod
 ```
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.21+
 - PostgreSQL 14+
-- Environment variables or config file
+- Node.js 20+ (for the main app)
 
 ### Installation
 
 ```bash
 cd services/price-service
 go mod download
-go build -o price-service ./cmd/server
+go build -o price-service cmd/server/main.go
 ```
 
 ### Configuration
 
-Create a `config/config.yaml` file or set environment variables:
+Set environment variables:
 
-```yaml
-server:
-  port: 3000
-  host: "0.0.0.0"
-
-database:
-  url: "postgres://user:pass@localhost:5432/kosarica"
-  max_connections: 25
-  min_connections: 5
-
-rate_limit:
-  requests_per_second: 2
-  max_retries: 3
-  initial_backoff_ms: 100
-  max_backoff_ms: 30000
-
-storage:
-  type: "local"
-  base_path: "./data/archives"
-
-logging:
-  level: "info"
-  format: "json"
+```bash
+export DATABASE_URL="postgres://user:pass@localhost:5432/kosarica"
+export PORT="8080"
+export INTERNAL_API_KEY="your-secret-key"
+export PRICE_SERVICE_RATE_LIMIT_REQUESTS_PER_SECOND=2
 ```
 
 ### Running the Server
 
 ```bash
-export DATABASE_URL="postgres://user:pass@localhost:5432/kosarica"
 ./price-service
 ```
 
-Server listens on `http://localhost:3000`
+Server listens on `http://localhost:8080`
 
 ## API Endpoints
 
-### Health Check
+### Health Checks
 
-```bash
-GET /health
-```
-
-Response:
-```json
-{
-  "status": "ok",
-  "database": "connected"
-}
-```
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/health` | Liveness check (always 200 OK) |
+| GET | `/internal/health` | Readiness + DB connection status |
 
 ### Ingestion
 
-Trigger ingestion for a specific chain:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/internal/admin/ingest/:chain` | Trigger ingestion |
+| GET | `/internal/ingestion/runs` | List ingestion runs |
+| GET | `/internal/ingestion/runs/:id` | Get run details |
 
+**Trigger ingestion:**
 ```bash
-POST /internal/admin/ingest/{chain}
+curl -X POST http://localhost:8080/internal/admin/ingest/konzum \
+  -H "INTERNAL_API_KEY: your-secret-key"
 ```
 
-Where `{chain}` is one of: `konzum`, `lidl`, `studenac`, `dm`, `plodine`, `interspar`, `kaufland`, `eurospin`, `ktc`, `metro`, `trgocentar`
+### Prices
 
-### Ingestion Status
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/internal/prices/:chain/:store` | Store prices |
+| GET | `/internal/items/search?q=` | Search items |
 
-Check status of an ingestion run:
+### Basket Optimization
 
-```bash
-GET /internal/admin/ingest/status/{runId}
-```
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/internal/basket/optimize/single` | Single-store optimize |
+| POST | `/internal/basket/optimize/multi` | Multi-store optimize |
 
-### List Ingestion Runs
+### Product Matching
 
-List recent ingestion runs for a chain:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/internal/matching/barcode` | Trigger barcode match |
 
-```bash
-GET /internal/admin/ingest/runs/{chain}
-```
+## Environment Variables
 
-## CLI Usage
-
-Build the CLI:
-
-```bash
-go build -o price-service-cli ./cmd/cli
-```
-
-### Commands
-
-```bash
-# Ingest specific chain
-price-service-cli ingest konzum --date 2026-01-19
-
-# Ingest all chains
-price-service-cli ingest --all
-
-# Discover files (no ingestion)
-price-service-cli discover lidl
-
-# Parse local file
-price-service-cli parse ~/sample.csv --chain konzum
-
-# List chains
-price-service-cli chains
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | - |
+| `PORT` | HTTP port | 8080 |
+| `INTERNAL_API_KEY` | Auth header for internal API | - |
+| `PRICE_SERVICE_RATE_LIMIT_REQUESTS_PER_SECOND` | Rate limit for external requests | 2 |
+| `LOG_LEVEL` | Log level (debug, info, warn, error) | info |
 
 ## Data Model
 
@@ -214,75 +180,107 @@ type NormalizedRow struct {
 # Unit tests
 go test ./internal/... -v
 
-# Integration tests (requires test database)
-go test ./tests/integration/... -v
-
-# E2E tests
-go test ./tests/e2e/... -v
-
 # Coverage
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
-### Adding a New Chain
-
-1. Create adapter in `internal/adapters/chains/{chain}.go`
-2. Implement chain interface
-3. Register in `internal/adapters/registry/registry.go`
-4. Add tests in `tests/integration/chains_test.go`
-
-## Deployment
-
-### Docker
+### Hot Reload (optional)
 
 ```bash
-# Build image
-docker build -t price-service:latest -f deployment/Dockerfile .
+# Install air
+go install github.com/air-verse/air@latest
 
-# Run with docker-compose
-docker-compose -f deployment/docker-compose.yml up -d
+# Run with hot reload
+air
 ```
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | - |
-| `PORT` | HTTP port | 3000 |
-| `LOG_LEVEL` | Log level | info |
-| `STORAGE_PATH` | Archive storage path | ./data/archives |
-| `PRICE_SERVICE_RATE_LIMIT_REQUESTS_PER_SECOND` | Rate limit | 2 |
-
-## Chain-Specific Notes
-
-See [CHAIN_ADAPTERS.md](docs/CHAIN_ADAPTERS.md) for detailed information about each chain's:
-- Data format and structure
-- Column mappings
-- Store ID extraction patterns
-- Special handling requirements
 
 ## Troubleshooting
 
 ### Encoding Issues
 
-Croatian characters not displaying correctly? The service auto-detects Windows-1250 encoding. Verify the source file encoding.
+**Problem**: Croatian characters not displaying correctly
+
+**Solution**: The service auto-detects Windows-1250 encoding. Verify the source file encoding with `file -i filename.csv`.
 
 ### Rate Limiting
 
-Getting 429 errors? Reduce `requests_per_second` in config or increase delays between requests.
+**Problem**: Getting 429 errors from chain portals
 
-### ZIP Expansion
+**Solution**: Reduce `PRICE_SERVICE_RATE_LIMIT_REQUESTS_PER_SECOND` to 1 or add delays between requests.
 
-ZIP files not expanding? Check storage path permissions and available disk space.
+### Circuit Breaker Issues
 
-## Contributing
+**Problem**: Node.js cannot reach Go service
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+**Solution**:
+1. Check Go service health: `curl http://localhost:8080/internal/health`
+2. Check INTERNAL_API_KEY matches on both services
+3. Review logs: `journalctl -u kosarica-go -n 100`
+
+### Database Connection Issues
+
+**Problem**: "connection refused" or timeout
+
+**Solution**:
+1. Verify PostgreSQL is running: `sudo systemctl status postgresql`
+2. Check DATABASE_URL format
+3. Verify database exists: `psql -l`
+
+### Memory Issues
+
+**Problem**: Service OOM when processing large files
+
+**Solution**:
+- The service uses streaming for large files
+- Check available memory: `free -h`
+- Consider reducing `DB_MAX_CONNS` if needed
+
+## Deployment
+
+### Production Build
+
+```bash
+go build -ldflags="-s -w" -o price-service cmd/server/main.go
+```
+
+### Systemd Service
+
+Create `/etc/systemd/system/kosarica-go.service`:
+
+```ini
+[Unit]
+Description=Kosarica Go Price Service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=kosarica
+WorkingDirectory=/home/kosarica/app/services/price-service
+Environment="DATABASE_URL=postgres://user:pass@localhost/kosarica"
+Environment="PORT=8080"
+ExecStart=/home/kosarica/app/services/price-service/price-service
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable kosarica-go
+sudo systemctl start kosarica-go
+```
+
+## Schema Authority
+
+**Important**: The Go service does NOT define database schema. All schema changes are made via Drizzle in the main app:
+
+1. Modify `src/db/schema.ts` in the main app
+2. Run `pnpm db:generate` to create migration
+3. Run `pnpm db:migrate` to apply migration
+4. Go service auto-reads updated schema
 
 ## License
 
@@ -292,4 +290,4 @@ See LICENSE file in the repository root.
 
 For issues and questions:
 - GitHub Issues: [github.com/kosarica/price-service/issues](https://github.com/kosarica/price-service/issues)
-- Documentation: [docs/](docs/)
+- Documentation: [doc/planning/](../doc/planning/)

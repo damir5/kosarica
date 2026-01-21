@@ -1,0 +1,858 @@
+# Generated from: doc/tmp/phase5-plan-reviewed.md, doc/tmp/phase7-plan-reviewed.md
+# Additional context: doc/tmp/phases-5-7-gap-specifications.md
+# Phase 5: Basket Optimization + Phase 7: Product Matching
+
+tasks:
+  # ===========================================================================
+  # PHASE 5: BASKET OPTIMIZATION
+  # ===========================================================================
+
+  # Step 1: Cache Foundation (Critical Fixes)
+  - title: Create optimizer interfaces and types
+    completed: true
+    parallel_group: 1
+    description: |
+      Create foundational Go files for the optimization system.
+
+      Files to create:
+      - services/price-service/internal/optimizer/interfaces.go
+      - services/price-service/internal/optimizer/types.go
+
+      interfaces.go - PriceSource interface:
+      ```go
+      type PriceSource interface {
+          GetPrice(chainSlug string, storeID, itemID int64) (CachedPrice, bool)
+          GetAveragePrice(chainSlug string, itemID int64) int64
+          GetNearestStores(chainSlug string, lat, lon, maxDistanceKm float64, limit int) []StoreWithDistance
+      }
+      ```
+
+      types.go - Use int64 for all money values (not int):
+      ```go
+      type CachedPrice struct {
+          Price         int64
+          DiscountPrice int64
+          HasDiscount   bool
+          IsException   bool
+      }
+
+      type OptimizeResult struct {
+          StoreID       int64
+          CoverageRatio float64
+          CoverageBin   int      // 4=100%, 3=90%+, 2=80%+, 1=<80%
+          SortingTotal  int64
+          RealTotal     int64
+          MissingItems  []MissingItem
+      }
+
+      type ItemPriceInfo struct {
+          ItemID         int64
+          ItemName       string
+          Quantity       int
+          BasePrice      int64
+          EffectivePrice int64
+          HasDiscount    bool
+          DiscountPrice  *int64
+          LineTotal      int64
+      }
+      ```
+
+      See phase5-plan-reviewed.md sections on int64 money types and GC pressure fixes.
+
+  - title: Create config constants for optimizer
+    completed: true
+    parallel_group: 1
+    description: |
+      Create configuration constants for the optimizer.
+
+      File to create:
+      - services/price-service/internal/optimizer/config.go
+
+      ```go
+      type OptimizerConfig struct {
+          CacheLoadTimeout      time.Duration `default:"30s"`
+          CacheTTL              time.Duration `default:"1h"`
+          CacheRefreshJitter    time.Duration `default:"5m"`
+          WarmupConcurrency     int           `default:"3"`
+          TopCheapestStores     int           `default:"10"`
+          TopNearestStores      int           `default:"5"`
+          MaxCandidates         int           `default:"20"`
+          MaxDistanceKm         float64       `default:"50.0"`
+          OptimalTimeoutMs      int           `default:"100"`
+          MaxBasketItems        int           `default:"100"`
+          MinBasketItems        int           `default:"1"`
+          MissingItemPenaltyMult float64      `default:"2.0"`
+          MissingItemFallback    int64        `default:"10000"`
+          CoverageBins          []float64     `default:"[1.0, 0.9, 0.8]"`
+      }
+      ```
+
+      See phase5-plan-reviewed.md "Pre-Implementation Specifications" section.
+
+  - title: Implement group-aware price cache
+    completed: true
+    parallel_group: 2
+    description: |
+      Create the group-aware cache with per-chain sharding.
+
+      File to create:
+      - services/price-service/internal/optimizer/cache.go
+
+      Key requirements from review:
+      1. Mirror database structure (groupPrices + storeToGroup), NOT map[storeID]map[itemID]Price
+      2. Use sync.RWMutex for top-level chains map
+      3. Per-chain ChainCache with atomic.Value for snapshot
+      4. Snapshot swap pattern (build off-lock, swap under lock)
+      5. Safe nil-map access throughout
+      6. singleflight with dedicated load context (not request ctx)
+      7. Semaphore-limited warmup (max 3 concurrent)
+      8. Single DB transaction for consistent snapshot
+      9. Compute item average prices during load (for penalty calc)
+
+      Structure:
+      ```go
+      type PriceCache struct {
+          chainsMu sync.RWMutex
+          chains   map[string]*ChainCache
+          sf       singleflight.Group
+      }
+
+      type ChainCache struct {
+          snapshot atomic.Value  // *ChainCacheSnapshot
+          loadedAt atomic.Value  // time.Time
+      }
+
+      type ChainCacheSnapshot struct {
+          groupPrices      map[int]map[int64]CachedPrice
+          storeToGroup     map[int64]int
+          exceptions       map[int64]map[int64]CachedPrice
+          storeLocations   map[int64]Location
+          itemAveragePrice map[int64]int64
+          estimatedSizeBytes int64
+      }
+      ```
+
+      See phase5-plan-reviewed.md issues #1, #3, #9, #10, #11, #12, #13, #17.
+
+  - title: Implement geo filtering for nearest stores
+    completed: true
+    parallel_group: 2
+    description: |
+      Create efficient geo-filtering with bounding box pre-filter.
+
+      File to create:
+      - services/price-service/internal/optimizer/geo.go
+
+      Requirements:
+      1. Bounding box pre-filter (cheap lat/lon comparison)
+      2. Haversine distance calculation only for candidates in bounding box
+      3. Sort by distance and take top N
+
+      ```go
+      func (c *PriceCache) GetNearestStores(
+          chainSlug string,
+          lat, lon float64,
+          maxDistanceKm float64,
+          limit int,
+      ) []StoreWithDistance
+
+      func HaversineKm(lat1, lon1, lat2, lon2 float64) float64
+      ```
+
+      See phases-5-7-gap-specifications.md "Nearest Stores Selection Algorithm".
+
+  - title: Add Prometheus metrics for optimizer
+    completed: true
+    parallel_group: 2
+    description: |
+      Create Prometheus metrics for observability.
+
+      File to create:
+      - services/price-service/internal/optimizer/metrics.go
+
+      Metrics to implement:
+      ```go
+      var (
+          cacheHits = promauto.NewCounterVec(prometheus.CounterOpts{
+              Name: "optimizer_cache_hits_total",
+          }, []string{"chain"})
+
+          cacheMisses = promauto.NewCounterVec(prometheus.CounterOpts{
+              Name: "optimizer_cache_misses_total",
+          }, []string{"chain"})
+
+          cacheLoadDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+              Name:    "optimizer_cache_load_duration_seconds",
+              Buckets: []float64{0.1, 0.5, 1, 2, 5, 10},
+          }, []string{"chain"})
+
+          optimizationDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+              Name:    "optimizer_calculation_duration_seconds",
+              Buckets: []float64{0.01, 0.05, 0.1, 0.2, 0.5, 1},
+          }, []string{"type"})
+
+          basketSize = promauto.NewHistogram(prometheus.HistogramOpts{
+              Name:    "optimizer_basket_items_count",
+              Buckets: []float64{5, 10, 20, 50, 100},
+          })
+
+          snapshotMemoryBytes = promauto.NewGaugeVec(prometheus.GaugeOpts{
+              Name: "optimizer_snapshot_memory_bytes",
+          }, []string{"chain"})
+      )
+      ```
+
+      See phase5-plan-reviewed.md "Monitoring Requirements".
+
+  - title: Write cache unit tests
+    completed: true
+    parallel_group: 3
+    description: |
+      Write comprehensive unit tests for the cache.
+
+      File to create:
+      - services/price-service/internal/optimizer/cache_test.go
+
+      Test cases required:
+      1. Thundering herd (100 concurrent requests, only 1 DB hit via singleflight)
+      2. Context cancellation doesn't fail other callers (dedicated load context)
+      3. Nil-map safety (missing store, missing group, missing item)
+      4. Snapshot swap timing (no multi-second locks)
+      5. Warmup semaphore limits concurrent DB loads to 3
+      6. DB transaction consistency (store→group mapping valid)
+
+      See phase5-plan-reviewed.md "Must-Specify Invariants" table.
+
+  # Step 2: Single-Store Optimizer
+  - title: Implement single-store optimizer
+    completed: true
+    parallel_group: 4
+    description: |
+      Create the single-store optimizer with coverage-first ranking.
+
+      File to create:
+      - services/price-service/internal/optimizer/single.go
+
+      Requirements:
+      1. Use PriceSource interface (decoupled from cache impl)
+      2. Coverage-first ranking (binned by 1.0/0.9/0.8/<0.8)
+      3. Penalty calculation using cached averages
+      4. Separate SortingTotal vs RealTotal in results
+      5. Context cancellation support
+
+      Key functions:
+      ```go
+      func (o *SingleStoreOptimizer) Optimize(ctx context.Context, req OptimizeRequest) ([]SingleStoreResult, error)
+
+      func GetEffectivePrice(p CachedPrice) int64 {
+          if p.HasDiscount && p.DiscountPrice > 0 && p.DiscountPrice < p.Price {
+              return p.DiscountPrice
+          }
+          return p.Price
+      }
+
+      func sortResults(results []OptimizeResult) {
+          // Coverage bins first, then SortingTotal
+      }
+
+      func coverageBin(ratio float64) int {
+          switch {
+          case ratio >= 1.0: return 4
+          case ratio >= 0.9: return 3
+          case ratio >= 0.8: return 2
+          default: return 1
+          }
+      }
+      ```
+
+      See phase5-plan-reviewed.md issues #4, #14, #15, #16.
+
+  - title: Write single-store optimizer tests
+    completed: true
+    parallel_group: 5
+    description: |
+      Write tests for single-store optimizer.
+
+      File to create:
+      - services/price-service/internal/optimizer/single_test.go
+
+      Test cases:
+      1. Correctness (cheapest store wins within coverage bin)
+      2. Missing items flagged correctly
+      3. Penalty uses chain average, not magic constant
+      4. High-coverage stores rank above cheap-but-incomplete
+      5. Tie-breaking rules (distance, chain slug, store ID)
+      6. Context cancellation mid-optimization
+
+      See phase5-plan-reviewed.md "Success Criteria - Correctness".
+
+  # Step 3: Multi-Store Optimizer
+  - title: Implement multi-store optimizer
+    completed: true
+    parallel_group: 6
+    description: |
+      Create the multi-store optimizer with candidate filtering.
+
+      File to create:
+      - services/price-service/internal/optimizer/multi.go
+
+      Requirements:
+      1. Candidate selection: top 10 cheapest (coverage >= 0.8) + top 5 nearest
+      2. Greedy algorithm with coverage post-pass
+      3. Optimal algorithm with hard 100ms timeout
+      4. Automatic fallback to greedy on timeout
+      5. Multi-store coverage = combined items / total items
+      6. Goroutine limits for CPU-bound work
+
+      ```go
+      func (o *MultiStoreOptimizer) Optimize(ctx context.Context, req OptimizeRequest) (*MultiStoreResult, error) {
+          candidates := o.selectCandidates(ctx, req)
+
+          if len(req.BasketItems) <= 10 && len(candidates) <= 15 {
+              optCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+              defer cancel()
+
+              result, err := o.optimalAlgorithm(optCtx, req, candidates)
+              if err == nil {
+                  return result, nil
+              }
+              if err != context.DeadlineExceeded {
+                  return nil, err
+              }
+              log.Warn("optimal timed out, falling back to greedy")
+          }
+
+          return o.greedyAlgorithm(ctx, req, candidates)
+      }
+      ```
+
+      See phase5-plan-reviewed.md issues #5, #18 and phases-5-7-gap-specifications.md "Multi-Store Unassigned Items Post-Pass".
+
+  - title: Write multi-store optimizer tests
+    completed: true
+    parallel_group: 7
+    description: |
+      Write tests for multi-store optimizer.
+
+      File to create:
+      - services/price-service/internal/optimizer/multi_test.go
+
+      Test cases:
+      1. Greedy vs optimal correctness
+      2. Timeout triggers fallback
+      3. Combined coverage calculation
+      4. Performance within bounds (<200ms)
+      5. Coverage post-pass assigns remaining items
+      6. Unassigned items when no store has them
+
+      See phase5-plan-reviewed.md "Success Criteria - Performance".
+
+  # Step 4: API Integration
+  - title: Create HTTP handlers for optimization
+    completed: true
+    parallel_group: 8
+    description: |
+      Create Go HTTP handlers with validation.
+
+      File to create:
+      - services/price-service/internal/handlers/optimize.go
+
+      Requirements:
+      1. Input validation: basket size 1-100, quantity > 0, lat/lon ranges
+      2. Wire cache refresh to ingestion pipeline
+      3. Error responses with proper codes
+
+      HTTP endpoints:
+      - POST /internal/basket/optimize/single
+      - POST /internal/basket/optimize/multi
+
+      Status codes:
+      - 200: Success
+      - 400: Validation error
+      - 404: Chain not found
+      - 503: Cache unavailable
+      - 504: Optimization timeout
+
+      See phase5-plan-reviewed.md "API Request/Response Schemas".
+
+  - title: Create oRPC routes for basket optimization
+    completed: true
+    parallel_group: 8
+    description: |
+      Create Node.js oRPC routes using goFetch.
+
+      File to create:
+      - src/orpc/router/basket.ts
+
+      ```typescript
+      import { goFetch } from '@/lib/go-service-client';
+
+      export const basketRouter = router({
+        optimizeSingle: procedure
+          .input(optimizeRequestSchema)
+          .mutation(async ({ input }) => {
+            return goFetch<SingleStoreResult[]>('/internal/basket/optimize/single', {
+              method: 'POST',
+              body: JSON.stringify(input),
+            });
+          }),
+
+        optimizeMulti: procedure
+          .input(multiOptimizeRequestSchema)
+          .mutation(async ({ input }) => {
+            return goFetch<MultiStoreResult>('/internal/basket/optimize/multi', {
+              method: 'POST',
+              body: JSON.stringify(input),
+            });
+          }),
+      });
+      ```
+
+      Update src/orpc/router/index.ts to add basket router.
+
+      See phase5-plan-reviewed.md issue #7.
+
+  - title: Write API integration tests
+    completed: true
+    parallel_group: 9
+    description: |
+      Write E2E tests for optimization API.
+
+      File to create:
+      - services/price-service/internal/handlers/optimize_test.go
+
+      Test cases:
+      1. E2E happy path (single and multi)
+      2. Validation error responses
+      3. 503 when cache unavailable
+      4. Stress test: 100 items x 500 stores
+      5. Haversine edge cases (poles, 0km distance, date line crossing)
+
+      See phase5-plan-reviewed.md "Testing Gaps".
+
+  # Step 5: Production Hardening
+  - title: Add production hardening to optimizer
+    completed: true
+    parallel_group: 10
+    description: |
+      Add resilience features to the optimizer.
+
+      Files to modify:
+      - services/price-service/internal/optimizer/cache.go
+
+      Requirements:
+      1. Circuit breaker for cache failures
+      2. Structured logging with request IDs
+      3. Feature flags for multi-store disable
+      4. Health check for cache freshness
+      5. Graceful degradation: block requests until warmup done
+
+      Add to services/price-service/internal/handlers/:
+      - Health endpoint reports cache freshness per chain
+
+      See phase5-plan-reviewed.md "Success Criteria - Resilience".
+
+  # ===========================================================================
+  # PHASE 7: PRODUCT MATCHING
+  # ===========================================================================
+
+  # Step 1: Schema Updates
+  - title: Create matching schema tables
+    completed: true
+    parallel_group: 11
+    description: |
+      Add Drizzle schema tables for product matching.
+
+      File to modify:
+      - src/db/schema.ts
+
+      Tables to add:
+      1. productMatchCandidates - supports top-N suggestions per item with versioning
+      2. productMatchQueue - review queue with audit trail
+      3. productMatchRejections - scoped rejections (not global block)
+      4. productMatchAudit - audit log with proper FK
+      5. canonicalBarcodes - with nullable product_id for race-safe creation
+
+      Key constraints:
+      - productLinks needs UNIQUE on retailer_item_id
+      - itemCandidateUniq on (retailerItemId, candidateProductId)
+      - itemRankUniq on (retailerItemId, rank)
+      - version column for optimistic locking
+
+      See phase7-plan-reviewed.md "Step 1: Schema Updates" for full schema.
+
+  - title: Create migration for matching tables
+    completed: true
+    parallel_group: 11
+    description: |
+      Create raw SQL migration for pgvector and pg_trgm.
+
+      File to create:
+      - drizzle/XXXX_add_matching_tables.sql
+
+      ```sql
+      CREATE EXTENSION IF NOT EXISTS vector;
+      CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+      ALTER TABLE product_links
+      ADD CONSTRAINT product_links_item_uniq UNIQUE (retailer_item_id);
+
+      CREATE TABLE retailer_item_embeddings (
+        retailer_item_id TEXT PRIMARY KEY REFERENCES retailer_items(id) ON DELETE CASCADE,
+        embedding vector(1536),
+        model_version TEXT NOT NULL,
+        normalized_text TEXT NOT NULL,
+        normalized_text_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+
+      CREATE TABLE product_embeddings (
+        product_id TEXT PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+        embedding vector(1536),
+        model_version TEXT NOT NULL,
+        normalized_text TEXT NOT NULL,
+        normalized_text_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+
+      -- Use HNSW for better recall
+      CREATE INDEX ON retailer_item_embeddings USING hnsw (embedding vector_cosine_ops);
+      CREATE INDEX ON product_embeddings USING hnsw (embedding vector_cosine_ops);
+      ```
+
+      Run drizzle-kit generate after schema changes.
+
+  # Step 2: Normalization
+  - title: Implement barcode and text normalization
+    completed: true
+    parallel_group: 12
+    description: |
+      Create normalization functions for barcode and text.
+
+      File to create:
+      - services/price-service/internal/matching/normalize.go
+
+      Functions:
+      1. NormalizeBarcode - UPC-A vs EAN-13, leading zeros, check digit validation
+      2. RemoveDiacritics - Croatian characters (c, c, d, s, z)
+      3. NormalizeUnit - unit conversions (l/ml, kg/g, kom/pcs)
+
+      Key rules:
+      - UPC-A (12 digits) -> EAN-13 (add leading 0)
+      - Skip placeholder barcodes (all zeros)
+      - Skip variable-weight codes (20-29 prefix)
+      - Validate EAN-13 check digit
+
+      See phase7-plan-reviewed.md "Step 2: Barcode Normalization".
+
+  # Step 3: Barcode Matching
+  - title: Implement race-safe barcode matching
+    completed: true
+    parallel_group: 13
+    description: |
+      Create barcode matching with advisory locks.
+
+      File to create:
+      - services/price-service/internal/matching/barcode.go
+
+      Requirements:
+      1. Use pg_advisory_xact_lock on barcode hash (works before row exists)
+      2. Suspicious barcode detection (name mismatch, brand conflict, unit mismatch)
+      3. pickBestItem to select canonical product data
+      4. Batch processing with streaming from DB
+
+      Key function:
+      ```go
+      func processSingleBarcode(ctx context.Context, db *pgxpool.Pool, barcode string, result *BarcodeResult) error {
+          return pgx.BeginTxFunc(ctx, db, pgx.TxOptions{}, func(tx pgx.Tx) error {
+              // 1. Advisory lock on barcode hash
+              _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, barcode)
+              // ...
+          })
+      }
+      ```
+
+      See phase7-plan-reviewed.md "Step 3: Barcode Matching".
+
+  - title: Write barcode matching tests
+    completed: true
+    parallel_group: 14
+    description: |
+      Write tests for barcode matching.
+
+      File to create:
+      - services/price-service/internal/matching/barcode_test.go
+
+      Test cases:
+      1. Valid EAN-13 processing
+      2. UPC-A to EAN-13 conversion
+      3. Invalid barcode rejection
+      4. Suspicious barcode detection (name mismatch)
+      5. Race condition handling (concurrent barcode processing)
+      6. Check digit validation
+
+  # Step 4: Embedding Cache
+  - title: Implement embedding provider and cache
+    completed: true
+    parallel_group: 15
+    description: |
+      Create embedding provider abstraction and caching.
+
+      Files to create:
+      - services/price-service/internal/matching/embedding.go
+
+      Requirements:
+      1. EmbeddingProvider interface with GenerateEmbeddingBatch
+      2. Cache embeddings in DB (retailer_item_embeddings, product_embeddings)
+      3. Hash-based invalidation (normalized_text_hash)
+      4. Retry with exponential backoff for API failures
+
+      ```go
+      type EmbeddingProvider interface {
+          GenerateEmbeddingBatch(ctx context.Context, texts []string) ([][]float32, error)
+          ModelVersion() string
+      }
+
+      func getCachedEmbeddings(ctx context.Context, db *pgxpool.Pool,
+          items []RetailerItem, hashes []string, modelVersion string) ([][]float32, error)
+
+      func storeEmbeddingCache(ctx context.Context, db *pgxpool.Pool,
+          itemID string, embedding []float32, text, hash, modelVersion string) error
+      ```
+
+      See phase7-plan-reviewed.md "Step 4: AI Matching".
+
+  # Step 5: AI Matching
+  - title: Implement 2-stage AI matching
+    completed: true
+    parallel_group: 16
+    description: |
+      Create AI matching with pg_trgm prefilter + embedding rerank.
+
+      File to create:
+      - services/price-service/internal/matching/ai.go
+
+      Requirements:
+      1. Stage 1: pg_trgm prefilter (cheap, in-DB) - top 200 candidates
+      2. Stage 2: Embedding rerank - top 5 candidates
+      3. Store candidates with versioning (matching_run_id, model_version)
+      4. Scoped rejections filter (not global block)
+      5. Auto-link threshold >= 0.95, review threshold >= 0.80
+
+      ```go
+      type AIMatcherConfig struct {
+          Provider          EmbeddingProvider
+          AutoLinkThreshold float32  // 0.95
+          ReviewThreshold   float32  // 0.80
+          BatchSize         int      // 100
+          MaxCandidates     int      // 5
+          TrgmPrefilter     int      // 200
+      }
+
+      func RunAIMatching(ctx context.Context, db *pgxpool.Pool,
+          cfg AIMatcherConfig, runID string) (*AIMatchResult, error)
+      ```
+
+      See phase7-plan-reviewed.md "Step 4: AI Matching - 2-Stage with Batching".
+
+  - title: Write AI matching tests
+    completed: true
+    parallel_group: 17
+    description: |
+      Write tests for AI matching.
+
+      File to create:
+      - services/price-service/internal/matching/ai_test.go
+
+      Test cases:
+      1. pg_trgm prefilter returns candidates
+      2. Embedding rerank orders correctly
+      3. Auto-link at high confidence
+      4. Queue for review at medium confidence
+      5. Scoped rejections filter candidates
+      6. Batch processing efficiency
+
+  # Step 6: Internal API
+  - title: Create Go endpoints for matching
+    completed: true
+    parallel_group: 18
+    description: |
+      Create Go HTTP endpoints for triggering matching.
+
+      File to modify:
+      - services/price-service/internal/api/router.go
+
+      Endpoints:
+      - POST /internal/matching/barcode - trigger barcode matching
+      - POST /internal/matching/ai - trigger AI matching
+      - GET /internal/matching/status - get matching run status
+
+      Also create:
+      - services/price-service/queries/matching.sql (sqlc queries)
+
+  # Step 7: Admin UI
+  - title: Create admin review queue components
+    completed: true
+    parallel_group: 19
+    description: |
+      Create React components for match review.
+
+      Files to create:
+      - src/components/admin/products/MatchReviewQueue.tsx
+      - src/components/admin/products/MatchReviewCard.tsx
+      - src/components/admin/products/ProductSearch.tsx
+      - src/components/admin/products/CreateProductModal.tsx
+
+      Requirements:
+      1. Keyset pagination (not offset-based)
+      2. Show top-N candidates per item
+      3. Scoped rejection (reject specific candidate, not all)
+      4. Optimistic locking (version check)
+      5. Bulk approve action
+
+      See phase7-plan-reviewed.md "Step 6: oRPC Routes".
+
+  - title: Create oRPC routes for product matching
+    completed: true
+    parallel_group: 19
+    description: |
+      Create oRPC routes with set-based queries.
+
+      File to create:
+      - src/orpc/router/products.ts
+
+      Routes:
+      1. getPendingMatches - keyset pagination, JSON aggregation for candidates
+      2. approveMatch - optimistic locking with version
+      3. rejectMatch - scoped or full rejection
+      4. bulkApprove - set-based bulk operation
+      5. resolveSuspicious - handle suspicious barcode items
+
+      Update src/orpc/router/index.ts to add products router.
+
+      Key: Use set-based queries to avoid N+1 problem (single query with JSON aggregation).
+
+      See phase7-plan-reviewed.md "Step 5: Admin Queries" and "Step 6: oRPC Routes".
+
+  # Step 8: Integration Tests
+  - title: Write matching integration tests
+    completed: true
+    parallel_group: 20
+    description: |
+      Write end-to-end integration tests.
+
+      File to create:
+      - services/price-service/internal/matching/integration_test.go
+
+      Test cases:
+      1. Full barcode matching flow
+      2. Full AI matching flow
+      3. Concurrent access handling
+      4. Queue processing
+      5. Audit log creation
+
+  # Step 9: Cleanup Jobs
+  - title: Implement cleanup and retention jobs
+    completed: true
+    parallel_group: 21
+    description: |
+      Create cleanup jobs for candidates and audit logs.
+
+      Files to create/modify:
+      - services/price-service/internal/jobs/cleanup_audit.go
+
+      Jobs:
+      1. CleanupOldCandidates - keep 7 days
+      2. CleanupAuditLogs - keep 90 days
+      3. Schedule in cron (daily at 3 AM)
+
+      ```go
+      type CleanupConfig struct {
+          CandidateRetentionDays int `default:"7"`
+          AuditRetentionDays     int `default:"90"`
+      }
+      ```
+
+      See phases-5-7-gap-specifications.md "Audit Log Retention".
+
+  # ===========================================================================
+  # CODE REVIEW TASKS
+  # ===========================================================================
+
+  - title: Code review with claude-cli
+    completed: true
+    parallel_group: 22
+    description: |
+      Run code review using claude-cli.
+
+      Command:
+      ```bash
+      claude -p "Review the Phase 5 (Basket Optimization) and Phase 7 (Product Matching) implementation. Focus on:
+      1. Concurrency safety (locks, race conditions)
+      2. Error handling
+      3. Memory management (GC pressure)
+      4. API design consistency
+      5. Test coverage
+
+      Key files:
+      - services/price-service/internal/optimizer/*.go
+      - services/price-service/internal/matching/*.go
+      - src/orpc/router/basket.ts
+      - src/orpc/router/products.ts"
+      ```
+
+      Review against the reviewed plans in doc/tmp/phase5-plan-reviewed.md and phase7-plan-reviewed.md.
+
+  - title: Code review with opencode GPT-5.2
+    completed: true
+    parallel_group: 22
+    description: |
+      Run code review using opencode with GPT-5.2.
+
+      Command:
+      ```bash
+      opencode --model github-copilot/gpt-5.2 -p "Review the Phase 5 and Phase 7 implementation focusing on:
+      1. Concurrency correctness (mutex usage, atomic operations)
+      2. Snapshot swap pattern implementation
+      3. singleflight context handling
+      4. int64 money type consistency
+      5. Nil-map safety
+
+      Check against invariants from doc/tmp/phase5-plan-reviewed.md 'Must-Specify Invariants' table."
+      ```
+
+  - title: Code review with opencode Gemini
+    completed: true
+    parallel_group: 22
+    description: |
+      Run code review using opencode with Gemini.
+
+      Command:
+      ```bash
+      opencode --model github-copilot/gemini-3-pro-preview -p "Review Phase 5 and Phase 7 implementation:
+      1. Cache architecture (group-aware structure)
+      2. Algorithm correctness (greedy, optimal)
+      3. Coverage-first ranking implementation
+      4. Barcode normalization edge cases
+      5. AI matching 2-stage pipeline
+
+      Reference: doc/tmp/phase5-plan-reviewed.md and doc/tmp/phase7-plan-reviewed.md"
+      ```
+
+  - title: Code review with Grok Code
+    completed: true
+    parallel_group: 22
+    description: |
+      Run code review using opencode with Grok Code.
+
+      Command:
+      ```bash
+      opencode --model opencode/grok-code -p "Review Phase 5 and Phase 7 for production hardening:
+      1. Lock contention (per-chain sharding)
+      2. Warmup concurrency limits
+      3. Timeout handling
+      4. Circuit breaker patterns
+      5. Graceful degradation
+
+      Check resilience criteria from doc/tmp/phase5-plan-reviewed.md 'Success Criteria - Resilience'."
+      ```

@@ -7,23 +7,174 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Cloudflare Workers                        │
+│                      Node.js Frontend                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │  TanStack   │  │   oRPC      │  │  Better Auth        │  │
 │  │  Start SSR  │  │   API       │  │  (Passkey support)  │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
-│                           │                                  │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Ingestion Pipeline                      │    │
-│  │  discover → fetch → expand(zip) → parse → persist   │    │
-│  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
-          │                │                    │
-    ┌─────▼─────┐   ┌─────▼─────┐      ┌──────▼──────┐
-    │  D1 (SQL) │   │  R2 (Blob)│      │   Queues    │
-    │ Database  │   │  Storage  │      │ (Async Jobs)│
-    └───────────┘   └───────────┘      └─────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Go Price Service                        │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   11 Chain  │  │   Basket    │  │  Product            │  │
+│  │  Adapters   │  │  Optimizer  │  │  Matching           │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+                    ┌──────────┐
+                    │PostgreSQL│
+                    └──────────┘
 ```
+
+## System Diagram (Mermaid)
+
+```mermaid
+graph LR
+    Client[Browser] -->|HTTP| Node[Node.js oRPC]
+    Node -->|Auth/Validation| Go[Go Price Service]
+    Go -->|pgx| PG[(PostgreSQL)]
+
+    subgraph "Node.js Frontend"
+        Node
+        Auth[Better Auth]
+    end
+
+    subgraph "Go Backend"
+        Adapters[Chain Adapters]
+        Pipeline[Ingestion Pipeline]
+        Optimizer[Basket Optimizer]
+        Matching[Product Matching]
+    end
+
+    subgraph "Database"
+        PG
+    end
+
+    Node --> Go
+    Go --> Adapters
+    Adapters --> Pipeline
+    Pipeline --> PG
+    Node --> Auth
+```
+
+## Data Flow Diagrams
+
+### Request Path
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant N as Node.js (oRPC)
+    participant G as Go Service
+    participant P as PostgreSQL
+
+    C->>N: HTTP Request + Auth
+    N->>N: Validate Session
+    N->>G: Internal API Call
+    G->>P: Query
+    P-->>G: Result
+    G-->>N: Response
+    N-->>C: JSON
+```
+
+### Ingestion Pipeline
+
+```mermaid
+graph LR
+    A[Discover] --> B[Fetch]
+    B --> C[Parse]
+    C --> D[Persist]
+    D --> E[(PostgreSQL)]
+
+    subgraph "Go Service"
+        A
+        B
+        C
+        D
+    end
+```
+
+## Schema Authority
+
+**Drizzle ORM is the source of truth for ALL database tables.**
+
+- Schema defined in `src/db/schema.ts`
+- Go service reads schema, never writes migrations
+- Migration workflow:
+  1. Modify `src/db/schema.ts`
+  2. Run `pnpm db:generate` (creates migration)
+  3. Run `pnpm db:migrate` (applies migration)
+  4. Go service auto-reads updated schema
+
+## State Machines
+
+### Store Enrichment
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: New store discovered
+    Pending --> Enriching: Admin starts enrichment
+    Enriching --> Enriched: Data fetched
+    Enriched --> Approved: Admin approves
+    Enriched --> Rejected: Admin rejects
+    Enriched --> Merged: Admin merges with existing
+    Approved --> Active
+    Rejected --> [*]
+    Merged --> [*]
+```
+
+### Product Matching
+
+```mermaid
+stateDiagram-v2
+    [*] --> Unmatched: Retailer item imported
+    Unmatched --> Candidate: Barcode match found
+    Candidate --> Verified: Admin confirms
+    Candidate --> Rejected: Admin rejects
+    Unmatched --> Unmatched: No barcode found
+    Verified --> Linked
+    Rejected --> [*]
+    Linked --> [*]
+```
+
+## Key Subsystems
+
+### Price Groups (Content-Addressable Deduplication)
+
+- Prices are grouped by SHA-256 hash of all prices in a store
+- Same prices = same group (~50% storage reduction)
+- Immutable: new prices always create a new group
+- Tables: `price_groups`, `store_group_history`, `group_prices`
+
+```mermaid
+graph LR
+    S[Store] --> SGH[store_group_history]
+    PG[price_groups] --> SGH
+    PG --> GP[group_prices]
+    RI[retailer_items] --> GP
+```
+
+### Circuit Breaker
+
+Protects against cascading failures when calling external services:
+
+- **Closed → Open**: 5 failures in 30 seconds
+- **Open → Half-Open**: 30 second cooldown
+- **Half-Open → Closed**: 1 successful request
+- **Half-Open → Open**: Request fails
+
+### Retry Logic
+
+Exponential backoff for GET requests:
+
+- Attempt 1: immediate
+- Attempt 2: 1 second delay
+- Attempt 3: 2 second delay
+- Attempt 4: 4 second delay
+- Max retries: 4
 
 ## Domain Model
 
@@ -41,55 +192,42 @@
 - **product_relations** - Variants, substitutes, bundles
 
 ### Price Data
-- **store_item_state** - Current price state per store+item
-- **store_item_price_periods** - Price history with time ranges
+- **price_groups** - Content-addressable price collections
+- **store_group_history** - Store → price group over time
+- **group_prices** - Individual item prices within a group
 
 ### Ingestion Tracking
 - **ingestion_runs** - Batch runs with status/stats
 - **ingestion_files** - Files processed per run
-- **ingestion_file_entries** - Individual rows from files
-- **ingestion_errors** - Error logging with severity
 
 ## Design Patterns
 
 ### Chain Adapter Pattern
-Each retail chain implements `ChainAdapter` interface (`src/ingestion/chains/`):
-- `discover()` - Find available price files
-- `fetch()` - Download with rate limiting
-- `parse()` - Normalize to `NormalizedRow`
-- `extractStoreIdentifier()` - Map filename → store
-- `validateRow()` - Chain-specific validation
+
+Each retail chain implements `ChainAdapter` interface in Go:
+
+```go
+type ChainAdapter interface {
+    Discover(ctx context.Context) ([]string, error)
+    Fetch(ctx context.Context, url string) ([]byte, error)
+    Parse(ctx context.Context, data []byte) ([]NormalizedRow, error)
+    ExtractStoreIdentifier(filename string) string
+}
+```
 
 Base classes: `BaseChainAdapter`, `BaseCsvAdapter`, `BaseXmlAdapter`
 
-### Queue-Based Processing
-Messages flow through Cloudflare Queues:
-1. `discover` → Find files
-2. `fetch` → Download to R2
-3. `expand` → Unzip if needed
-4. `parse` → Extract rows
-5. `persist` → Write to D1
+### Go Service Integration
 
-### Request Context
-Server-side code accesses bindings via `getEnv()`, `getDb()` from `src/utils/bindings.ts`. Context is set per-request.
+Node.js calls Go via internal HTTP API:
 
-## Key Flows
-
-### Authentication
-`/api/auth/*` → Better Auth handler → D1 (user, session, account, passkey tables)
-
-### RPC API
-`/api/rpc/*` → oRPC router (`src/orpc/router/`) → D1
-
-### Ingestion
-1. Cron trigger or CLI command starts run
-2. Chain adapter discovers files
-3. Files fetched with rate limiting to R2
-4. Parser normalizes rows
-5. Store resolution matches filename → store
-6. Persist to store_item_state with deduplication
+- Base URL: `http://localhost:8080`
+- Auth: `INTERNAL_API_KEY` header
+- Tracing: `X-Request-ID` propagated
+- Circuit breaker protects against failures
 
 ## Supported Chains
+
 konzum, lidl, plodine, interspar, studenac, kaufland, eurospin, dm, ktc, metro, trgocentar
 
 Each supports different file formats (CSV, XML, XLSX) with varying encodings (UTF-8, Windows-1250).

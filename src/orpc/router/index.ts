@@ -4,6 +4,7 @@ import {
 	getStoresByChain,
 	listCatalogPrices,
 } from "./catalog-prices";
+import * as basket from "./basket";
 import * as priceService from "./price-service";
 import { getSettings, updateSettings } from "./settings";
 import {
@@ -37,10 +38,27 @@ import {
 	listUsers,
 	updateUserRole,
 } from "./users";
+import {
+	approveMatch,
+	bulkApprove,
+	getPendingMatchCount,
+	getPendingMatches,
+	getStats,
+	rejectMatch,
+	resolveSuspicious,
+	searchProducts,
+} from "./products";
 
 export default {
 	listTodos,
 	addTodo,
+	basket: {
+		optimizeSingle: basket.optimizeSingle,
+		optimizeMulti: basket.optimizeMulti,
+		cacheWarmup: basket.cacheWarmup,
+		cacheRefresh: basket.cacheRefresh,
+		cacheHealth: basket.cacheHealth,
+	},
 	prices: {
 		getStorePrices: priceService.getStorePrices,
 		searchItems: priceService.searchItems,
@@ -95,6 +113,16 @@ export default {
 			list: listCatalogPrices,
 			getStoresByChain: getStoresByChain,
 			getCategories: getCategories,
+		},
+		products: {
+			getPendingMatches,
+			getPendingMatchCount,
+			approveMatch,
+			rejectMatch,
+			bulkApprove,
+			resolveSuspicious,
+			searchProducts,
+			getStats,
 		},
 	},
 };
