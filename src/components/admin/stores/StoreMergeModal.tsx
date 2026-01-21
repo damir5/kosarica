@@ -39,13 +39,14 @@ type PendingStore = {
 type TargetStore = {
 	id: string;
 	name: string;
+	updatedAt: Date | null;
 };
 
 interface StoreMergeModalProps {
 	store: PendingStore | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onConfirm: (targetStoreId: string) => Promise<void>;
+	onConfirm: (targetStoreId: string, targetStore: TargetStore | null) => Promise<void>;
 	isLoading?: boolean;
 }
 
@@ -65,6 +66,13 @@ export function StoreMergeModal({
 		}),
 	);
 
+	// Query the selected target store for full details (for optimistic locking)
+	const { data: selectedTargetData } = useQuery(
+		orpc.admin.stores.get.queryOptions({
+			input: { storeId: selectedTargetId },
+		}),
+	);
+
 	// Reset selection when modal closes
 	const handleOpenChange = (newOpen: boolean) => {
 		if (!newOpen) {
@@ -77,13 +85,15 @@ export function StoreMergeModal({
 
 	const handleConfirm = async () => {
 		if (selectedTargetId) {
-			await onConfirm(selectedTargetId);
+			// Pass the full target store for optimistic locking
+			await onConfirm(selectedTargetId, selectedTargetData ?? null);
 			setSelectedTargetId("");
 		}
 	};
 
 	// Use targetOptions which returns { id, name } for each store
-	const availableStores: TargetStore[] = targetOptions?.stores ?? [];
+	// Note: The linking API returns minimal info, we'll fetch full details on selection
+	const availableStores: Array<{ id: string; name: string }> = targetOptions?.stores ?? [];
 
 	// Get selected store name for display
 	const selectedStoreName = availableStores.find(

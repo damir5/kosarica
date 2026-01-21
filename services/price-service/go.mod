@@ -14,6 +14,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
 	github.com/xuri/excelize/v2 v2.8.1
 	golang.org/x/text v0.30.0
+	golang.org/x/time v0.5.0
 )
 
 require (

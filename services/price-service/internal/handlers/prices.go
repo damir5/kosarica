@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -298,5 +299,205 @@ func SearchItems(c *gin.Context) {
 		Items:  items,
 		Total:  total,
 		Query:  req.Query,
+	})
+}
+
+// ============================================================================
+// Price Groups Endpoints
+// ============================================================================
+
+// GetStorePricesViaGroup returns prices for a store using price groups
+// GET /internal/prices/group/:storeId
+func GetStorePricesViaGroup(c *gin.Context) {
+	storeID := c.Param("storeId")
+
+	if storeID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "storeId is required"})
+		return
+	}
+
+	pool := database.Pool()
+	ctx := c.Request.Context()
+
+	// Get prices via price group
+	prices, err := database.GetStorePrices(ctx, storeID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch store prices: " + err.Error()})
+		return
+	}
+
+	// Enrich with retailer item details
+	enrichedPrices := []StorePrice{}
+	for _, price := range prices {
+		var itemName string
+		var itemExternalID, brand, unit, unitQuantity *string
+
+		err := pool.QueryRow(ctx, `
+			SELECT name, external_id, brand, unit, unit_quantity
+			FROM retailer_items
+			WHERE id = $1
+		`, price.RetailerItemID).Scan(&itemName, &itemExternalID, &brand, &unit, &unitQuantity)
+
+		if err != nil {
+			if err != pgx.ErrNoRows {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch item details"})
+				return
+			}
+			itemName = "Unknown Item"
+		}
+
+		enrichedPrices = append(enrichedPrices, StorePrice{
+			RetailerItemID: price.RetailerItemID,
+			ItemName:       itemName,
+			ItemExternalID: itemExternalID,
+			Brand:          brand,
+			Unit:           unit,
+			UnitQuantity:   unitQuantity,
+			CurrentPrice:   &price.Price,
+			DiscountPrice:  price.DiscountPrice,
+			UnitPrice:      price.UnitPrice,
+			AnchorPrice:    price.AnchorPrice,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"prices": enrichedPrices,
+		"total":  len(enrichedPrices),
+	})
+}
+
+// GetHistoricalPriceRequest represents query parameters for historical price lookup
+type GetHistoricalPriceRequest struct {
+	StoreID string `form:"storeId" binding:"required"`
+	ItemID  string `form:"itemId" binding:"required"`
+	AsOf    string `form:"asOf"` // RFC3339 timestamp
+}
+
+// GetHistoricalPrice returns the historical price for an item at a store
+// GET /internal/prices/history?storeId=&itemId=&asOf=
+func GetHistoricalPrice(c *gin.Context) {
+	var req GetHistoricalPriceRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	pool := database.Pool()
+	ctx := c.Request.Context()
+
+	// Parse asOf timestamp, default to now if not provided
+	asOfTime := time.Now()
+	if req.AsOf != "" {
+		parsedTime, err := time.Parse(time.RFC3339, req.AsOf)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asOf format, use RFC3339"})
+			return
+		}
+		asOfTime = parsedTime
+	}
+
+	// Get historical price
+	price, discountPrice, err := database.GetHistoricalPriceForStore(ctx, req.StoreID, req.ItemID, asOfTime)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get item details
+	var itemName string
+	err = pool.QueryRow(ctx, `
+		SELECT name FROM retailer_items WHERE id = $1
+	`, req.ItemID).Scan(&itemName)
+
+	if err != nil {
+		itemName = "Unknown Item"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"itemId":        req.ItemID,
+		"itemName":      itemName,
+		"price":         price,
+		"discountPrice": discountPrice,
+		"asOf":          asOfTime.Format(time.RFC3339),
+	})
+}
+
+// ListPriceGroupsRequest represents query parameters for listing price groups
+type ListPriceGroupsRequest struct {
+	ChainSlug string `form:"chainSlug" binding:"required"`
+	Limit     int    `form:"limit" binding:"min=1,max=100"`
+	Offset    int    `form:"offset" binding:"min=0"`
+}
+
+// PriceGroupSummary represents a price group summary for listing
+type PriceGroupSummary struct {
+	ID          string `json:"id"`
+	ChainSlug   string `json:"chainSlug"`
+	PriceHash   string `json:"priceHash"`
+	StoreCount  int    `json:"storeCount"`
+	ItemCount   int    `json:"itemCount"`
+	FirstSeenAt string `json:"firstSeenAt"`
+	LastSeenAt  string `json:"lastSeenAt"`
+}
+
+// ListPriceGroups lists price groups for a chain
+// GET /internal/price-groups/:chainSlug
+func ListPriceGroups(c *gin.Context) {
+	chainSlug := c.Param("chainSlug")
+	if chainSlug == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "chainSlug is required"})
+		return
+	}
+
+	var req ListPriceGroupsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Set defaults
+	if req.Limit == 0 {
+		req.Limit = 50
+	}
+
+	pool := database.Pool()
+	ctx := c.Request.Context()
+
+	// Get total count
+	var total int
+	err := pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM price_groups WHERE chain_slug = $1
+	`, chainSlug).Scan(&total)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count price groups"})
+		return
+	}
+
+	// List price groups
+	groups, err := database.ListPriceGroups(ctx, chainSlug, req.Limit, req.Offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch price groups"})
+		return
+	}
+
+	summaries := make([]PriceGroupSummary, 0, len(groups))
+	for _, group := range groups {
+		summaries = append(summaries, PriceGroupSummary{
+			ID:          group.ID,
+			ChainSlug:   group.ChainSlug,
+			PriceHash:   group.PriceHash,
+			StoreCount:  group.StoreCount,
+			ItemCount:   group.ItemCount,
+			FirstSeenAt: group.FirstSeenAt.Format(time.RFC3339),
+			LastSeenAt:  group.LastSeenAt.Format(time.RFC3339),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"groups": summaries,
+		"total":  total,
+		"limit":  req.Limit,
+		"offset": req.Offset,
 	})
 }

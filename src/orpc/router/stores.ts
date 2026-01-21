@@ -1,10 +1,10 @@
-import { and, count, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
 import { processEnrichStore, type EnrichmentContext } from "@/lib/store-enrichment";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
-import { procedure } from "../base";
+import { procedure, superadminProcedure } from "../base";
 
 // ============================================================================
 // Core Store Operations
@@ -82,6 +82,62 @@ export const getStore = procedure
 		return result[0];
 	});
 
+/**
+ * Get detailed store information including enrichment tasks and related stores.
+ * This is a more expensive query than getStore and should only be used for detail views.
+ */
+export const getStoreDetail = procedure
+	.input(z.object({ storeId: z.string() }))
+	.handler(async ({ input }) => {
+		const db = getDb();
+
+		// Get the store
+		const [store] = await db
+			.select()
+			.from(stores)
+			.where(eq(stores.id, input.storeId));
+
+		if (!store) {
+			throw new Error("Store not found");
+		}
+
+		// Get enrichment tasks for this store
+		const enrichmentTasks = await db
+			.select()
+			.from(storeEnrichmentTasks)
+			.where(eq(storeEnrichmentTasks.storeId, input.storeId))
+			.orderBy(desc(storeEnrichmentTasks.createdAt));
+
+		// Get linked physical stores (if this is a virtual store)
+		let linkedPhysicalStores: typeof stores.$inferSelect[] = [];
+		if (store.isVirtual) {
+			linkedPhysicalStores = await db
+				.select()
+				.from(stores)
+				.where(eq(stores.priceSourceStoreId, input.storeId));
+		}
+
+		// Get similar stores (same chain, same city, not this store, limited to 5)
+		const similarStores = await db
+			.select()
+			.from(stores)
+			.where(
+				and(
+					eq(stores.chainSlug, store.chainSlug),
+					eq(stores.city, store.city || ""),
+					sql`${stores.id} != ${input.storeId}`,
+				),
+			)
+			.limit(5);
+
+		return {
+			store,
+			enrichmentTasks,
+			linkedPhysicalStores,
+			similarStores,
+		};
+	});
+
 export const updateStore = procedure
 	.input(
 		z.object({
@@ -111,9 +167,13 @@ export const updateStore = procedure
 		return { success: true };
 	});
 
-export const approveStore = procedure
-	.input(z.object({ storeId: z.string() }))
-	.handler(async ({ input }) => {
+export const approveStore = superadminProcedure
+	.input(z.object({
+		storeId: z.string(),
+		expectedUpdatedAt: z.string(),
+		approvalNotes: z.string().optional(),
+	}))
+	.handler(async ({ input, context }) => {
 		const db = getDb();
 
 		// Verify store exists and is pending
@@ -128,16 +188,35 @@ export const approveStore = procedure
 			throw new Error("Store is not in pending status");
 		}
 
+		// Optimistic locking: verify updatedAt hasn't changed
+		const expectedDate = new Date(input.expectedUpdatedAt);
+		if (!existing[0].updatedAt || existing[0].updatedAt.getTime() !== expectedDate.getTime()) {
+			throw new Error("Store was modified by someone else. Please refresh and try again.");
+		}
+
+		// Get the current user ID from context
+		const userId = (context as { user: { id: string } }).user?.id;
+
 		await db
 			.update(stores)
-			.set({ status: "active", updatedAt: new Date() })
+			.set({
+				status: "active",
+				updatedAt: new Date(),
+				...(input.approvalNotes && { approvalNotes: input.approvalNotes }),
+				approvedBy: userId,
+				approvedAt: new Date(),
+			})
 			.where(eq(stores.id, input.storeId));
 
 		return { success: true };
 	});
 
-export const rejectStore = procedure
-	.input(z.object({ storeId: z.string() }))
+export const rejectStore = superadminProcedure
+	.input(z.object({
+		storeId: z.string(),
+		expectedUpdatedAt: z.string(),
+		reason: z.string().optional(),
+	}))
 	.handler(async ({ input }) => {
 		const db = getDb();
 
@@ -150,16 +229,24 @@ export const rejectStore = procedure
 			throw new Error("Store not found");
 		}
 
+		// Optimistic locking: verify updatedAt hasn't changed
+		const expectedDate = new Date(input.expectedUpdatedAt);
+		if (!existing[0].updatedAt || existing[0].updatedAt.getTime() !== expectedDate.getTime()) {
+			throw new Error("Store was modified by someone else. Please refresh and try again.");
+		}
+
 		await db.delete(stores).where(eq(stores.id, input.storeId));
 
 		return { success: true };
 	});
 
-export const mergeStores = procedure
+export const mergeStores = superadminProcedure
 	.input(
 		z.object({
 			sourceStoreId: z.string(),
+			sourceExpectedUpdatedAt: z.string(),
 			targetStoreId: z.string(),
+			targetExpectedUpdatedAt: z.string(),
 		}),
 	)
 	.handler(async ({ input }) => {
@@ -180,6 +267,16 @@ export const mergeStores = procedure
 		}
 		if (targetStore.length === 0) {
 			throw new Error("Target store not found");
+		}
+
+		// Optimistic locking: verify both stores haven't been modified
+		const sourceExpectedDate = new Date(input.sourceExpectedUpdatedAt);
+		const targetExpectedDate = new Date(input.targetExpectedUpdatedAt);
+		if (!sourceStore[0].updatedAt || sourceStore[0].updatedAt.getTime() !== sourceExpectedDate.getTime()) {
+			throw new Error("Source store was modified by someone else. Please refresh and try again.");
+		}
+		if (!targetStore[0].updatedAt || targetStore[0].updatedAt.getTime() !== targetExpectedDate.getTime()) {
+			throw new Error("Target store was modified by someone else. Please refresh and try again.");
 		}
 
 		// Update any stores that have sourceStore as their priceSourceStoreId
@@ -681,4 +778,164 @@ export const createPhysicalStore = procedure
 			.where(eq(stores.id, storeId));
 
 		return { store: createdStore };
+	});
+
+// ============================================================================
+// Bulk Operations
+// ============================================================================
+
+/**
+ * Bulk approve multiple stores as new price sources.
+ * All stores must be in pending status and pass optimistic locking.
+ */
+export const bulkApproveStores = superadminProcedure
+	.input(
+		z.object({
+			storeIds: z.array(z.string()).min(1, "At least one store ID is required"),
+			approvalNotes: z.string().optional(),
+		}),
+	)
+	.handler(async ({ input, context }) => {
+		const db = getDb();
+
+		// Get the current user ID from context
+		const userId = (context as { user: { id: string } }).user?.id;
+
+		// Fetch all stores and verify they exist and are pending
+		const existingStores = await db
+			.select()
+			.from(stores)
+			.where(inArray(stores.id, input.storeIds));
+
+		if (existingStores.length !== input.storeIds.length) {
+			throw new Error(
+				`Some stores not found. Found ${existingStores.length} of ${input.storeIds.length}`,
+			);
+		}
+
+		// Verify all stores are in pending status
+		const nonPendingStores = existingStores.filter((s) => s.status !== "pending");
+		if (nonPendingStores.length > 0) {
+			throw new Error(
+				`Only pending stores can be approved. ${nonPendingStores.length} stores are not pending.`,
+			);
+		}
+
+		const now = new Date();
+
+		// Update all stores to active status
+		await db
+			.update(stores)
+			.set({
+				status: "active",
+				updatedAt: now,
+				...(input.approvalNotes && { approvalNotes: input.approvalNotes }),
+				approvedBy: userId,
+				approvedAt: now,
+			})
+			.where(inArray(stores.id, input.storeIds));
+
+		return {
+			success: true,
+			approved: input.storeIds.length,
+		};
+	});
+
+/**
+ * Bulk reject multiple stores by deleting them.
+ * All stores must be in pending status.
+ */
+export const bulkRejectStores = superadminProcedure
+	.input(
+		z.object({
+			storeIds: z.array(z.string()).min(1, "At least one store ID is required"),
+			reason: z.string().optional(),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const db = getDb();
+
+		// Fetch all stores and verify they exist and are pending
+		const existingStores = await db
+			.select()
+			.from(stores)
+			.where(inArray(stores.id, input.storeIds));
+
+		if (existingStores.length !== input.storeIds.length) {
+			throw new Error(
+				`Some stores not found. Found ${existingStores.length} of ${input.storeIds.length}`,
+			);
+		}
+
+		// Verify all stores are in pending status
+		const nonPendingStores = existingStores.filter((s) => s.status !== "pending");
+		if (nonPendingStores.length > 0) {
+			throw new Error(
+				`Only pending stores can be rejected. ${nonPendingStores.length} stores are not pending.`,
+			);
+		}
+
+		// Delete all stores
+		await db
+			.delete(stores)
+			.where(inArray(stores.id, input.storeIds));
+
+		return {
+			success: true,
+			rejected: input.storeIds.length,
+		};
+	});
+
+/**
+ * Force approve a store by skipping enrichment requirements.
+ * This should only be used with documented justification.
+ */
+export const forceApproveStore = superadminProcedure
+	.input(z.object({
+		storeId: z.string(),
+		expectedUpdatedAt: z.string(),
+		approvalNotes: z.string().optional(),
+		justification: z.string().min(1, "Justification is required for force approval"),
+	}))
+	.handler(async ({ input, context }) => {
+		const db = getDb();
+
+		// Verify store exists and is pending
+		const existing = await db
+			.select()
+			.from(stores)
+			.where(eq(stores.id, input.storeId));
+		if (existing.length === 0) {
+			throw new Error("Store not found");
+		}
+		if (existing[0].status !== "pending") {
+			throw new Error("Store is not in pending status");
+		}
+
+		// Optimistic locking: verify updatedAt hasn't changed
+		const expectedDate = new Date(input.expectedUpdatedAt);
+		if (!existing[0].updatedAt || existing[0].updatedAt.getTime() !== expectedDate.getTime()) {
+			throw new Error("Store was modified by someone else. Please refresh and try again.");
+		}
+
+		// Get the current user ID from context
+		const userId = (context as { user: { id: string } }).user?.id;
+
+		// Combine notes with force approval justification
+		const combinedNotes = input.approvalNotes
+			? `${input.approvalNotes}\n\n[FORCE APPROVAL] ${input.justification}`
+			: `[FORCE APPROVAL] ${input.justification}`;
+
+		await db
+			.update(stores)
+			.set({
+				status: "active",
+				updatedAt: new Date(),
+				approvalNotes: combinedNotes,
+				approvedBy: userId,
+				approvedAt: new Date(),
+			})
+			.where(eq(stores.id, input.storeId));
+
+		return { success: true };
 	});

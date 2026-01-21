@@ -9,6 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { StoreStatusBadge } from "./StoreStatusBadge";
 
 type PendingStore = {
 	id: string;
@@ -29,6 +30,8 @@ type PendingStore = {
 interface PendingStoreCardProps {
 	index: number;
 	store: PendingStore;
+	isSelected?: boolean;
+	onSelectionChange?: (selected: boolean) => void;
 	onApprove: () => void;
 	onMerge: () => void;
 	onReject: () => void;
@@ -38,6 +41,8 @@ interface PendingStoreCardProps {
 export function PendingStoreCard({
 	index,
 	store,
+	isSelected = false,
+	onSelectionChange,
 	onApprove,
 	onMerge,
 	onReject,
@@ -55,6 +60,15 @@ export function PendingStoreCard({
 				{/* Store Header */}
 				<div className="flex items-start justify-between mb-4">
 					<div className="flex items-start gap-3">
+						{onSelectionChange && (
+							<input
+								type="checkbox"
+								checked={isSelected}
+								onChange={(e) => onSelectionChange(e.target.checked)}
+								className="mt-1 h-4 w-4 rounded border-border text-amber-600 focus:ring-2 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer"
+								aria-label={`Select ${store.name}`}
+							/>
+						)}
 						<div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700 font-medium text-sm dark:bg-amber-900/50 dark:text-amber-400">
 							{index}
 						</div>
@@ -67,6 +81,7 @@ export function PendingStoreCard({
 								<span className="font-semibold text-foreground">
 									"{store.name}"
 								</span>
+								{store.status && <StoreStatusBadge status={store.status} />}
 							</div>
 							<div className="flex items-center gap-2 mt-1">
 								<FileSpreadsheet className="h-4 w-4 text-muted-foreground" />

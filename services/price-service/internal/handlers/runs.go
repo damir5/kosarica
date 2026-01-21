@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -634,26 +632,6 @@ func DeleteRun(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Run deleted successfully",
 		"runId":   runID,
-	})
-}
-
-// HealthCheck returns the health status of the ingestion service
-// GET /internal/health
-func HealthCheck(c *gin.Context) {
-	pool := database.Pool()
-	ctx := c.Request.Context()
-
-	// Check database connection
-	if err := pool.Ping(ctx); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "unhealthy",
-			"error":  "database connection failed",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status": "ok",
 	})
 }
 

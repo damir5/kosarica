@@ -7,6 +7,13 @@
       "when": 1768809531892,
       "tag": "0000_puzzling_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1768940366174,
+      "tag": "0001_ambiguous_grandmaster",
+      "breakpoints": true
     }
   ]
 }

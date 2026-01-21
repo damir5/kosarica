@@ -4,6 +4,7 @@ import {
 	Clock,
 	Loader2,
 	MapPin,
+	RefreshCw,
 	XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,8 @@ export interface EnrichmentTask {
 interface EnrichmentTaskCardProps {
 	task: EnrichmentTask;
 	onVerify?: (task: EnrichmentTask) => void;
+	onRetry?: (task: EnrichmentTask) => void;
+	isRetrying?: boolean;
 }
 
 const STATUS_ICONS = {
@@ -65,6 +68,8 @@ const CONFIDENCE_COLORS = {
 export function EnrichmentTaskCard({
 	task,
 	onVerify,
+	onRetry,
+	isRetrying,
 }: EnrichmentTaskCardProps) {
 	const StatusIcon = STATUS_ICONS[task.status];
 	const outputData = task.outputData ? JSON.parse(task.outputData) : null;
@@ -113,12 +118,35 @@ export function EnrichmentTaskCard({
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
-				{/* Error Message */}
-				{task.status === "failed" && task.errorMessage && (
+				{/* Error Message with Retry */}
+				{task.status === "failed" && (
 					<div className="mb-4 rounded-md bg-destructive/10 border border-destructive/30 p-3">
-						<div className="flex items-start gap-2">
-							<AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
-							<p className="text-sm text-destructive">{task.errorMessage}</p>
+						<div className="flex items-start justify-between gap-3">
+							<div className="flex items-start gap-2">
+								<AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+								<div>
+									<p className="text-sm font-medium text-destructive">Enrichment Failed</p>
+									{task.errorMessage && (
+										<p className="text-sm text-destructive/80 mt-1">{task.errorMessage}</p>
+									)}
+								</div>
+							</div>
+							{onRetry && (
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() => onRetry(task)}
+									disabled={isRetrying}
+									className="shrink-0"
+								>
+									{isRetrying ? (
+										<Loader2 className="h-3 w-3 mr-1 animate-spin" />
+									) : (
+										<RefreshCw className="h-3 w-3 mr-1" />
+									)}
+									Retry
+								</Button>
+							)}
 						</div>
 					</div>
 				)}

@@ -129,7 +129,13 @@ export const stores = pgTable(
 		priceSourceStoreId: text("price_source_store_id").references(
 			(): AnyPgColumn => stores.id,
 		),
-		status: text("status").default("active"), // 'active' | 'pending'
+		status: text("status").default("active"), // 'active' | 'pending' | 'enriched' | 'needs_review' | 'approved' | 'rejected' | 'merged' | 'failed'
+		// Approval workflow tracking
+		approvalNotes: text("approval_notes"), // Notes from approval/rejection
+		approvedBy: text("approved_by").references(() => user.id, {
+			onDelete: "set null",
+		}), // User who approved/rejected
+		approvedAt: timestamp("approved_at"), // When approval/rejection happened
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},
@@ -140,6 +146,7 @@ export const stores = pgTable(
 		priceSourceIdx: index("stores_price_source_idx").on(
 			table.priceSourceStoreId,
 		),
+		approvedByIdx: index("stores_approved_by_idx").on(table.approvedBy),
 	}),
 );
 
@@ -480,5 +487,136 @@ export const storeEnrichmentTasks = pgTable(
 			table.type,
 		),
 		statusIdx: index("store_enrichment_tasks_status_idx").on(table.status),
+	}),
+);
+
+// ============================================================================
+// Price Groups: price_groups, group_prices, store_group_history, store_price_exceptions
+// Content-addressable price storage for 50%+ storage reduction
+// ============================================================================
+
+export const priceGroups = pgTable(
+	"price_groups",
+	{
+		id: cuid2("prg").primaryKey(),
+		chainSlug: text("chain_slug")
+			.notNull()
+			.references(() => chains.slug, { onDelete: "cascade" }),
+		priceHash: text("price_hash").notNull(), // SHA-256 hex
+		hashVersion: integer("hash_version")
+			.notNull()
+			.default(1), // For hash algorithm versioning
+		storeCount: integer("store_count").notNull().default(0),
+		itemCount: integer("item_count").notNull().default(0),
+		firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
+		lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+		createdAt: timestamp("created_at").notNull().defaultNow(),
+		updatedAt: timestamp("updated_at").notNull().defaultNow(),
+	},
+	(table) => ({
+		chainSlugIdx: index("price_groups_chain_slug_idx").on(table.chainSlug),
+		priceHashIdx: index("price_groups_price_hash_idx").on(table.priceHash),
+		lastSeenIdx: index("price_groups_last_seen_idx").on(table.lastSeenAt),
+		storeCountIdx: index("price_groups_store_count_idx").on(table.storeCount),
+		// Content-addressable uniqueness constraint
+		chainHashVersionUnique: uniqueIndex(
+			"price_groups_chain_hash_unique",
+		).on(table.chainSlug, table.priceHash, table.hashVersion),
+	}),
+);
+
+export const groupPrices = pgTable(
+	"group_prices",
+	{
+		priceGroupId: text("price_group_id")
+			.notNull()
+			.references(() => priceGroups.id, { onDelete: "cascade" }),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		price: integer("price").notNull(), // cents/lipa, NOT NULL
+		discountPrice: integer("discount_price"), // NULL = no discount (distinct from 0!)
+		unitPrice: integer("unit_price"), // price per unit in cents (e.g., per kg/l)
+		anchorPrice: integer("anchor_price"), // "sidrena cijena" anchor/reference price in cents
+		createdAt: timestamp("created_at").notNull().defaultNow(),
+	},
+	(table) => ({
+		// Composite primary key
+		priceGroupRetailerItemPk: uniqueIndex(
+			"group_prices_pkey",
+		).on(table.priceGroupId, table.retailerItemId),
+		priceGroupIdIdx: index("group_prices_price_group_id_idx").on(
+			table.priceGroupId,
+		),
+		retailerItemIdIdx: index("group_prices_retailer_item_id_idx").on(
+			table.retailerItemId,
+		),
+	}),
+);
+
+export const storeGroupHistory = pgTable(
+	"store_group_history",
+	{
+		id: cuid2("sgh").primaryKey(),
+		storeId: text("store_id")
+			.notNull()
+			.references(() => stores.id, { onDelete: "cascade" }),
+		priceGroupId: text("price_group_id")
+			.notNull()
+			.references(() => priceGroups.id, { onDelete: "cascade" }),
+		validFrom: timestamp("valid_from").notNull(),
+		validTo: timestamp("valid_to"), // NULL = current membership
+		createdAt: timestamp("created_at").notNull().defaultNow(),
+	},
+	(table) => ({
+		storeIdIdx: index("store_group_history_store_id_idx").on(table.storeId),
+		priceGroupIdIdx: index("store_group_history_price_group_id_idx").on(
+			table.priceGroupId,
+		),
+		validFromIdx: index("store_group_history_valid_from_idx").on(
+			table.validFrom,
+		),
+		// Partial unique index for current membership (valid_to IS NULL)
+		// Ensures each store has exactly one current price group
+		currentMembershipUnique: uniqueIndex(
+			"store_group_history_current",
+		).on(table.storeId).where(sql`valid_to IS NULL`),
+		// Note: GiST exclusion constraint for no-overlap must be added manually in SQL
+		// as Drizzle doesn't support EXCLUDE constraints natively
+	}),
+);
+
+export const storePriceExceptions = pgTable(
+	"store_price_exceptions",
+	{
+		storeId: text("store_id")
+			.notNull()
+			.references(() => stores.id, { onDelete: "cascade" }),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		price: integer("price").notNull(), // cents/lipa
+		discountPrice: integer("discount_price"), // NULL = no discount (distinct from 0!)
+		reason: text("reason").notNull(), // why this exception exists
+		expiresAt: timestamp("expires_at").notNull(), // exceptions MUST expire
+		createdAt: timestamp("created_at").notNull().defaultNow(),
+		createdBy: text("created_by").references(() => user.id, {
+			onDelete: "set null",
+		}),
+	},
+	(table) => ({
+		// Composite primary key
+		storeRetailerItemPk: uniqueIndex(
+			"store_price_exceptions_pkey",
+		).on(table.storeId, table.retailerItemId),
+		storeIdIdx: index("store_price_exceptions_store_id_idx").on(
+			table.storeId,
+		),
+		retailerItemIdIdx: index("store_price_exceptions_retailer_item_id_idx").on(
+			table.retailerItemId,
+		),
+		expiresAtIdx: index("store_price_exceptions_expires_at_idx").on(
+			table.expiresAt,
+		),
 	}),
 );

@@ -11,6 +11,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/pricegroups"
 	"github.com/kosarica/price-service/internal/types"
 )
 
@@ -187,21 +188,16 @@ func createStore(ctx context.Context, chainID string, storeIdentifier string, me
 	return storeID, nil
 }
 
-// persistRowsForStore persists normalized rows for a specific store
+// persistRowsForStore persists normalized rows for a specific store using price groups
 func persistRowsForStore(ctx context.Context, chainID string, storeID string, storeIdentifier string, rows []types.NormalizedRow, archiveID string) (int, int, []string, error) {
-	pool := database.Pool()
-
-	// Begin transaction
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return 0, 0, nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
+	// Step 1: Collect all validated items with prices
+	itemPrices := make([]pricegroups.ItemPrice, 0, len(rows))
+	itemData := make(map[string]types.NormalizedRow) // Map itemID -> row data
 	persisted := 0
 	priceChanges := 0
 	itemIDs := make([]string, 0, len(rows))
 
+	// First pass: validate and find/create retailer items, build price hash input
 	for _, row := range rows {
 		// Validate row
 		validation := validateNormalizedRow(row)
@@ -210,16 +206,91 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 			continue
 		}
 
-		// Find or create retailer item (pass transaction)
-		retailerItemID, err := findOrCreateRetailerItemTx(ctx, tx, chainID, row, archiveID)
+		// Find or create retailer item
+		retailerItemID, err := findOrCreateRetailerItem(ctx, chainID, row, archiveID)
 		if err != nil {
 			fmt.Printf("[WARN] Failed to find/create retailer item for row %d: %v\n", row.RowNumber, err)
 			continue
 		}
 
 		itemIDs = append(itemIDs, retailerItemID)
+		itemData[retailerItemID] = row
 
-		// Check for price change
+		// Add to price hash input
+		itemPrices = append(itemPrices, pricegroups.ItemPrice{
+			ItemID:        retailerItemID,
+			Price:         row.Price,
+			DiscountPrice: row.DiscountPrice,
+		})
+	}
+
+	if len(itemPrices) == 0 {
+		return 0, 0, nil, nil // No valid items
+	}
+
+	// Step 2: Compute price hash
+	priceHash := pricegroups.ComputePriceHash(itemPrices)
+
+	// Step 3: Find or create price group by hash
+	group, isNewGroup, err := database.FindOrCreatePriceGroup(ctx, chainID, priceHash)
+	if err != nil {
+		return 0, 0, nil, fmt.Errorf("failed to find/create price group: %w", err)
+	}
+
+	// Detect "Zombie Group" scenario:
+	// If a previous run created the group but failed to insert prices, we have an existing group with 0 items.
+	// We must treat this as a new group to retry the price insertion.
+	if !isNewGroup && len(itemPrices) > 0 && group.ItemCount == 0 {
+		fmt.Printf("[WARN] Detected zombie price group %s (0 items). Attempting repair.\n", group.ID)
+		isNewGroup = true
+	}
+
+	// Step 4: If new group (or zombie), bulk insert group prices
+	if isNewGroup {
+		groupPrices := make([]database.GroupPrice, 0, len(itemPrices))
+		for _, itemPrice := range itemPrices {
+			row := itemData[itemPrice.ItemID]
+			groupPrices = append(groupPrices, database.GroupPrice{
+				PriceGroupID:   group.ID,
+				RetailerItemID: itemPrice.ItemID,
+				Price:          itemPrice.Price,
+				DiscountPrice:  itemPrice.DiscountPrice,
+				UnitPrice:      row.UnitPrice,
+				AnchorPrice:    row.AnchorPrice,
+			})
+		}
+
+		if err := database.BulkInsertGroupPrices(ctx, group.ID, groupPrices); err != nil {
+			return 0, 0, nil, fmt.Errorf("failed to bulk insert group prices: %w", err)
+		}
+		fmt.Printf("[INFO] Created new price group %s with %d items\n", group.ID, len(groupPrices))
+	} else {
+		// Existing group: update last_seen_at
+		if err := database.UpdateGroupLastSeen(ctx, group.ID); err != nil {
+			fmt.Printf("[WARN] Failed to update group last_seen: %v\n", err)
+		}
+	}
+
+	// Step 5: Assign store to group (closes previous membership)
+	if err := database.AssignStoreToGroup(ctx, storeID, group.ID); err != nil {
+		return 0, 0, nil, fmt.Errorf("failed to assign store to group: %w", err)
+	}
+
+	// Step 6: Update store_item_state for price change tracking
+	// We still maintain store_item_state for historical price tracking
+	pool := database.Pool()
+
+	// Begin transaction for store item state updates
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return 0, 0, nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	for _, itemID := range itemIDs {
+		row := itemData[itemID]
+
+		// Check for price change (from previous state)
 		priceChanged := false
 		var previousPrice *int
 
@@ -227,13 +298,13 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 			SELECT current_price
 			FROM store_item_state
 			WHERE store_id = $1 AND retailer_item_id = $2
-		`, storeID, retailerItemID).Scan(&previousPrice); err == nil && previousPrice != nil {
+		`, storeID, itemID).Scan(&previousPrice); err == nil && previousPrice != nil {
 			if *previousPrice != row.Price {
 				priceChanged = true
 			}
 		}
 
-		// Upsert store item state
+		// Upsert store item state (for tracking price history)
 		priceSignature := computePriceSignature(row)
 
 		_, err = tx.Exec(ctx, `
@@ -262,14 +333,14 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 				price_signature = EXCLUDED.price_signature,
 				last_seen_at = NOW(),
 				updated_at = NOW()
-		`, uuid.New().String(), storeID, retailerItemID, row.Price, previousPrice,
+		`, uuid.New().String(), storeID, itemID, row.Price, previousPrice,
 			row.DiscountPrice, row.DiscountStart, row.DiscountEnd,
 			row.UnitPrice, row.UnitPriceBaseQuantity, row.UnitPriceBaseUnit,
 			row.LowestPrice30d, row.AnchorPrice, row.AnchorPriceAsOf,
 			priceSignature)
 
 		if err != nil {
-			fmt.Printf("[WARN] Failed to upsert store item state for row %d: %v\n", row.RowNumber, err)
+			fmt.Printf("[WARN] Failed to upsert store item state for item %s: %v\n", itemID, err)
 			continue
 		}
 
@@ -283,7 +354,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 				INSERT INTO retailer_item_barcodes (id, retailer_item_id, barcode, is_primary, created_at)
 				VALUES ($1, $2, $3, true, NOW())
 				ON CONFLICT DO NOTHING
-			`, barcodeID, retailerItemID, barcode)
+			`, barcodeID, itemID, barcode)
 		}
 
 		persisted++
@@ -296,6 +367,8 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 	if err := tx.Commit(ctx); err != nil {
 		return 0, 0, nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+
+	fmt.Printf("[INFO] Assigned store %s to price group %s (%d items)\n", storeID, group.ID, len(itemPrices))
 
 	return persisted, priceChanges, itemIDs, nil
 }

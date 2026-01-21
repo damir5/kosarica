@@ -45,7 +45,7 @@ func (rl *IPRateLimiter) GetLimiter(ip string) *rate.Limiter {
 
 	limiter, exists := rl.limiters[ip]
 	if !exists {
-		limiter = rate.NewLimiter(rl.config.RequestsPerSecond, rl.config.BurstSize)
+		limiter = rate.NewLimiter(rate.Limit(rl.config.RequestsPerSecond), rl.config.BurstSize)
 		rl.limiters[ip] = limiter
 	}
 
@@ -109,7 +109,7 @@ func RateLimitMiddleware(config ...RateLimiterConfig) gin.HandlerFunc {
 // ServiceRateLimitMiddleware applies rate limiting for service-to-service calls
 // Uses a global limiter (not per-IP) since all internal services share the same key
 func ServiceRateLimitMiddleware(requestsPerSecond float64, burstSize int) gin.HandlerFunc {
-	limiter := rate.NewLimiter(requestsPerSecond, burstSize)
+	limiter := rate.NewLimiter(rate.Limit(requestsPerSecond), burstSize)
 
 	return func(c *gin.Context) {
 		if !limiter.Allow() {

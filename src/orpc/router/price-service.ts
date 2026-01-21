@@ -262,6 +262,78 @@ export const searchItems = procedure
 	});
 
 // ============================================================================
+// Price Groups Routes
+// ============================================================================
+
+/**
+ * Get store prices via price group
+ * GET /internal/prices/group/:storeId
+ */
+export const getStorePricesGroup = procedure
+	.input(
+		z.object({
+			storeId: z.string(),
+		}),
+	)
+	.handler(async ({ input }) => {
+		return goFetchWithRetry(`/internal/prices/group/${input.storeId}`, {
+			timeout: 5000,
+		});
+	});
+
+/**
+ * Get historical price for an item at a store
+ * GET /internal/prices/history?storeId=&itemId=&asOf=
+ */
+export const getHistoricalPrice = procedure
+	.input(
+		z.object({
+			storeId: z.string(),
+			itemId: z.string(),
+			asOf: z.string().optional(), // RFC3339 timestamp
+		}),
+	)
+	.handler(async ({ input }) => {
+		const params = new URLSearchParams({
+			storeId: input.storeId,
+			itemId: input.itemId,
+		});
+
+		if (input.asOf) {
+			params.set("asOf", input.asOf);
+		}
+
+		return goFetchWithRetry(
+			`/internal/prices/history?${params.toString()}`,
+			{ timeout: 5000 },
+		);
+	});
+
+/**
+ * List price groups for a chain
+ * GET /internal/price-groups/:chainSlug?limit=&offset=
+ */
+export const listPriceGroups = procedure
+	.input(
+		z.object({
+			chainSlug: ChainSlugSchema,
+			limit: z.number().int().min(1).max(100).default(50),
+			offset: z.number().int().min(0).default(0),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const params = new URLSearchParams({
+			limit: input.limit.toString(),
+			offset: input.offset.toString(),
+		});
+
+		return goFetchWithRetry(
+			`/internal/price-groups/${input.chainSlug}?${params.toString()}`,
+			{ timeout: 5000 },
+		);
+	});
+
+// ============================================================================
 // Chains Routes
 // ============================================================================
 
