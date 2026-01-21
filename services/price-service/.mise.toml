@@ -1,6 +1,10 @@
 [tools]
 go = "latest"
 
+# ==============================================================================
+# BUILD & RUN TASKS
+# ==============================================================================
+
 [tasks.build]
 description = "Build the Go service"
 run = "go build -o ./cli ./cmd/main.go"
@@ -8,6 +12,14 @@ run = "go build -o ./cli ./cmd/main.go"
 [tasks.run]
 description = "Run the Go service directly"
 run = "go run ./cmd/main.go"
+
+[tasks.dev]
+description = "Run the Go service with hot reload (requires air)"
+run = "air || go run ./cmd/main.go"
+
+# ==============================================================================
+# TEST TASKS
+# ==============================================================================
 
 [tasks.test]
 description = "Run all Go tests"
@@ -37,6 +49,320 @@ run = "go test -v ./..."
 description = "Run tests with coverage"
 run = "go test -cover ./..."
 
+[tasks.test-coverage-html]
+description = "Run tests with coverage and generate HTML report"
+run = """
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+echo "Coverage report generated: coverage.html"
+"""
+
+# ==============================================================================
+# E2E TEST WORKFLOW (Setup -> Test -> Teardown)
+# ==============================================================================
+
+[tasks.e2e]
+description = "Run complete e2e workflow: setup, test, teardown"
+depends = ["e2e-full"]
+
+[tasks.e2e-full]
+description = "Run complete e2e workflow with automated setup and teardown"
+run = """
+#!/usr/bin/env bash
+set -e
+
+echo "=========================================="
+echo "E2E Test Workflow"
+echo "=========================================="
+
+# Trap to ensure teardown runs even if tests fail
+trap 'echo "Test failed or interrupted, running teardown..."; mise run e2e-teardown || true' EXIT
+
+# Step 1: Setup
+echo ""
+echo "Step 1: Setting up environment..."
+mise run e2e-setup
+
+# Step 2: Wait for services to be ready
+echo ""
+echo "Step 2: Waiting for services to be ready..."
+mise run e2e-wait
+
+# Step 3: Run tests
+echo ""
+echo "Step 3: Running e2e tests..."
+mise run e2e-run
+
+# Step 4: Teardown
+echo ""
+echo "Step 4: Tearing down environment..."
+trap - EXIT  # Disable the trap so we don't run teardown twice
+mise run e2e-teardown
+
+echo ""
+echo "=========================================="
+echo "E2E Test Workflow completed successfully!"
+echo "=========================================="
+"""
+
+# ==============================================================================
+# E2E SETUP
+# ==============================================================================
+
+[tasks.e2e-setup]
+description = "Set up e2e test environment (start containers, run migrations)"
+run = """
+#!/usr/bin/env bash
+set -e
+
+echo "Setting up e2e test environment..."
+
+# Create Docker network if it doesn't exist
+docker network create kosarica-e2e-network 2>/dev/null || true
+
+# Start PostgreSQL container
+echo "Starting PostgreSQL container..."
+docker run -d \
+  --name kosarica-e2e-postgres \
+  --network kosarica-e2e-network \
+  -e POSTGRES_USER=test \
+  -e POSTGRES_PASSWORD=test \
+  -e POSTGRES_DB=testdb \
+  -p 5433:5432 \
+  postgres:16-alpine || {
+    echo "PostgreSQL container already exists, removing and recreating..."
+    docker rm -f kosarica-e2e-postgres 2>/dev/null || true
+    docker run -d \
+      --name kosarica-e2e-postgres \
+      --network kosarica-e2e-network \
+      -e POSTGRES_USER=test \
+      -e POSTGRES_PASSWORD=test \
+      -e POSTGRES_DB=testdb \
+      -p 5433:5432 \
+      postgres:16-alpine
+}
+
+# Start Redis container (optional - for future use)
+echo "Starting Redis container..."
+docker run -d \
+  --name kosarica-e2e-redis \
+  --network kosarica-e2e-network \
+  -p 6380:6379 \
+  redis:7-alpine || {
+    echo "Redis container already exists, removing and recreating..."
+    docker rm -f kosarica-e2e-redis 2>/dev/null || true
+    docker run -d \
+      --name kosarica-e2e-redis \
+      --network kosarica-e2e-network \
+      -p 6380:6379 \
+      redis:7-alpine
+}
+
+echo ""
+echo "Containers started. Waiting for PostgreSQL to be ready..."
+
+# Wait for PostgreSQL to be ready
+MAX_ATTEMPTS=30
+ATTEMPT=0
+until docker exec kosarica-e2e-postgres pg_isready -U test -d testdb >/dev/null 2>&1; do
+  ATTEMPT=$((ATTEMPT + 1))
+  if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+    echo "PostgreSQL failed to start within expected time"
+    exit 1
+  fi
+  echo "Waiting for PostgreSQL... ($ATTEMPT/$MAX_ATTEMPTS)"
+  sleep 1
+done
+
+echo "PostgreSQL is ready!"
+
+# Set environment variables for tests
+export DATABASE_URL="postgres://test:test@localhost:5433/testdb?sslmode=disable"
+export TESTCONTAINERS_ENABLED="true"
+export POSTGRES_HOST="localhost"
+export POSTGRES_PORT="5433"
+export POSTGRES_USER="test"
+export POSTGRES_PASSWORD="test"
+export POSTGRES_DB="testdb"
+export REDIS_HOST="localhost"
+export REDIS_PORT="6380"
+
+echo ""
+echo "Environment variables set:"
+echo "  DATABASE_URL=$DATABASE_URL"
+echo "  POSTGRES_HOST=$POSTGRES_HOST"
+echo "  POSTGRES_PORT=$POSTGRES_PORT"
+echo "  REDIS_HOST=$REDIS_HOST"
+echo "  REDIS_PORT=$REDIS_PORT"
+echo ""
+echo "E2E setup complete!"
+"""
+
+# ==============================================================================
+# E2E WAIT
+# ==============================================================================
+
+[tasks.e2e-wait]
+description = "Wait for all e2e services to be healthy"
+run = """
+#!/usr/bin/env bash
+set -e
+
+echo "Waiting for services to be healthy..."
+
+# Wait for PostgreSQL
+MAX_ATTEMPTS=30
+ATTEMPT=0
+until docker exec kosarica-e2e-postgres pg_isready -U test -d testdb >/dev/null 2>&1; do
+  ATTEMPT=$((ATTEMPT + 1))
+  if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+    echo "PostgreSQL not ready within expected time"
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "PostgreSQL is ready!"
+
+# Wait for Redis
+until docker exec kosarica-e2e-redis redis-cli ping >/dev/null 2>&1; do
+  echo "Waiting for Redis..."
+  sleep 1
+done
+
+echo "Redis is ready!"
+echo "All services are healthy!"
+"""
+
+# ==============================================================================
+# E2E RUN TESTS
+# ==============================================================================
+
+[tasks.e2e-run]
+description = "Run e2e tests against the test environment"
+run = """
+#!/usr/bin/env bash
+set -e
+
+echo "Running e2e tests..."
+
+# Set environment variables
+export DATABASE_URL="postgres://test:test@localhost:5433/testdb?sslmode=disable"
+export TESTCONTAINERS_ENABLED="true"
+export POSTGRES_HOST="localhost"
+export POSTGRES_PORT="5433"
+export POSTGRES_USER="test"
+export POSTGRES_PASSWORD="test"
+export POSTGRES_DB="testdb"
+
+# Run e2e tests with verbose output
+go test -v ./tests/e2e/... -timeout 10m
+
+echo "E2E tests completed!"
+"""
+
+# ==============================================================================
+# E2E TEARDOWN
+# ==============================================================================
+
+[tasks.e2e-teardown]
+description = "Tear down e2e test environment (stop and remove containers)"
+run = """
+#!/usr/bin/env bash
+set -e
+
+echo "Tearing down e2e test environment..."
+
+# Stop and remove PostgreSQL container
+if docker ps -a | grep -q kosarica-e2e-postgres; then
+  echo "Stopping PostgreSQL container..."
+  docker stop kosarica-e2e-postgres || true
+  docker rm kosarica-e2e-postgres || true
+fi
+
+# Stop and remove Redis container
+if docker ps -a | grep -q kosarica-e2e-redis; then
+  echo "Stopping Redis container..."
+  docker stop kosarica-e2e-redis || true
+  docker rm kosarica-e2e-redis || true
+fi
+
+# Remove network (optional)
+if docker network ls | grep -q kosarica-e2e-network; then
+  echo "Removing network..."
+  docker network rm kosarica-e2e-network || true
+fi
+
+echo "E2E teardown complete!"
+"""
+
+# ==============================================================================
+# E2E CLEANUP (Force clean any leftover containers)
+# ==============================================================================
+
+[tasks.e2e-cleanup]
+description = "Force clean any leftover e2e containers and resources"
+run = """
+#!/usr/bin/env bash
+set -e
+
+echo "Cleaning up any leftover e2e resources..."
+
+docker stop kosarica-e2e-postgres kosarica-e2e-redis 2>/dev/null || true
+docker rm kosarica-e2e-postgres kosarica-e2e-redis 2>/dev/null || true
+docker network rm kosarica-e2e-network 2>/dev/null || true
+
+echo "Cleanup complete!"
+"""
+
+# ==============================================================================
+# E2E INDIVIDUAL STEPS (for manual testing)
+# ==============================================================================
+
+[tasks.e2e-rebuild]
+description = "Rebuild e2e environment (teardown + setup)"
+run = """
+mise run e2e-teardown || true
+mise run e2e-setup
+"""
+
+[tasks.e2e-logs]
+description = "Show logs from e2e containers"
+run = """
+#!/usr/bin/env bash
+echo "=== PostgreSQL Logs ==="
+docker logs kosarica-e2e-postgres 2>&1 | tail -50
+echo ""
+echo "=== Redis Logs ==="
+docker logs kosarica-e2e-redis 2>&1 | tail -50
+"""
+
+[tasks.e2e-shell]
+description = "Open shell in PostgreSQL container"
+run = """
+docker exec -it kosarica-e2e-postgres psql -U test -d testdb
+"""
+
+# ==============================================================================
+# MIGRATION TASKS
+# ==============================================================================
+
+[tasks.migrate-up]
+description = "Run database migrations"
+run = "go run ./cmd/main.go migrate up"
+
+[tasks.migrate-down]
+description = "Rollback database migrations"
+run = "go run ./cmd/main.go migrate down"
+
+[tasks.migrate-reset]
+description = "Reset database (drop and recreate)"
+run = "go run ./cmd/main.go migrate reset"
+
+# ==============================================================================
+# MODULE TASKS
+# ==============================================================================
+
 [tasks.mod]
 description = "Tidy go modules"
 run = "go mod tidy"
@@ -45,6 +371,132 @@ run = "go mod tidy"
 description = "Download go module dependencies"
 run = "go mod download"
 
+[tasks.mod-verify]
+description = "Verify go module dependencies"
+run = "go mod verify"
+
+# ==============================================================================
+# LINTING & FORMATTING
+# ==============================================================================
+
 [tasks.lint]
 description = "Run golangci-lint if available"
 run = "golangci-lint run || echo 'golangci-lint not installed'"
+
+[tasks.fmt]
+description = "Format Go code"
+run = "go fmt ./..."
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks.fmt-check]
+description = "Check if Go code is formatted"
+run = """
+if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+  echo "Go code is not formatted. Run 'mise run fmt' to fix."
+  gofmt -s -l .
+  exit 1
+fi
+"""
+
+# ==============================================================================
+# CLEANUP TASKS
+# ==============================================================================
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = """
+rm -f ./cli
+rm -f coverage.out coverage.html
+echo "Cleaned build artifacts"
+"""
+
+[tasks.clean-all]
+description = "Clean all build artifacts and caches"
+run = """
+rm -f ./cli
+rm -f coverage.out coverage.html
+go clean -cache -testcache
+echo "Cleaned all build artifacts and caches"
+"""
+
+# ==============================================================================
+# DOCKER TASKS
+# ==============================================================================
+
+[tasks.docker-build]
+description = "Build Docker image for the service"
+run = """
+docker build -t kosarica/price-service:latest .
+"""
+
+[tasks.docker-run]
+description = "Run service in Docker container"
+run = """
+docker run -d \
+  --name price-service \
+  -p 8080:8080 \
+  -e DATABASE_URL="${DATABASE_URL}" \
+  kosarica/price-service:latest
+"""
+
+[tasks.docker-stop]
+description = "Stop and remove Docker container"
+run = """
+docker stop price-service 2>/dev/null || true
+docker rm price-service 2>/dev/null || true
+"""
+
+# ==============================================================================
+# HELP
+# ==============================================================================
+
+[tasks.help]
+description = "Show available mise tasks"
+run = """
+echo "Available mise tasks for price-service:"
+echo ""
+echo "Build & Run:"
+echo "  build         - Build the Go service"
+echo "  run           - Run the Go service directly"
+echo "  dev           - Run with hot reload (requires air)"
+echo ""
+echo "Testing:"
+echo "  test          - Run all Go tests"
+echo "  test-unit     - Run unit tests only"
+echo "  test-integration - Run integration tests"
+echo "  test-e2e      - Run e2e tests (requires setup)"
+echo "  test-coverage - Run tests with coverage"
+echo ""
+echo "E2E Workflow:"
+echo "  e2e           - Run complete e2e workflow (recommended)"
+echo "  e2e-setup     - Set up e2e test environment"
+echo "  e2e-wait      - Wait for services to be ready"
+echo "  e2e-run       - Run e2e tests"
+echo "  e2e-teardown  - Tear down e2e environment"
+echo "  e2e-rebuild   - Rebuild e2e environment"
+echo "  e2e-cleanup   - Force clean any leftover resources"
+echo "  e2e-logs      - Show logs from e2e containers"
+echo "  e2e-shell     - Open shell in PostgreSQL container"
+echo ""
+echo "Migrations:"
+echo "  migrate-up    - Run database migrations"
+echo "  migrate-down  - Rollback database migrations"
+echo ""
+echo "Code Quality:"
+echo "  lint          - Run golangci-lint"
+echo "  fmt           - Format Go code"
+echo "  fmt-check     - Check if code is formatted"
+echo "  vet           - Run go vet"
+echo ""
+echo "Cleanup:"
+echo "  clean         - Clean build artifacts"
+echo "  clean-all     - Clean all artifacts and caches"
+echo ""
+echo "Docker:"
+echo "  docker-build  - Build Docker image"
+echo "  docker-run    - Run in Docker container"
+echo "  docker-stop   - Stop Docker container"
+"""
