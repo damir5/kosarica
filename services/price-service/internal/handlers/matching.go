@@ -7,11 +7,11 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/jobs"
 	"github.com/kosarica/price-service/internal/matching"
+	"github.com/kosarica/price-service/internal/pkg/cuid2"
 )
 
 // MatchingHandler handles product matching HTTP endpoints
@@ -35,11 +35,11 @@ type TriggerBarcodeMatchingRequest struct {
 
 // BarcodeMatchingResponse represents the response from barcode matching
 type BarcodeMatchingResponse struct {
-	RunID         string `json:"runId"`
-	NewProducts   int    `json:"newProducts"`
-	NewLinks      int    `json:"newLinks"`
-	Suspicious    int    `json:"suspiciousFlags"`
-	Skipped       int    `json:"skipped"`
+	RunID       string `json:"runId"`
+	NewProducts int    `json:"newProducts"`
+	NewLinks    int    `json:"newLinks"`
+	Suspicious  int    `json:"suspiciousFlags"`
+	Skipped     int    `json:"skipped"`
 }
 
 // TriggerBarcodeMatching triggers barcode-based product matching
@@ -51,7 +51,7 @@ func (h *MatchingHandler) TriggerBarcodeMatching(c *gin.Context) {
 		req.BatchSize = 100
 	}
 
-	runID := uuid.New().String()
+	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	slog.Info("triggering barcode matching", "run_id", runID, "batch_size", req.BatchSize)
 
 	ctx := c.Request.Context()
@@ -83,12 +83,12 @@ type TriggerAIMatchingRequest struct {
 
 // AIMatchingResponse represents the response from AI matching
 type AIMatchingResponse struct {
-	RunID          string `json:"runId"`
-	Processed      int    `json:"processed"`
-	HighConfidence int    `json:"highConfidence"`
-	QueuedForReview int   `json:"queuedForReview"`
-	NoMatch        int    `json:"noMatch"`
-	CacheHits      int    `json:"cacheHits"`
+	RunID           string `json:"runId"`
+	Processed       int    `json:"processed"`
+	HighConfidence  int    `json:"highConfidence"`
+	QueuedForReview int    `json:"queuedForReview"`
+	NoMatch         int    `json:"noMatch"`
+	CacheHits       int    `json:"cacheHits"`
 }
 
 // TriggerAIMatching triggers AI-based product matching
@@ -109,7 +109,7 @@ func (h *MatchingHandler) TriggerAIMatching(c *gin.Context) {
 		req.BatchSize = 100
 	}
 
-	runID := uuid.New().String()
+	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	slog.Info("triggering AI matching", "run_id", runID,
 		"auto_link_threshold", req.AutoLinkThreshold,
 		"review_threshold", req.ReviewThreshold)

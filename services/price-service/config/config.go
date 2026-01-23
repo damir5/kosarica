@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -104,7 +106,7 @@ func Load(configPath string) (*Config, error) {
 	return &cfg, nil
 }
 
-// loadEnvFile loads .env file using viper's automatic env detection
+// loadEnvFile loads .env file by parsing KEY=VALUE lines and setting them as environment variables
 func loadEnvFile(v *viper.Viper) error {
 	// Try to load .env file from various locations
 	envPaths := []string{
@@ -116,14 +118,43 @@ func loadEnvFile(v *viper.Viper) error {
 	for _, path := range envPaths {
 		envFile := fmt.Sprintf("%s/.env", path)
 		if _, err := os.Stat(envFile); err == nil {
-			v.SetConfigFile(envFile)
-			v.SetConfigType("env")
-			if err := v.ReadInConfig(); err == nil {
+			// Parse .env file and set environment variables
+			if err := loadDotEnvFile(envFile); err == nil {
 				return nil
 			}
 		}
 	}
 	return fmt.Errorf("no .env file found")
+}
+
+// loadDotEnvFile reads a .env file and sets environment variables
+func loadDotEnvFile(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse KEY=VALUE
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			// Remove quotes if present
+			value = strings.Trim(value, "\"'")
+			os.Setenv(key, value)
+		}
+	}
+	return scanner.Err()
 }
 
 // bindEnvVars binds environment variables to config keys

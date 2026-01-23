@@ -107,7 +107,7 @@ function IngestionDashboard() {
 	// Trigger chain mutation
 	const triggerMutation = useMutation({
 		mutationFn: async (chainSlug: string) => {
-			return orpc.admin.ingestion.triggerChain.call({ chainSlug, date: selectedDate });
+			return orpc.admin.ingestion.triggerChain.call({ chain: chainSlug, targetDate: selectedDate });
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });

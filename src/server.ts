@@ -25,7 +25,16 @@ config({ path: `.env.${nodeEnv}` }); // Load .env.development first
 config(); // Then load .env (defaults)
 
 // Initialize OpenTelemetry first, before any other imports
-const telemetrySdk = initTelemetry();
+let telemetrySdk: unknown = null;
+
+async function setupTelemetry() {
+	telemetrySdk = await initTelemetry();
+}
+
+// Don't block server start on telemetry - initialize in background
+setupTelemetry().catch((error) => {
+	console.error("[Server] Failed to initialize telemetry:", error);
+});
 
 const logger = createLogger("app");
 

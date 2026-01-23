@@ -10,12 +10,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/metric"
 	metricnoop "go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	tracenoop "go.opentelemetry.io/otel/trace/noop"
 )
 
@@ -101,9 +101,9 @@ func Init(ctx context.Context, cfg Config) (func(context.Context) error, error) 
 	otel.SetTracerProvider(tracerProvider)
 
 	// Create meter provider
-	meterProvider := metric.NewMeterProvider(
-		metric.WithReader(metric.NewManualReader()),
-		metric.WithResource(res),
+	meterProvider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewManualReader()),
+		sdkmetric.WithResource(res),
 	)
 	otel.SetMeterProvider(meterProvider)
 

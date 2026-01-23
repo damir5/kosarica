@@ -6,10 +6,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/pipeline"
+	"github.com/kosarica/price-service/internal/pkg/cuid2"
 )
 
 // ingestionSem limits concurrent ingestion goroutines to prevent resource exhaustion
@@ -22,10 +22,10 @@ type IngestChainRequest struct {
 
 // IngestChainStartedResponse represents the 202 response when ingestion is started
 type IngestChainStartedResponse struct {
-	RunID    string `json:"runId"`
-	Status   string `json:"status"`
-	PollURL  string `json:"pollUrl"`
-	Message  string `json:"message,omitempty"`
+	RunID   string `json:"runId"`
+	Status  string `json:"status"`
+	PollURL string `json:"pollUrl"`
+	Message string `json:"message,omitempty"`
 }
 
 // IngestChain triggers ingestion for a specific chain asynchronously
@@ -57,7 +57,7 @@ func IngestChain(c *gin.Context) {
 	}
 
 	// Create run record in database
-	runID := uuid.New().String()
+	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	pool := database.Pool()
 	ctx := c.Request.Context()
 
@@ -118,8 +118,8 @@ func GetIngestionStatus(c *gin.Context) {
 
 	// TODO: Implement status lookup from database
 	c.JSON(http.StatusOK, gin.H{
-		"runId":  runID,
-		"status": "pending",
+		"runId":   runID,
+		"status":  "pending",
 		"message": "Status lookup not yet implemented",
 	})
 }
@@ -130,7 +130,7 @@ func ListIngestionRuns(c *gin.Context) {
 	chainID := c.Param("chain")
 	if chainID == "" {
 		c.JSON(http.StatusOK, gin.H{
-			"runs":  []interface{}{},
+			"runs":    []interface{}{},
 			"message": "Listing all runs (chain not specified)",
 		})
 		return
@@ -138,8 +138,8 @@ func ListIngestionRuns(c *gin.Context) {
 
 	// TODO: Implement runs lookup from database
 	c.JSON(http.StatusOK, gin.H{
-		"chain": chainID,
-		"runs":  []interface{}{},
+		"chain":   chainID,
+		"runs":    []interface{}{},
 		"message": "Run listing not yet implemented",
 	})
 }

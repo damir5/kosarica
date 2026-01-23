@@ -230,3 +230,33 @@ pg_dump $DATABASE_URL | gzip > backup_$(date +%Y%m%d).sql.gz
 # Restore
 gunzip < backup_20240121.sql.gz | psql $DATABASE_URL
 ```
+
+## Schema Export for sqlc (Alternative Workflow)
+
+While the project uses hand-written SQL with pgx (per ADR-001), here's how to maintain sqlc compatibility if needed:
+
+### Automated Schema Sync Process
+
+```bash
+# 1. Modify schema definition
+vim src/db/schema.ts
+
+# 2. Generate and apply migration
+pnpm db:generate
+pnpm db:migrate
+
+# 3. Export current schema from database
+pg_dump --schema-only --no-owner --no-privileges $DATABASE_URL > src/db/tasks/schema.sql
+
+# 4. Generate sqlc code (if using sqlc)
+cd services/price-service && sqlc generate
+```
+
+### Schema Export Details
+
+- **Source**: `src/db/schema.ts` (Drizzle ORM definition)
+- **Migrations**: `drizzle/` directory (generated SQL files)
+- **Exported Schema**: `src/db/tasks/schema.sql` (pg_dump output)
+- **sqlc Config**: `services/price-service/sqlc.yaml` (if implemented)
+
+This ensures the sqlc schema file stays in sync with database changes automatically.

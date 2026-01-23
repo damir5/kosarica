@@ -3,15 +3,34 @@
  *
  * This module sets up OpenTelemetry for distributed tracing and metrics.
  * It's configured to send telemetry to an OpenTelemetry Collector.
+ *
+ * NOTE: Node-specific imports are done dynamically to avoid Vite SSR
+ * bundling issues. The OTEL SDK initialization happens in instrumentation.ts
+ * before other app imports.
  */
 
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { Resource } from '@opentelemetry/resources';
-import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
+// Dynamic imports for Node.js-only packages to avoid Vite SSR bundling issues
+async function loadNodeSDK() {
+	const [
+		{ NodeSDK },
+		{ Resource },
+		{ SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION },
+		{ OTLPTraceExporter },
+		{ OTLPMetricExporter },
+		{ PeriodicExportingMetricReader },
+		{ HttpInstrumentation },
+	] = await Promise.all([
+		import('@opentelemetry/sdk-node'),
+		import('@opentelemetry/resources'),
+		import('@opentelemetry/semantic-conventions'),
+		import('@opentelemetry/exporter-trace-otlp-grpc'),
+		import('@opentelemetry/exporter-metrics-otlp-grpc'),
+		import('@opentelemetry/sdk-metrics'),
+		import('@opentelemetry/instrumentation-http'),
+	]);
+
+	return { NodeSDK, Resource, SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION, OTLPTraceExporter, OTLPMetricExporter, PeriodicExportingMetricReader, HttpInstrumentation };
+}
 
 /**
  * Telemetry configuration
@@ -62,11 +81,11 @@ export function getTelemetryConfig(): TelemetryConfig {
  * ```ts
  * import { initTelemetry } from './telemetry';
  *
- * const sdk = initTelemetry();
+ * const sdk = await initTelemetry();
  * // Start your application
  * ```
  */
-export function initTelemetry(config: Partial<TelemetryConfig> = {}): NodeSDK | null {
+export async function initTelemetry(config: Partial<TelemetryConfig> = {}): Promise<any> {
 	const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
 	// Return null if telemetry is not enabled
@@ -74,6 +93,18 @@ export function initTelemetry(config: Partial<TelemetryConfig> = {}): NodeSDK | 
 		console.log('[Telemetry] OpenTelemetry disabled (no OTEL_EXPORTER_OTLP_ENDPOINT set)');
 		return null;
 	}
+
+	// Load Node.js-specific OpenTelemetry modules
+	const {
+		NodeSDK,
+		Resource,
+		SEMRESATTRS_SERVICE_NAME,
+		SEMRESATTRS_SERVICE_VERSION,
+		OTLPTraceExporter,
+		OTLPMetricExporter,
+		PeriodicExportingMetricReader,
+		HttpInstrumentation,
+	} = await loadNodeSDK();
 
 	// Create resource with service information
 	const resource = Resource.default().merge(
@@ -134,7 +165,7 @@ export function initTelemetry(config: Partial<TelemetryConfig> = {}): NodeSDK | 
  *
  * @param sdk - The NodeSDK instance returned from initTelemetry
  */
-export async function shutdownTelemetry(sdk: NodeSDK | null): Promise<void> {
+export async function shutdownTelemetry(sdk: unknown): Promise<void> {
 	if (sdk) {
 		try {
 			await sdk.shutdown();

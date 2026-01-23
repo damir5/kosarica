@@ -1,9 +1,12 @@
 import { sql } from "drizzle-orm";
 import {
 	type AnyPgColumn,
+	bigint,
+	bigserial,
 	boolean,
 	index,
 	integer,
+	jsonb,
 	pgTable,
 	serial,
 	smallint,
@@ -177,40 +180,7 @@ export const retailerItems = pgTable(
 	"retailer_items",
 	{
 		id: cuid2("rit").primaryKey(),
-		chainSlug: text("chain_slug")
-			.notNull()
-			.references(() => chains.slug, { onDelete: "cascade" }),
-		externalId: text("external_id"), // retailer's internal ID for the item
-		name: text("name").notNull(),
-		description: text("description"),
-		category: text("category"),
-		subcategory: text("subcategory"),
-		brand: text("brand"),
-		unit: text("unit"), // kg, l, kom, etc.
-		unitQuantity: text("unit_quantity"), // "1", "0.5", "500g", etc.
-		imageUrl: text("image_url"),
-		createdAt: timestamp("created_at").defaultNow(),
-		updatedAt: timestamp("updated_at").defaultNow(),
-	},
-	(table) => ({
-		chainExternalIdIdx: index("retailer_items_chain_external_id_idx").on(
-			table.chainSlug,
-			table.externalId,
-		),
-		chainNameIdx: index("retailer_items_chain_name_idx").on(
-			table.chainSlug,
-			table.name,
-		),
-	}),
-);
-
-export const retailerItemBarcodes = pgTable(
-	"retailer_item_barcodes",
-	{
-		id: cuid2("rib").primaryKey(),
-		retailerItemId: text("retailer_item_id")
-			.notNull()
-			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		retailerItemId: integer("retailer_item_id").notNull(),
 		barcode: text("barcode").notNull(), // EAN-13, EAN-8, etc.
 		isPrimary: boolean("is_primary").default(false),
 		createdAt: timestamp("created_at").defaultNow(),
@@ -290,7 +260,7 @@ export const productRelations = pgTable("product_relations", {
 export const storeItemState = pgTable(
 	"store_item_state",
 	{
-		id: cuid2("sis").primaryKey(),
+		id: bigserial({ mode: "bigint" }).primaryKey(),
 		storeId: text("store_id")
 			.notNull()
 			.references(() => stores.id, { onDelete: "cascade" }),
@@ -329,7 +299,7 @@ export const storeItemState = pgTable(
 export const storeItemPricePeriods = pgTable(
 	"store_item_price_periods",
 	{
-		id: cuid2("sip").primaryKey(),
+		id: bigserial({ mode: "bigint" }).primaryKey(),
 		storeItemStateId: text("store_item_state_id")
 			.notNull()
 			.references(() => storeItemState.id, { onDelete: "cascade" }),
@@ -355,7 +325,7 @@ export const storeItemPricePeriods = pgTable(
 // ============================================================================
 
 export const ingestionRuns = pgTable("ingestion_runs", {
-	id: cuid2("igr").primaryKey(),
+	id: bigserial({ mode: "bigint" }).primaryKey(),
 	chainSlug: text("chain_slug")
 		.notNull()
 		.references(() => chains.slug, { onDelete: "cascade" }),
@@ -372,12 +342,12 @@ export const ingestionRuns = pgTable("ingestion_runs", {
 	// Rerun support
 	parentRunId: text("parent_run_id"), // FK to ingestionRuns.id for rerun tracking
 	rerunType: text("rerun_type"), // 'file', 'chunk', 'entry', null for original runs
-	rerunTargetId: text("rerun_target_id"), // ID of the file/chunk/entry being rerun
+	rerunTargetId: text("rerun_target_id"), // ID of file/chunk/entry being rerun
 	createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const ingestionFiles = pgTable("ingestion_files", {
-	id: cuid2("igf").primaryKey(),
+	id: bigserial({ mode: "bigint" }).primaryKey(),
 	runId: text("run_id")
 		.notNull()
 		.references(() => ingestionRuns.id, { onDelete: "cascade" }),
@@ -441,7 +411,7 @@ export const ingestionFileEntries = pgTable("ingestion_file_entries", {
 });
 
 export const ingestionErrors = pgTable("ingestion_errors", {
-	id: cuid2("ier").primaryKey(),
+	id: bigserial({ mode: "bigint" }).primaryKey(),
 	runId: text("run_id")
 		.notNull()
 		.references(() => ingestionRuns.id, { onDelete: "cascade" }),
@@ -459,6 +429,28 @@ export const ingestionErrors = pgTable("ingestion_errors", {
 	errorDetails: text("error_details"), // JSON with stack trace, context, etc.
 	severity: text("severity").notNull().default("error"), // 'warning', 'error', 'critical'
 	createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Failed rows archive for analysis and re-processing
+export const retailerItemsFailed = pgTable("retailer_items_failed", {
+	id: cuid2("id").primaryKey(),
+	chainSlug: text("chain_slug").notNull(),
+	runId: text("run_id").references(() => ingestionRuns.id, {
+		onDelete: "cascade",
+	}),
+	fileId: text("file_id").references(() => ingestionFiles.id, {
+		onDelete: "cascade",
+	}),
+	storeIdentifier: text("store_identifier"),
+	rowNumber: integer("row_number"),
+	rawData: text("raw_data").notNull(), // Full CSV row data for analysis
+	validationErrors: jsonb("validation_errors").notNull(), // JSON array of error messages
+	failedAt: timestamp("failed_at").defaultNow(),
+	reviewed: boolean("reviewed").default(false),
+	reviewedBy: text("reviewed_by"),
+	reviewNotes: text("review_notes"),
+	reprocessable: boolean("reprocessable").default(true),
+	reprocessedAt: timestamp("reprocessed_at"),
 });
 
 // ============================================================================
@@ -507,9 +499,7 @@ export const priceGroups = pgTable(
 			.notNull()
 			.references(() => chains.slug, { onDelete: "cascade" }),
 		priceHash: text("price_hash").notNull(), // SHA-256 hex
-		hashVersion: integer("hash_version")
-			.notNull()
-			.default(1), // For hash algorithm versioning
+		hashVersion: integer("hash_version").notNull().default(1), // For hash algorithm versioning
 		storeCount: integer("store_count").notNull().default(0),
 		itemCount: integer("item_count").notNull().default(0),
 		firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
@@ -523,9 +513,11 @@ export const priceGroups = pgTable(
 		lastSeenIdx: index("price_groups_last_seen_idx").on(table.lastSeenAt),
 		storeCountIdx: index("price_groups_store_count_idx").on(table.storeCount),
 		// Content-addressable uniqueness constraint
-		chainHashVersionUnique: uniqueIndex(
-			"price_groups_chain_hash_unique",
-		).on(table.chainSlug, table.priceHash, table.hashVersion),
+		chainHashVersionUnique: uniqueIndex("price_groups_chain_hash_unique").on(
+			table.chainSlug,
+			table.priceHash,
+			table.hashVersion,
+		),
 	}),
 );
 
@@ -546,9 +538,10 @@ export const groupPrices = pgTable(
 	},
 	(table) => ({
 		// Composite primary key
-		priceGroupRetailerItemPk: uniqueIndex(
-			"group_prices_pkey",
-		).on(table.priceGroupId, table.retailerItemId),
+		priceGroupRetailerItemPk: uniqueIndex("group_prices_pkey").on(
+			table.priceGroupId,
+			table.retailerItemId,
+		),
 		priceGroupIdIdx: index("group_prices_price_group_id_idx").on(
 			table.priceGroupId,
 		),
@@ -582,9 +575,9 @@ export const storeGroupHistory = pgTable(
 		),
 		// Partial unique index for current membership (valid_to IS NULL)
 		// Ensures each store has exactly one current price group
-		currentMembershipUnique: uniqueIndex(
-			"store_group_history_current",
-		).on(table.storeId).where(sql`valid_to IS NULL`),
+		currentMembershipUnique: uniqueIndex("store_group_history_current")
+			.on(table.storeId)
+			.where(sql`valid_to IS NULL`),
 		// Note: GiST exclusion constraint for no-overlap must be added manually in SQL
 		// as Drizzle doesn't support EXCLUDE constraints natively
 	}),
@@ -610,12 +603,11 @@ export const storePriceExceptions = pgTable(
 	},
 	(table) => ({
 		// Composite primary key
-		storeRetailerItemPk: uniqueIndex(
-			"store_price_exceptions_pkey",
-		).on(table.storeId, table.retailerItemId),
-		storeIdIdx: index("store_price_exceptions_store_id_idx").on(
+		storeRetailerItemPk: uniqueIndex("store_price_exceptions_pkey").on(
 			table.storeId,
+			table.retailerItemId,
 		),
+		storeIdIdx: index("store_price_exceptions_store_id_idx").on(table.storeId),
 		retailerItemIdIdx: index("store_price_exceptions_retailer_item_id_idx").on(
 			table.retailerItemId,
 		),
@@ -637,9 +629,12 @@ export const productMatchCandidates = pgTable(
 		retailerItemId: text("retailer_item_id")
 			.notNull()
 			.references(() => retailerItems.id, { onDelete: "cascade" }),
-		candidateProductId: text("candidate_product_id").references(() => products.id, {
-			onDelete: "cascade",
-		}),
+		candidateProductId: text("candidate_product_id").references(
+			() => products.id,
+			{
+				onDelete: "cascade",
+			},
+		),
 		similarity: text("similarity"), // stored as text to match real type in Go
 		matchType: text("match_type").notNull(), // 'barcode', 'ai', 'trgm', 'heuristic'
 		rank: smallint("rank").default(1), // 1 = best candidate
@@ -717,7 +712,7 @@ export const productMatchRejections = pgTable(
 export const productMatchAudit = pgTable(
 	"product_match_audit",
 	{
-		id: cuid2("pma").primaryKey(),
+		id: bigserial({ mode: "bigint" }).primaryKey(),
 		queueId: text("queue_id")
 			.notNull()
 			.references(() => productMatchQueue.id, { onDelete: "cascade" }), // FK!
@@ -744,6 +739,8 @@ export const canonicalBarcodes = pgTable(
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 	},
 	(table) => ({
-		productIdIdx: index("canonical_barcodes_product_id_idx").on(table.productId),
+		productIdIdx: index("canonical_barcodes_product_id_idx").on(
+			table.productId,
+		),
 	}),
 );

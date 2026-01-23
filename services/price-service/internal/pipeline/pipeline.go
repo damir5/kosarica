@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/kosarica/price-service/internal/storage"
 )
 
 // IngestionResult represents the result of an ingestion run
 type IngestionResult struct {
-	Success         bool
-	RunID           string
-	FilesProcessed  int
+	Success          bool
+	RunID            string
+	FilesProcessed   int
 	EntriesPersisted int
-	Errors          []string
+	Errors           []string
 }
 
 // Run executes the full ingestion pipeline for a chain
@@ -156,7 +156,7 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 func createIngestionRun(ctx context.Context, chainID string) string {
 	pool := database.Pool()
 
-	runID := uuid.New().String()
+	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	now := time.Now()
 
 	_, err := pool.Exec(ctx, `

@@ -52,22 +52,22 @@ type RetailerItem struct {
 	Unit         *string    `json:"unit"`          // kg, l, kom, etc.
 	UnitQuantity *string    `json:"unit_quantity"` // "1", "0.5", "500g", etc.
 	ImageURL     *string    `json:"image_url"`     // Image URL
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // RetailerItemBarcode maps a retailer item to its barcodes
 type RetailerItemBarcode struct {
 	ID              string    `json:"id"`               // CUID2
-	RetailerItemID  string    `json:"retailer_item_id"` // FK to retailer_items.id
-	Barcode         string    `json:"barcode"`          // EAN code
-	IsPrimary       bool      `json:"is_primary"`       // Whether this is the primary barcode
+	RetailerItemID string    `json:"retailer_item_id"`  // FK to retailer_items.id
+	Barcode         string     `json:"barcode"`          // EAN-13, EAN-8, etc.
+	IsPrimary       bool      `json:"is_primary"`       // Whether this is a primary barcode
 	CreatedAt       time.Time `json:"created_at"`
 }
 
 // StoreItemState tracks the current state of an item at a store
 type StoreItemState struct {
-	ID                   string     `json:"id"`                      // CUID2
+	ID                   int64      `json:"id"`                      // CUID2
 	StoreID              string     `json:"store_id"`                // FK to stores.id
 	RetailerItemID       string     `json:"retailer_item_id"`        // FK to retailer_items.id
 	CurrentPrice         *int       `json:"current_price"`           // Price in cents/lipa
@@ -76,20 +76,21 @@ type StoreItemState struct {
 	DiscountStart        *time.Time `json:"discount_start"`          // Discount start date
 	DiscountEnd          *time.Time `json:"discount_end"`            // Discount end date
 	InStock              bool       `json:"in_stock"`                // Whether item is in stock
-	UnitPrice            *int       `json:"unit_price"`              // Price per unit in cents
-	UnitPriceBaseQuantity *string   `json:"unit_price_base_quantity"` // Base quantity for unit price
-	UnitPriceBaseUnit    *string    `json:"unit_price_base_unit"`    // Unit for unit price
-	LowestPrice30d       *int       `json:"lowest_price_30d"`        // Lowest price in last 30 days
-	AnchorPrice          *int       `json:"anchor_price"`            // Anchor/reference price
-	AnchorPriceAsOf      *time.Time `json:"anchor_price_as_of"`      // Date anchor price was set
-	PriceSignature       *string    `json:"price_signature"`         // Hash for deduplication
+	// Price transparency fields (Croatian regulation)
+	UnitPrice            *int       `json:"unit_price"`              // Price per unit in cents (e.g., per kg/l)
+	UnitPriceBaseQuantity *string   `json:"unit_price_base_quantity"` // Base quantity for unit price (e.g., "1", "100")
+	UnitPriceBaseUnit    *string   `json:"unit_price_base_unit"`    // Unit for unit price (e.g., "kg", "l", "kom")
+	LowestPrice30d       *int       `json:"lowest_price_30d"`        // Lowest price in last 30 days, in cents
+	AnchorPrice          *int       `json:"anchor_price"`            // "sidrena cijena" anchor/reference price in cents
+	AnchorPriceAsOf       *time.Time `json:"anchor_price_as_of"`      // Date anchor price was set
+	PriceSignature       *string   `json:"price_signature"`         // Hash for deduplication
 	LastSeenAt           time.Time  `json:"last_seen_at"`            // Last time this price was seen
 	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 // IngestionRun represents a single ingestion run for a chain
 type IngestionRun struct {
-	ID             string     `json:"id"`               // CUID2
+	ID             int64      `json:"id"`               // CUID2
 	ChainSlug      string     `json:"chain_slug"`       // FK to chains.slug
 	Source         string     `json:"source"`           // 'cli', 'worker', 'scheduled'
 	Status         string     `json:"status"`           // 'pending', 'running', 'completed', 'failed'
@@ -101,16 +102,17 @@ type IngestionRun struct {
 	ProcessedEntries *int     `json:"processed_entries"`
 	ErrorCount     *int       `json:"error_count"`
 	Metadata       *string    `json:"metadata"`         // JSON for additional run info
-	ParentRunID    *string    `json:"parent_run_id"`    // For rerun tracking
+	// Rerun support
+	ParentRunID    *int64     `json:"parent_run_id"`    // For rerun tracking
 	RerunType      *string    `json:"rerun_type"`       // 'file', 'chunk', 'entry'
-	RerunTargetID  *string    `json:"rerun_target_id"`  // ID of file/chunk/entry being rerun
+	RerunTargetID  *int64    `json:"rerun_target_id"`  // ID of file/chunk/entry being rerun
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // IngestionFile represents a file being ingested
 type IngestionFile struct {
-	ID             *string    `json:"id"`              // CUID2
-	RunID          string     `json:"run_id"`          // FK to ingestion_runs.id
+	ID             *int64     `json:"id"`              // CUID2
+	RunID          int64     `json:"run_id"`          // FK to ingestion_runs.id
 	Filename       string     `json:"filename"`        // Original filename
 	FileType       string     `json:"file_type"`       // 'csv', 'xml', 'xlsx', 'zip'
 	FileSize       *int       `json:"file_size"`       // Size in bytes
@@ -119,6 +121,7 @@ type IngestionFile struct {
 	EntryCount     *int       `json:"entry_count"`     // Number of entries
 	ProcessedAt    *time.Time `json:"processed_at"`
 	Metadata       *string    `json:"metadata"`        // JSON for file-specific info
+	// Chunking support
 	TotalChunks    *int       `json:"total_chunks"`    // Number of chunks
 	ProcessedChunks *int      `json:"processed_chunks"` // Processed chunks
 	ChunkSize      *int       `json:"chunk_size"`      // Rows per chunk
@@ -127,14 +130,14 @@ type IngestionFile struct {
 
 // IngestionError represents an error during ingestion
 type IngestionError struct {
-	ID           string     `json:"id"`            // CUID2
-	RunID        string     `json:"run_id"`        // FK to ingestion_runs.id
-	FileID       *string    `json:"file_id"`       // FK to ingestion_files.id
-	ChunkID      *string    `json:"chunk_id"`      // FK to ingestion_chunks.id
-	EntryID      *string    `json:"entry_id"`      // FK to ingestion_file_entries.id
-	ErrorType    string     `json:"error_type"`    // 'parse', 'validation', 'store_resolution', 'persist'
+	ID            int64     `json:"id"`            // CUID2
+	RunID         int64     `json:"run_id"`         // FK to ingestion_runs.id
+	FileID        *string   `json:"file_id"`       // FK to ingestion_files.id
+	ChunkID       *string   `json:"chunk_id"`       // FK to ingestion_chunks.id
+	EntryID       *string   `json:"entry_id"`      // FK to ingestion_file_entries.id
+	ErrorType     string     `json:"error_type"`    // 'parse', 'validation', 'store_resolution', 'persist'
 	ErrorMessage string     `json:"error_message"` // Error message
-	ErrorDetails *string    `json:"error_details"` // JSON with stack trace
-	Severity     string     `json:"severity"`      // 'warning', 'error', 'critical'
-	CreatedAt    time.Time  `json:"created_at"`
+	ErrorDetails *string   `json:"error_details"` // JSON with stack trace
+	Severity      string     `json:"severity"`      // 'warning', 'error', 'critical'
+	CreatedAt     time.Time  `json:"created_at"`
 }

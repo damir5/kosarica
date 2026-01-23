@@ -120,9 +120,9 @@ func (p *Parser) ParseWithStoreID(content []byte, storeID string) (*types.ParseR
 		if len(errs) > 0 {
 			for _, e := range errs {
 				result.Errors = append(result.Errors, types.ParseError{
-					RowNumber:    &rowNumber,
-					Field:        e.Field,
-					Message:      e.Message,
+					RowNumber:     &rowNumber,
+					Field:         e.Field,
+					Message:       e.Message,
 					OriginalValue: e.OriginalValue,
 				})
 			}
@@ -179,6 +179,29 @@ func (p *Parser) buildColumnIndices(headers []string, mapping *CsvColumnMapping)
 
 	indices := make(map[string]int)
 
+	// Fuzzy header matching: remove diacritics for comparison
+	normalizeHeader := func(h string) string {
+		return strings.ToLower(
+			strings.Map(func(r rune) rune {
+				switch r {
+				case 'š':
+					return 's'
+				case 'č':
+					return 'c'
+				case 'ć':
+					return 'c'
+				case 'ž':
+					return 'z'
+				case 'đ':
+					return 'd'
+				case 'Đ':
+					return 'd'
+				default:
+					return r
+				}
+			}, strings.TrimSpace(h)))
+	}
+
 	resolveIndex := func(field string, value *string, required bool) error {
 		if value == nil {
 			if required {
@@ -200,12 +223,25 @@ func (p *Parser) buildColumnIndices(headers []string, mapping *CsvColumnMapping)
 			return nil
 		}
 
-		// It's a header name - find it
+		// Try exact case-insensitive match first
 		idx = -1
 		for i, h := range headers {
 			if strings.EqualFold(strings.TrimSpace(h), strings.TrimSpace(*value)) {
 				idx = i
 				break
+			}
+		}
+
+		// Fallback: fuzzy match (diacritic-insensitive)
+		if idx == -1 {
+			normalizedMapping := normalizeHeader(*value)
+			for i, h := range headers {
+				normalizedHeader := normalizeHeader(h)
+				if normalizedHeader == normalizedMapping {
+					fmt.Printf("[WARN] Fuzzy header match: %s -> %s\n", *value, h)
+					idx = i
+					break
+				}
 			}
 		}
 
@@ -273,17 +309,22 @@ func (p *Parser) mapRowToNormalized(rawRow []string, rowNumber int, indices map[
 	// Parse price
 	price := 0
 	if priceStr := getValue("price"); priceStr != nil {
+		fmt.Printf("[DEBUG] Price column FOUND: row=%d, value=%q, indices=%v\n", rowNumber, *priceStr, indices)
 		parsed, err := ParsePrice(*priceStr)
 		if err != nil {
+			fmt.Printf("[DEBUG] Price parse ERROR: row=%d, value=%q, err=%v\n", rowNumber, *priceStr, err)
 			errors = append(errors, types.ParseError{
-				RowNumber:    &rowNumber,
-				Field:        types.StringPtr("price"),
-				Message:      "Invalid price value",
+				RowNumber:     &rowNumber,
+				Field:         types.StringPtr("price"),
+				Message:       "Invalid price value",
 				OriginalValue: priceStr,
 			})
 		} else {
+			fmt.Printf("[DEBUG] Price parse OK: row=%d, value=%q -> %d cents\n", rowNumber, *priceStr, parsed)
 			price = parsed
 		}
+	} else {
+		fmt.Printf("[DEBUG] Price column NOT FOUND: row=%d, indices=%v\n", rowNumber, indices)
 	}
 
 	// Parse discount price
@@ -365,29 +406,29 @@ func (p *Parser) mapRowToNormalized(rawRow []string, rowNumber int, indices map[
 	rawDataJSON, _ := json.Marshal(rawRow)
 
 	row := &types.NormalizedRow{
-		StoreIdentifier:      storeIdentifier,
-		ExternalID:           getValue("externalId"),
-		Name:                 name,
-		Description:          getValue("description"),
-		Category:             getValue("category"),
-		Subcategory:          getValue("subcategory"),
-		Brand:                getValue("brand"),
-		Unit:                 getValue("unit"),
-		UnitQuantity:         getValue("unitQuantity"),
-		Price:                price,
-		DiscountPrice:        discountPrice,
-		DiscountStart:        discountStart,
-		DiscountEnd:          discountEnd,
-		Barcodes:             barcodes,
-		ImageURL:             getValue("imageUrl"),
-		RowNumber:            rowNumber,
-		RawData:              string(rawDataJSON),
-		UnitPrice:            unitPrice,
+		StoreIdentifier:       storeIdentifier,
+		ExternalID:            getValue("externalId"),
+		Name:                  name,
+		Description:           getValue("description"),
+		Category:              getValue("category"),
+		Subcategory:           getValue("subcategory"),
+		Brand:                 getValue("brand"),
+		Unit:                  getValue("unit"),
+		UnitQuantity:          getValue("unitQuantity"),
+		Price:                 price,
+		DiscountPrice:         discountPrice,
+		DiscountStart:         discountStart,
+		DiscountEnd:           discountEnd,
+		Barcodes:              barcodes,
+		ImageURL:              getValue("imageUrl"),
+		RowNumber:             rowNumber,
+		RawData:               string(rawDataJSON),
+		UnitPrice:             unitPrice,
 		UnitPriceBaseQuantity: getValue("unitPriceBaseQuantity"),
-		UnitPriceBaseUnit:    getValue("unitPriceBaseUnit"),
-		LowestPrice30d:       lowestPrice30d,
-		AnchorPrice:          anchorPrice,
-		AnchorPriceAsOf:      anchorPriceAsOf,
+		UnitPriceBaseUnit:     getValue("unitPriceBaseUnit"),
+		LowestPrice30d:        lowestPrice30d,
+		AnchorPrice:           anchorPrice,
+		AnchorPriceAsOf:       anchorPriceAsOf,
 	}
 
 	return row, nil
