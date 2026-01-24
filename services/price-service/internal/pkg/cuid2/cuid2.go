@@ -3,6 +3,7 @@ package cuid2
 import (
 	crypto_rand "crypto/rand"
 	"math/big"
+	"math/rand"
 	"strings"
 	"time"
 )
@@ -10,11 +11,32 @@ import (
 // Base62 alphabet: 0-9, A-Z, a-z (62 characters)
 const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
+// randomBytes reads random bytes with fallback to math/rand if crypto/rand fails
+func randomBytes(p []byte) error {
+	// Try crypto/rand first
+	_, err := crypto_rand.Read(p)
+	if err == nil {
+		return nil
+	}
+	
+	// Fallback to math/rand if crypto/rand fails
+	// This is less secure but prevents service crash
+	rand.Seed(time.Now().UnixNano())
+	n, err := rand.Read(p)
+	if err != nil {
+		return err
+	}
+	if n != len(p) {
+		return err
+	}
+	return nil
+}
+
 // EncodeTimestampBase62 encodes a Unix timestamp (seconds) as a 6-character base62 string.
 // Produces lexicographically sortable output for timestamps.
 //
 // Range: 0 to ~56 billion seconds (~1800 years from Unix epoch)
-func EncodeTimestampBase64(timestampSeconds int64) string {
+func EncodeTimestampBase62(timestampSeconds int64) string {
 	n := timestampSeconds
 	result := make([]byte, 6)
 	for i := 5; i >= 0; i-- {
@@ -23,6 +45,11 @@ func EncodeTimestampBase64(timestampSeconds int64) string {
 		n = n / 62
 	}
 	return string(result)
+}
+
+// EncodeTimestampBase64 is an alias for EncodeTimestampBase62 for backward compatibility
+func EncodeTimestampBase64(timestampSeconds int64) string {
+	return EncodeTimestampBase62(timestampSeconds)
 }
 
 // generateCuidLikeId generates a CUID-like ID using base62 encoding with rejection sampling.
@@ -36,9 +63,9 @@ func generateCuidLikeId(length int) string {
 	// Request extra bytes to account for rejection sampling (~3% rejection rate)
 	bytesNeeded := (length*6)/8 + 4
 	bytes := make([]byte, bytesNeeded)
-	_, err := crypto_rand.Read(bytes)
-	if err != nil {
-		panic("failed to read random bytes: " + err.Error())
+	if err := randomBytes(bytes); err != nil {
+		// Last resort: use timestamp-based ID
+		return EncodeTimestampBase62(time.Now().Unix()) + string(base62Alphabet)[0:length-6]
 	}
 
 	var result strings.Builder
@@ -65,9 +92,9 @@ func generateCuidLikeId(length int) string {
 
 		// If we run out of bytes (unlikely), get more
 		if byteIndex >= len(bytes) && result.Len() < length {
-			_, err := crypto_rand.Read(bytes)
-			if err != nil {
-				panic("failed to read random bytes: " + err.Error())
+			if err := randomBytes(bytes); err != nil {
+				// Last resort: append timestamp to complete
+				return result.String() + EncodeTimestampBase62(time.Now().Unix())[:length-result.Len()]
 			}
 			byteIndex = 0
 			bitBuffer = 0
@@ -106,7 +133,7 @@ func GeneratePrefixedId(prefix string, options PrefixedIdOptions) string {
 	}
 
 	if timeSortable {
-		timestamp := EncodeTimestampBase64(time.Now().Unix())
+		timestamp := EncodeTimestampBase62(time.Now().Unix())
 		if randomLength == 0 {
 			randomLength = 18
 		}
@@ -121,5 +148,24 @@ func GeneratePrefixedId(prefix string, options PrefixedIdOptions) string {
 
 // RandomBigInt generates a random big.Int in range [0, max)
 func RandomBigInt(max *big.Int) (*big.Int, error) {
-	return crypto_rand.Int(crypto_rand.Reader, max)
+	// Try crypto/rand first
+	n, err := crypto_rand.Int(crypto_rand.Reader, max)
+	if err == nil {
+		return n, nil
+	}
+	
+	// Fallback to math/rand if crypto/rand fails
+	// Convert max to int64 and use rand.Int63n
+	rand.Seed(time.Now().UnixNano())
+	if !max.IsUint64() {
+		// If max doesn't fit in uint64, return error
+		return nil, err
+	}
+	maxUint64 := max.Uint64()
+	if maxUint64 > 0 {
+		randomVal := rand.Int63n(int64(maxUint64))
+		return new(big.Int).SetInt64(randomVal), nil
+	}
+	
+	return new(big.Int), err
 }

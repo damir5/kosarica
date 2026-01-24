@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -11,21 +12,44 @@ import (
 
 func StartIngestionWorker(ctx context.Context) error {
 	queue := taskqueue.New(nil) // Pool will be initialized later
-	config := taskqueue.WorkerConfig{
+	config := WorkerConfig{
 		WorkerID:  "ingestion-worker-1",
-		TaskTypes: []string{taskqueue.TaskTypeIngestion, taskqueue.TaskTypeRerun},
-		MaxTasks:  5,
+		TaskTypes: []string{"ingestion", "rerun"},
+		MaxTasks: 5,
 		PollDelay: 5 * time.Second,
 	}
 
 	worker := New(queue, config)
-	worker.RegisterHandler(taskqueue.TaskTypeIngestion, NewIngestionHandler(""))
-	worker.RegisterHandler(taskqueue.TaskTypeRerun, NewRerunHandler())
+	worker.RegisterHandler("ingestion", NewIngestionHandler())
+	worker.RegisterHandler("rerun", NewRerunHandler())
 
 	fmt.Println("[WORKER] Starting ingestion worker...")
 	worker.Start(ctx)
 
 	return nil
+}
+
+func NewIngestionHandler() func(context.Context, []byte) error {
+	return func(ctx context.Context, payload []byte) error {
+		var req struct {
+			RunID string `json:"runId"`
+		}
+
+		if err := json.Unmarshal(payload, &req); err != nil {
+			return fmt.Errorf("failed to unmarshal ingestion payload: %w", err)
+		}
+
+		result, err := pipeline.Run(ctx, "konzum", "")
+		if err != nil {
+			return err
+		}
+
+		if !result.Success {
+			return fmt.Errorf("ingestion failed with %d errors", len(result.Errors))
+		}
+
+		return nil
+	}
 }
 
 func NewRerunHandler() func(context.Context, []byte) error {

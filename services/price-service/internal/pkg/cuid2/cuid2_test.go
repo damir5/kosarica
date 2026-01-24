@@ -17,10 +17,10 @@ func TestEncodeTimestampBase64(t *testing.T) {
 		{"Zero timestamp", 0, "000000"},
 		{"One second", 1, "000001"},
 		{"62 seconds", 62, "000010"},
-		{"One minute", 60, "00000O"},
-		{"One hour", 3600, "0000Tg"},
-		{"One day", 86400, "000NkX"},
-		{"Unix epoch test", 1704067200, "0CL2Kw"},
+		{"One minute", 60, "00000y"},
+		{"One hour", 3600, "0000w4"},
+		{"One day", 86400, "000MTY"},
+		{"Unix epoch test", 1704067200, "1rK5iq"},
 	}
 
 	for _, tt := range tests {
@@ -30,6 +30,24 @@ func TestEncodeTimestampBase64(t *testing.T) {
 				t.Errorf("EncodeTimestampBase64(%d) = %s, want %s", tt.seconds, result, tt.expected)
 			}
 		})
+	}
+
+	// Verify base62 encoding consistency by checking specific values
+	testEncodings := map[int64]string{
+		0:          "000000",
+		1:          "000001",
+		62:         "000010",
+		60:         "00000y",
+		3600:       "0000w4",
+		86400:      "000MTY",
+		1704067200:  "1rK5iq",
+	}
+
+	for seconds, expected := range testEncodings {
+		result := EncodeTimestampBase64(seconds)
+		if result != expected {
+			t.Errorf("Base62 encoding mismatch for %d: got %s, want %s", seconds, result, expected)
+		}
 	}
 
 	result := EncodeTimestampBase64(1234567890)

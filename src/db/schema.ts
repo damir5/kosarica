@@ -300,7 +300,7 @@ export const storeItemPricePeriods = pgTable(
 	"store_item_price_periods",
 	{
 		id: bigserial({ mode: "bigint" }).primaryKey(),
-		storeItemStateId: text("store_item_state_id")
+		storeItemStateId: bigint("store_item_state_id", { mode: "bigint" })
 			.notNull()
 			.references(() => storeItemState.id, { onDelete: "cascade" }),
 		price: integer("price").notNull(), // price in cents/lipa
@@ -340,7 +340,7 @@ export const ingestionRuns = pgTable("ingestion_runs", {
 	errorCount: integer("error_count").default(0),
 	metadata: text("metadata"), // JSON for additional run info
 	// Rerun support
-	parentRunId: text("parent_run_id"), // FK to ingestionRuns.id for rerun tracking
+	parentRunId: bigint("parent_run_id", { mode: "bigint" }), // FK to ingestionRuns.id for rerun tracking
 	rerunType: text("rerun_type"), // 'file', 'chunk', 'entry', null for original runs
 	rerunTargetId: text("rerun_target_id"), // ID of file/chunk/entry being rerun
 	createdAt: timestamp("created_at").defaultNow(),
@@ -348,7 +348,7 @@ export const ingestionRuns = pgTable("ingestion_runs", {
 
 export const ingestionFiles = pgTable("ingestion_files", {
 	id: bigserial({ mode: "bigint" }).primaryKey(),
-	runId: text("run_id")
+	runId: bigint("run_id", { mode: "bigint" })
 		.notNull()
 		.references(() => ingestionRuns.id, { onDelete: "cascade" }),
 	filename: text("filename").notNull(),
@@ -370,7 +370,7 @@ export const ingestionChunks = pgTable(
 	"ingestion_chunks",
 	{
 		id: cuid2("igc").primaryKey(),
-		fileId: text("file_id")
+		fileId: bigint("file_id", { mode: "bigint" })
 			.notNull()
 			.references(() => ingestionFiles.id, { onDelete: "cascade" }),
 		chunkIndex: integer("chunk_index").notNull(), // 0-based index
@@ -395,7 +395,7 @@ export const ingestionChunks = pgTable(
 
 export const ingestionFileEntries = pgTable("ingestion_file_entries", {
 	id: cuid2("ige").primaryKey(),
-	fileId: text("file_id")
+	fileId: bigint("file_id", { mode: "bigint" })
 		.notNull()
 		.references(() => ingestionFiles.id, { onDelete: "cascade" }),
 	rowNumber: integer("row_number"),
@@ -412,12 +412,15 @@ export const ingestionFileEntries = pgTable("ingestion_file_entries", {
 
 export const ingestionErrors = pgTable("ingestion_errors", {
 	id: bigserial({ mode: "bigint" }).primaryKey(),
-	runId: text("run_id")
+	runId: bigint("run_id", { mode: "bigint" })
 		.notNull()
 		.references(() => ingestionRuns.id, { onDelete: "cascade" }),
-	fileId: text("file_id").references(() => ingestionFiles.id, {
-		onDelete: "set null",
-	}),
+	fileId: bigint("file_id", { mode: "bigint" }).references(
+		() => ingestionFiles.id,
+		{
+			onDelete: "set null",
+		},
+	),
 	chunkId: text("chunk_id").references(() => ingestionChunks.id, {
 		onDelete: "set null",
 	}),
@@ -435,12 +438,18 @@ export const ingestionErrors = pgTable("ingestion_errors", {
 export const retailerItemsFailed = pgTable("retailer_items_failed", {
 	id: cuid2("id").primaryKey(),
 	chainSlug: text("chain_slug").notNull(),
-	runId: text("run_id").references(() => ingestionRuns.id, {
-		onDelete: "cascade",
-	}),
-	fileId: text("file_id").references(() => ingestionFiles.id, {
-		onDelete: "cascade",
-	}),
+	runId: bigint("run_id", { mode: "bigint" }).references(
+		() => ingestionRuns.id,
+		{
+			onDelete: "cascade",
+		},
+	),
+	fileId: bigint("file_id", { mode: "bigint" }).references(
+		() => ingestionFiles.id,
+		{
+			onDelete: "cascade",
+		},
+	),
 	storeIdentifier: text("store_identifier"),
 	rowNumber: integer("row_number"),
 	rawData: text("raw_data").notNull(), // Full CSV row data for analysis
