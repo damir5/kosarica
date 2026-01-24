@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	
+
 	"github.com/gin-gonic/gin"
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
+	"github.com/rs/zerolog/log"
 )
 
 // ingestionSem limits concurrent ingestion goroutines to prevent resource exhaustion
@@ -198,7 +199,7 @@ func markRunFailed(ctx context.Context, runID string, errorMsg string) {
 		WHERE id = $1
 	`, runID, fmt.Sprintf(`{"error": "%s"}`, errorMsg))
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to mark run %s as failed: %v\n", runID, err)
+		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as failed")
 	}
 }
 
@@ -214,6 +215,6 @@ func markRunCompleted(ctx context.Context, runID string, filesProcessed int, ent
 		WHERE id = $1
 	`, runID, filesProcessed, entriesPersisted)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to mark run %s as completed: %v\n", runID, err)
+		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as completed")
 	}
 }

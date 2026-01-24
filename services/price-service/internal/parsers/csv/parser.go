@@ -8,6 +8,7 @@ import (
 
 	"github.com/kosarica/price-service/internal/parsers/charset"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // Parser implements CSV parsing with encoding detection and column mapping
@@ -238,7 +239,7 @@ func (p *Parser) buildColumnIndices(headers []string, mapping *CsvColumnMapping)
 			for i, h := range headers {
 				normalizedHeader := normalizeHeader(h)
 				if normalizedHeader == normalizedMapping {
-					fmt.Printf("[WARN] Fuzzy header match: %s -> %s\n", *value, h)
+					log.Warn().Str("mapping", *value).Str("header", h).Msg("Fuzzy header match")
 					idx = i
 					break
 				}
@@ -309,10 +310,10 @@ func (p *Parser) mapRowToNormalized(rawRow []string, rowNumber int, indices map[
 	// Parse price
 	price := 0
 	if priceStr := getValue("price"); priceStr != nil {
-		fmt.Printf("[DEBUG] Price column FOUND: row=%d, value=%q, indices=%v\n", rowNumber, *priceStr, indices)
+		log.Debug().Int("row", rowNumber).Str("value", *priceStr).Interface("indices", indices).Msg("Price column FOUND")
 		parsed, err := ParsePrice(*priceStr)
 		if err != nil {
-			fmt.Printf("[DEBUG] Price parse ERROR: row=%d, value=%q, err=%v\n", rowNumber, *priceStr, err)
+			log.Debug().Int("row", rowNumber).Str("value", *priceStr).Err(err).Msg("Price parse ERROR")
 			errors = append(errors, types.ParseError{
 				RowNumber:     &rowNumber,
 				Field:         types.StringPtr("price"),
@@ -320,11 +321,11 @@ func (p *Parser) mapRowToNormalized(rawRow []string, rowNumber int, indices map[
 				OriginalValue: priceStr,
 			})
 		} else {
-			fmt.Printf("[DEBUG] Price parse OK: row=%d, value=%q -> %d cents\n", rowNumber, *priceStr, parsed)
+			log.Debug().Int("row", rowNumber).Str("value", *priceStr).Int("cents", parsed).Msg("Price parse OK")
 			price = parsed
 		}
 	} else {
-		fmt.Printf("[DEBUG] Price column NOT FOUND: row=%d, indices=%v\n", rowNumber, indices)
+		log.Debug().Int("row", rowNumber).Interface("indices", indices).Msg("Price column NOT FOUND")
 	}
 
 	// Parse discount price

@@ -4,11 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/taskqueue"
+	"github.com/rs/zerolog"
 )
+
+var log = zerolog.New(os.Stdout).With().Timestamp().Str("component", "worker").Logger()
 
 func StartIngestionWorker(ctx context.Context) error {
 	queue := taskqueue.New(nil) // Pool will be initialized later
@@ -23,7 +27,7 @@ func StartIngestionWorker(ctx context.Context) error {
 	worker.RegisterHandler("ingestion", NewIngestionHandler())
 	worker.RegisterHandler("rerun", NewRerunHandler())
 
-	fmt.Println("[WORKER] Starting ingestion worker...")
+	log.Info().Msg("Starting ingestion worker...")
 	worker.Start(ctx)
 
 	return nil
@@ -77,11 +81,11 @@ func NewRerunHandler() func(context.Context, []byte) error {
 
 func CleanupOldRuns(ctx context.Context) error {
 	queue := taskqueue.New(nil)
-	count, err := queue.CleanupOldTasks(ctx, 7) // Keep 7 days
+	count, err := 	queue.CleanupOldTasks(ctx, 7) // Keep 7 days
 	if err != nil {
 		return fmt.Errorf("failed to cleanup old tasks: %w", err)
 	}
 
-	fmt.Printf("[WORKER] Cleaned up %d old tasks\n", count)
+	log.Info().Int("count", count).Msg("Cleaned up old tasks")
 	return nil
 }

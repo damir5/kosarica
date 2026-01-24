@@ -1,12 +1,12 @@
-import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { orpc } from "@/orpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle, Check, ChevronRight, X } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, ChevronRight, AlertTriangle } from "lucide-react";
+import { orpc } from "@/orpc";
 
 interface RetailerItem {
 	id: string;
@@ -65,20 +65,31 @@ function getSimilarityPercent(similarity: string): number {
 	return Math.round(parseFloat(similarity) * 100);
 }
 
-function getMatchConfidenceBadge(similarity: string, matchType: string) {
+function getMatchConfidenceBadge(similarity: string, _matchType: string) {
 	const percent = getSimilarityPercent(similarity);
 
 	if (percent >= 95) {
-		return <Badge className="bg-green-500 text-white">High Confidence ({percent}%)</Badge>;
+		return (
+			<Badge className="bg-green-500 text-white">
+				High Confidence ({percent}%)
+			</Badge>
+		);
 	}
 	if (percent >= 80) {
-		return <Badge className="bg-yellow-500 text-white">Medium ({percent}%)</Badge>;
+		return (
+			<Badge className="bg-yellow-500 text-white">Medium ({percent}%)</Badge>
+		);
 	}
 	return <Badge variant="outline">Low ({percent}%)</Badge>;
 }
 
-export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: MatchReviewCardProps) {
-	const queryClient = useQueryClient();
+export function MatchReviewCard({
+	item,
+	isSelected,
+	onSelect,
+	onApprove,
+}: MatchReviewCardProps) {
+	const _queryClient = useQueryClient();
 	const [selectedProductId, setSelectedProductId] = useState<string | null>(
 		item.linkedProductId || (item.candidates[0]?.candidateProductId ?? null),
 	);
@@ -131,7 +142,9 @@ export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: Match
 		if (!selectedProductId) return;
 
 		// Check if this is a suspicious barcode
-		const hasSuspiciousFlag = item.candidates.some((c) => c.flags?.includes("suspicious_barcode"));
+		const hasSuspiciousFlag = item.candidates.some((c) =>
+			c.flags?.includes("suspicious_barcode"),
+		);
 		if (hasSuspiciousFlag) {
 			resolveSuspiciousMutation.mutate(selectedProductId);
 		} else {
@@ -148,18 +161,27 @@ export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: Match
 	};
 
 	const retailerItem = item.retailer_item;
-	const hasSuspiciousFlag = item.candidates.some((c) => c.flags?.includes("suspicious"));
+	const hasSuspiciousFlag = item.candidates.some((c) =>
+		c.flags?.includes("suspicious"),
+	);
 
 	return (
 		<Card className={isSelected ? "ring-2 ring-primary" : ""}>
 			<CardHeader>
 				<div className="flex items-start gap-3">
-					<Checkbox checked={isSelected} onCheckedChange={onSelect} className="mt-1" />
+					<Checkbox
+						checked={isSelected}
+						onCheckedChange={onSelect}
+						className="mt-1"
+					/>
 					<div className="flex-1 space-y-2">
 						<div className="flex items-center justify-between">
 							<CardTitle className="text-lg">{retailerItem.name}</CardTitle>
 							{hasSuspiciousFlag && (
-								<Badge variant="destructive" className="flex items-center gap-1">
+								<Badge
+									variant="destructive"
+									className="flex items-center gap-1"
+								>
 									<AlertTriangle className="h-3 w-3" />
 									Suspicious
 								</Badge>
@@ -182,15 +204,22 @@ export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: Match
 							{retailerItem.unit && (
 								<>
 									<span>•</span>
-									<span>{retailerItem.unitQuantity} {retailerItem.unit}</span>
+									<span>
+										{retailerItem.unitQuantity} {retailerItem.unit}
+									</span>
 								</>
 							)}
 						</div>
 						{item.candidates.length > 0 && (
 							<div className="flex flex-wrap gap-2">
 								{item.candidates.slice(0, 3).map((candidate) => (
-									<Badge key={candidate.candidateProductId} variant="outline" className={MATCH_TYPE_COLORS[candidate.matchType] ?? ""}>
-										{candidate.matchType} ({getSimilarityPercent(candidate.similarity)}%)
+									<Badge
+										key={candidate.candidateProductId}
+										variant="outline"
+										className={MATCH_TYPE_COLORS[candidate.matchType] ?? ""}
+									>
+										{candidate.matchType} (
+										{getSimilarityPercent(candidate.similarity)}%)
 									</Badge>
 								))}
 							</div>
@@ -201,9 +230,15 @@ export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: Match
 			<CardContent>
 				{item.candidates.length === 0 ? (
 					<div className="space-y-4">
-						<p className="text-muted-foreground">No product candidates found. Create a new product or search manually.</p>
+						<p className="text-muted-foreground">
+							No product candidates found. Create a new product or search
+							manually.
+						</p>
 						<div className="flex gap-2">
-							<Button onClick={() => setShowProductSearch(true)} variant="outline">
+							<Button
+								onClick={() => setShowProductSearch(true)}
+								variant="outline"
+							>
 								Search Products
 							</Button>
 							<Button onClick={handleRejectAll} variant="destructive">
@@ -223,7 +258,9 @@ export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: Match
 											? "border-primary bg-primary/5"
 											: "border-border hover:border-primary/50"
 									}`}
-									onClick={() => setSelectedProductId(candidate.candidateProductId)}
+									onClick={() =>
+										setSelectedProductId(candidate.candidateProductId)
+									}
 								>
 									<div className="flex items-start gap-4">
 										{/* Product Image */}
@@ -241,7 +278,9 @@ export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: Match
 
 										<div className="flex-1 space-y-2">
 											<div className="flex items-center justify-between">
-												<h4 className="font-medium">{candidate.product.name}</h4>
+												<h4 className="font-medium">
+													{candidate.product.name}
+												</h4>
 												{selectedProductId === candidate.candidateProductId && (
 													<div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
 														<Check className="h-3 w-3 text-primary-foreground" />
@@ -250,7 +289,9 @@ export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: Match
 											</div>
 
 											<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-												{candidate.product.brand && <span>{candidate.product.brand}</span>}
+												{candidate.product.brand && (
+													<span>{candidate.product.brand}</span>
+												)}
 												{candidate.product.category && (
 													<>
 														<span>•</span>
@@ -260,10 +301,18 @@ export function MatchReviewCard({ item, isSelected, onSelect, onApprove }: Match
 											</div>
 
 											<div className="flex items-center gap-2">
-												<Badge variant="outline" className={MATCH_TYPE_COLORS[candidate.matchType] ?? ""}>
+												<Badge
+													variant="outline"
+													className={
+														MATCH_TYPE_COLORS[candidate.matchType] ?? ""
+													}
+												>
 													{candidate.matchType}
 												</Badge>
-												{getMatchConfidenceBadge(candidate.similarity, candidate.matchType)}
+												{getMatchConfidenceBadge(
+													candidate.similarity,
+													candidate.matchType,
+												)}
 												{candidate.flags && (
 													<Badge variant="destructive">{candidate.flags}</Badge>
 												)}
@@ -357,14 +406,24 @@ function ProductSearchModal({
 	onClose: () => void;
 }) {
 	const [query, setQuery] = useState(retailerItemName);
-	const [results, setResults] = useState<Array<{ id: string; name: string; brand: string | null; category: string | null }>>([]);
+	const [results, setResults] = useState<
+		Array<{
+			id: string;
+			name: string;
+			brand: string | null;
+			category: string | null;
+		}>
+	>([]);
 	const [isLoading, setIsLoading] = useState(false);
 
 	const searchProducts = async (searchQuery: string) => {
 		if (!searchQuery || searchQuery.length < 3) return;
 		setIsLoading(true);
 		try {
-			const response = await orpc.admin.products.searchProducts({ query: searchQuery, limit: 20 });
+			const response = await orpc.admin.products.searchProducts({
+				query: searchQuery,
+				limit: 20,
+			});
 			setResults(response as typeof results);
 		} catch (error) {
 			console.error("Search failed:", error);
@@ -387,15 +446,18 @@ function ProductSearchModal({
 						}}
 						placeholder="Search by product name..."
 						className="w-full mt-2 px-3 py-2 border rounded-md"
-						autoFocus
 					/>
 				</div>
 				<div className="flex-1 overflow-y-auto p-4 space-y-2">
 					{isLoading ? (
-						<div className="text-center text-muted-foreground">Searching...</div>
+						<div className="text-center text-muted-foreground">
+							Searching...
+						</div>
 					) : results.length === 0 ? (
 						<div className="text-center text-muted-foreground">
-							{query.length < 3 ? "Enter at least 3 characters to search" : "No products found"}
+							{query.length < 3
+								? "Enter at least 3 characters to search"
+								: "No products found"}
 						</div>
 					) : (
 						results.map((product) => (

@@ -4,11 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/kosarica/price-service/internal/taskqueue"
+	"github.com/rs/zerolog"
 )
+
+var log = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 type WorkerConfig struct {
 	WorkerID   string
@@ -42,7 +46,11 @@ func (w *Worker) RegisterHandler(taskType string, handler func(context.Context, 
 }
 
 func (w *Worker) Start(ctx context.Context) {
-	fmt.Printf("[WORKER] Starting worker: %s (types: %v)\n", w.config.WorkerID, w.config.TaskTypes)
+	log.Info().
+		Str("component", "worker").
+		Str("worker_id", w.config.WorkerID).
+		Strs("task_types", w.config.TaskTypes).
+		Msg("Starting worker")
 
 	for i := 0; i < w.config.NumWorkers; i++ {
 		go w.workerLoop(ctx, i)
@@ -51,14 +59,23 @@ func (w *Worker) Start(ctx context.Context) {
 
 func (w *Worker) Stop() {
 	close(w.stopChan)
-	fmt.Printf("[WORKER] Worker %s stopping, waiting for in-flight tasks...\n", w.config.WorkerID)
+	log.Info().
+		Str("component", "worker").
+		Str("worker_id", w.config.WorkerID).
+		Msg("Worker stopping, waiting for in-flight tasks")
 	w.wg.Wait()
-	fmt.Printf("[WORKER] Worker %s stopped\n", w.config.WorkerID)
+	log.Info().
+		Str("component", "worker").
+		Str("worker_id", w.config.WorkerID).
+		Msg("Worker stopped")
 }
 
 func (w *Worker) workerLoop(ctx context.Context, workerNum int) {
 	workerID := fmt.Sprintf("%s-%d", w.config.WorkerID, workerNum)
-	fmt.Printf("[WORKER] Starting worker goroutine %s\n", workerID)
+	log.Info().
+		Str("component", "worker").
+		Str("worker_id", workerID).
+		Msg("Starting worker goroutine")
 
 	ticker := time.NewTicker(w.config.PollDelay)
 	defer ticker.Stop()
@@ -66,11 +83,17 @@ func (w *Worker) workerLoop(ctx context.Context, workerNum int) {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("[WORKER] Worker %s shutting down\n", workerID)
+			log.Info().
+				Str("component", "worker").
+				Str("worker_id", workerID).
+				Msg("Worker shutting down")
 			return
 
 		case <-w.stopChan:
-			fmt.Printf("[WORKER] Worker %s received stop signal\n", workerID)
+			log.Info().
+				Str("component", "worker").
+				Str("worker_id", workerID).
+				Msg("Worker received stop signal")
 			return
 
 		case <-ticker.C:
@@ -87,7 +110,7 @@ func (w *Worker) processTasks(ctx context.Context, workerID string) {
 	})
 
 	if claimResult.Err != nil {
-		fmt.Printf("[ERROR] Failed to claim tasks: %v\n", claimResult.Err)
+		log.Error().Err(claimResult.Err).Msg("Failed to claim tasks")
 		return
 	}
 
@@ -95,7 +118,11 @@ func (w *Worker) processTasks(ctx context.Context, workerID string) {
 		return // No tasks to process
 	}
 
-	fmt.Printf("[WORKER] Worker %s claimed %d tasks\n", workerID, len(claimResult.Tasks))
+	log.Info().
+		Str("component", "worker").
+		Str("worker_id", workerID).
+		Int("task_count", len(claimResult.Tasks)).
+		Msg("Worker claimed tasks")
 
 	for _, task := range claimResult.Tasks {
 		w.processTask(ctx, workerID, task)
@@ -108,12 +135,19 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 
 	handler, exists := w.handlers[task.TaskType]
 	if !exists {
-		fmt.Printf("[WARN] No handler for task type: %s\n", task.TaskType)
+		log.Warn().
+			Str("task_type", task.TaskType).
+			Msg("No handler for task type")
 		w.queue.FailTask(ctx, task.ID, "No handler registered", false)
 		return
 	}
 
-	fmt.Printf("[WORKER] Worker %s processing task %s (type: %s)\n", workerID, task.ID, task.TaskType)
+	log.Info().
+		Str("component", "worker").
+		Str("worker_id", workerID).
+		Str("task_id", task.ID).
+		Str("task_type", task.TaskType).
+		Msg("Worker processing task")
 
 	// Transition to 'processing' status
 	pool := w.queue.GetPool()
@@ -123,14 +157,14 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 		WHERE id = $1
 		`, task.ID)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to mark task as processing: %v\n", err)
+		log.Error().Err(err).Msg("Failed to mark task as processing")
 		w.queue.FailTask(ctx, task.ID, fmt.Sprintf("Status update failed: %v", err), false)
 		return
 	}
 
 	var payloadJSON interface{}
 	if err := json.Unmarshal(task.Payload, &payloadJSON); err != nil {
-		fmt.Printf("[ERROR] Failed to unmarshal payload: %v\n", err)
+		log.Error().Err(err).Msg("Failed to unmarshal payload")
 		w.queue.FailTask(ctx, task.ID, fmt.Sprintf("Payload parse error: %v", err), false)
 		return
 	}
@@ -138,15 +172,22 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 	handlerErr := handler(ctx, task.Payload)
 	if handlerErr != nil {
 		w.queue.FailTask(ctx, task.ID, handlerErr.Error(), true)
-		fmt.Printf("[ERROR] Task %s failed: %v\n", task.ID, handlerErr)
+		log.Error().
+			Str("task_id", task.ID).
+			Err(handlerErr).
+			Msg("Task failed")
 		return
 	}
 
 	completeErr := w.queue.CompleteTask(ctx, task.ID, payloadJSON)
 	if completeErr != nil {
-		fmt.Printf("[ERROR] Failed to mark task as completed: %v\n", completeErr)
+		log.Error().Err(completeErr).Msg("Failed to mark task as completed")
 		return
 	}
 
-	fmt.Printf("[WORKER] Worker %s completed task %s\n", workerID, task.ID)
+	log.Info().
+		Str("component", "worker").
+		Str("worker_id", workerID).
+		Str("task_id", task.ID).
+		Msg("Worker completed task")
 }

@@ -1,5 +1,4 @@
 import { sql } from "drizzle-orm";
-import { task_queue } from "../schema";
 
 export async function up(db: import("postgres").Sql) {
 	await db.execute(sql`

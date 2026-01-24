@@ -114,7 +114,7 @@ func runParse(cmd *cobra.Command, args []string) error {
 }
 
 func outputParseTable(chainID string, result *types.ParseResult) {
-	fmt.Printf("\nParse Results for %s\n", chainID)
+	logger.Info().Str("chain", chainID).Msg("Parse Results")
 	fmt.Println(strings.Repeat("-", 60))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
@@ -129,7 +129,7 @@ func outputParseTable(chainID string, result *types.ParseResult) {
 
 	// Show first few errors if any
 	if len(result.Errors) > 0 {
-		fmt.Printf("\nFirst %d Errors:\n", min(len(result.Errors), 10))
+		logger.Info().Int("error_count", min(len(result.Errors), 10)).Msg("First Errors")
 		fmt.Println(strings.Repeat("-", 60))
 		for i, err := range result.Errors {
 			if i >= 10 {
@@ -146,13 +146,13 @@ func outputParseTable(chainID string, result *types.ParseResult) {
 			fmt.Printf("Row %s, Field '%s': %s\n", rowNum, field, err.Message)
 		}
 		if len(result.Errors) > 10 {
-			fmt.Printf("... and %d more errors\n", len(result.Errors)-10)
+			logger.Info().Int("more_errors", len(result.Errors)-10).Msg("Additional errors")
 		}
 	}
 
 	// Show sample of valid rows
 	if len(result.Rows) > 0 {
-		fmt.Printf("\nSample Rows (first %d):\n", min(len(result.Rows), 5))
+		logger.Info().Int("sample_count", min(len(result.Rows), 5)).Msg("Sample Rows")
 		fmt.Println(strings.Repeat("-", 60))
 		for i, row := range result.Rows {
 			if i >= 5 {

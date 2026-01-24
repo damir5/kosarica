@@ -36,7 +36,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/orpc/client";
-import { type EnrichmentTask } from "./EnrichmentTaskCard";
+import type { EnrichmentTask } from "./EnrichmentTaskCard";
 import { StoreEnrichmentSection } from "./StoreEnrichmentSection";
 import { StoreLocationMap } from "./StoreLocationMap";
 import { StoreStatusBadge } from "./StoreStatusBadge";
@@ -94,9 +94,18 @@ interface StoreDetailDrawerProps {
 	storeId: string | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onApprove?: (storeId: string, expectedUpdatedAt: string, notes?: string) => Promise<void>;
+	onApprove?: (
+		storeId: string,
+		expectedUpdatedAt: string,
+		notes?: string,
+	) => Promise<void>;
 	onReject?: (storeId: string, expectedUpdatedAt: string) => Promise<void>;
-	onForceApprove?: (storeId: string, expectedUpdatedAt: string, notes?: string, justification?: string) => Promise<void>;
+	onForceApprove?: (
+		storeId: string,
+		expectedUpdatedAt: string,
+		notes?: string,
+		justification?: string,
+	) => Promise<void>;
 	onMerge?: (storeId: string) => void;
 }
 
@@ -112,7 +121,8 @@ export function StoreDetailDrawer({
 	const queryClient = useQueryClient();
 	const [approvalNotes, setApprovalNotes] = useState("");
 	const [rejectReason, setRejectReason] = useState("");
-	const [forceApproveJustification, setForceApproveJustification] = useState("");
+	const [forceApproveJustification, setForceApproveJustification] =
+		useState("");
 	const [showForceApprove, setShowForceApprove] = useState(false);
 	const [selectedTask, setSelectedTask] = useState<EnrichmentTask | null>(null);
 	const [verifyModalOpen, setVerifyModalOpen] = useState(false);
@@ -131,8 +141,10 @@ export function StoreDetailDrawer({
 	});
 
 	const store = detailData?.store as StoreDetail | undefined;
-	const enrichmentTasks = (detailData?.enrichmentTasks || []) as EnrichmentTaskData[];
-	const linkedPhysicalStores = (detailData?.linkedPhysicalStores || []) as LinkedStore[];
+	const enrichmentTasks = (detailData?.enrichmentTasks ||
+		[]) as EnrichmentTaskData[];
+	const linkedPhysicalStores = (detailData?.linkedPhysicalStores ||
+		[]) as LinkedStore[];
 	const similarStores = (detailData?.similarStores || []) as SimilarStore[];
 
 	// Verify enrichment mutation
@@ -171,7 +183,9 @@ export function StoreDetailDrawer({
 		if (!store || !onApprove) return;
 
 		if (!store.updatedAt) {
-			setError("Cannot approve store: missing update timestamp. Please refresh and try again.");
+			setError(
+				"Cannot approve store: missing update timestamp. Please refresh and try again.",
+			);
 			return;
 		}
 
@@ -189,9 +203,13 @@ export function StoreDetailDrawer({
 			setShowForceApprove(false);
 			onOpenChange(false);
 		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : "Approval failed";
+			const errorMessage =
+				err instanceof Error ? err.message : "Approval failed";
 			// Check if this is a conflict error (store was modified by someone else)
-			if (errorMessage.includes("modified by someone else") || errorMessage.includes("refresh")) {
+			if (
+				errorMessage.includes("modified by someone else") ||
+				errorMessage.includes("refresh")
+			) {
 				setIsConflictError(true);
 			}
 			setError(errorMessage);
@@ -209,7 +227,9 @@ export function StoreDetailDrawer({
 		}
 
 		if (!store.updatedAt) {
-			setError("Cannot force approve store: missing update timestamp. Please refresh and try again.");
+			setError(
+				"Cannot force approve store: missing update timestamp. Please refresh and try again.",
+			);
 			return;
 		}
 
@@ -229,8 +249,12 @@ export function StoreDetailDrawer({
 			setShowForceApprove(false);
 			onOpenChange(false);
 		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : "Force approval failed";
-			if (errorMessage.includes("modified by someone else") || errorMessage.includes("refresh")) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Force approval failed";
+			if (
+				errorMessage.includes("modified by someone else") ||
+				errorMessage.includes("refresh")
+			) {
 				setIsConflictError(true);
 			}
 			setError(errorMessage);
@@ -248,7 +272,9 @@ export function StoreDetailDrawer({
 		}
 
 		if (!store.updatedAt) {
-			setError("Cannot reject store: missing update timestamp. Please refresh and try again.");
+			setError(
+				"Cannot reject store: missing update timestamp. Please refresh and try again.",
+			);
 			return;
 		}
 
@@ -257,16 +283,17 @@ export function StoreDetailDrawer({
 		setIsConflictError(false);
 
 		try {
-			await onReject(
-				store.id,
-				store.updatedAt.toISOString(),
-			);
+			await onReject(store.id, store.updatedAt.toISOString());
 			setRejectReason("");
 			onOpenChange(false);
 		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : "Rejection failed";
+			const errorMessage =
+				err instanceof Error ? err.message : "Rejection failed";
 			// Check if this is a conflict error (store was modified by someone else)
-			if (errorMessage.includes("modified by someone else") || errorMessage.includes("refresh")) {
+			if (
+				errorMessage.includes("modified by someone else") ||
+				errorMessage.includes("refresh")
+			) {
 				setIsConflictError(true);
 			}
 			setError(errorMessage);
@@ -368,11 +395,13 @@ export function StoreDetailDrawer({
 							</DialogHeader>
 
 							{error && (
-								<div className={`rounded-md border p-3 ${
-									isConflictError
-										? "bg-amber-50/50 border-amber-300 dark:bg-amber-950/20 dark:border-amber-800"
-										: "bg-destructive/10 border-destructive/30"
-								}`}>
+								<div
+									className={`rounded-md border p-3 ${
+										isConflictError
+											? "bg-amber-50/50 border-amber-300 dark:bg-amber-950/20 dark:border-amber-800"
+											: "bg-destructive/10 border-destructive/30"
+									}`}
+								>
 									<div className="flex items-start gap-3">
 										{isConflictError ? (
 											<AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 mt-0.5 shrink-0" />
@@ -380,18 +409,24 @@ export function StoreDetailDrawer({
 											<AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
 										)}
 										<div className="flex-1">
-											<p className={`text-sm font-medium ${
-												isConflictError
-													? "text-amber-800 dark:text-amber-300"
-													: "text-destructive"
-											}`}>
-												{isConflictError ? "Concurrent Modification Detected" : "Error"}
+											<p
+												className={`text-sm font-medium ${
+													isConflictError
+														? "text-amber-800 dark:text-amber-300"
+														: "text-destructive"
+												}`}
+											>
+												{isConflictError
+													? "Concurrent Modification Detected"
+													: "Error"}
 											</p>
-											<p className={`text-sm mt-1 ${
-												isConflictError
-													? "text-amber-700 dark:text-amber-400"
-													: "text-destructive"
-											}`}>
+											<p
+												className={`text-sm mt-1 ${
+													isConflictError
+														? "text-amber-700 dark:text-amber-400"
+														: "text-destructive"
+												}`}
+											>
 												{error}
 											</p>
 											{isConflictError && (
@@ -430,7 +465,9 @@ export function StoreDetailDrawer({
 												<span className="text-xs font-medium text-muted-foreground">
 													Chain
 												</span>
-												<p className="text-sm">{store.chainSlug.toUpperCase()}</p>
+												<p className="text-sm">
+													{store.chainSlug.toUpperCase()}
+												</p>
 											</div>
 											<div>
 												<span className="text-xs font-medium text-muted-foreground">
@@ -489,7 +526,9 @@ export function StoreDetailDrawer({
 												</p>
 											</div>
 										</div>
-										{(store.approvedBy || store.approvedAt || store.approvalNotes) && (
+										{(store.approvedBy ||
+											store.approvedAt ||
+											store.approvalNotes) && (
 											<>
 												<Separator />
 												<div>
@@ -501,7 +540,9 @@ export function StoreDetailDrawer({
 														{store.approvedBy && (
 															<p className="text-sm">
 																Approved by:{" "}
-																<span className="font-medium">{store.approvedBy}</span>
+																<span className="font-medium">
+																	{store.approvedBy}
+																</span>
 															</p>
 														)}
 														{store.approvedAt && (
@@ -573,15 +614,21 @@ export function StoreDetailDrawer({
 														className="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/50"
 													>
 														<div>
-															<p className="text-sm font-medium">{similar.name}</p>
+															<p className="text-sm font-medium">
+																{similar.name}
+															</p>
 															<p className="text-xs text-muted-foreground">
-																{similar.address || similar.city || "No address"}
+																{similar.address ||
+																	similar.city ||
+																	"No address"}
 															</p>
 														</div>
 														<Button
 															variant="ghost"
 															size="sm"
-															onClick={() => {/* TODO: navigate to store */}}
+															onClick={() => {
+																/* TODO: navigate to store */
+															}}
 														>
 															View <ArrowRight className="h-3 w-3 ml-1" />
 														</Button>
@@ -604,7 +651,8 @@ export function StoreDetailDrawer({
 												</Badge>
 											</CardTitle>
 											<CardDescription>
-												Physical locations using this virtual store as price source
+												Physical locations using this virtual store as price
+												source
 											</CardDescription>
 										</CardHeader>
 										<CardContent>
@@ -615,7 +663,9 @@ export function StoreDetailDrawer({
 														className="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/50"
 													>
 														<div>
-															<p className="text-sm font-medium">{linked.name}</p>
+															<p className="text-sm font-medium">
+																{linked.name}
+															</p>
 															<p className="text-xs text-muted-foreground">
 																{linked.address || linked.city || "No address"}
 															</p>
@@ -623,7 +673,9 @@ export function StoreDetailDrawer({
 														<Button
 															variant="ghost"
 															size="sm"
-															onClick={() => {/* TODO: navigate to store */}}
+															onClick={() => {
+																/* TODO: navigate to store */
+															}}
 														>
 															View <ArrowRight className="h-3 w-3 ml-1" />
 														</Button>
@@ -679,7 +731,10 @@ export function StoreDetailDrawer({
 												<div className="flex gap-2">
 													<Button
 														onClick={handleApprove}
-														disabled={actionInProgress === "approve" || actionInProgress === "force-approve"}
+														disabled={
+															actionInProgress === "approve" ||
+															actionInProgress === "force-approve"
+														}
 														className="flex-1 bg-green-600 hover:bg-green-700 text-white"
 													>
 														{actionInProgress === "approve" ? (
@@ -697,7 +752,10 @@ export function StoreDetailDrawer({
 													{!showForceApprove ? (
 														<Button
 															onClick={() => setShowForceApprove(true)}
-															disabled={actionInProgress === "approve" || actionInProgress === "force-approve"}
+															disabled={
+																actionInProgress === "approve" ||
+																actionInProgress === "force-approve"
+															}
 															variant="outline"
 															className="text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/20"
 														>
@@ -726,20 +784,26 @@ export function StoreDetailDrawer({
 																Force Approval Required
 															</p>
 															<p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-																Skipping enrichment requires documented justification for audit purposes.
+																Skipping enrichment requires documented
+																justification for audit purposes.
 															</p>
 														</div>
 													</div>
 													<Textarea
 														value={forceApproveJustification}
-														onChange={(e) => setForceApproveJustification(e.target.value)}
+														onChange={(e) =>
+															setForceApproveJustification(e.target.value)
+														}
 														placeholder="Explain why enrichment should be skipped (e.g., 'Store data verified manually', 'Known location from field visit', 'Legacy store with verified data')..."
 														className="min-h-[80px] resize-none"
 														required
 													/>
 													<Button
 														onClick={handleForceApprove}
-														disabled={actionInProgress === "force-approve" || !forceApproveJustification.trim()}
+														disabled={
+															actionInProgress === "force-approve" ||
+															!forceApproveJustification.trim()
+														}
 														variant="outline"
 														className="w-full border-amber-500 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20"
 													>

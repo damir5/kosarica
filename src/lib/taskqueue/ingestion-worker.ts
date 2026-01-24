@@ -1,5 +1,5 @@
 import { rerunIngestion, scheduleIngestion } from "@/lib/go-service-client";
-import { scheduleTask, type TaskType } from "./index";
+import type { TaskType } from "./index";
 
 export function createIngestionWorker() {
 	const worker = new TaskQueueWorker({

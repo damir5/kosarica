@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, DollarSign, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
-	CatalogPricesTable,
 	type CatalogPriceRow,
+	CatalogPricesTable,
 } from "@/components/admin/CatalogPricesTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -201,9 +201,7 @@ function CatalogPricesPage() {
 								<SelectTrigger className="w-[180px]">
 									<SelectValue
 										placeholder={
-											chainFilter === "all"
-												? "Select chain first"
-												: "Store"
+											chainFilter === "all" ? "Select chain first" : "Store"
 										}
 									/>
 								</SelectTrigger>
@@ -333,9 +331,7 @@ function CatalogPricesPage() {
 				{/* Table */}
 				{data && !isLoading && (
 					<>
-						<CatalogPricesTable
-							prices={data.prices as CatalogPriceRow[]}
-						/>
+						<CatalogPricesTable prices={data.prices as CatalogPriceRow[]} />
 
 						{/* Pagination */}
 						<div className="mt-4 flex items-center justify-between">

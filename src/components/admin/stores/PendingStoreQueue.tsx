@@ -105,8 +105,8 @@ export function PendingStoreQueue({
 							No pending stores
 						</h3>
 						<p className="text-sm text-muted-foreground">
-							All stores have been reviewed. New stores will appear here when they
-							are detected from data imports.
+							All stores have been reviewed. New stores will appear here when
+							they are detected from data imports.
 						</p>
 					</div>
 				</CardContent>
@@ -142,7 +142,8 @@ export function PendingStoreQueue({
 						</label>
 						{someSelected && (
 							<span className="text-xs text-muted-foreground">
-								{selectedIds.size} store{selectedIds.size !== 1 ? "s" : ""} selected
+								{selectedIds.size} store{selectedIds.size !== 1 ? "s" : ""}{" "}
+								selected
 							</span>
 						)}
 					</div>
@@ -279,22 +280,21 @@ export function sortStores(
 	switch (sortBy) {
 		case "newest":
 			return sorted.sort(
-				(a, b) =>
-					(b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+				(a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
 			);
 		case "oldest":
 			return sorted.sort(
-				(a, b) =>
-					(a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0),
+				(a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0),
 			);
 		case "name_asc":
 			return sorted.sort((a, b) => a.name.localeCompare(b.name));
 		case "name_desc":
 			return sorted.sort((a, b) => b.name.localeCompare(a.name));
 		case "chain_asc":
-			return sorted.sort((a, b) =>
-				a.chainSlug.localeCompare(b.chainSlug) ||
-				a.name.localeCompare(b.name),
+			return sorted.sort(
+				(a, b) =>
+					a.chainSlug.localeCompare(b.chainSlug) ||
+					a.name.localeCompare(b.name),
 			);
 		default:
 			return sorted;

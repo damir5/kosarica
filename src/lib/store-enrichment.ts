@@ -8,7 +8,7 @@
 import { eq } from "drizzle-orm";
 import type { DatabaseType } from "@/db";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
-import { geocodeAddress, type GeocodingInput } from "@/lib/geocoding";
+import { type GeocodingInput, geocodeAddress } from "@/lib/geocoding";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("store-enrichment");
@@ -54,7 +54,10 @@ export async function processEnrichStore(
 		.where(eq(storeEnrichmentTasks.id, taskId));
 
 	// Get store data
-	const [store] = await ctx.db.select().from(stores).where(eq(stores.id, storeId));
+	const [store] = await ctx.db
+		.select()
+		.from(stores)
+		.where(eq(stores.id, storeId));
 
 	if (!store) {
 		await ctx.db

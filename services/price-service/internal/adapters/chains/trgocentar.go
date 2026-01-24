@@ -13,6 +13,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/xml"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // TrgocentarAdapter is the chain adapter for Trgocentar retail chain
@@ -115,17 +116,17 @@ func (a *TrgocentarAdapter) Discover(targetDate string) ([]types.DiscoveredFile,
 	discoveredFiles := make([]types.DiscoveredFile, 0)
 	seenURLs := make(map[string]bool)
 
-	fmt.Printf("[DEBUG] Fetching Trgocentar portal: %s\n", a.BaseURL())
+	log.Debug().Str("url", a.BaseURL()).Msg("Fetching Trgocentar portal")
 
 	resp, err := a.HTTPClient().Get(a.BaseURL())
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to fetch Trgocentar portal: %v\n", err)
+		log.Error().Err(err).Msg("Failed to fetch Trgocentar portal")
 		return nil, fmt.Errorf("failed to fetch Trgocentar portal: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("[ERROR] Trgocentar portal returned status %d\n", resp.StatusCode)
+		log.Error().Int("status", resp.StatusCode).Msg("Trgocentar portal returned non-200 status")
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 

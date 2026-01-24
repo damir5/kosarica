@@ -1,4 +1,4 @@
-import { getDatabase, type DatabaseType } from "@/db";
+import { type DatabaseType, getDatabase } from "@/db";
 
 /**
  * Application environment configuration.

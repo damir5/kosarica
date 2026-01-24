@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { orpc } from "@/orpc";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Loader2, Search } from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { orpc } from "@/orpc";
 
 interface Product {
 	id: string;
@@ -21,7 +20,12 @@ interface ProductSearchProps {
 	limit?: number;
 }
 
-export function ProductSearch({ query: initialQuery, onSelect, minLength = 3, limit = 20 }: ProductSearchProps) {
+export function ProductSearch({
+	query: initialQuery,
+	onSelect,
+	minLength = 3,
+	limit = 20,
+}: ProductSearchProps) {
 	const [query, setQuery] = useState(initialQuery);
 
 	const { data: results, isLoading } = useQuery({
@@ -49,20 +53,27 @@ export function ProductSearch({ query: initialQuery, onSelect, minLength = 3, li
 			</div>
 
 			{query.length > 0 && query.length < minLength && (
-				<p className="text-sm text-muted-foreground">Enter at least {minLength} characters to search</p>
+				<p className="text-sm text-muted-foreground">
+					Enter at least {minLength} characters to search
+				</p>
 			)}
 
 			{products.length > 0 && (
 				<div className="space-y-2 max-h-96 overflow-y-auto">
 					{products.map((product) => (
 						<button
+							type="button"
 							key={product.id}
 							onClick={() => onSelect(product)}
 							className="w-full text-left p-3 border rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
 						>
 							<div className="flex items-start gap-3">
 								{product.imageUrl ? (
-									<img src={product.imageUrl} alt={product.name} className="w-12 h-12 object-cover rounded" />
+									<img
+										src={product.imageUrl}
+										alt={product.name}
+										className="w-12 h-12 object-cover rounded"
+									/>
 								) : (
 									<div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground text-xs">
 										No image
@@ -72,7 +83,9 @@ export function ProductSearch({ query: initialQuery, onSelect, minLength = 3, li
 									<div className="font-medium truncate">{product.name}</div>
 									<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
 										{product.brand && <span>{product.brand}</span>}
-										{product.category && <Badge variant="outline">{product.category}</Badge>}
+										{product.category && (
+											<Badge variant="outline">{product.category}</Badge>
+										)}
 									</div>
 								</div>
 							</div>
@@ -82,7 +95,9 @@ export function ProductSearch({ query: initialQuery, onSelect, minLength = 3, li
 			)}
 
 			{query.length >= minLength && !isLoading && products.length === 0 && (
-				<p className="text-center text-muted-foreground py-4">No products found</p>
+				<p className="text-center text-muted-foreground py-4">
+					No products found
+				</p>
 			)}
 		</div>
 	);

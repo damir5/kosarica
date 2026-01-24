@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/csv"
@@ -123,17 +124,17 @@ func (a *IntersparAdapter) Discover(targetDate string) ([]types.DiscoveredFile, 
 
 	// Construct the JSON API URL
 	apiUrl := fmt.Sprintf("https://www.spar.hr/datoteke_cjenici/Cjenik%s.json", dateForApi)
-	fmt.Printf("[DEBUG] Fetching Interspar JSON API: %s\n", apiUrl)
+	log.Debug().Str("url", apiUrl).Msg("Fetching Interspar JSON API")
 
 	resp, err := a.HTTPClient().Get(apiUrl)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to fetch Interspar JSON API: %v\n", err)
+		log.Error().Err(err).Msg("Failed to fetch Interspar JSON API")
 		return nil, fmt.Errorf("failed to fetch Interspar JSON API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("[ERROR] Interspar JSON API returned status %d\n", resp.StatusCode)
+		log.Error().Int("status_code", resp.StatusCode).Msg("Interspar JSON API returned error status")
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -148,11 +149,11 @@ func (a *IntersparAdapter) Discover(targetDate string) ([]types.DiscoveredFile, 
 	}
 
 	if len(data.Files) == 0 {
-		fmt.Printf("[DEBUG] No files found in JSON response for date %s\n", date)
+		log.Debug().Str("date", date).Msg("No files found in JSON response")
 		return discoveredFiles, nil
 	}
 
-	fmt.Printf("[DEBUG] Found %d file(s) in JSON response\n", len(data.Files))
+	log.Debug().Int("file_count", len(data.Files)).Msg("Found files in JSON response")
 
 	lastModified, _ := time.Parse("2006-01-02", date)
 	for _, file := range data.Files {

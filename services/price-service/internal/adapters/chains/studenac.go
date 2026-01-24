@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/xml"
@@ -195,7 +197,7 @@ func (a *StudenacAdapter) Discover(targetDate string) ([]types.DiscoveredFile, e
 		filterDate = a.discoveryDate
 	}
 
-	fmt.Printf("[DEBUG] Fetching Studenac portal: %s\n", a.BaseURL())
+	log.Debug().Str("url", a.BaseURL()).Msg("Fetching Studenac portal")
 
 	resp, err := a.HTTPClient().Get(a.BaseURL())
 	if err != nil {

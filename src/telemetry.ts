@@ -20,16 +20,25 @@ async function loadNodeSDK() {
 		{ PeriodicExportingMetricReader },
 		{ HttpInstrumentation },
 	] = await Promise.all([
-		import('@opentelemetry/sdk-node'),
-		import('@opentelemetry/resources'),
-		import('@opentelemetry/semantic-conventions'),
-		import('@opentelemetry/exporter-trace-otlp-grpc'),
-		import('@opentelemetry/exporter-metrics-otlp-grpc'),
-		import('@opentelemetry/sdk-metrics'),
-		import('@opentelemetry/instrumentation-http'),
+		import("@opentelemetry/sdk-node"),
+		import("@opentelemetry/resources"),
+		import("@opentelemetry/semantic-conventions"),
+		import("@opentelemetry/exporter-trace-otlp-grpc"),
+		import("@opentelemetry/exporter-metrics-otlp-grpc"),
+		import("@opentelemetry/sdk-metrics"),
+		import("@opentelemetry/instrumentation-http"),
 	]);
 
-	return { NodeSDK, Resource, SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION, OTLPTraceExporter, OTLPMetricExporter, PeriodicExportingMetricReader, HttpInstrumentation };
+	return {
+		NodeSDK,
+		Resource,
+		SEMRESATTRS_SERVICE_NAME,
+		SEMRESATTRS_SERVICE_VERSION,
+		OTLPTraceExporter,
+		OTLPMetricExporter,
+		PeriodicExportingMetricReader,
+		HttpInstrumentation,
+	};
 }
 
 /**
@@ -52,11 +61,12 @@ export interface TelemetryConfig {
  * Default configuration values
  */
 const DEFAULT_CONFIG = {
-	enabled: process.env.OTEL_EXPORTER_OTLP_ENDPOINT !== '',
-	endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'opentelemetry-collector:4317',
-	serviceName: process.env.OTEL_SERVICE_NAME || 'kosarica-nodejs',
-	serviceVersion: process.env.VERSION || process.env.GIT_COMMIT || '1.0.0',
-	environment: process.env.NODE_ENV || process.env.BUILD_ENV || 'production',
+	enabled: process.env.OTEL_EXPORTER_OTLP_ENDPOINT !== "",
+	endpoint:
+		process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "opentelemetry-collector:4317",
+	serviceName: process.env.OTEL_SERVICE_NAME || "kosarica-nodejs",
+	serviceVersion: process.env.VERSION || process.env.GIT_COMMIT || "1.0.0",
+	environment: process.env.NODE_ENV || process.env.BUILD_ENV || "production",
 } as const satisfies TelemetryConfig;
 
 /**
@@ -64,11 +74,12 @@ const DEFAULT_CONFIG = {
  */
 export function getTelemetryConfig(): TelemetryConfig {
 	return {
-		enabled: process.env.OTEL_EXPORTER_OTLP_ENDPOINT !== '',
-		endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'opentelemetry-collector:4317',
-		serviceName: process.env.OTEL_SERVICE_NAME || 'kosarica-nodejs',
-		serviceVersion: process.env.VERSION || process.env.GIT_COMMIT || '1.0.0',
-		environment: process.env.NODE_ENV || process.env.BUILD_ENV || 'production',
+		enabled: process.env.OTEL_EXPORTER_OTLP_ENDPOINT !== "",
+		endpoint:
+			process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "opentelemetry-collector:4317",
+		serviceName: process.env.OTEL_SERVICE_NAME || "kosarica-nodejs",
+		serviceVersion: process.env.VERSION || process.env.GIT_COMMIT || "1.0.0",
+		environment: process.env.NODE_ENV || process.env.BUILD_ENV || "production",
 	};
 }
 
@@ -85,12 +96,16 @@ export function getTelemetryConfig(): TelemetryConfig {
  * // Start your application
  * ```
  */
-export async function initTelemetry(config: Partial<TelemetryConfig> = {}): Promise<any> {
+export async function initTelemetry(
+	config: Partial<TelemetryConfig> = {},
+): Promise<any> {
 	const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
 	// Return null if telemetry is not enabled
 	if (!finalConfig.enabled) {
-		console.log('[Telemetry] OpenTelemetry disabled (no OTEL_EXPORTER_OTLP_ENDPOINT set)');
+		console.log(
+			"[Telemetry] OpenTelemetry disabled (no OTEL_EXPORTER_OTLP_ENDPOINT set)",
+		);
 		return null;
 	}
 
@@ -111,9 +126,9 @@ export async function initTelemetry(config: Partial<TelemetryConfig> = {}): Prom
 		new Resource({
 			[SEMRESATTRS_SERVICE_NAME]: finalConfig.serviceName,
 			[SEMRESATTRS_SERVICE_VERSION]: finalConfig.serviceVersion,
-			'service.type': 'backend',
-			'deployment.environment': finalConfig.environment,
-		})
+			"service.type": "backend",
+			"deployment.environment": finalConfig.environment,
+		}),
 	);
 
 	// Create trace exporter
@@ -140,7 +155,7 @@ export async function initTelemetry(config: Partial<TelemetryConfig> = {}): Prom
 			new HttpInstrumentation({
 				applyCustomAttributesOnSpan: (span: any) => {
 					// Add custom attributes to HTTP spans
-					span.setAttribute('service.name', finalConfig.serviceName);
+					span.setAttribute("service.name", finalConfig.serviceName);
 				},
 			}),
 		],
@@ -149,11 +164,13 @@ export async function initTelemetry(config: Partial<TelemetryConfig> = {}): Prom
 	// Initialize the SDK
 	try {
 		sdk.start();
-		console.log(`[Telemetry] OpenTelemetry initialized for ${finalConfig.serviceName}`);
+		console.log(
+			`[Telemetry] OpenTelemetry initialized for ${finalConfig.serviceName}`,
+		);
 		console.log(`[Telemetry] Exporting to: ${finalConfig.endpoint}`);
 		return sdk;
 	} catch (error) {
-		console.error('[Telemetry] Failed to initialize OpenTelemetry:', error);
+		console.error("[Telemetry] Failed to initialize OpenTelemetry:", error);
 		return null;
 	}
 }
@@ -169,9 +186,9 @@ export async function shutdownTelemetry(sdk: unknown): Promise<void> {
 	if (sdk) {
 		try {
 			await sdk.shutdown();
-			console.log('[Telemetry] OpenTelemetry shut down successfully');
+			console.log("[Telemetry] OpenTelemetry shut down successfully");
 		} catch (error) {
-			console.error('[Telemetry] Error shutting down OpenTelemetry:', error);
+			console.error("[Telemetry] Error shutting down OpenTelemetry:", error);
 		}
 	}
 }

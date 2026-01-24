@@ -49,14 +49,10 @@ export const listCatalogPrices = procedure
 			conditions.push(lte(storeItemState.currentPrice, input.maxPrice));
 		}
 		if (input.dateFrom) {
-			conditions.push(
-				gte(storeItemState.lastSeenAt, new Date(input.dateFrom)),
-			);
+			conditions.push(gte(storeItemState.lastSeenAt, new Date(input.dateFrom)));
 		}
 		if (input.dateTo) {
-			conditions.push(
-				lte(storeItemState.lastSeenAt, new Date(input.dateTo)),
-			);
+			conditions.push(lte(storeItemState.lastSeenAt, new Date(input.dateTo)));
 		}
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

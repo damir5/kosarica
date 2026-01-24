@@ -5,7 +5,7 @@
  * These tests use mocked database connections and do not require a real database.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDb } from "@/utils/bindings";
 
 // Mock the database
@@ -113,8 +113,13 @@ describe("Store Mutations Unit Tests", () => {
 
 			const expectedDate = new Date(input.expectedUpdatedAt);
 			const store = existing[0];
-			if (!store.updatedAt || store.updatedAt.getTime() !== expectedDate.getTime()) {
-				throw new Error("Store was modified by someone else. Please refresh and try again.");
+			if (
+				!store.updatedAt ||
+				store.updatedAt.getTime() !== expectedDate.getTime()
+			) {
+				throw new Error(
+					"Store was modified by someone else. Please refresh and try again.",
+				);
 			}
 
 			await mockDb.update().set({
@@ -207,8 +212,13 @@ describe("Store Mutations Unit Tests", () => {
 			const expectedDate = new Date(input.expectedUpdatedAt);
 			const actualStore = existing[0];
 
-			if (!actualStore.updatedAt || actualStore.updatedAt.getTime() !== expectedDate.getTime()) {
-				expect(actualStore.updatedAt?.getTime()).not.toBe(expectedDate.getTime());
+			if (
+				!actualStore.updatedAt ||
+				actualStore.updatedAt.getTime() !== expectedDate.getTime()
+			) {
+				expect(actualStore.updatedAt?.getTime()).not.toBe(
+					expectedDate.getTime(),
+				);
 			}
 		});
 
@@ -249,7 +259,10 @@ describe("Store Mutations Unit Tests", () => {
 			const expectedDate = new Date(input.expectedUpdatedAt);
 			const actualStore = existing[0];
 
-			if (!actualStore.updatedAt || actualStore.updatedAt.getTime() !== expectedDate.getTime()) {
+			if (
+				!actualStore.updatedAt ||
+				actualStore.updatedAt.getTime() !== expectedDate.getTime()
+			) {
 				// This should fail validation
 				expect(actualStore.updatedAt).toBeNull();
 			}
@@ -303,8 +316,12 @@ describe("Store Mutations Unit Tests", () => {
 			const sourceExpectedDate = new Date(input.sourceExpectedUpdatedAt);
 			const targetExpectedDate = new Date(input.targetExpectedUpdatedAt);
 
-			expect(sourceStore.updatedAt?.getTime()).toBe(sourceExpectedDate.getTime());
-			expect(targetStore.updatedAt?.getTime()).toBe(targetExpectedDate.getTime());
+			expect(sourceStore.updatedAt?.getTime()).toBe(
+				sourceExpectedDate.getTime(),
+			);
+			expect(targetStore.updatedAt?.getTime()).toBe(
+				targetExpectedDate.getTime(),
+			);
 		});
 	});
 
@@ -326,7 +343,9 @@ describe("Store Mutations Unit Tests", () => {
 			};
 
 			const existingStores = await mockDb.select();
-			const nonPendingStores = existingStores.filter((s: any) => s.status !== "pending");
+			const nonPendingStores = existingStores.filter(
+				(s: any) => s.status !== "pending",
+			);
 
 			expect(existingStores.length).toBe(input.storeIds.length);
 			expect(nonPendingStores.length).toBe(0);
@@ -341,7 +360,9 @@ describe("Store Mutations Unit Tests", () => {
 			mockDb.select.mockResolvedValue(stores);
 
 			const existingStores = await mockDb.select();
-			const nonPendingStores = existingStores.filter((s: any) => s.status !== "pending");
+			const nonPendingStores = existingStores.filter(
+				(s: any) => s.status !== "pending",
+			);
 
 			expect(nonPendingStores.length).toBeGreaterThan(0);
 			expect(nonPendingStores[0].id).toBe("sto_2");
@@ -419,7 +440,9 @@ describe("Store Mutations Unit Tests", () => {
 				? `${input.approvalNotes}\n\n[FORCE APPROVAL] ${input.justification}`
 				: `[FORCE APPROVAL] ${input.justification}`;
 
-			expect(combinedNotes).toBe("[FORCE APPROVAL] Legacy store with verified data");
+			expect(combinedNotes).toBe(
+				"[FORCE APPROVAL] Legacy store with verified data",
+			);
 		});
 	});
 
@@ -457,7 +480,10 @@ describe("Store Mutations Unit Tests", () => {
 			const expectedDate = new Date(input.expectedUpdatedAt);
 			const actualStore = existing[0];
 
-			if (!actualStore.updatedAt || actualStore.updatedAt.getTime() !== expectedDate.getTime()) {
+			if (
+				!actualStore.updatedAt ||
+				actualStore.updatedAt.getTime() !== expectedDate.getTime()
+			) {
 				// This should fail validation
 				expect(actualStore.updatedAt).toBeNull();
 			}
@@ -484,7 +510,9 @@ describe("Store Mutations Unit Tests", () => {
 				approvedAt: new Date(),
 			});
 
-			expect(capturedUpdateData.approvalNotes).toBe("Store verified via field visit on 2024-01-15");
+			expect(capturedUpdateData.approvalNotes).toBe(
+				"Store verified via field visit on 2024-01-15",
+			);
 		});
 
 		it("should not set approval notes when not provided", async () => {

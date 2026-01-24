@@ -5,9 +5,9 @@
  * with direct function calls for a single-server Node.js deployment.
  */
 
-import Bree from "bree";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import Bree from "bree";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("scheduler");

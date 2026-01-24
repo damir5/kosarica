@@ -1,14 +1,14 @@
-import { eq, and, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { superadminProcedure } from "../base";
-import { getDb } from "@/utils/bindings";
 import {
-	productMatchQueue,
-	productMatchCandidates,
-	productMatchRejections,
 	productLinks,
 	productMatchAudit,
+	productMatchCandidates,
+	productMatchQueue,
+	productMatchRejections,
 } from "@/db/schema";
+import { getDb } from "@/utils/bindings";
+import { superadminProcedure } from "../base";
 
 // Schema for input validation
 const approveMatchSchema = z.object({
@@ -180,7 +180,9 @@ export const approveMatch = superadminProcedure
 				queue.linkedProductId ??
 				(
 					await tx
-						.select({ candidateProductId: productMatchCandidates.candidateProductId })
+						.select({
+							candidateProductId: productMatchCandidates.candidateProductId,
+						})
 						.from(productMatchCandidates)
 						.where(
 							and(
@@ -265,7 +267,9 @@ export const rejectMatch = superadminProcedure
 				const remaining = await tx
 					.select({ count: sql<number>`count(*)` })
 					.from(productMatchCandidates)
-					.where(eq(productMatchCandidates.retailerItemId, queue.retailerItemId));
+					.where(
+						eq(productMatchCandidates.retailerItemId, queue.retailerItemId),
+					);
 
 				// If no candidates left, mark as rejected
 				if (remaining[0]?.count === 0) {

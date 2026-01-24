@@ -1,10 +1,4 @@
-import {
-	ArrowUpDown,
-	Building2,
-	Filter,
-	Search,
-	X,
-} from "lucide-react";
+import { ArrowUpDown, Building2, Filter, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -103,12 +97,15 @@ export function PendingStoresFilters({
 
 			{/* Chain Filter */}
 			<div className="space-y-2">
-				<label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+				<label
+					htmlFor="chain-filter"
+					className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"
+				>
 					<Building2 className="h-3 w-3" />
 					Chain
 				</label>
 				<Select value={selectedChain} onValueChange={onChainChange}>
-					<SelectTrigger className="w-full">
+					<SelectTrigger className="w-full" id="chain-filter">
 						<SelectValue placeholder="Select chain" />
 					</SelectTrigger>
 					<SelectContent>
@@ -123,12 +120,18 @@ export function PendingStoresFilters({
 
 			{/* Sort */}
 			<div className="space-y-2">
-				<label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+				<label
+					htmlFor="sort-select"
+					className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"
+				>
 					<ArrowUpDown className="h-3 w-3" />
 					Sort By
 				</label>
-				<Select value={sortBy} onValueChange={(v) => onSortChange(v as PendingStoreSortOption)}>
-					<SelectTrigger className="w-full">
+				<Select
+					value={sortBy}
+					onValueChange={(v) => onSortChange(v as PendingStoreSortOption)}
+				>
+					<SelectTrigger className="w-full" id="sort-select">
 						<SelectValue placeholder="Sort by" />
 					</SelectTrigger>
 					<SelectContent>
@@ -144,7 +147,8 @@ export function PendingStoresFilters({
 			{/* Results count */}
 			<div className="pt-2 border-t">
 				<p className="text-xs text-muted-foreground">
-					<span className="font-medium text-foreground">{storeCount}</span> store
+					<span className="font-medium text-foreground">{storeCount}</span>{" "}
+					store
 					{storeCount !== 1 ? "s" : ""} found
 				</p>
 			</div>

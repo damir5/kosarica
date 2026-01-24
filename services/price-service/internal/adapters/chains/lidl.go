@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	zipexpand "github.com/kosarica/price-service/internal/ingestion/zip"
@@ -103,17 +104,17 @@ func (a *LidlAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error
 		filterDate = a.discoveryDate
 	}
 
-	fmt.Printf("[DEBUG] Fetching Lidl portal: %s\n", a.BaseURL())
+	log.Debug().Str("url", a.BaseURL()).Msg("Fetching Lidl portal")
 
 	resp, err := a.HTTPClient().Get(a.BaseURL())
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to fetch Lidl portal: %v\n", err)
+		log.Error().Err(err).Msg("Failed to fetch Lidl portal")
 		return nil, fmt.Errorf("failed to fetch Lidl portal: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("[ERROR] Lidl portal returned status %d\n", resp.StatusCode)
+		log.Error().Int("status_code", resp.StatusCode).Msg("Lidl portal returned error status")
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -221,7 +222,7 @@ func (a *LidlAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error
 		}
 	}
 
-	fmt.Printf("[DEBUG] Discovered %d files from Lidl portal\n", len(discoveredFiles))
+	log.Debug().Int("file_count", len(discoveredFiles)).Msg("Discovered files from Lidl portal")
 	return discoveredFiles, nil
 }
 
@@ -253,7 +254,7 @@ func (a *LidlAdapter) ExpandZIP(ctx context.Context, content []byte, filename st
 		}
 	}
 
-	fmt.Printf("[DEBUG] Expanded %d CSV files from ZIP %s\n", len(csvFiles), filename)
+	log.Debug().Int("csv_count", len(csvFiles)).Str("filename", filename).Msg("Expanded CSV files from ZIP")
 	return csvFiles, nil
 }
 

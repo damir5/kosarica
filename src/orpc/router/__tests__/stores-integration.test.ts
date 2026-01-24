@@ -10,14 +10,14 @@
  * Set INTEGRATION_TESTS=1 to run these tests.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 
 describe.skipIf(!process.env.INTEGRATION_TESTS)(
 	"Store Approval Workflow Integration Tests",
 	() => {
-		let testStoreIds: string[] = [];
+		const testStoreIds: string[] = [];
 
 		beforeAll(async () => {
 			const db = getDb();
@@ -33,7 +33,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 
 			// Store 1: Pending store
 			const store1Id = generatePrefixedId("sto");
-			await db.insert_into("stores")
+			await db
+				.insert_into("stores")
 				.values({
 					id: store1Id,
 					chain_slug: "konzum",
@@ -54,7 +55,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 
 			// Store 2: Another pending store for merge testing
 			const store2Id = generatePrefixedId("sto");
-			await db.insert_into("stores")
+			await db
+				.insert_into("stores")
 				.values({
 					id: store2Id,
 					chain_slug: "konzum",
@@ -75,7 +77,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 
 			// Store 3: Active store for merge testing
 			const store3Id = generatePrefixedId("sto");
-			await db.insert_into("stores")
+			await db
+				.insert_into("stores")
 				.values({
 					id: store3Id,
 					chain_slug: "konzum",
@@ -101,9 +104,7 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 			// Clean up test stores
 			for (const storeId of testStoreIds) {
 				try {
-					await db.delete_from("stores")
-						.where("id", "=", storeId)
-						.execute();
+					await db.delete_from("stores").where("id", "=", storeId).execute();
 				} catch (e) {
 					// Ignore errors during cleanup
 					console.warn(`Failed to cleanup store ${storeId}:`, e);
@@ -117,7 +118,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				const storeId = testStoreIds[0];
 
 				// Verify initial state
-				const [store] = await db.select_from("stores")
+				const [store] = await db
+					.select_from("stores")
 					.where("id", "=", storeId)
 					.all();
 
@@ -129,7 +131,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				const approvalNotes = "Integration test approval";
 				const now = new Date().toISOString();
 
-				await db.update("stores")
+				await db
+					.update("stores")
 					.set({
 						status: "active",
 						updated_at: now,
@@ -141,7 +144,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 					.execute();
 
 				// Verify final state
-				const [updatedStore] = await db.select_from("stores")
+				const [updatedStore] = await db
+					.select_from("stores")
 					.where("id", "=", storeId)
 					.all();
 
@@ -156,7 +160,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				const storeId = testStoreIds[2]; // Already active
 
 				// Verify store is active
-				const [store] = await db.select_from("stores")
+				const [store] = await db
+					.select_from("stores")
 					.where("id", "=", storeId)
 					.all();
 
@@ -174,21 +179,24 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				const storeId = testStoreIds[1];
 
 				// Get current store
-				const [store] = await db.select_from("stores")
+				const [store] = await db
+					.select_from("stores")
 					.where("id", "=", storeId)
 					.all();
 
 				const originalUpdatedAt = store.updated_at;
 
 				// Simulate another user modifying the store
-				await db.update("stores")
+				await db
+					.update("stores")
 					.set({ updated_at: new Date().toISOString() })
 					.where("id", "=", storeId)
 					.execute();
 
 				// Try to approve with old timestamp
 				const expectedDate = new Date(originalUpdatedAt);
-				const [currentStore] = await db.select_from("stores")
+				const [currentStore] = await db
+					.select_from("stores")
 					.where("id", "=", storeId)
 					.all();
 				const currentDate = new Date(currentStore.updated_at);
@@ -213,10 +221,12 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				const targetId = testStoreIds[1];
 
 				// Verify both stores exist
-				const [sourceStore] = await db.select_from("stores")
+				const [sourceStore] = await db
+					.select_from("stores")
 					.where("id", "=", sourceId)
 					.all();
-				const [targetStore] = await db.select_from("stores")
+				const [targetStore] = await db
+					.select_from("stores")
 					.where("id", "=", targetId)
 					.all();
 
@@ -235,7 +245,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 
 				for (let i = 1; i <= 3; i++) {
 					const storeId = generatePrefixedId("sto");
-					await db.insert_into("stores")
+					await db
+						.insert_into("stores")
 						.values({
 							id: storeId,
 							chain_slug: "konzum",
@@ -254,7 +265,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 
 				// Verify all stores are pending
 				for (const storeId of bulkStoreIds) {
-					const [store] = await db.select_from("stores")
+					const [store] = await db
+						.select_from("stores")
 						.where("id", "=", storeId)
 						.all();
 					expect(store.status).toBe("pending");
@@ -265,7 +277,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				const bulkNotes = "Bulk approval integration test";
 
 				for (const storeId of bulkStoreIds) {
-					await db.update("stores")
+					await db
+						.update("stores")
 						.set({
 							status: "active",
 							updated_at: new Date().toISOString(),
@@ -279,7 +292,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 
 				// Verify all stores are now active
 				for (const storeId of bulkStoreIds) {
-					const [store] = await db.select_from("stores")
+					const [store] = await db
+						.select_from("stores")
 						.where("id", "=", storeId)
 						.all();
 					expect(store.status).toBe("active");
@@ -290,10 +304,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				// Cleanup
 				for (const storeId of bulkStoreIds) {
 					try {
-						await db.delete_from("stores")
-							.where("id", "=", storeId)
-							.execute();
-					} catch (e) {
+						await db.delete_from("stores").where("id", "=", storeId).execute();
+					} catch (_e) {
 						// Ignore cleanup errors
 					}
 				}
@@ -303,7 +315,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				const db = getDb();
 
 				// Try to get pending stores
-				const pendingStores = await db.select_from("stores")
+				const pendingStores = await db
+					.select_from("stores")
 					.where("status", "=", "pending")
 					.all();
 
@@ -320,7 +333,8 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 					justification: "",
 				};
 
-				const hasJustification = input.justification && input.justification.trim().length > 0;
+				const hasJustification =
+					input.justification && input.justification.trim().length > 0;
 				expect(hasJustification).toBe(false);
 			});
 

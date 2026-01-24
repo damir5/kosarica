@@ -10,6 +10,7 @@ import (
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/kosarica/price-service/internal/storage"
+	"github.com/rs/zerolog/log"
 )
 
 // IngestionResult represents the result of an ingestion run
@@ -46,7 +47,7 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 		return nil, fmt.Errorf("failed to create ingestion run")
 	}
 
-	fmt.Printf("[INFO] Starting ingestion run %s for chain %s\n", runID, chainID)
+	log.Info().Str("runId", runID).Str("chain", chainID).Msg("Starting ingestion run")
 
 	result := &IngestionResult{
 		RunID:  runID,
@@ -54,7 +55,7 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 	}
 
 	// Phase 1: Discover
-	fmt.Printf("[INFO] Phase 1: Discovery\n")
+	log.Info().Msg("Phase 1: Discovery")
 	discoveredFiles, err := DiscoverPhase(ctx, chainID, runID, targetDate)
 	if err != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("Discovery failed: %v", err))
@@ -64,25 +65,25 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 	}
 
 	if len(discoveredFiles) == 0 {
-		fmt.Printf("[INFO] No files discovered, ingestion complete\n")
+		log.Info().Msg("No files discovered, ingestion complete")
 		result.Success = true
 		return result, nil
 	}
 
-	fmt.Printf("[INFO] Discovered %d files\n", len(discoveredFiles))
+	log.Info().Int("count", len(discoveredFiles)).Msg("Discovered files")
 
 	var firstArchiveID string
 
 	// Process each file through fetch, parse, persist phases
 	for _, file := range discoveredFiles {
-		fmt.Printf("[INFO] Processing file: %s\n", file.Filename)
+		log.Info().Str("filename", file.Filename).Msg("Processing file")
 
 		// Phase 2: Fetch (with storage backend)
 		fetchResult, err := FetchPhase(ctx, chainID, file, storageBackend)
 		if err != nil {
 			errMsg := fmt.Sprintf("Fetch failed for %s: %v", file.Filename, err)
 			result.Errors = append(result.Errors, errMsg)
-			fmt.Printf("[ERROR] %s\n", errMsg)
+			log.Error().Str("error", errMsg).Msg("Fetch failed")
 			continue
 		}
 
@@ -101,16 +102,16 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 		if err != nil {
 			errMsg := fmt.Sprintf("Parse failed for %s: %v", file.Filename, err)
 			result.Errors = append(result.Errors, errMsg)
-			fmt.Printf("[ERROR] %s\n", errMsg)
+			log.Error().Str("error", errMsg).Msg("Parse failed")
 			continue
 		}
 
 		if parseResult.ValidRows == 0 {
-			fmt.Printf("[INFO] No valid rows in %s, skipping persist\n", file.Filename)
+			log.Info().Str("filename", file.Filename).Msg("No valid rows, skipping persist")
 			result.FilesProcessed++
 			// Update run progress for empty files
 			if err := incrementProcessedFiles(ctx, runID); err != nil {
-				fmt.Printf("[WARN] Failed to increment processed files: %v\n", err)
+				log.Warn().Err(err).Msg("Failed to increment processed files")
 			}
 			continue
 		}
@@ -120,7 +121,7 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 		if err != nil {
 			errMsg := fmt.Sprintf("Persist failed for %s: %v", file.Filename, err)
 			result.Errors = append(result.Errors, errMsg)
-			fmt.Printf("[ERROR] %s\n", errMsg)
+			log.Error().Str("error", errMsg).Msg("Persist failed")
 			continue
 		}
 
@@ -131,21 +132,21 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 	// Link first archive to ingestion run
 	if firstArchiveID != "" {
 		if err := database.LinkArchiveToIngestionRun(ctx, firstArchiveID, runID); err != nil {
-			fmt.Printf("[WARN] Failed to link archive to run: %v\n", err)
+			log.Warn().Err(err).Msg("Failed to link archive to run")
 		} else {
-			fmt.Printf("[INFO] Linked archive %s to run %s\n", firstArchiveID, runID)
+			log.Info().Str("archiveId", firstArchiveID).Str("runId", runID).Msg("Linked archive to run")
 		}
 	}
 
 	// Mark run as completed
-	fmt.Printf("[INFO] Ingestion run %s complete: %d files, %d entries\n", runID, result.FilesProcessed, result.EntriesPersisted)
+	log.Info().Str("runId", runID).Int("files", result.FilesProcessed).Int("entries", result.EntriesPersisted).Msg("Ingestion run complete")
 	if len(result.Errors) > 0 {
-		fmt.Printf("[WARN] Run completed with %d errors\n", len(result.Errors))
+		log.Warn().Int("errors", len(result.Errors)).Msg("Run completed with errors")
 	}
 
 	// Update run status to completed
 	if err := markRunCompleted(ctx, runID, result.FilesProcessed, result.EntriesPersisted); err != nil {
-		fmt.Printf("[WARN] Failed to mark run as completed: %v\n", err)
+		log.Warn().Err(err).Msg("Failed to mark run as completed")
 	}
 
 	result.Success = len(result.Errors) == 0
@@ -168,7 +169,7 @@ func createIngestionRun(ctx context.Context, chainID string) string {
 	`, runID, chainID, now, now)
 
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to create ingestion run: %v\n", err)
+		log.Error().Err(err).Msg("Failed to create ingestion run")
 		return ""
 	}
 

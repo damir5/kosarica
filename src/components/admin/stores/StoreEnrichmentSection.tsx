@@ -218,7 +218,10 @@ export function StoreEnrichmentSection({
 										task={task as EnrichmentTask}
 										onVerify={handleVerify}
 										onRetry={(task) => handleTriggerEnrichment(task.type)}
-										isRetrying={triggerMutation.isPending && triggerMutation.variables === task.type}
+										isRetrying={
+											triggerMutation.isPending &&
+											triggerMutation.variables === task.type
+										}
 									/>
 								))}
 							</div>

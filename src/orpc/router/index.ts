@@ -1,11 +1,21 @@
 import { getConfigInfo } from "./admin";
+import * as basket from "./basket";
 import {
 	getCategories,
 	getStoresByChain,
 	listCatalogPrices,
 } from "./catalog-prices";
-import * as basket from "./basket";
 import * as priceService from "./price-service";
+import {
+	approveMatch,
+	bulkApprove,
+	getPendingMatchCount,
+	getPendingMatches,
+	getStats,
+	rejectMatch,
+	resolveSuspicious,
+	searchProducts,
+} from "./products";
 import { getSettings, updateSettings } from "./settings";
 import {
 	approveStore,
@@ -38,16 +48,6 @@ import {
 	listUsers,
 	updateUserRole,
 } from "./users";
-import {
-	approveMatch,
-	bulkApprove,
-	getPendingMatchCount,
-	getPendingMatches,
-	getStats,
-	rejectMatch,
-	resolveSuspicious,
-	searchProducts,
-} from "./products";
 
 export default {
 	listTodos,

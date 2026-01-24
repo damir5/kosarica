@@ -14,6 +14,7 @@ import (
 	zipexpand "github.com/kosarica/price-service/internal/ingestion/zip"
 	"github.com/kosarica/price-service/internal/parsers/csv"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // eurospinColumnMapping is the primary column mapping for Eurospin CSV files
@@ -115,18 +116,18 @@ func (a *EurospinAdapter) Discover(targetDate string) ([]types.DiscoveredFile, e
 		date = time.Now().Format("2006-01-02")
 	}
 
-	fmt.Printf("[DEBUG] Fetching Eurospin portal for date: %s\n", date)
-	fmt.Printf("[DEBUG] URL: %s\n", a.BaseURL())
+	log.Debug().Str("date", date).Msg("Fetching Eurospin portal")
+	log.Debug().Str("url", a.BaseURL()).Msg("Using base URL")
 
 	resp, err := a.HTTPClient().Get(a.BaseURL())
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to fetch Eurospin portal: %v\n", err)
+		log.Error().Err(err).Msg("Failed to fetch Eurospin portal")
 		return nil, fmt.Errorf("failed to fetch Eurospin portal: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("[ERROR] Eurospin portal returned status %d\n", resp.StatusCode)
+		log.Error().Int("status", resp.StatusCode).Msg("Eurospin portal returned non-200 status")
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -192,7 +193,7 @@ func (a *EurospinAdapter) Discover(targetDate string) ([]types.DiscoveredFile, e
 		})
 	}
 
-	fmt.Printf("[DEBUG] Found %d file(s) for date %s\n", len(discoveredFiles), date)
+	log.Debug().Int("count", len(discoveredFiles)).Str("date", date).Msg("Found files for date")
 	return discoveredFiles, nil
 }
 
@@ -259,7 +260,7 @@ func (a *EurospinAdapter) ExpandZIP(ctx context.Context, content []byte, filenam
 		}
 	}
 
-	fmt.Printf("[DEBUG] Expanded %d CSV files from ZIP %s\n", len(csvFiles), filename)
+	log.Debug().Int("count", len(csvFiles)).Str("filename", filename).Msg("Expanded CSV files from ZIP")
 	return csvFiles, nil
 }
 

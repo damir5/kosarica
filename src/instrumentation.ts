@@ -8,7 +8,7 @@
  * automatic instrumentation of modules.
  */
 
-import { initTelemetry } from './telemetry';
+import { initTelemetry } from "./telemetry";
 
 // Initialize OpenTelemetry immediately when this module is loaded
 // This ensures telemetry is active before any other code runs

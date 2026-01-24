@@ -10,6 +10,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // ParseResult represents the result of parsing a file
@@ -29,7 +30,7 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 		return nil, fmt.Errorf("failed to get adapter for %s: %w", chainID, err)
 	}
 
-	fmt.Printf("[INFO] Parsing file: %s\n", file.Filename)
+	log.Info().Str("filename", file.Filename).Msg("Parsing file")
 
 	// Parse the content
 	parseResult, err := adapter.Parse(fetchResult.Content, file.Filename, nil)
@@ -37,16 +38,32 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 		return nil, fmt.Errorf("parse failed for %s: %w", file.Filename, err)
 	}
 
-	fmt.Printf("[INFO] Parsed %d rows (%d valid) from %s\n", parseResult.TotalRows, parseResult.ValidRows, file.Filename)
+	log.Info().
+		Int("total_rows", parseResult.TotalRows).
+		Int("valid_rows", parseResult.ValidRows).
+		Str("filename", file.Filename).
+		Msg("Parsed file")
 
 	// Log any parse errors
 	if len(parseResult.Errors) > 0 {
-		fmt.Printf("[WARN] %d parse errors in %s\n", len(parseResult.Errors), file.Filename)
+		log.Warn().
+			Int("error_count", len(parseResult.Errors)).
+			Str("filename", file.Filename).
+			Msg("Parse errors found")
 		for _, e := range parseResult.Errors[:5] { // Log first 5 errors
-			fmt.Printf("[WARN]   Row %d: %s\n", e.RowNumber, e.Message)
+			event := log.Warn().
+				Str("error", e.Message).
+				Str("filename", file.Filename)
+			if e.RowNumber != nil {
+				event = event.Int("row_number", *e.RowNumber)
+			}
+			event.Msg("Parse error")
 		}
 		if len(parseResult.Errors) > 5 {
-			fmt.Printf("[WARN]   ... and %d more errors\n", len(parseResult.Errors)-5)
+			log.Warn().
+				Int("additional_error_count", len(parseResult.Errors)-5).
+				Str("filename", file.Filename).
+				Msg("Additional parse errors not shown")
 		}
 	}
 
@@ -62,7 +79,7 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 	}
 
 	if parseResult.ValidRows == 0 {
-		fmt.Printf("[INFO] No valid rows to persist from %s\n", file.Filename)
+		log.Info().Str("filename", file.Filename).Msg("No valid rows to persist")
 		markFileCompleted(ctx, fileID, 0)
 		return &ParseResult{
 			FileID:    fileID,

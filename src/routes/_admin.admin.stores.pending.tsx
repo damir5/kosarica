@@ -11,12 +11,7 @@ import {
 import { StoreApprovalModal } from "@/components/admin/stores/StoreApprovalModal";
 import { StoreMergeModal } from "@/components/admin/stores/StoreMergeModal";
 import { Badge } from "@/components/ui/badge";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { orpc } from "@/orpc/client";
 
 export const Route = createFileRoute("/_admin/admin/stores/pending")({
@@ -120,10 +115,11 @@ function PendingStoresPage() {
 	const rejectMutation = useMutation({
 		mutationFn: async (storeId: string) => {
 			// Find the store to get its actual updatedAt value for optimistic locking
-			const store = allStores.find(s => s.id === storeId);
+			const store = allStores.find((s) => s.id === storeId);
 			return orpc.admin.stores.reject.call({
 				storeId,
-				expectedUpdatedAt: store?.updatedAt?.toISOString() ?? new Date().toISOString(),
+				expectedUpdatedAt:
+					store?.updatedAt?.toISOString() ?? new Date().toISOString(),
 			});
 		},
 		onSuccess: () => {
@@ -134,7 +130,13 @@ function PendingStoresPage() {
 
 	// Bulk approve mutation
 	const bulkApproveMutation = useMutation({
-		mutationFn: async ({ storeIds, approvalNotes }: { storeIds: string[]; approvalNotes?: string }) => {
+		mutationFn: async ({
+			storeIds,
+			approvalNotes,
+		}: {
+			storeIds: string[];
+			approvalNotes?: string;
+		}) => {
 			return orpc.admin.stores.bulkApprove.call({
 				storeIds,
 				approvalNotes,
@@ -148,7 +150,13 @@ function PendingStoresPage() {
 
 	// Bulk reject mutation
 	const bulkRejectMutation = useMutation({
-		mutationFn: async ({ storeIds, reason }: { storeIds: string[]; reason?: string }) => {
+		mutationFn: async ({
+			storeIds,
+			reason,
+		}: {
+			storeIds: string[];
+			reason?: string;
+		}) => {
 			return orpc.admin.stores.bulkReject.call({
 				storeIds,
 				reason,
@@ -187,13 +195,9 @@ function PendingStoresPage() {
 		result = result.sort((a, b) => {
 			switch (sortBy) {
 				case "newest":
-					return (
-						(b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0)
-					);
+					return (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0);
 				case "oldest":
-					return (
-						(a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0)
-					);
+					return (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0);
 				case "name_asc":
 					return a.name.localeCompare(b.name);
 				case "name_desc":
@@ -213,7 +217,10 @@ function PendingStoresPage() {
 
 	// Pagination
 	const ITEMS_PER_PAGE = 10;
-	const totalPages = Math.max(1, Math.ceil(processedStores.length / ITEMS_PER_PAGE));
+	const totalPages = Math.max(
+		1,
+		Math.ceil(processedStores.length / ITEMS_PER_PAGE),
+	);
 	const paginatedStores = processedStores.slice(
 		(currentPage - 1) * ITEMS_PER_PAGE,
 		currentPage * ITEMS_PER_PAGE,
@@ -222,7 +229,7 @@ function PendingStoresPage() {
 	// Reset to page 1 when filters change
 	useEffect(() => {
 		setCurrentPage(1);
-	}, [searchQuery, selectedChain, sortBy]);
+	}, []);
 
 	const hasActiveFilters = searchQuery !== "" || selectedChain !== "all";
 
@@ -388,7 +395,8 @@ function PendingStoresPage() {
 							)}
 
 							{/* Empty State (when no results after filtering) */}
-							{!isLoading && processedStores.length === 0 &&
+							{!isLoading &&
+								processedStores.length === 0 &&
 								allStores.length > 0 && (
 									<Card>
 										<CardContent className="flex flex-col items-center justify-center py-12">
@@ -397,8 +405,8 @@ function PendingStoresPage() {
 												No stores match your filters
 											</h3>
 											<p className="text-muted-foreground text-sm text-center max-w-sm">
-												Try adjusting your search or filter settings to find what
-												you're looking for.
+												Try adjusting your search or filter settings to find
+												what you're looking for.
 											</p>
 										</CardContent>
 									</Card>
@@ -422,7 +430,9 @@ function PendingStoresPage() {
 					setApprovalError(null);
 					if (approvalStore) {
 						if (!approvalStore.updatedAt) {
-							setApprovalError("Cannot approve store: missing update timestamp. Please refresh and try again.");
+							setApprovalError(
+								"Cannot approve store: missing update timestamp. Please refresh and try again.",
+							);
 							return;
 						}
 						await approveMutation.mutateAsync({
@@ -445,7 +455,9 @@ function PendingStoresPage() {
 				onConfirm={async (targetStoreId, targetStore) => {
 					if (mergeStore) {
 						if (!mergeStore.updatedAt || !targetStore?.updatedAt) {
-							setApprovalError("Cannot merge stores: missing update timestamp. Please refresh and try again.");
+							setApprovalError(
+								"Cannot merge stores: missing update timestamp. Please refresh and try again.",
+							);
 							return;
 						}
 						await mergeMutation.mutateAsync({

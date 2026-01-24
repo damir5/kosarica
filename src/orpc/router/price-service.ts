@@ -57,10 +57,9 @@ export const listRuns = procedure
 			params.set("status", input.status);
 		}
 
-		return goFetchWithRetry(
-			`/internal/ingestion/runs?${params.toString()}`,
-			{ timeout: 5000 },
-		);
+		return goFetchWithRetry(`/internal/ingestion/runs?${params.toString()}`, {
+			timeout: 5000,
+		});
 	});
 
 /**
@@ -167,14 +166,13 @@ export const triggerChain = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		return goFetch(
-			`/internal/admin/ingest/${input.chain}`,
-			{
-				method: "POST",
-				body: input.targetDate ? JSON.stringify({ targetDate: input.targetDate }) : undefined,
-				timeout: 10000, // 10s timeout - should return 202 immediately
-			},
-		);
+		return goFetch(`/internal/admin/ingest/${input.chain}`, {
+			method: "POST",
+			body: input.targetDate
+				? JSON.stringify({ targetDate: input.targetDate })
+				: undefined,
+			timeout: 10000, // 10s timeout - should return 202 immediately
+		});
 	});
 
 /**
@@ -255,10 +253,9 @@ export const searchItems = procedure
 			params.set("chainSlug", input.chainSlug);
 		}
 
-		return goFetchWithRetry(
-			`/internal/items/search?${params.toString()}`,
-			{ timeout: 5000 },
-		);
+		return goFetchWithRetry(`/internal/items/search?${params.toString()}`, {
+			timeout: 5000,
+		});
 	});
 
 // ============================================================================
@@ -303,10 +300,9 @@ export const getHistoricalPrice = procedure
 			params.set("asOf", input.asOf);
 		}
 
-		return goFetchWithRetry(
-			`/internal/prices/history?${params.toString()}`,
-			{ timeout: 5000 },
-		);
+		return goFetchWithRetry(`/internal/prices/history?${params.toString()}`, {
+			timeout: 5000,
+		});
 	});
 
 /**
