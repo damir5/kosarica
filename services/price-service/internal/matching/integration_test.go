@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
 // TestEmbeddingProvider is a mock implementation for testing
@@ -56,62 +55,45 @@ func setupIntegrationTestDB(ctx context.Context, t testing.TB) (*pgxpool.Pool, f
 		return nil, func() {}, fmt.Errorf("skipping integration test in short mode")
 	}
 
-	// Start PostgreSQL container
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "postgres:16-alpine",
-			ExposedPorts: []string{"5432/tcp"},
-			Env: map[string]string{
-				"POSTGRES_USER":     "test",
-				"POSTGRES_PASSWORD": "test",
-				"POSTGRES_DB":       "test",
-			},
-			WaitingFor: wait.ForLog("database system is ready to accept connections"),
-		},
-		Started: true,
-	})
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:16-alpine",
+		postgres.WithDatabase("test"),
+		postgres.WithUsername("test"),
+		postgres.WithPassword("test"),
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("start container: %w", err)
 	}
 
-	// Get connection details
-	host, err := container.Host(ctx)
+	connString, err := postgresContainer.ConnectionString(ctx)
 	if err != nil {
-		container.Terminate(ctx)
-		return nil, nil, fmt.Errorf("get host: %w", err)
+		postgresContainer.Terminate(ctx)
+		return nil, nil, fmt.Errorf("get connection string: %w", err)
 	}
-
-	port, err := container.MappedPort(ctx, "5432")
-	if err != nil {
-		container.Terminate(ctx)
-		return nil, nil, fmt.Errorf("get port: %w", err)
-	}
-
-	connString := fmt.Sprintf("postgres://test:test@%s:%s/test?sslmode=disable", host, port.Port())
 
 	// Connect to database
 	poolConfig, err := pgxpool.ParseConfig(connString)
 	if err != nil {
-		container.Terminate(ctx)
+		postgresContainer.Terminate(ctx)
 		return nil, nil, fmt.Errorf("parse config: %w", err)
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
-		container.Terminate(ctx)
+		postgresContainer.Terminate(ctx)
 		return nil, nil, fmt.Errorf("connect: %w", err)
 	}
 
 	// Run migrations
 	if err := runTestMigrations(ctx, pool); err != nil {
 		pool.Close()
-		container.Terminate(ctx)
+		postgresContainer.Terminate(ctx)
 		return nil, nil, fmt.Errorf("migrate: %w", err)
 	}
 
 	cleanup := func() {
 		pool.Close()
-		container.Terminate(ctx)
+		postgresContainer.Terminate(ctx)
 	}
 
 	return pool, cleanup, nil
