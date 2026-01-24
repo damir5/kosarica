@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/kosarica/price-service/internal/pkg/cuid2"
 )
 
 // FindOrCreatePriceGroup finds an existing price group by hash or creates a new one
@@ -43,7 +43,7 @@ func FindOrCreatePriceGroup(ctx context.Context, chainSlug, priceHash string) (*
 
 	// Not found, create new group
 	now := time.Now()
-	newGroupID := uuid.New().String()
+	newGroupID := cuid2.GeneratePrefixedId("grp", cuid2.PrefixedIdOptions{})
 
 	insertQuery := `
 		INSERT INTO price_groups (
@@ -188,7 +188,7 @@ func AssignStoreToGroup(ctx context.Context, storeID, groupID string) error {
 	}
 
 	// Create new membership entry
-	historyID := uuid.New().String()
+	historyID := cuid2.GeneratePrefixedId("sid", cuid2.PrefixedIdOptions{})
 	_, err = tx.Exec(ctx, `
 		INSERT INTO store_group_history (id, store_id, price_group_id, valid_from, valid_to, created_at)
 		VALUES ($1, $2, $3, $4, NULL, NOW())

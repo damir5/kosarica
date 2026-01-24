@@ -1,2 +1,9 @@
 # Ralphy Progress Log
 
+- [✓] 2026-01-22 09:11 - pnpm dev then curl http://localhost:3002 errors with An error occurred while server rendering /:
+
+      Cannot find module '@opentelemetry/sdk-node' imported from '/workspace/src/telemetry.
+
+  ts'
+
+  work until you fix it

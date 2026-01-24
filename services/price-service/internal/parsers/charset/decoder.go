@@ -29,9 +29,9 @@ var windows1250Chars = map[byte]rune{
 type Encoding string
 
 const (
-	EncodingUTF8      Encoding = "utf-8"
+	EncodingUTF8        Encoding = "utf-8"
 	EncodingWindows1250 Encoding = "windows-1250"
-	EncodingISO88592   Encoding = "iso-8859-2"
+	EncodingISO88592    Encoding = "iso-8859-2"
 )
 
 // DetectEncoding detects the encoding of a byte buffer
@@ -58,8 +58,12 @@ func DetectEncoding(data []byte) Encoding {
 			}
 		}
 
-		if windows1250Score > 2 {
-			return EncodingWindows1250
+		// FIX: If valid UTF-8 AND contains Croatian characters, prefer UTF-8 directly
+		// This prevents false positive Windows-1250 detection on UTF-8 files
+		// with Croatian diacritics (š, č, ć, ž, đ) which share byte values
+		// in UTF-8 multibyte sequences
+		if windows1250Score > 0 {
+			return EncodingUTF8
 		}
 
 		return EncodingUTF8
@@ -72,15 +76,21 @@ func DetectEncoding(data []byte) Encoding {
 // Decode converts a byte buffer from the specified encoding to UTF-8 string
 func Decode(data []byte, enc Encoding) (string, error) {
 	if enc == EncodingUTF8 || enc == "" {
-		// If it's supposed to be UTF-8 but isn't valid, try Windows-1250
+		// FIX: If data is valid UTF-8, return directly regardless of requested encoding
+		// This prevents double-decoding when adapter sets windows-1250 but file is UTF-8
 		if utf8.Valid(data) {
 			return string(data), nil
 		}
-		// Fall back to Windows-1250
+		// Fall back to Windows-1250 only if NOT valid UTF-8
 		return decodeWindows1250(data)
 	}
 
 	if enc == EncodingWindows1250 {
+		// FIX: Validate UTF-8 first before attempting Windows-1250 decoding
+		// If file is actually UTF-8 (but adapter thinks it's Windows-1250), use UTF-8
+		if utf8.Valid(data) {
+			return string(data), nil
+		}
 		return decodeWindows1250(data)
 	}
 

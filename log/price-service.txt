@@ -1,0 +1,169 @@
+{"level":"info","service":"price-service","endpoint":"opentelemetry-collector:4317","time":1769169679,"message":"OpenTelemetry initialized"}
+{"level":"info","service":"price-service","time":1769169679,"message":"Starting Price Service..."}
+{"level":"info","service":"price-service","time":1769169679,"message":"Database connected"}
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /health                   --> github.com/kosarica/price-service/internal/handlers.HealthCheck (3 handlers)
+[GIN-debug] GET    /internal/health          --> github.com/kosarica/price-service/internal/handlers.HealthCheck (5 handlers)
+[GIN-debug] GET    /internal/chains          --> github.com/kosarica/price-service/internal/handlers.ListChains (5 handlers)
+[GIN-debug] POST   /internal/admin/ingest/:chain --> github.com/kosarica/price-service/internal/handlers.IngestChain (5 handlers)
+[GIN-debug] GET    /internal/admin/ingestion/failed-rows --> github.com/kosarica/price-service/internal/handlers.GetFailedRows (5 handlers)
+[GIN-debug] PUT    /internal/admin/ingestion/failed-rows/:id/notes --> github.com/kosarica/price-service/internal/handlers.UpdateFailedRowNotes (5 handlers)
+[GIN-debug] POST   /internal/admin/ingestion/failed-rows/reprocess --> github.com/kosarica/price-service/internal/handlers.ReprocessFailedRows (5 handlers)
+[GIN-debug] GET    /internal/ingestion/runs  --> github.com/kosarica/price-service/internal/handlers.ListRuns (5 handlers)
+[GIN-debug] GET    /internal/ingestion/runs/:runId --> github.com/kosarica/price-service/internal/handlers.GetRun (5 handlers)
+[GIN-debug] GET    /internal/ingestion/runs/:runId/files --> github.com/kosarica/price-service/internal/handlers.ListFiles (5 handlers)
+[GIN-debug] GET    /internal/ingestion/runs/:runId/errors --> github.com/kosarica/price-service/internal/handlers.ListErrors (5 handlers)
+[GIN-debug] GET    /internal/ingestion/stats --> github.com/kosarica/price-service/internal/handlers.GetStats (5 handlers)
+[GIN-debug] POST   /internal/ingestion/runs/:runId/rerun --> github.com/kosarica/price-service/internal/handlers.RerunRun (5 handlers)
+[GIN-debug] DELETE /internal/ingestion/runs/:runId --> github.com/kosarica/price-service/internal/handlers.DeleteRun (5 handlers)
+[GIN-debug] GET    /internal/prices/:chainSlug/:storeId --> github.com/kosarica/price-service/internal/handlers.GetStorePrices (5 handlers)
+[GIN-debug] GET    /internal/items/search    --> github.com/kosarica/price-service/internal/handlers.SearchItems (5 handlers)
+{"level":"info","service":"price-service","addr":"0.0.0.0:8081","time":1769169679,"message":"Server listening"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":23.70533,"ip":"127.0.0.1","time":1769169680,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.165627,"ip":"127.0.0.1","time":1769169680,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":1.527805,"ip":"127.0.0.1","time":1769169680,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.104417,"ip":"127.0.0.1","time":1769169681,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.068376,"ip":"127.0.0.1","time":1769169683,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":9.959628,"ip":"127.0.0.1","time":1769169683,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.278513,"ip":"127.0.0.1","time":1769169686,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.129501,"ip":"127.0.0.1","time":1769169687,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.061792,"ip":"127.0.0.1","time":1769169688,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":22.020649,"ip":"127.0.0.1","time":1769169688,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.082834,"ip":"127.0.0.1","time":1769169689,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.195127,"ip":"127.0.0.1","time":1769169691,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":27.188569,"ip":"127.0.0.1","time":1769169691,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":31.905318,"ip":"127.0.0.1","time":1769169694,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.156626,"ip":"127.0.0.1","time":1769169695,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":10.774135,"ip":"127.0.0.1","time":1769169697,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":13.249823,"ip":"127.0.0.1","time":1769169700,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":30.543265,"ip":"127.0.0.1","time":1769169703,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":38.076413,"ip":"127.0.0.1","time":1769169706,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.822116,"ip":"127.0.0.1","time":1769169709,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.197045,"ip":"127.0.0.1","time":1769169712,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.206986,"ip":"127.0.0.1","time":1769169715,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.830776,"ip":"127.0.0.1","time":1769169719,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.505214,"ip":"127.0.0.1","time":1769169722,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.609063,"ip":"127.0.0.1","time":1769169725,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.717519,"ip":"127.0.0.1","time":1769169728,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.837109,"ip":"127.0.0.1","time":1769169731,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":11.947075,"ip":"127.0.0.1","time":1769169734,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.933535,"ip":"127.0.0.1","time":1769169737,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":5.935102,"ip":"127.0.0.1","time":1769173682,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":63.036403,"ip":"127.0.0.1","time":1769173682,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.157,"ip":"127.0.0.1","time":1769173683,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.965554,"ip":"127.0.0.1","time":1769173685,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.090958,"ip":"127.0.0.1","time":1769173685,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.531639,"ip":"127.0.0.1","time":1769173688,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.07525,"ip":"127.0.0.1","time":1769173689,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.468763,"ip":"127.0.0.1","time":1769173691,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.304603,"ip":"127.0.0.1","time":1769173694,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.802652,"ip":"127.0.0.1","time":1769173697,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":30.245468,"ip":"127.0.0.1","time":1769173700,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.033649,"ip":"127.0.0.1","time":1769173703,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.797965,"ip":"127.0.0.1","time":1769173706,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":10.578767,"ip":"127.0.0.1","time":1769173709,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":9.306843,"ip":"127.0.0.1","time":1769173712,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.046709,"ip":"127.0.0.1","time":1769173724,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":22.994377,"ip":"127.0.0.1","time":1769173724,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.058583,"ip":"127.0.0.1","time":1769173725,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.051542,"ip":"127.0.0.1","time":1769173727,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.773318,"ip":"127.0.0.1","time":1769173727,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.315779,"ip":"127.0.0.1","time":1769173730,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.065209,"ip":"127.0.0.1","time":1769173731,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":33.239975,"ip":"127.0.0.1","time":1769173733,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.199242,"ip":"127.0.0.1","time":1769173736,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.163898,"ip":"127.0.0.1","time":1769173739,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.974253,"ip":"127.0.0.1","time":1769173742,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.471625,"ip":"127.0.0.1","time":1769173745,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":9.846597,"ip":"127.0.0.1","time":1769173748,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.575964,"ip":"127.0.0.1","time":1769173751,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.980591,"ip":"127.0.0.1","time":1769173754,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":2.614633,"ip":"127.0.0.1","time":1769173812,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":24.855541,"ip":"127.0.0.1","time":1769173812,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.118001,"ip":"127.0.0.1","time":1769173813,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.453057,"ip":"127.0.0.1","time":1769173815,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.0445,"ip":"127.0.0.1","time":1769173815,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":15.273385,"ip":"127.0.0.1","time":1769173818,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.04175,"ip":"127.0.0.1","time":1769173819,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.034027,"ip":"127.0.0.1","time":1769173821,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":37.745877,"ip":"127.0.0.1","time":1769173825,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":7.076347,"ip":"127.0.0.1","time":1769178640,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":62.818246,"ip":"127.0.0.1","time":1769178640,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.342001,"ip":"127.0.0.1","time":1769178641,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.975216,"ip":"127.0.0.1","time":1769178643,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.070959,"ip":"127.0.0.1","time":1769178643,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.824391,"ip":"127.0.0.1","time":1769178646,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":1.00646,"ip":"127.0.0.1","time":1769178647,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.623307,"ip":"127.0.0.1","time":1769178649,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.448348,"ip":"127.0.0.1","time":1769178652,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.005924,"ip":"127.0.0.1","time":1769178655,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.279131,"ip":"127.0.0.1","time":1769178659,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.145257,"ip":"127.0.0.1","time":1769178662,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.577715,"ip":"127.0.0.1","time":1769178665,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.5048,"ip":"127.0.0.1","time":1769178668,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.044631,"ip":"127.0.0.1","time":1769178671,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.637053,"ip":"127.0.0.1","time":1769178674,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":10.483937,"ip":"127.0.0.1","time":1769178677,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":26.867052,"ip":"127.0.0.1","time":1769178680,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.827132,"ip":"127.0.0.1","time":1769178683,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":33.682315,"ip":"127.0.0.1","time":1769178686,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.123208,"ip":"127.0.0.1","time":1769178689,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.941428,"ip":"127.0.0.1","time":1769178689,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.054041,"ip":"127.0.0.1","time":1769178690,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":0.565584,"ip":"127.0.0.1","time":1769178806,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":35.208018,"ip":"127.0.0.1","time":1769178806,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/stats","query":"","status":400,"latency":4.775258,"ip":"127.0.0.1","time":1769178878,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":34.307099,"ip":"127.0.0.1","time":1769178878,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":28.284506,"ip":"127.0.0.1","time":1769178881,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.71301,"ip":"127.0.0.1","time":1769178885,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.137423,"ip":"127.0.0.1","time":1769178888,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":15.840485,"ip":"127.0.0.1","time":1769178891,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.86014,"ip":"127.0.0.1","time":1769178894,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.066259,"ip":"127.0.0.1","time":1769178897,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":12.69773,"ip":"127.0.0.1","time":1769178900,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.608512,"ip":"127.0.0.1","time":1769178903,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":10.012975,"ip":"127.0.0.1","time":1769178906,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":9.177349,"ip":"127.0.0.1","time":1769178909,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":15.57286,"ip":"127.0.0.1","time":1769178912,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.33013,"ip":"127.0.0.1","time":1769178915,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.484881,"ip":"127.0.0.1","time":1769178918,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":27.443838,"ip":"127.0.0.1","time":1769178921,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.582053,"ip":"127.0.0.1","time":1769178924,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.860675,"ip":"127.0.0.1","time":1769178927,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.33972,"ip":"127.0.0.1","time":1769178930,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.991842,"ip":"127.0.0.1","time":1769178933,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.963673,"ip":"127.0.0.1","time":1769178936,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.354263,"ip":"127.0.0.1","time":1769178939,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":10.22435,"ip":"127.0.0.1","time":1769178942,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.415465,"ip":"127.0.0.1","time":1769178945,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.559548,"ip":"127.0.0.1","time":1769178948,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.643929,"ip":"127.0.0.1","time":1769178951,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.469431,"ip":"127.0.0.1","time":1769178954,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":11.521478,"ip":"127.0.0.1","time":1769178958,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.650845,"ip":"127.0.0.1","time":1769178961,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.64989,"ip":"127.0.0.1","time":1769178964,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.455389,"ip":"127.0.0.1","time":1769178967,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.457471,"ip":"127.0.0.1","time":1769178970,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.224552,"ip":"127.0.0.1","time":1769178973,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.303927,"ip":"127.0.0.1","time":1769178976,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.002097,"ip":"127.0.0.1","time":1769178979,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":10.400893,"ip":"127.0.0.1","time":1769178982,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":8.208181,"ip":"127.0.0.1","time":1769178985,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":12.812272,"ip":"127.0.0.1","time":1769178988,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.443679,"ip":"127.0.0.1","time":1769178991,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":31.993471,"ip":"127.0.0.1","time":1769178994,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.876591,"ip":"127.0.0.1","time":1769178997,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.064965,"ip":"127.0.0.1","time":1769179000,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.144966,"ip":"127.0.0.1","time":1769179003,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.288549,"ip":"127.0.0.1","time":1769179006,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.540926,"ip":"127.0.0.1","time":1769179009,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.695386,"ip":"127.0.0.1","time":1769179012,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":6.675136,"ip":"127.0.0.1","time":1769179015,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":7.052095,"ip":"127.0.0.1","time":1769179018,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":4.904591,"ip":"127.0.0.1","time":1769179022,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.508051,"ip":"127.0.0.1","time":1769179025,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":3.946548,"ip":"127.0.0.1","time":1769179028,"message":"HTTP request"}
+{"level":"info","service":"price-service","method":"GET","path":"/internal/ingestion/runs","query":"limit=20&offset=0","status":200,"latency":5.997302,"ip":"127.0.0.1","time":1769179031,"message":"HTTP request"}

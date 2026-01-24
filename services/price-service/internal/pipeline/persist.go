@@ -2,23 +2,25 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/kosarica/price-service/internal/pricegroups"
 	"github.com/kosarica/price-service/internal/types"
 )
 
 // PersistResult represents the result of persisting parsed data
 type PersistResult struct {
-	Persisted     int
-	PriceChanges  int
+	Persisted    int
+	PriceChanges int
 }
 
 // PersistPhase executes the persist phase of the ingestion pipeline
@@ -46,7 +48,7 @@ func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult,
 		}
 
 		// Persist rows for this store
-		persisted, priceChanges, itemIDs, err := persistRowsForStore(ctx, chainID, storeID, storeIdentifier, rows, archiveID)
+		persisted, priceChanges, itemIDs, err := persistRowsForStore(ctx, chainID, storeID, storeIdentifier, rows, archiveID, runID, parseResult.FileID)
 		if err != nil {
 			fmt.Printf("[ERROR] Failed to persist rows for store %s: %v\n", storeIdentifier, err)
 			continue
@@ -140,7 +142,7 @@ func createStore(ctx context.Context, chainID string, storeIdentifier string, me
 	pool := database.Pool()
 
 	// Generate store ID
-	storeID := uuid.New().String()
+	storeID := cuid2.GeneratePrefixedId("sid", cuid2.PrefixedIdOptions{})
 
 	// Determine store name and details
 	name := fmt.Sprintf("%s Store %s", chainID, storeIdentifier)
@@ -174,7 +176,7 @@ func createStore(ctx context.Context, chainID string, storeIdentifier string, me
 	}
 
 	// Insert store identifier
-	identifierID := uuid.New().String()
+	identifierID := cuid2.GeneratePrefixedId("sid", cuid2.PrefixedIdOptions{})
 	_, err = pool.Exec(ctx, `
 		INSERT INTO store_identifiers (id, store_id, type, value, created_at)
 		VALUES ($1, $2, 'filename_code', $3, NOW())
@@ -189,7 +191,7 @@ func createStore(ctx context.Context, chainID string, storeIdentifier string, me
 }
 
 // persistRowsForStore persists normalized rows for a specific store using price groups
-func persistRowsForStore(ctx context.Context, chainID string, storeID string, storeIdentifier string, rows []types.NormalizedRow, archiveID string) (int, int, []string, error) {
+func persistRowsForStore(ctx context.Context, chainID string, storeID string, storeIdentifier string, rows []types.NormalizedRow, archiveID string, runID string, fileID string) (int, int, []string, error) {
 	// Step 1: Collect all validated items with prices
 	itemPrices := make([]pricegroups.ItemPrice, 0, len(rows))
 	itemData := make(map[string]types.NormalizedRow) // Map itemID -> row data
@@ -202,7 +204,18 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		// Validate row
 		validation := validateNormalizedRow(row)
 		if !validation.IsValid {
-			fmt.Printf("[WARN] Skipping invalid row %d: %v\n", row.RowNumber, validation.Errors)
+			fmt.Printf("[DEBUG] VALIDATION FAILED - Row %d\n", row.RowNumber)
+			fmt.Printf("  Name: %q\n", row.Name)
+			fmt.Printf("  Price: %d\n", row.Price)
+			fmt.Printf("  Store: %s, Chain: %s\n", row.StoreIdentifier, chainID)
+			fmt.Printf("  Errors: %v\n", validation.Errors)
+			fmt.Printf("  Raw Data: %s\n", row.RawData)
+
+			// Save failed row for later analysis and re-processing
+			if err := saveFailedRow(ctx, database.Pool(), chainID, runID, fileID, row, validation); err != nil {
+				fmt.Printf("[ERROR] Failed to save failed row %d: %v\n", row.RowNumber, err)
+			}
+
 			continue
 		}
 
@@ -333,7 +346,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 				price_signature = EXCLUDED.price_signature,
 				last_seen_at = NOW(),
 				updated_at = NOW()
-		`, uuid.New().String(), storeID, itemID, row.Price, previousPrice,
+		`, cuid2.GeneratePrefixedId("sid", cuid2.PrefixedIdOptions{}), storeID, itemID, row.Price, previousPrice,
 			row.DiscountPrice, row.DiscountStart, row.DiscountEnd,
 			row.UnitPrice, row.UnitPriceBaseQuantity, row.UnitPriceBaseUnit,
 			row.LowestPrice30d, row.AnchorPrice, row.AnchorPriceAsOf,
@@ -349,7 +362,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 			if barcode == "" {
 				continue
 			}
-			barcodeID := uuid.New().String()
+			barcodeID := cuid2.GeneratePrefixedId("bid", cuid2.PrefixedIdOptions{})
 			_, err = tx.Exec(ctx, `
 				INSERT INTO retailer_item_barcodes (id, retailer_item_id, barcode, is_primary, created_at)
 				VALUES ($1, $2, $3, true, NOW())
@@ -399,7 +412,7 @@ func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.Nor
 	}
 
 	// Create new item
-	itemID := uuid.New().String()
+	itemID := cuid2.GeneratePrefixedId("itm", cuid2.PrefixedIdOptions{})
 	_, err := pool.Exec(ctx, `
 		INSERT INTO retailer_items (
 			id, chain_slug, external_id, name, description, category, subcategory,
@@ -448,7 +461,7 @@ func findOrCreateRetailerItemTx(ctx context.Context, tx pgx.Tx, chainID string, 
 	}
 
 	// Create new item
-	itemID := uuid.New().String()
+	itemID := cuid2.GeneratePrefixedId("itm", cuid2.PrefixedIdOptions{})
 	_, err := tx.Exec(ctx, `
 		INSERT INTO retailer_items (
 			id, chain_slug, external_id, name, description, category, subcategory,
@@ -471,6 +484,30 @@ func findOrCreateRetailerItemTx(ctx context.Context, tx pgx.Tx, chainID string, 
 		row.Subcategory, row.Brand, row.Unit, row.UnitQuantity, row.ImageURL, archiveID)
 
 	return itemID, err
+}
+
+// saveFailedRow saves a failed row for later analysis and re-processing
+func saveFailedRow(ctx context.Context, pool *pgxpool.Pool, chainID string, runID string, fileID string, row types.NormalizedRow, validation types.NormalizedRowValidation) error {
+	// Marshal validation errors to JSON
+	errorsJSON, _ := json.Marshal(validation.Errors)
+
+	// Generate unique ID using cuid2
+	itemID := cuid2.GeneratePrefixedId("failed", cuid2.PrefixedIdOptions{})
+
+	// Insert into retailer_items_failed table using pool.Exec
+	_, err := pool.Exec(ctx, `
+		INSERT INTO retailer_items_failed (
+			id, chain_slug, run_id, file_id, store_identifier, row_number,
+			raw_data, validation_errors, failed_at, reprocessable
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), true)
+	`, itemID, chainID, runID, fileID, row.StoreIdentifier, row.RowNumber, row.RawData, errorsJSON)
+
+	if err != nil {
+		return fmt.Errorf("failed to save failed row %d: %w", row.RowNumber, err)
+	}
+
+	fmt.Printf("[INFO] Saved failed row %d to retailer_items_failed\n", row.RowNumber)
+	return nil
 }
 
 // validateNormalizedRow validates a normalized row

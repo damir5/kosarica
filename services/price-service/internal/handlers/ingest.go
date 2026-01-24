@@ -4,28 +4,28 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
+	
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/pipeline"
+	"github.com/kosarica/price-service/internal/pkg/cuid2"
 )
 
 // ingestionSem limits concurrent ingestion goroutines to prevent resource exhaustion
 var ingestionSem = make(chan struct{}, 10) // Max 10 concurrent ingestion runs
 
-// IngestChainRequest represents the request body for triggering ingestion
+// IngestChainRequest represents a request body for triggering ingestion
 type IngestChainRequest struct {
 	TargetDate string `json:"targetDate,omitempty"` // YYYY-MM-DD format
 }
 
 // IngestChainStartedResponse represents the 202 response when ingestion is started
 type IngestChainStartedResponse struct {
-	RunID    string `json:"runId"`
-	Status   string `json:"status"`
-	PollURL  string `json:"pollUrl"`
-	Message  string `json:"message,omitempty"`
+	RunID   string `json:"runId"`
+	Status  string `json:"status"`
+	PollURL string `json:"pollUrl"`
+	Message string `json:"message,omitempty"`
 }
 
 // IngestChain triggers ingestion for a specific chain asynchronously
@@ -39,7 +39,7 @@ func IngestChain(c *gin.Context) {
 		})
 		return
 	}
-
+	
 	// Parse optional request body
 	var req IngestChainRequest
 	if c.Request.Body != nil && c.Request.ContentLength > 0 {
@@ -47,7 +47,7 @@ func IngestChain(c *gin.Context) {
 			// Ignore bind errors, use defaults
 		}
 	}
-
+	
 	// Validate chain ID
 	if !chains.IsValidChain(chainID) {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -55,12 +55,12 @@ func IngestChain(c *gin.Context) {
 		})
 		return
 	}
-
+	
 	// Create run record in database
-	runID := uuid.New().String()
+	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	pool := database.Pool()
 	ctx := c.Request.Context()
-
+	
 	_, err := pool.Exec(ctx, `
 		INSERT INTO ingestion_runs (
 			id, chain_slug, source, status, started_at, created_at
@@ -68,24 +68,24 @@ func IngestChain(c *gin.Context) {
 			$1, $2, 'api', 'running', NOW(), NOW()
 		)
 	`, runID, chainID)
-
+	
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("Failed to create ingestion run: %v", err),
 		})
 		return
 	}
-
+	
 	// Spawn goroutine for actual processing
 	go func() {
 		// Acquire semaphore slot (blocks if max concurrent reached)
 		ingestionSem <- struct{}{}
 		defer func() { <-ingestionSem }() // Release semaphore slot when done
-
+		
 		// Use a background context for the goroutine
 		bgCtx := context.Background()
 		result, runErr := pipeline.Run(bgCtx, chainID, req.TargetDate)
-
+		
 		// Update run status based on result
 		if runErr != nil {
 			markRunFailed(bgCtx, runID, runErr.Error())
@@ -95,7 +95,7 @@ func IngestChain(c *gin.Context) {
 			markRunCompleted(bgCtx, runID, result.FilesProcessed, result.EntriesPersisted)
 		}
 	}()
-
+	
 	// Return 202 Accepted immediately
 	c.JSON(http.StatusAccepted, IngestChainStartedResponse{
 		RunID:   runID,
@@ -115,12 +115,19 @@ func GetIngestionStatus(c *gin.Context) {
 		})
 		return
 	}
-
-	// TODO: Implement status lookup from database
+	
+	// Look up status from database
+	pool := database.Pool()
+	var status string
+	err := pool.QueryRow(c.Request.Context(), "SELECT status FROM ingestion_runs WHERE id = $1", runID).Scan(&status)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to lookup status"})
+		return
+	}
+	
 	c.JSON(http.StatusOK, gin.H{
-		"runId":  runID,
-		"status": "pending",
-		"message": "Status lookup not yet implemented",
+		"runId":   runID,
+		"status":  status,
 	})
 }
 
@@ -130,20 +137,56 @@ func ListIngestionRuns(c *gin.Context) {
 	chainID := c.Param("chain")
 	if chainID == "" {
 		c.JSON(http.StatusOK, gin.H{
-			"runs":  []interface{}{},
+			"runs":    []interface{}{},
 			"message": "Listing all runs (chain not specified)",
 		})
 		return
 	}
-
-	// TODO: Implement runs lookup from database
+	
+	// Look up runs from database
+	pool := database.Pool()
+	rows, err := pool.Query(c.Request.Context(), `
+		SELECT id, status, started_at, completed_at, files_processed, entries_persisted
+		FROM ingestion_runs
+		WHERE chain_slug = $1 AND source = 'api'
+		ORDER BY started_at DESC
+		LIMIT 20
+	`, chainID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to lookup runs"})
+		return
+	}
+	defer rows.Close()
+	
+	var runs []interface{}
+	for rows.Next() {
+		var run struct {
+			ID             string `json:"id"`
+			Status         string `json:"status"`
+			StartedAt      string `json:"startedAt"`
+			CompletedAt    *string `json:"completedAt,omitempty"`
+			FilesProcessed int    `json:"filesProcessed"`
+			EntriesPersisted int   `json:"entriesPersisted"`
+		}
+		err := rows.Scan(
+			&run.ID,
+			&run.Status,
+			&run.StartedAt,
+			&run.CompletedAt,
+			&run.FilesProcessed,
+			&run.EntriesPersisted,
+		)
+		if err != nil {
+			continue
+		}
+		runs = append(runs, run)
+	}
+	
 	c.JSON(http.StatusOK, gin.H{
 		"chain": chainID,
-		"runs":  []interface{}{},
-		"message": "Run listing not yet implemented",
+		"runs":  runs,
 	})
 }
-
 // markRunFailed marks an ingestion run as failed
 func markRunFailed(ctx context.Context, runID string, errorMsg string) {
 	pool := database.Pool()

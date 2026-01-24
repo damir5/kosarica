@@ -7,16 +7,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// CleanupConfig holds configuration for cleanup jobs
-type CleanupConfig struct {
+// ExceptionCleanupConfig holds configuration for cleanup jobs
+type ExceptionCleanupConfig struct {
 	ExceptionCleanupInterval time.Duration // How often to run exception cleanup
 	OrphanGroupCleanupAge    time.Duration // Age threshold for orphan group cleanup
 	Enabled                  bool          // Whether cleanup jobs are enabled
 }
 
-// DefaultCleanupConfig returns the default cleanup configuration
-func DefaultCleanupConfig() CleanupConfig {
-	return CleanupConfig{
+// DefaultExceptionCleanupConfig returns the default cleanup configuration
+func DefaultExceptionCleanupConfig() ExceptionCleanupConfig {
+	return ExceptionCleanupConfig{
 		ExceptionCleanupInterval: 1 * time.Hour,
 		OrphanGroupCleanupAge:    30 * 24 * time.Hour, // 30 days
 		Enabled:                  true,
@@ -25,7 +25,7 @@ func DefaultCleanupConfig() CleanupConfig {
 
 // CleanupManager manages background cleanup jobs
 type CleanupManager struct {
-	config CleanupConfig
+	config ExceptionCleanupConfig
 	logger *zerolog.Logger
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -35,7 +35,7 @@ type CleanupManager struct {
 }
 
 // NewCleanupManager creates a new cleanup manager
-func NewCleanupManager(config CleanupConfig, logger *zerolog.Logger) *CleanupManager {
+func NewCleanupManager(config ExceptionCleanupConfig, logger *zerolog.Logger) *CleanupManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &CleanupManager{

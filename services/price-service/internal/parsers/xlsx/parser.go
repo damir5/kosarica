@@ -516,6 +516,11 @@ func parsePrice(value string) (int, error) {
 		return 0, err
 	}
 
+	// Debug logging
+	if parsed <= 0 {
+		fmt.Printf("[DEBUG] parsePrice: raw=%q cleaned=%q parsed=%f\n", value, cleaned, parsed)
+	}
+
 	// Convert to cents
 	return int(math.Round(parsed * 100)), nil
 }

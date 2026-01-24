@@ -41,3 +41,11 @@ run = "pnpm db:migrate"
 [tasks.db-studio]
 description = "Open Drizzle Studio (Node.js)"
 run = "pnpm db:studio"
+
+[tasks.db-export-schema]
+description = "Export current schema from database for sqlc"
+run = "pg_dump --schema-only --no-owner --no-privileges $DATABASE_URL > src/db/tasks/schema.sql"
+
+[tasks.sqlc-generate]
+description = "Generate sqlc Go code from queries"
+run = "cd services/price-service && sqlc generate"

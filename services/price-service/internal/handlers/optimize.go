@@ -96,7 +96,7 @@ var (
 func InitOptimizers(cache *optimizer.PriceCache, config *optimizer.OptimizerConfig, metrics *optimizer.MetricsRecorder) {
 	priceCache = cache
 	optimizerConfig = config
-	singleStoreOptimizer = optimizer.NewSingleStoreOptimizer(cache, config, metrics)
+	singleStoreOptimizer = optimizer.NewSingleStoreOptimizer(cache, config)
 	multiStoreOptimizer = optimizer.NewMultiStoreOptimizer(cache, config, metrics)
 }
 

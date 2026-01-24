@@ -91,6 +91,27 @@ func markRunCompleted(ctx context.Context, runID string, processedFiles int, pro
 	return err
 }
 
+// MarkRunInterrupted marks an ingestion run as interrupted (e.g., service restart)
+func MarkRunInterrupted(ctx context.Context, runID string) error {
+	pool := database.Pool()
+	now := time.Now()
+	_, err := pool.Exec(ctx, `
+		UPDATE ingestion_runs
+		SET status = 'interrupted',
+		    completed_at = $1,
+		    metadata = jsonb_set(
+		        COALESCE(metadata, '{}'::jsonb),
+		        '{interrupted_reason}',
+		        to_jsonb('Service restarted during processing')
+		    )
+		WHERE id = $2
+	`, now, runID)
+	if err != nil {
+		return fmt.Errorf("failed to mark run as interrupted: %w", err)
+	}
+	return nil
+}
+
 // markRunFailed marks an ingestion run as failed
 func markRunFailed(ctx context.Context, runID string, errorMsg string) error {
 	pool := database.Pool()

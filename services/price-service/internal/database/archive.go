@@ -4,10 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/kosarica/price-service/internal/pkg/cuid2"
 )
 
 // Archive represents a stored archive file
@@ -31,11 +30,11 @@ type Archive struct {
 
 // ArchiveFilterOptions contains options for filtering archives
 type ArchiveFilterOptions struct {
-	ChainSlug   *string
-	StartDate   *time.Time
-	EndDate     *time.Time
-	Limit       int
-	Offset      int
+	ChainSlug *string
+	StartDate *time.Time
+	EndDate   *time.Time
+	Limit     int
+	Offset    int
 }
 
 // CreateArchive creates a new archive record in the database
@@ -228,5 +227,5 @@ func CalculateChecksum(data []byte) string {
 
 // GenerateArchiveID generates a new archive ID with arc_ prefix
 func GenerateArchiveID() string {
-	return fmt.Sprintf("arc_%s", uuid.New().String())
+	return cuid2.GeneratePrefixedId("arc", cuid2.PrefixedIdOptions{})
 }

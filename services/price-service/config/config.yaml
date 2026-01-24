@@ -7,9 +7,9 @@ server:
   write_timeout: 30s
 
 database:
-  url: ${DATABASE_URL}
-  max_connections: 25
-  min_connections: 5
+  url: ""
+  max_connections: 100
+  min_connections: 10
   max_conn_lifetime: 1h
   max_conn_idle_time: 30m
 

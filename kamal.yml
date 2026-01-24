@@ -1,0 +1,174 @@
+# Kamal deployment configuration for Kosarica
+# See: https://kamal-deploy.org/
+
+service: kosarica
+image: kosarica/app
+registry:
+  server: ghcr.io
+  username: ${GITHUB_USERNAME}
+  password: ${KAMAL_REGISTRY_PASSWORD}
+
+# Deployment servers
+servers:
+  web:
+    hosts:
+      - ${KAMAL_HOST}
+    labels:
+      service: kosarica
+
+# Environment variables
+env:
+  clear:
+    NODE_ENV: production
+    PORT: 3000
+    LOG_LEVEL: info
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector:4317
+    OTEL_SERVICE_NAME: kosarica-nodejs
+  secret:
+    # Secret env vars
+    - POSTGRES_USER
+    - POSTGRES_PASSWORD
+    - POSTGRES_DB
+    - DATABASE_URL
+    - INTERNAL_API_KEY
+    - INTERNAL_API_URL
+    - BETTER_AUTH_SECRET
+    - BETTER_AUTH_URL
+    - PASSKEY_RP_ID
+    - PASSKEY_RP_NAME
+    - ZO_ROOT_USER_EMAIL
+    - ZO_ROOT_USER_PASSWORD
+    - ZO_BASIC_AUTH
+    - ZO_ORG_ID
+
+# Builder configuration
+builder:
+  dockerfile: Dockerfile
+  context: .
+  args:
+    BUILD_TIME: ${BUILD_TIME}
+    GIT_COMMIT: ${GIT_COMMIT}
+    BUILD_ENV: production
+
+# Deployment options
+deploy:
+  # Expose port 3000 to host (for nginx proxy)
+  port: 3000
+
+  # Health check
+  healthcheck:
+    path: /api/health
+    interval: 10
+    max_attempts: 5
+
+  # Volume mounts (for persistent storage)
+  volumes:
+    - /app/data:/app/data
+    - /app/logs:/app/logs
+
+  # Stop old container after starting new one
+  stop_wait_time: 30
+
+# Accessories (services that run alongside the main app)
+accessories:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    host: ${KAMAL_HOST}
+    port: 5432
+    env:
+      clear:
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_DB: ${POSTGRES_DB}
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - /var/lib/kosarica/postgres:/var/lib/postgresql/data
+    options:
+      restart: unless-stopped
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+
+  # Go Price Service
+  price-service:
+    image: kosarica/price-service:latest
+    host: ${KAMAL_HOST}
+    port: 8080
+    env:
+      clear:
+        PORT: 8080
+        LOG_LEVEL: info
+        LOG_FORMAT: json
+        STORAGE_PATH: /app/data/archives
+        OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector:4317
+        OTEL_SERVICE_NAME: price-service
+      secret:
+        - DATABASE_URL
+        - INTERNAL_API_KEY
+    volumes:
+      - /var/lib/kosarica/price-service:/app/data/archives
+    options:
+      restart: unless-stopped
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+        interval: 30s
+        timeout: 5s
+        retries: 3
+
+  # OpenTelemetry Collector
+  opentelemetry-collector:
+    image: otel/opentelemetry-collector:latest
+    host: ${KAMAL_HOST}
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    env:
+      secret:
+        - ZO_BASIC_AUTH
+        - ZO_ORG_ID
+    volumes:
+      - /etc/kamal/accessories/otel-collector-config.yaml:/etc/otelcol-config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+    options:
+      command: ["--config=/etc/otelcol-config.yaml"]
+      restart: unless-stopped
+
+  # OpenObserve observability platform
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    host: ${KAMAL_HOST}
+    port: 5080
+    env:
+      clear:
+        ZO_MEMORY_CACHE_ENABLED: "false"
+        ZO_COMPACT_ENABLED: "true"
+      secret:
+        - ZO_ROOT_USER_EMAIL
+        - ZO_ROOT_USER_PASSWORD
+    volumes:
+      - /var/lib/kosarica/openobserve:/data
+    options:
+      restart: unless-stopped
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:5080/health"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+
+# SSH options
+ssh:
+  user: ${KAMAL_SSH_USER:-root}
+  port: ${KAMAL_SSH_PORT:-22}
+  # Use your SSH key
+  # keys: ["~/.ssh/id_ed25519"]
+
+# Logging options
+logging:
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"

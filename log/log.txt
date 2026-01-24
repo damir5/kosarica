@@ -1,0 +1,753 @@
+
+> kosarica@ dev /workspace
+> vite dev
+
+
+  VITE v7.3.1  ready in 1083 ms
+
+  ➜  Local:   http://localhost:3002/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+[vite] connected.
+[dotenv@17.2.3] injecting env (0) from .env.development -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+{"level":30,"time":1769169674728,"msg":"Initializing server...","service":"kosarica-nodejs","caller":"src/server.ts:45:9","loggerType":"app"}
+[Telemetry] OpenTelemetry initialized for kosarica-nodejs
+[Telemetry] Exporting to: opentelemetry-collector:4317
+{"level":30,"time":1769169676024,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_46dc73ea","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:20 [vite] (client) hmr update /src/styles.css?direct
+12:01:20 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169680100,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_46dc73ea","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":4076}
+12:01:20 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169680898,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_9fa7b118","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+{"level":30,"time":1769169680900,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_a776ee2a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:20 [vite] (client) hmr update /src/styles.css?direct
+12:01:20 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169680906,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_a776ee2a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":6}
+{"level":30,"time":1769169681935,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_52e374aa","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+12:01:21 [vite] (client) hmr update /src/styles.css?direct
+12:01:21 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169683939,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_1163be16","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:23 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169683952,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_3e931bb0","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+12:01:23 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169683958,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_1163be16","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":19}
+{"level":30,"time":1769169686972,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ffa86173","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:26 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169686985,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ffa86173","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+12:01:26 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169687969,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_6da2acf5","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+12:01:27 [vite] (client) hmr update /src/styles.css?direct
+12:01:27 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169688352,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_891328bc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+{"level":30,"time":1769169688354,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_cf65c86e","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+12:01:28 [vite] (client) hmr update /src/styles.css?direct
+12:01:28 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169688424,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_891328bc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":72}
+12:01:28 [vite] (client) hmr update /src/styles.css?direct
+12:01:28 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169689385,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_4b97e310","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+12:01:29 [vite] (client) hmr update /src/styles.css?direct
+12:01:29 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169691405,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_c36f0d1b","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+12:01:31 [vite] (client) hmr update /src/styles.css?direct
+12:01:31 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169691433,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_34756161","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:31 [vite] (client) hmr update /src/styles.css?direct
+12:01:31 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169691497,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_34756161","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":64}
+{"level":30,"time":1769169694507,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_afc3ffdc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:34 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169694592,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_afc3ffdc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":85}
+12:01:34 [vite] (client) hmr update /src/styles.css?direct
+12:01:34 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169695442,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_33a6a9ad","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+12:01:35 [vite] (client) hmr update /src/styles.css?direct
+12:01:35 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169697604,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_1c5172b4","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:37 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169697620,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_1c5172b4","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":16}
+12:01:37 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169700636,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_7fefaedf","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:40 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169700720,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_7fefaedf","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":84}
+12:01:40 [vite] (client) hmr update /src/styles.css?direct
+12:01:40 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169703732,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_9b6d325b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:43 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169703797,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_9b6d325b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":65}
+12:01:43 [vite] (client) hmr update /src/styles.css?direct
+12:01:43 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169706822,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_fc3648c8","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:46 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169706915,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_fc3648c8","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":94}
+12:01:46 [vite] (client) hmr update /src/styles.css?direct
+12:01:46 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169709926,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_243897e2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:49 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169709931,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_243897e2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":6}
+12:01:49 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169712940,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_9356f7ca","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:52 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169712948,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_9356f7ca","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":8}
+12:01:52 [vite] (client) hmr update /src/styles.css?direct
+12:01:53 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169715955,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_5f97b948","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:55 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169716024,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_5f97b948","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":69}
+12:01:56 [vite] (client) hmr update /src/styles.css?direct
+12:01:56 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169719041,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_b5416e94","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:01:59 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169719054,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_b5416e94","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+12:01:59 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169722067,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_e8dde99f","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:02:02 [vite] (client) hmr update /src/styles.css?direct
+12:02:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169722076,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_e8dde99f","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":9}
+12:02:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169725089,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_5d653099","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:02:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169725101,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_5d653099","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":12}
+12:02:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169728113,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_870e39b1","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:02:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169728125,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_870e39b1","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":12}
+12:02:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169731142,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_44b9c267","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:02:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169731156,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_44b9c267","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":14}
+12:02:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169734170,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_79d1c09b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:02:14 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169734189,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_79d1c09b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":19}
+12:02:14 [vite] (client) hmr update /src/styles.css?direct
+12:02:14 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169737204,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ab2944c9","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+12:02:17 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769169737215,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ab2944c9","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":11}
+12:02:17 [vite] (client) hmr update /src/styles.css?direct
+12:03:30 [vite] (client) hmr update /src/styles.css?direct
+12:03:30 [vite] (client) hmr update /src/styles.css?direct
+12:03:43 [vite] (client) hmr update /src/styles.css?direct
+12:03:43 [vite] (client) hmr update /src/styles.css?direct
+12:03:58 [vite] (client) hmr update /src/styles.css?direct
+12:03:58 [vite] (client) hmr update /src/styles.css?direct
+12:04:23 [vite] (client) hmr update /src/styles.css?direct
+12:04:23 [vite] (client) hmr update /src/styles.css?direct
+12:04:38 [vite] (client) hmr update /src/styles.css?direct
+12:04:38 [vite] (client) hmr update /src/styles.css?direct
+12:04:51 [vite] (client) hmr update /src/styles.css?direct
+12:04:51 [vite] (client) hmr update /src/styles.css?direct
+12:05:27 [vite] (client) hmr update /src/styles.css?direct
+12:05:27 [vite] (client) hmr update /src/styles.css?direct
+12:05:27 [vite] (client) hmr update /src/styles.css?direct
+12:05:27 [vite] (client) hmr update /src/styles.css?direct
+12:06:23 [vite] (client) hmr update /src/styles.css?direct
+12:06:23 [vite] (client) hmr update /src/styles.css?direct
+12:06:43 [vite] (client) hmr update /src/styles.css?direct
+12:06:43 [vite] (client) hmr update /src/styles.css?direct
+12:06:54 [vite] (client) hmr update /src/styles.css?direct
+12:06:54 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173682115,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_83c4eb9d","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+{"level":30,"time":1769173682132,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_2ec19ac2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173682239,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_2ec19ac2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":107}
+13:08:02 [vite] (client) hmr update /src/styles.css?direct
+13:08:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173683274,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ce8af937","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:08:03 [vite] (client) hmr update /src/styles.css?direct
+13:08:03 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173685246,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_98cad7e7","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173685254,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_98cad7e7","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":7}
+13:08:05 [vite] (client) hmr update /src/styles.css?direct
+13:08:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173685347,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_228549c1","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+{"level":30,"time":1769173688263,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_c6188cd2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173688272,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_c6188cd2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":9}
+13:08:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173689357,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_61bbf9da","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:08:09 [vite] (client) hmr update /src/styles.css?direct
+13:08:09 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173691280,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_9f1e033b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173691290,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_9f1e033b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":10}
+13:08:11 [vite] (client) hmr update /src/styles.css?direct
+13:08:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173694303,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ee56f4ca","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:14 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173694316,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ee56f4ca","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+13:08:14 [vite] (client) hmr update /src/styles.css?direct
+13:08:14 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173697331,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_d0dad88f","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:17 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173697345,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_d0dad88f","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":14}
+13:08:17 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173700356,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_efb24fc2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:20 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173700440,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_efb24fc2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":84}
+13:08:20 [vite] (client) hmr update /src/styles.css?direct
+13:08:20 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173703452,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_3badc4de","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:23 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173703467,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_3badc4de","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":15}
+13:08:23 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173706482,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_f00248bc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:26 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173706495,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_f00248bc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+13:08:26 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173709511,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_2a7894a8","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:29 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173709529,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_2a7894a8","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":18}
+13:08:29 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173712546,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_b8a305fd","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:32 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173712563,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_b8a305fd","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":17}
+13:08:32 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173724095,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_1cd6c27e","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:08:44 [vite] (client) hmr update /src/styles.css?direct
+13:08:44 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173724100,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_5e27b3f5","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+{"level":30,"time":1769173724150,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_5e27b3f5","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":50}
+13:08:44 [vite] (client) hmr update /src/styles.css?direct
+13:08:44 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173725104,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_0e5fdfbf","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:08:45 [vite] (client) hmr update /src/styles.css?direct
+13:08:45 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173727112,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_17a8363b","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:08:47 [vite] (client) hmr update /src/styles.css?direct
+13:08:47 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173727168,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_764b4034","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:47 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173727174,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_764b4034","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":6}
+13:08:47 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173730187,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_322efa14","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:50 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173730267,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_322efa14","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":80}
+13:08:50 [vite] (client) hmr update /src/styles.css?direct
+13:08:50 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173731121,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_96b53c50","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:08:51 [vite] (client) hmr update /src/styles.css?direct
+13:08:51 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173733302,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_99e4961b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:53 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173733386,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_99e4961b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":84}
+13:08:53 [vite] (client) hmr update /src/styles.css?direct
+13:08:53 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173736399,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_76291314","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:56 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173736410,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_76291314","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":11}
+13:08:56 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173739422,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_e604d6e7","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:08:59 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173739430,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_e604d6e7","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":8}
+13:08:59 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173742444,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ebb241f6","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:09:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173742457,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ebb241f6","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+13:09:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173745470,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_16ccfc9a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:09:05 [vite] (client) hmr update /src/styles.css?direct
+13:09:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173745481,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_16ccfc9a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":11}
+{"level":30,"time":1769173748493,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_4baf2d8b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:09:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173748508,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_4baf2d8b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":15}
+13:09:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173751521,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_a825c070","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:09:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173751536,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_a825c070","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":15}
+13:09:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173754549,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_312aed48","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:09:14 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173754563,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_312aed48","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":14}
+13:09:14 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173812700,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_cdd66dd1","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+{"level":30,"time":1769173812707,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_f479a603","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:10:12 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173812779,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_f479a603","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":72}
+13:10:12 [vite] (client) hmr update /src/styles.css?direct
+13:10:12 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173813786,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_d27fb119","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:10:13 [vite] (client) hmr update /src/styles.css?direct
+13:10:13 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173815785,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ef14cb25","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:10:15 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173815794,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ef14cb25","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":9}
+13:10:15 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173815872,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_3ccf68bf","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:10:15 [vite] (client) hmr update /src/styles.css?direct
+13:10:15 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173818807,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_b510f341","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:10:18 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173818888,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_b510f341","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":81}
+13:10:18 [vite] (client) hmr update /src/styles.css?direct
+13:10:18 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173819880,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_e66022c4","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+13:10:19 [vite] (client) hmr update /src/styles.css?direct
+13:10:19 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173821907,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_c6b8df78","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:10:21 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173821920,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_c6b8df78","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+13:10:21 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173824958,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_1b93662f","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+13:10:24 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769173825037,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_1b93662f","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":79}
+13:10:25 [vite] (client) hmr update /src/styles.css?direct
+13:10:25 [vite] (client) hmr update /src/styles.css?direct
+13:14:34 [vite] (client) hmr update /src/styles.css?direct
+13:14:34 [vite] (client) hmr update /src/styles.css?direct
+13:23:23 [vite] (client) hmr update /src/styles.css?direct
+13:23:23 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178640574,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_11dfbfde","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+{"level":30,"time":1769178640729,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_bcb4eae1","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:30:40 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178640878,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_bcb4eae1","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":149}
+14:30:40 [vite] (client) hmr update /src/styles.css?direct
+14:30:40 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178641884,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_16133cc3","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+14:30:41 [vite] (client) hmr update /src/styles.css?direct
+14:30:41 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178643886,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_8cc75bdd","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:30:43 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178643892,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_8cc75bdd","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":6}
+14:30:43 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178643952,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_dd8663d8","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+14:30:43 [vite] (client) hmr update /src/styles.css?direct
+14:30:43 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178646903,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_0cd924df","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:30:46 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178646917,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_0cd924df","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":14}
+14:30:46 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178647970,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_04e4646b","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+14:30:47 [vite] (client) hmr update /src/styles.css?direct
+14:30:47 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178649926,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_55dc06ea","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:30:49 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178649943,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_55dc06ea","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":17}
+14:30:49 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178652960,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_543660bc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:30:52 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178652977,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_543660bc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":16}
+14:30:52 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178655988,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ab59abd3","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:30:55 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178655994,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ab59abd3","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":6}
+14:30:55 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178659002,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_db9bc032","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:30:59 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178659058,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_db9bc032","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":56}
+14:30:59 [vite] (client) hmr update /src/styles.css?direct
+14:30:59 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178662067,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_883fe11a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178662072,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_883fe11a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":5}
+14:31:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178665079,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_aa055cbd","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178665084,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_aa055cbd","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":5}
+14:31:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178668090,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_d02c5bd3","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178668097,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_d02c5bd3","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":7}
+14:31:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178671105,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_7a7b84ac","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178671109,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_7a7b84ac","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":4}
+14:31:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178674119,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_225b2049","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:14 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178674130,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_225b2049","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":11}
+14:31:14 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178677145,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_43c1fe17","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:17 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178677159,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_43c1fe17","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":14}
+14:31:17 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178680164,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_f8013e91","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:20 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178680218,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_f8013e91","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":54}
+14:31:20 [vite] (client) hmr update /src/styles.css?direct
+14:31:20 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178683223,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_7c205d18","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:23 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178683229,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_7c205d18","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":6}
+14:31:23 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178686256,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ca87ab3c","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:26 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178686334,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ca87ab3c","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":78}
+14:31:26 [vite] (client) hmr update /src/styles.css?direct
+14:31:26 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178689288,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_bda14b88","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+{"level":30,"time":1769178689290,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_2ee6177e","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:31:29 [vite] (client) hmr update /src/styles.css?direct
+14:31:29 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178689302,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_2ee6177e","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":12}
+{"level":30,"time":1769178690303,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_888b741e","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+14:31:30 [vite] (client) hmr update /src/styles.css?direct
+14:31:30 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178806181,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_9b1f6ecc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:33:26 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178806197,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_febdbb94","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+{"level":30,"time":1769178806267,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_9b1f6ecc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":87}
+14:33:26 [vite] (client) hmr update /src/styles.css?direct
+14:33:26 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178878766,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_109b7161","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+{"level":30,"time":1769178878776,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_cbd27d16","method":"POST","path":"/api/rpc/admin/ingestion/getStats"}
+14:34:38 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178878880,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_109b7161","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":114}
+14:34:38 [vite] (client) hmr update /src/styles.css?direct
+14:34:38 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178881914,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_a6f7c2e1","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:34:41 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178881988,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_a6f7c2e1","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":74}
+14:34:41 [vite] (client) hmr update /src/styles.css?direct
+14:34:41 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178885001,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ef1022bb","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:34:45 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178885011,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ef1022bb","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":10}
+14:34:45 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178888020,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_27d4835c","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:34:48 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178888027,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_27d4835c","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":7}
+14:34:48 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178891039,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_64ba42ac","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:34:51 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178891131,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_64ba42ac","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":91}
+14:34:51 [vite] (client) hmr update /src/styles.css?direct
+14:34:51 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178894148,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_c2a753ee","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:34:54 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178894169,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_c2a753ee","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":21}
+14:34:54 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178897178,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_b010e322","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:34:57 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178897186,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_b010e322","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":8}
+14:34:57 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178900200,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_54c45be0","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:00 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178900220,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_54c45be0","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":20}
+14:35:00 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178903235,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_195ab3c2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:03 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178903250,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_195ab3c2","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":15}
+14:35:03 [vite] (client) hmr update /src/styles.css?direct
+14:35:03 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178906258,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_8bb5e8f5","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:06 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178906272,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_8bb5e8f5","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":14}
+14:35:06 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178909284,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_0a290a61","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:09 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178909300,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_0a290a61","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":16}
+14:35:09 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178912317,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_904e4108","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:12 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178912398,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_904e4108","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":82}
+14:35:12 [vite] (client) hmr update /src/styles.css?direct
+14:35:12 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178915406,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_e772cb85","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:15 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178915411,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_e772cb85","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":5}
+14:35:15 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178918418,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_eb15dd8f","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:18 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178918468,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_eb15dd8f","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":50}
+14:35:18 [vite] (client) hmr update /src/styles.css?direct
+14:35:18 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178921486,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_7ef128cc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:21 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178921556,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_7ef128cc","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":70}
+14:35:21 [vite] (client) hmr update /src/styles.css?direct
+14:35:21 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178924569,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_693f0abf","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:24 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178924656,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_693f0abf","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":87}
+14:35:24 [vite] (client) hmr update /src/styles.css?direct
+14:35:24 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178927666,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_8de37827","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:27 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178927674,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_8de37827","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":8}
+14:35:27 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178930684,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_2b97c44a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:30 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178930754,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_2b97c44a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":70}
+14:35:30 [vite] (client) hmr update /src/styles.css?direct
+14:35:30 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178933763,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ecadc464","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:33 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178933771,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ecadc464","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":8}
+14:35:33 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178936779,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_a2878b21","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:36 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178936787,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_a2878b21","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":8}
+14:35:36 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178939800,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_46d01aad","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:39 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178939813,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_46d01aad","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+14:35:39 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178942827,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_b4807e34","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:42 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178942843,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_b4807e34","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":16}
+14:35:42 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178945853,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_23ffdd1d","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:45 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178945858,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_23ffdd1d","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":5}
+14:35:45 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178948865,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_09e9f9cf","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:48 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178948870,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_09e9f9cf","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":5}
+14:35:48 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178951886,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_d3f5d761","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:51 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178951899,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_d3f5d761","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+14:35:51 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178954914,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_16a43432","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:54 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178954929,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_16a43432","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":15}
+14:35:54 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178957992,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_039e4d75","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:35:58 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178958070,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_039e4d75","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":79}
+14:35:58 [vite] (client) hmr update /src/styles.css?direct
+14:35:58 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178961086,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_52ea5e98","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:01 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178961156,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_52ea5e98","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":70}
+14:36:01 [vite] (client) hmr update /src/styles.css?direct
+14:36:01 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178964174,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_4665fb47","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:04 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178964189,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_4665fb47","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":15}
+14:36:04 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178967205,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_82ad5600","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:07 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178967219,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_82ad5600","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":14}
+14:36:07 [vite] (client) hmr update /src/styles.css?direct
+14:36:07 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178970232,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_7fd7b8de","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:10 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178970246,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_7fd7b8de","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":14}
+14:36:10 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178973261,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_ec378692","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:13 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178973329,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_ec378692","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":68}
+14:36:13 [vite] (client) hmr update /src/styles.css?direct
+14:36:13 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178976339,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_56a15682","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:16 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178976351,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_56a15682","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":12}
+14:36:16 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178979375,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_712438be","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:19 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178979388,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_712438be","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+14:36:19 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178982401,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_e7cae77b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:22 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178982484,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_e7cae77b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":83}
+14:36:22 [vite] (client) hmr update /src/styles.css?direct
+14:36:22 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178985495,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_16e6c8c1","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:25 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178985507,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_16e6c8c1","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":12}
+14:36:25 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178988523,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_47c14001","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:28 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178988610,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_47c14001","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":87}
+14:36:28 [vite] (client) hmr update /src/styles.css?direct
+14:36:28 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178991624,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_20998872","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:31 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178991637,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_20998872","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+14:36:31 [vite] (client) hmr update /src/styles.css?direct
+14:36:31 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178994655,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_5fe3c025","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:34 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178994734,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_5fe3c025","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":79}
+14:36:34 [vite] (client) hmr update /src/styles.css?direct
+14:36:34 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178997747,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_9c2f5f21","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:37 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769178997753,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_9c2f5f21","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":6}
+14:36:37 [vite] (client) hmr update /src/styles.css?direct
+14:36:37 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179000762,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_87984c1a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:40 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179000769,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_87984c1a","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":7}
+14:36:40 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179003778,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_764e95c4","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:43 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179003784,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_764e95c4","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":6}
+14:36:43 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179006793,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_acd6c4b6","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:46 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179006852,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_acd6c4b6","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":59}
+14:36:46 [vite] (client) hmr update /src/styles.css?direct
+14:36:46 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179009865,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_261295fd","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:49 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179009873,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_261295fd","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":8}
+14:36:49 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179012880,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_b3e34674","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:52 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179012889,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_b3e34674","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":9}
+14:36:52 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179015898,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_0855315d","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:55 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179015908,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_0855315d","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":10}
+14:36:55 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179018917,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_08c9b84d","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:36:58 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179018983,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_08c9b84d","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":66}
+14:36:58 [vite] (client) hmr update /src/styles.css?direct
+14:36:58 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179022010,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_23e30d0b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:37:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179022067,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_23e30d0b","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":57}
+14:37:02 [vite] (client) hmr update /src/styles.css?direct
+14:37:02 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179025080,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_3de2d64d","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:37:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179025159,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_3de2d64d","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":79}
+14:37:05 [vite] (client) hmr update /src/styles.css?direct
+14:37:05 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179028168,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_92388463","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:37:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179028175,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_92388463","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":7}
+14:37:08 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179031187,"msg":"RPC request started","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:18:7","loggerType":"rpc","requestId":"req_22f2d55e","method":"POST","path":"/api/rpc/admin/ingestion/listRuns"}
+14:37:11 [vite] (client) hmr update /src/styles.css?direct
+{"level":30,"time":1769179031200,"msg":"RPC request completed","service":"kosarica-nodejs","caller":"src/routes/api.rpc.$.ts:40:9","loggerType":"rpc","requestId":"req_22f2d55e","method":"POST","path":"/api/rpc/admin/ingestion/listRuns","status":200,"duration":13}
+14:37:11 [vite] (client) hmr update /src/styles.css?direct
+14:41:11 [vite] (client) hmr update /src/styles.css?direct
+14:41:11 [vite] (client) hmr update /src/styles.css?direct
+14:41:19 [vite] (client) hmr update /src/styles.css?direct
+14:41:19 [vite] (client) hmr update /src/styles.css?direct
+14:42:35 [vite] (client) hmr update /src/styles.css?direct
+14:42:35 [vite] (client) hmr update /src/styles.css?direct
+14:43:30 [vite] (client) hmr update /src/styles.css?direct
+14:43:30 [vite] (client) hmr update /src/styles.css?direct
+14:44:31 [vite] (client) hmr update /src/styles.css?direct
+14:44:31 [vite] (client) hmr update /src/styles.css?direct
+14:44:33 [vite] (client) hmr update /src/styles.css?direct
+14:44:33 [vite] (client) hmr update /src/styles.css?direct
+14:49:43 [vite] (client) hmr update /src/styles.css?direct
+14:49:43 [vite] (client) hmr update /src/styles.css?direct
+14:49:43 [vite] (client) hmr update /src/styles.css?direct
+14:49:43 [vite] (client) hmr update /src/styles.css?direct
+14:50:03 [vite] (client) hmr update /src/styles.css?direct
+14:50:03 [vite] (client) hmr update /src/styles.css?direct
+14:50:17 [vite] (client) hmr update /src/styles.css?direct
+14:50:17 [vite] (client) hmr update /src/styles.css?direct
+14:50:53 [vite] (client) hmr update /src/styles.css?direct
+14:50:53 [vite] (client) hmr update /src/styles.css?direct
+14:50:57 [vite] (client) hmr update /src/styles.css?direct
+14:50:57 [vite] (client) hmr update /src/styles.css?direct
+14:51:20 [vite] (client) hmr update /src/styles.css?direct
+14:51:20 [vite] (client) hmr update /src/styles.css?direct
+14:51:20 [vite] (client) hmr update /src/styles.css?direct
+14:51:20 [vite] (client) hmr update /src/styles.css?direct
+14:51:26 [vite] (client) hmr update /src/styles.css?direct
+14:51:26 [vite] (client) hmr update /src/styles.css?direct
+14:51:34 [vite] (client) hmr update /src/styles.css?direct
+14:51:34 [vite] (client) hmr update /src/styles.css?direct
+14:52:46 [vite] (client) hmr update /src/styles.css?direct
+14:52:46 [vite] (client) hmr update /src/styles.css?direct
+14:53:35 [vite] (client) hmr update /src/styles.css?direct
+14:53:35 [vite] (client) hmr update /src/styles.css?direct
+14:58:19 [vite] (client) hmr update /src/styles.css?direct
+14:58:19 [vite] (client) hmr update /src/styles.css?direct
+14:58:19 [vite] (client) hmr update /src/styles.css?direct
+14:58:19 [vite] (client) hmr update /src/styles.css?direct
+14:58:19 [vite] (client) hmr update /src/styles.css?direct
+14:58:19 [vite] (client) hmr update /src/styles.css?direct
+14:59:29 [vite] (client) hmr update /src/styles.css?direct
+14:59:29 [vite] (client) hmr update /src/styles.css?direct
+14:59:29 [vite] (client) hmr update /src/styles.css?direct
+14:59:29 [vite] (client) hmr update /src/styles.css?direct
+14:59:37 [vite] (client) hmr update /src/styles.css?direct
+14:59:37 [vite] (client) hmr update /src/styles.css?direct
+14:59:37 [vite] (client) hmr update /src/styles.css?direct
+14:59:37 [vite] (client) hmr update /src/styles.css?direct
+14:59:37 [vite] (client) hmr update /src/styles.css?direct
+14:59:37 [vite] (client) hmr update /src/styles.css?direct
+15:00:26 [vite] (client) hmr update /src/styles.css?direct
+15:00:26 [vite] (ssr) page reload src/lib/go-service-client.ts
+[vite] program reload
+[dotenv@17.2.3] injecting env (0) from .env.development -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+{"level":30,"time":1769180426688,"msg":"Initializing server...","service":"kosarica-nodejs","caller":"src/server.ts:45:9","loggerType":"app"}
+[Telemetry] OpenTelemetry initialized for kosarica-nodejs
+[Telemetry] Exporting to: opentelemetry-collector:4317
+15:00:26 [vite] (client) hmr update /src/styles.css?direct
+15:00:26 [vite] (ssr) page reload src/lib/go-service-client.ts
+15:00:26 [vite] (client) hmr update /src/styles.css?direct
+15:00:46 [vite] (client) hmr update /src/styles.css?direct
+15:00:46 [vite] (client) hmr update /src/styles.css?direct
+15:00:46 [vite] (client) hmr update /src/styles.css?direct
+15:00:46 [vite] (client) hmr update /src/styles.css?direct
+15:41:29 [vite] (client) hmr update /src/styles.css?direct
+15:41:29 [vite] (client) hmr update /src/styles.css?direct
+15:41:39 [vite] (client) hmr update /src/styles.css?direct
+15:41:39 [vite] (client) hmr update /src/styles.css?direct
+15:41:48 [vite] (client) hmr update /src/styles.css?direct
+15:41:48 [vite] (client) hmr update /src/styles.css?direct
+15:42:26 [vite] (client) hmr update /src/styles.css?direct
+15:42:26 [vite] (client) hmr update /src/styles.css?direct
+15:44:17 [vite] (client) hmr update /src/styles.css?direct
+15:44:17 [vite] (client) hmr update /src/styles.css?direct
+15:44:59 [vite] (client) hmr update /src/styles.css?direct
+15:44:59 [vite] (client) hmr update /src/styles.css?direct
+15:45:19 [vite] (client) hmr update /src/styles.css?direct
+15:45:19 [vite] (client) hmr update /src/styles.css?direct
+15:45:25 [vite] (client) hmr update /src/styles.css?direct
+15:45:25 [vite] (client) hmr update /src/styles.css?direct
+15:45:43 [vite] (client) hmr update /src/styles.css?direct
+15:45:43 [vite] (client) hmr update /src/styles.css?direct
+15:46:06 [vite] (client) hmr update /src/styles.css?direct
+15:46:06 [vite] (client) hmr update /src/styles.css?direct
+15:46:06 [vite] (client) hmr update /src/styles.css?direct
+15:46:06 [vite] (client) hmr update /src/styles.css?direct
+15:46:16 [vite] (client) hmr update /src/styles.css?direct
+15:46:16 [vite] (client) hmr update /src/styles.css?direct
+15:46:28 [vite] (client) hmr update /src/styles.css?direct
+15:46:28 [vite] (client) hmr update /src/styles.css?direct
+15:46:38 [vite] (client) hmr update /src/styles.css?direct
+15:46:38 [vite] (client) hmr update /src/styles.css?direct
+15:46:46 [vite] (client) hmr update /src/styles.css?direct
+15:46:46 [vite] (client) hmr update /src/styles.css?direct
+15:47:07 [vite] (client) hmr update /src/styles.css?direct
+15:47:07 [vite] (client) hmr update /src/styles.css?direct
+15:47:15 [vite] (client) hmr update /src/styles.css?direct
+15:47:15 [vite] (client) hmr update /src/styles.css?direct
+15:47:20 [vite] (client) hmr update /src/styles.css?direct
+15:47:20 [vite] (client) hmr update /src/styles.css?direct
+15:48:29 [vite] (client) hmr update /src/styles.css?direct
+15:48:29 [vite] (client) hmr update /src/styles.css?direct
+15:48:35 [vite] (client) hmr update /src/styles.css?direct
+15:48:35 [vite] (client) hmr update /src/styles.css?direct
+15:54:10 [vite] (client) hmr update /src/styles.css?direct
+15:54:10 [vite] (client) hmr update /src/styles.css?direct
+15:54:23 [vite] (client) hmr update /src/styles.css?direct
+15:54:23 [vite] (client) hmr update /src/styles.css?direct
+15:54:32 [vite] (client) hmr update /src/styles.css?direct
+15:54:32 [vite] (client) hmr update /src/styles.css?direct
+15:54:42 [vite] (client) hmr update /src/styles.css?direct
+15:54:42 [vite] (client) hmr update /src/styles.css?direct
+15:55:45 [vite] (client) hmr update /src/styles.css?direct
+15:55:45 [vite] (client) hmr update /src/styles.css?direct
+15:56:08 [vite] (client) hmr update /src/styles.css?direct
+15:56:08 [vite] (client) hmr update /src/styles.css?direct
+15:56:59 [vite] (client) hmr update /src/styles.css?direct
+15:56:59 [vite] (client) hmr update /src/styles.css?direct
+15:57:00 [vite] (client) hmr update /src/styles.css?direct
+15:57:00 [vite] (client) hmr update /src/styles.css?direct
+15:57:24 [vite] (client) hmr update /src/styles.css?direct
+15:57:24 [vite] (client) hmr update /src/styles.css?direct
+15:57:24 [vite] (client) hmr update /src/styles.css?direct
+15:57:24 [vite] (client) hmr update /src/styles.css?direct
+15:57:42 [vite] (client) hmr update /src/styles.css?direct
+15:57:42 [vite] (client) hmr update /src/styles.css?direct
+15:57:42 [vite] (client) hmr update /src/styles.css?direct
+15:57:42 [vite] (client) hmr update /src/styles.css?direct

@@ -56,8 +56,19 @@ const config = defineConfig({
     viteReact(),
   ],
   ssr: {
-    // Externalize native Node.js modules
-    external: ['bree'],
+    // Externalize native Node.js modules and OpenTelemetry packages
+    external: [
+      'bree',
+      '@opentelemetry/sdk-node',
+      '@opentelemetry/resources',
+      '@opentelemetry/semantic-conventions',
+      '@opentelemetry/exporter-trace-otlp-grpc',
+      '@opentelemetry/exporter-metrics-otlp-grpc',
+      '@opentelemetry/sdk-metrics',
+      '@opentelemetry/sdk-trace-node',
+      '@opentelemetry/instrumentation-http',
+      '@opentelemetry/api',
+    ],
   },
 })
 

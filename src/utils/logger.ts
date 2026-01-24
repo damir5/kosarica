@@ -197,6 +197,7 @@ interface PinoLogEntry {
 	caller?: string;
 	loggerType?: LoggerType;
 	requestId?: string;
+	service: string;
 	[key: string]: unknown;
 }
 
@@ -287,6 +288,7 @@ function formatLogEntry(
 		level: PINO_LEVELS[level],
 		time: Date.now(),
 		msg: message,
+		service: "kosarica-nodejs",
 	};
 
 	// Add caller location in dev mode

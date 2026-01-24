@@ -19,7 +19,7 @@ export interface Cuid2Options {
  * By default, generates time-sortable IDs (6-char timestamp + 18-char random)
  * for better B-tree index locality.
  *
- * @param prefix - The prefix to prepend to the ID (e.g., 'usr', 'ses', 'cfg')
+ * @param prefix - The prefix to prepend to ID (e.g., 'usr', 'ses', 'cfg')
  * @param options - Optional configuration (timeSortable defaults to true)
  * @returns A text column configured to generate prefixed crypto IDs
  *
