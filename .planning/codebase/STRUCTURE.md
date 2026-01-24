@@ -21,7 +21,6 @@ kosarica/main/
 │   └── styles/            # Global styles
 ├── drizzle/               # Database migrations
 ├── .planning/             # Project planning docs
-├── .beads/                # Issue tracking
 ├── package.json           # Project manifest
 ├── vite.config.ts         # Build configuration
 ├── wrangler.jsonc         # Cloudflare Workers config
@@ -209,11 +208,6 @@ kosarica/main/
 - Purpose: Project planning documents
 - Source: Created by GSD workflow
 - Committed: Yes
-
-**.beads/**
-- Purpose: Issue tracking (beads system)
-- Source: Managed by bd CLI
-- Committed: Yes (JSONL files)
 
 **.wrangler/**
 - Purpose: Wrangler local state/cache
