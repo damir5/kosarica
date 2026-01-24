@@ -12,6 +12,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/csv"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // kauflandAsset represents a single asset from Kaufland's JSON API
@@ -124,18 +125,26 @@ func (a *KauflandAdapter) Discover(targetDate string) ([]types.DiscoveredFile, e
 	}
 	targetDatePattern := fmt.Sprintf("%s%s%s", parts[2], parts[1], parts[0]) // DDMMYYYY
 
-	fmt.Printf("[DEBUG] Fetching Kaufland asset API: %s\n", kauflandAssetAPIURL)
-	fmt.Printf("[DEBUG] Looking for date pattern: %s\n", targetDatePattern)
+	log.Debug().
+		Str("url", kauflandAssetAPIURL).
+		Str("date_pattern", targetDatePattern).
+		Msg("Fetching Kaufland asset API")
 
 	resp, err := a.HTTPClient().Get(kauflandAssetAPIURL)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to fetch Kaufland asset API: %v\n", err)
+		log.Error().
+			Err(err).
+			Str("url", kauflandAssetAPIURL).
+			Msg("Failed to fetch Kaufland asset API")
 		return nil, fmt.Errorf("failed to fetch Kaufland asset API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("[ERROR] Kaufland asset API returned status %d\n", resp.StatusCode)
+		log.Error().
+			Int("status_code", resp.StatusCode).
+			Str("url", kauflandAssetAPIURL).
+			Msg("Kaufland asset API returned non-200 status")
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -196,9 +205,15 @@ func (a *KauflandAdapter) Discover(targetDate string) ([]types.DiscoveredFile, e
 	}
 
 	if len(discoveredFiles) == 0 {
-		fmt.Printf("[DEBUG] No CSV files found for date %s (pattern: %s)\n", date, targetDatePattern)
+		log.Debug().
+			Str("date", date).
+			Str("pattern", targetDatePattern).
+			Msg("No CSV files found for date")
 	} else {
-		fmt.Printf("[DEBUG] Found %d CSV file(s) for date %s\n", len(discoveredFiles), date)
+		log.Debug().
+			Int("file_count", len(discoveredFiles)).
+			Str("date", date).
+			Msg("Found CSV files for date")
 	}
 
 	return discoveredFiles, nil

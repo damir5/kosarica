@@ -1,4 +1,9 @@
-import { Map, MapMarker, MapPopup, MapTileLayer } from "@/components/ui/map";
+import {
+	Map as MapComponent,
+	MapMarker,
+	MapPopup,
+	MapTileLayer,
+} from "@/components/ui/map";
 
 export interface StoreLocationMapClientProps {
 	latitude: number;
@@ -18,7 +23,7 @@ export function StoreLocationMapClient({
 	const position: [number, number] = [latitude, longitude];
 
 	return (
-		<Map
+		<MapComponent
 			center={position}
 			zoom={DEFAULT_ZOOM}
 			scrollWheelZoom={false}
@@ -35,6 +40,6 @@ export function StoreLocationMapClient({
 					</MapPopup>
 				)}
 			</MapMarker>
-		</Map>
+		</MapComponent>
 	);
 }

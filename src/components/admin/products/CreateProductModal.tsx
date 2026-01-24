@@ -1,12 +1,19 @@
-import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { orpc } from "@/orpc";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { orpc } from "@/orpc";
 
 interface CreateProductModalProps {
 	open: boolean;
@@ -78,7 +85,9 @@ export function CreateProductModal({
 						<Input
 							id="name"
 							value={formData.name}
-							onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+							onChange={(e) =>
+								setFormData({ ...formData, name: e.target.value })
+							}
 							required
 						/>
 					</div>
@@ -88,7 +97,9 @@ export function CreateProductModal({
 						<Input
 							id="brand"
 							value={formData.brand}
-							onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+							onChange={(e) =>
+								setFormData({ ...formData, brand: e.target.value })
+							}
 						/>
 					</div>
 
@@ -97,7 +108,9 @@ export function CreateProductModal({
 						<Input
 							id="category"
 							value={formData.category}
-							onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+							onChange={(e) =>
+								setFormData({ ...formData, category: e.target.value })
+							}
 						/>
 					</div>
 
@@ -107,7 +120,9 @@ export function CreateProductModal({
 							<Input
 								id="unitQuantity"
 								value={formData.unitQuantity}
-								onChange={(e) => setFormData({ ...formData, unitQuantity: e.target.value })}
+								onChange={(e) =>
+									setFormData({ ...formData, unitQuantity: e.target.value })
+								}
 								placeholder="e.g., 1, 500"
 							/>
 						</div>
@@ -116,7 +131,9 @@ export function CreateProductModal({
 							<Input
 								id="unit"
 								value={formData.unit}
-								onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+								onChange={(e) =>
+									setFormData({ ...formData, unit: e.target.value })
+								}
 								placeholder="e.g., kg, l, kom"
 							/>
 						</div>
@@ -127,7 +144,9 @@ export function CreateProductModal({
 						<Input
 							id="imageUrl"
 							value={formData.imageUrl}
-							onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+							onChange={(e) =>
+								setFormData({ ...formData, imageUrl: e.target.value })
+							}
 							placeholder="https://..."
 						/>
 					</div>
@@ -137,17 +156,28 @@ export function CreateProductModal({
 						<Textarea
 							id="description"
 							value={formData.description}
-							onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+							onChange={(e) =>
+								setFormData({ ...formData, description: e.target.value })
+							}
 							rows={3}
 						/>
 					</div>
 
 					<DialogFooter>
-						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => onOpenChange(false)}
+						>
 							Cancel
 						</Button>
-						<Button type="submit" disabled={createMutation.isPending || !formData.name.trim()}>
-							{createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+						<Button
+							type="submit"
+							disabled={createMutation.isPending || !formData.name.trim()}
+						>
+							{createMutation.isPending && (
+								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+							)}
 							Create Product
 						</Button>
 					</DialogFooter>

@@ -10,6 +10,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // DiscoverPhase executes the discovery phase of the ingestion pipeline
@@ -21,9 +22,15 @@ func DiscoverPhase(ctx context.Context, chainID string, runID string, targetDate
 		return nil, fmt.Errorf("failed to get adapter for %s: %w", chainID, err)
 	}
 
-	fmt.Printf("[INFO] Starting discovery for chain %s (run %s)\n", chainID, runID)
+	log.Info().
+		Str("chain", chainID).
+		Str("run_id", runID).
+		Msg("Starting discovery")
+
 	if targetDate != "" {
-		fmt.Printf("[INFO] Target date: %s\n", targetDate)
+		log.Info().
+			Str("target_date", targetDate).
+			Msg("Discovery target date")
 	}
 
 	// Discover files
@@ -32,7 +39,10 @@ func DiscoverPhase(ctx context.Context, chainID string, runID string, targetDate
 		return nil, fmt.Errorf("discovery failed: %w", err)
 	}
 
-	fmt.Printf("[INFO] Discovery complete: found %d files for chain %s\n", len(files), chainID)
+	log.Info().
+		Str("chain", chainID).
+		Int("files_found", len(files)).
+		Msg("Discovery complete")
 
 	// Initialize run stats and record total files
 	if err := initializeRunStats(ctx, runID); err != nil {
@@ -45,7 +55,9 @@ func DiscoverPhase(ctx context.Context, chainID string, runID string, targetDate
 
 	// If no files found, mark run as completed
 	if len(files) == 0 {
-		fmt.Printf("[WARN] No files discovered for chain %s\n", chainID)
+		log.Warn().
+			Str("chain", chainID).
+			Msg("No files discovered")
 		if err := markRunCompleted(ctx, runID, 0, 0); err != nil {
 			return nil, fmt.Errorf("failed to mark run as completed: %w", err)
 		}

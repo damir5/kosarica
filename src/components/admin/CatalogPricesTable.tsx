@@ -97,7 +97,8 @@ export function CatalogPricesTable({ prices }: CatalogPricesTableProps) {
 								{formatPrice(price.currentPrice)}
 							</TableCell>
 							<TableCell>
-								{price.discountPrice !== null && price.discountPrice !== undefined ? (
+								{price.discountPrice !== null &&
+								price.discountPrice !== undefined ? (
 									<Badge variant="destructive" className="font-mono">
 										{formatPrice(price.discountPrice)}
 									</Badge>

@@ -83,7 +83,10 @@ export function ErrorCategoryView({
 				<CardContent>
 					<div className="space-y-4">
 						{[...Array(3)].map((_, i) => (
-							<div key={`skeleton-${i}`} className="h-16 bg-muted animate-pulse rounded" />
+							<div
+								key={`skeleton-${i}`}
+								className="h-16 bg-muted animate-pulse rounded"
+							/>
 						))}
 					</div>
 				</CardContent>

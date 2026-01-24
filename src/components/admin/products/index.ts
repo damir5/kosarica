@@ -1,5 +1,5 @@
-export { MatchReviewQueue } from "./MatchReviewQueue";
-export { MatchReviewCard } from "./MatchReviewCard";
 export { BulkActionsBar } from "./BulkActionsBar";
-export { ProductSearch } from "./ProductSearch";
 export { CreateProductModal } from "./CreateProductModal";
+export { MatchReviewCard } from "./MatchReviewCard";
+export { MatchReviewQueue } from "./MatchReviewQueue";
+export { ProductSearch } from "./ProductSearch";

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/csv"
@@ -97,11 +99,11 @@ func (a *KonzumAdapter) Discover(targetDate string) ([]types.DiscoveredFile, err
 
 	for page := 1; page <= maxPages; page++ {
 		pageURL := fmt.Sprintf("%s?date=%s&page=%d", a.BaseURL(), date, page)
-		fmt.Printf("[DEBUG] Fetching Konzum page %d: %s\n", page, pageURL)
+		log.Debug().Int("page", page).Str("url", pageURL).Msg("Fetching Konzum page")
 
 		files, err := a.discoverPage(pageURL, seenURLs, date, page)
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to fetch page %d: %v\n", page, err)
+			log.Error().Int("page", page).Err(err).Msg("Failed to fetch page")
 			break
 		}
 

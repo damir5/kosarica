@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -79,7 +81,7 @@ func Load(configPath string) (*Config, error) {
 	// Load .env file using godotenv
 	if err := loadEnvFile(v); err != nil {
 		// .env is optional, log but don't fail
-		fmt.Printf("Warning: .env file not loaded: %v\n", err)
+		log.Warn().Err(err).Msg("Warning: .env file not loaded")
 	}
 
 	// Enable environment variable override

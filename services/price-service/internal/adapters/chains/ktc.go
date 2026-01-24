@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/csv"
@@ -102,18 +103,18 @@ func (a *KtcAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error)
 	discoveredFiles := make([]types.DiscoveredFile, 0)
 	seenURLs := make(map[string]bool)
 
-	fmt.Printf("[DEBUG] Fetching %s portal: %s\n", a.Name(), a.BaseURL())
+	log.Debug().Str("chain", a.Name()).Str("portal", a.BaseURL()).Msg("Fetching portal")
 
 	// Fetch main page to get list of stores
 	resp, err := a.HTTPClient().Get(a.BaseURL())
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to fetch KTC portal: %v\n", err)
+		log.Error().Err(err).Msg("Failed to fetch KTC portal")
 		return nil, fmt.Errorf("failed to fetch KTC portal: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("[ERROR] KTC portal returned status %d\n", resp.StatusCode)
+		log.Error().Int("status_code", resp.StatusCode).Msg("KTC portal returned unexpected status")
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -140,7 +141,7 @@ func (a *KtcAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error)
 		}
 	}
 
-	fmt.Printf("[DEBUG] Found %d store(s) on KTC portal\n", len(stores))
+	log.Debug().Int("store_count", len(stores)).Msg("Found stores on KTC portal")
 
 	// For each store, fetch store page and extract CSV links
 	for _, storeName := range stores {
@@ -148,13 +149,13 @@ func (a *KtcAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error)
 
 		storeResp, err := a.HTTPClient().Get(storeURL)
 		if err != nil {
-			fmt.Printf("[WARN] Failed to fetch store page for %s: %v\n", storeName, err)
+			log.Warn().Str("store", storeName).Err(err).Msg("Failed to fetch store page")
 			continue
 		}
 		defer storeResp.Body.Close()
 
 		if storeResp.StatusCode != 200 {
-			fmt.Printf("[WARN] Store page for %s returned status %d\n", storeName, storeResp.StatusCode)
+			log.Warn().Str("store", storeName).Int("status_code", storeResp.StatusCode).Msg("Store page returned unexpected status")
 			continue
 		}
 

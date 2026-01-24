@@ -46,7 +46,10 @@ interface StoreMergeModalProps {
 	store: PendingStore | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onConfirm: (targetStoreId: string, targetStore: TargetStore | null) => Promise<void>;
+	onConfirm: (
+		targetStoreId: string,
+		targetStore: TargetStore | null,
+	) => Promise<void>;
 	isLoading?: boolean;
 }
 
@@ -93,7 +96,8 @@ export function StoreMergeModal({
 
 	// Use targetOptions which returns { id, name } for each store
 	// Note: The linking API returns minimal info, we'll fetch full details on selection
-	const availableStores: Array<{ id: string; name: string }> = targetOptions?.stores ?? [];
+	const availableStores: Array<{ id: string; name: string }> =
+		targetOptions?.stores ?? [];
 
 	// Get selected store name for display
 	const selectedStoreName = availableStores.find(

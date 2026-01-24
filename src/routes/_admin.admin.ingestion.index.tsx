@@ -107,7 +107,10 @@ function IngestionDashboard() {
 	// Trigger chain mutation
 	const triggerMutation = useMutation({
 		mutationFn: async (chainSlug: string) => {
-			return orpc.admin.ingestion.triggerChain.call({ chain: chainSlug, targetDate: selectedDate });
+			return orpc.admin.ingestion.triggerChain.call({
+				chain: chainSlug,
+				targetDate: selectedDate,
+			});
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
@@ -160,10 +163,14 @@ function IngestionDashboard() {
 								</SelectContent>
 							</Select>
 							<Button variant="outline" size="icon" onClick={handleRefresh}>
-								<RefreshCw className={`h-4 w-4 ${hasActiveRuns ? "animate-spin" : ""}`} />
+								<RefreshCw
+									className={`h-4 w-4 ${hasActiveRuns ? "animate-spin" : ""}`}
+								/>
 							</Button>
 							{hasActiveRuns && (
-								<span className="text-xs text-muted-foreground">Auto-refreshing</span>
+								<span className="text-xs text-muted-foreground">
+									Auto-refreshing
+								</span>
 							)}
 						</div>
 					</div>

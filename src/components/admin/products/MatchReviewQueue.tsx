@@ -1,14 +1,13 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createReactQueryHooks } from "@/orpc/react";
-import { orpc } from "@/orpc";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import { MatchReviewCard } from "./MatchReviewCard";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { orpc } from "@/orpc";
+import { createReactQueryHooks } from "@/orpc/react";
 import { BulkActionsBar } from "./BulkActionsBar";
+import { MatchReviewCard } from "./MatchReviewCard";
 
 interface RetailerItem {
 	id: string;
@@ -55,7 +54,7 @@ interface MatchReviewQueueResponse {
 	hasMore: boolean;
 }
 
-const hooks = createReactQueryHooks(orpc);
+const _hooks = createReactQueryHooks(orpc);
 
 export function MatchReviewQueue() {
 	const queryClient = useQueryClient();
@@ -69,7 +68,10 @@ export function MatchReviewQueue() {
 	} = useQuery({
 		queryKey: ["admin", "products", "pendingMatches", cursor],
 		queryFn: async () => {
-			const result = await orpc.admin.products.getPendingMatches({ limit: 20, cursor });
+			const result = await orpc.admin.products.getPendingMatches({
+				limit: 20,
+				cursor,
+			});
 			return result as MatchReviewQueueResponse;
 		},
 	});
@@ -86,8 +88,12 @@ export function MatchReviewQueue() {
 		},
 		onSuccess: () => {
 			setSelectedIds(new Set());
-			queryClient.invalidateQueries({ queryKey: ["admin", "products", "pendingMatches"] });
-			queryClient.invalidateQueries({ queryKey: ["admin", "products", "pendingMatchCount"] });
+			queryClient.invalidateQueries({
+				queryKey: ["admin", "products", "pendingMatches"],
+			});
+			queryClient.invalidateQueries({
+				queryKey: ["admin", "products", "pendingMatchCount"],
+			});
 		},
 	});
 
@@ -150,7 +156,9 @@ export function MatchReviewQueue() {
 			<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+						<CardTitle className="text-sm font-medium">
+							Pending Review
+						</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="text-2xl font-bold">{pendingCount}</div>
@@ -162,17 +170,27 @@ export function MatchReviewQueue() {
 					</CardHeader>
 					<CardContent>
 						<div className="text-2xl font-bold">
-							{items.filter((item) => item.candidates.some((c) => c.matchType === "ai")).length}
+							{
+								items.filter((item) =>
+									item.candidates.some((c) => c.matchType === "ai"),
+								).length
+							}
 						</div>
 					</CardContent>
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium">Barcode Matches</CardTitle>
+						<CardTitle className="text-sm font-medium">
+							Barcode Matches
+						</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="text-2xl font-bold">
-							{items.filter((item) => item.candidates.some((c) => c.matchType === "barcode")).length}
+							{
+								items.filter((item) =>
+									item.candidates.some((c) => c.matchType === "barcode"),
+								).length
+							}
 						</div>
 					</CardContent>
 				</Card>
@@ -182,7 +200,11 @@ export function MatchReviewQueue() {
 					</CardHeader>
 					<CardContent>
 						<div className="text-2xl font-bold">
-							{items.filter((item) => item.candidates.some((c) => c.flags !== null)).length}
+							{
+								items.filter((item) =>
+									item.candidates.some((c) => c.flags !== null),
+								).length
+							}
 						</div>
 					</CardContent>
 				</Card>
@@ -224,12 +246,15 @@ export function MatchReviewQueue() {
 					{/* Select All Checkbox */}
 					<div className="flex items-center gap-2 mb-4">
 						<input
+							id="select-all"
 							type="checkbox"
 							checked={selectedIds.size === items.length}
 							onChange={handleSelectAll}
 							className="h-4 w-4"
 						/>
-						<label className="text-sm">Select All ({items.length})</label>
+						<label htmlFor="select-all" className="text-sm">
+							Select All ({items.length})
+						</label>
 					</div>
 
 					{/* Items List */}
@@ -241,8 +266,12 @@ export function MatchReviewQueue() {
 								isSelected={selectedIds.has(item.id)}
 								onSelect={() => handleSelectItem(item.id)}
 								onApprove={() => {
-									queryClient.invalidateQueries({ queryKey: ["admin", "products", "pendingMatches"] });
-									queryClient.invalidateQueries({ queryKey: ["admin", "products", "pendingMatchCount"] });
+									queryClient.invalidateQueries({
+										queryKey: ["admin", "products", "pendingMatches"],
+									});
+									queryClient.invalidateQueries({
+										queryKey: ["admin", "products", "pendingMatchCount"],
+									});
 								}}
 							/>
 						))}
@@ -250,7 +279,11 @@ export function MatchReviewQueue() {
 
 					{/* Pagination */}
 					<div className="flex items-center justify-between mt-6">
-						<Button onClick={handlePrevious} variant="outline" disabled={!cursor}>
+						<Button
+							onClick={handlePrevious}
+							variant="outline"
+							disabled={!cursor}
+						>
 							<ChevronLeft className="h-4 w-4 mr-2" />
 							Previous
 						</Button>

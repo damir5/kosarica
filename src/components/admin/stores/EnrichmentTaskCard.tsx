@@ -125,9 +125,13 @@ export function EnrichmentTaskCard({
 							<div className="flex items-start gap-2">
 								<AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
 								<div>
-									<p className="text-sm font-medium text-destructive">Enrichment Failed</p>
+									<p className="text-sm font-medium text-destructive">
+										Enrichment Failed
+									</p>
 									{task.errorMessage && (
-										<p className="text-sm text-destructive/80 mt-1">{task.errorMessage}</p>
+										<p className="text-sm text-destructive/80 mt-1">
+											{task.errorMessage}
+										</p>
 									)}
 								</div>
 							</div>

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"crypto/subtle"
-	"log"
 	"net/http"
 	"os"
 
@@ -14,7 +13,12 @@ import (
 func InternalAuthMiddleware() gin.HandlerFunc {
 	apiKey := os.Getenv("INTERNAL_API_KEY")
 	if apiKey == "" {
-		log.Fatal("INTERNAL_API_KEY not set")
+		// Return a middleware that always returns 500 if misconfigured
+		return func(c *gin.Context) {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"error": "server misconfigured: INTERNAL_API_KEY not set",
+			})
+		}
 	}
 	apiKeyBytes := []byte(apiKey)
 

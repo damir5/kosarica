@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -518,7 +519,11 @@ func parsePrice(value string) (int, error) {
 
 	// Debug logging
 	if parsed <= 0 {
-		fmt.Printf("[DEBUG] parsePrice: raw=%q cleaned=%q parsed=%f\n", value, cleaned, parsed)
+		log.Debug().
+			Str("raw", value).
+			Str("cleaned", cleaned).
+			Float64("parsed", parsed).
+			Msg("parsePrice")
 	}
 
 	// Convert to cents

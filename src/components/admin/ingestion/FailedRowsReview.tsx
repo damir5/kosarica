@@ -35,6 +35,8 @@ export default function FailedRowsReview() {
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 	const [currentChain, setCurrentChain] = useState("konzum");
 
+	// biome-ignore lint/correctness/noInvalidUseBeforeDeclaration: function hoisting
+	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional
 	useEffect(() => {
 		loadFailedRows();
 	}, [page, currentChain]);
@@ -188,6 +190,7 @@ export default function FailedRowsReview() {
 				</select>
 
 				<button
+					type="button"
 					onClick={handleSelectAll}
 					className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
 					disabled={loading || failedRows.length === 0}
@@ -196,6 +199,7 @@ export default function FailedRowsReview() {
 				</button>
 
 				<button
+					type="button"
 					onClick={handleSelectNone}
 					className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
 					disabled={selectedIds.size === 0}
@@ -204,6 +208,7 @@ export default function FailedRowsReview() {
 				</button>
 
 				<button
+					type="button"
 					onClick={() => handleReprocess(Array.from(selectedIds))}
 					className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
 					disabled={loading || selectedIds.size === 0}
@@ -303,6 +308,7 @@ export default function FailedRowsReview() {
 											<td className="px-6 py-3">
 												<div className="flex gap-2">
 													<button
+														type="button"
 														className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
 														onClick={() => showRawData(row.rawData)}
 													>
@@ -310,6 +316,7 @@ export default function FailedRowsReview() {
 													</button>
 													{!row.reviewed && (
 														<button
+															type="button"
 															className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
 															onClick={() => handleMarkAsReviewed(row.id)}
 														>
@@ -328,6 +335,7 @@ export default function FailedRowsReview() {
 					{totalPages > 1 && (
 						<div className="flex justify-center items-center gap-4 mt-4">
 							<button
+								type="button"
 								onClick={() => setPage((p) => Math.max(1, p - 1))}
 								disabled={page === 1 || loading}
 								className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -338,6 +346,7 @@ export default function FailedRowsReview() {
 								Page {page} of {totalPages}
 							</span>
 							<button
+								type="button"
 								onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
 								disabled={page === totalPages || loading}
 								className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"

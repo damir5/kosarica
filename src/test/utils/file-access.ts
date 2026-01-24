@@ -5,10 +5,10 @@
  */
 
 import * as fs from "node:fs/promises";
-import * as fsSync from "node:fs";
 import * as path from "node:path";
 
-const SAMPLE_DATA_DIR = process.env.SAMPLE_DATA_DIR || path.join(process.cwd(), "sample-data");
+const SAMPLE_DATA_DIR =
+	process.env.SAMPLE_DATA_DIR || path.join(process.cwd(), "sample-data");
 
 /**
  * Check if a file or directory exists.
@@ -58,7 +58,10 @@ export async function readdir(dirPath: string): Promise<string[]> {
  */
 export async function readFile(filePath: string): Promise<ArrayBuffer> {
 	const buffer = await fs.readFile(filePath);
-	return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+	return buffer.buffer.slice(
+		buffer.byteOffset,
+		buffer.byteOffset + buffer.byteLength,
+	);
 }
 
 /**

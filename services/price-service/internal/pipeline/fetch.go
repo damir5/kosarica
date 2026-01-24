@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
@@ -33,7 +34,7 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 		return nil, fmt.Errorf("failed to get adapter for %s: %w", chainID, err)
 	}
 
-	fmt.Printf("[INFO] Fetching file: %s from %s\n", file.Filename, file.URL)
+	log.Info().Str("filename", file.Filename).Str("url", file.URL).Msg("Fetching file")
 
 	// Fetch the file
 	fetched, err := adapter.Fetch(file)
@@ -50,7 +51,7 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 		return nil, fmt.Errorf("failed to check archive: %w", err)
 	}
 	if existingArchive != nil {
-		fmt.Printf("[INFO] Skipping duplicate file: %s (existing archive: %s)\n", file.Filename, existingArchive.ID)
+		log.Info().Str("filename", file.Filename).Str("existing_archive", existingArchive.ID).Msg("Skipping duplicate file")
 		return &FetchResult{
 			ArchiveID: existingArchive.ID,
 			Content:   fetched.Content,
@@ -92,11 +93,11 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 	}
 
 	if err := database.CreateArchive(ctx, archive); err != nil {
-		fmt.Printf("[WARN] Failed to create archive record: %v\n", err)
+		log.Warn().Err(err).Msg("Failed to create archive record")
 		// Continue anyway - file is stored
 	}
 
-	fmt.Printf("[INFO] Archived file: %s (%d bytes, hash: %s, key: %s)\n", file.Filename, fileSize, hash, storageKey)
+	log.Info().Str("filename", file.Filename).Int64("file_size", fileSize).Str("hash", hash).Str("storage_key", storageKey).Msg("Archived file")
 
 	return &FetchResult{
 		StorageKey: storageKey,

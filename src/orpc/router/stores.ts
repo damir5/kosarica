@@ -1,7 +1,10 @@
 import { and, count, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { storeEnrichmentTasks, stores } from "@/db/schema";
-import { processEnrichStore, type EnrichmentContext } from "@/lib/store-enrichment";
+import {
+	type EnrichmentContext,
+	processEnrichStore,
+} from "@/lib/store-enrichment";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 import { procedure, superadminProcedure } from "../base";
@@ -109,7 +112,7 @@ export const getStoreDetail = procedure
 			.orderBy(desc(storeEnrichmentTasks.createdAt));
 
 		// Get linked physical stores (if this is a virtual store)
-		let linkedPhysicalStores: typeof stores.$inferSelect[] = [];
+		let linkedPhysicalStores: (typeof stores.$inferSelect)[] = [];
 		if (store.isVirtual) {
 			linkedPhysicalStores = await db
 				.select()
@@ -168,11 +171,13 @@ export const updateStore = procedure
 	});
 
 export const approveStore = superadminProcedure
-	.input(z.object({
-		storeId: z.string(),
-		expectedUpdatedAt: z.string(),
-		approvalNotes: z.string().optional(),
-	}))
+	.input(
+		z.object({
+			storeId: z.string(),
+			expectedUpdatedAt: z.string(),
+			approvalNotes: z.string().optional(),
+		}),
+	)
 	.handler(async ({ input, context }) => {
 		const db = getDb();
 
@@ -190,8 +195,13 @@ export const approveStore = superadminProcedure
 
 		// Optimistic locking: verify updatedAt hasn't changed
 		const expectedDate = new Date(input.expectedUpdatedAt);
-		if (!existing[0].updatedAt || existing[0].updatedAt.getTime() !== expectedDate.getTime()) {
-			throw new Error("Store was modified by someone else. Please refresh and try again.");
+		if (
+			!existing[0].updatedAt ||
+			existing[0].updatedAt.getTime() !== expectedDate.getTime()
+		) {
+			throw new Error(
+				"Store was modified by someone else. Please refresh and try again.",
+			);
 		}
 
 		// Get the current user ID from context
@@ -212,11 +222,13 @@ export const approveStore = superadminProcedure
 	});
 
 export const rejectStore = superadminProcedure
-	.input(z.object({
-		storeId: z.string(),
-		expectedUpdatedAt: z.string(),
-		reason: z.string().optional(),
-	}))
+	.input(
+		z.object({
+			storeId: z.string(),
+			expectedUpdatedAt: z.string(),
+			reason: z.string().optional(),
+		}),
+	)
 	.handler(async ({ input }) => {
 		const db = getDb();
 
@@ -231,8 +243,13 @@ export const rejectStore = superadminProcedure
 
 		// Optimistic locking: verify updatedAt hasn't changed
 		const expectedDate = new Date(input.expectedUpdatedAt);
-		if (!existing[0].updatedAt || existing[0].updatedAt.getTime() !== expectedDate.getTime()) {
-			throw new Error("Store was modified by someone else. Please refresh and try again.");
+		if (
+			!existing[0].updatedAt ||
+			existing[0].updatedAt.getTime() !== expectedDate.getTime()
+		) {
+			throw new Error(
+				"Store was modified by someone else. Please refresh and try again.",
+			);
 		}
 
 		await db.delete(stores).where(eq(stores.id, input.storeId));
@@ -272,11 +289,21 @@ export const mergeStores = superadminProcedure
 		// Optimistic locking: verify both stores haven't been modified
 		const sourceExpectedDate = new Date(input.sourceExpectedUpdatedAt);
 		const targetExpectedDate = new Date(input.targetExpectedUpdatedAt);
-		if (!sourceStore[0].updatedAt || sourceStore[0].updatedAt.getTime() !== sourceExpectedDate.getTime()) {
-			throw new Error("Source store was modified by someone else. Please refresh and try again.");
+		if (
+			!sourceStore[0].updatedAt ||
+			sourceStore[0].updatedAt.getTime() !== sourceExpectedDate.getTime()
+		) {
+			throw new Error(
+				"Source store was modified by someone else. Please refresh and try again.",
+			);
 		}
-		if (!targetStore[0].updatedAt || targetStore[0].updatedAt.getTime() !== targetExpectedDate.getTime()) {
-			throw new Error("Target store was modified by someone else. Please refresh and try again.");
+		if (
+			!targetStore[0].updatedAt ||
+			targetStore[0].updatedAt.getTime() !== targetExpectedDate.getTime()
+		) {
+			throw new Error(
+				"Target store was modified by someone else. Please refresh and try again.",
+			);
 		}
 
 		// Update any stores that have sourceStore as their priceSourceStoreId
@@ -594,22 +621,20 @@ export const triggerEnrichment = procedure
 
 		// Create enrichment task
 		const taskId = generatePrefixedId("set");
-		await db
-			.insert(storeEnrichmentTasks)
-			.values({
-				id: taskId,
-				storeId: input.storeId,
-				type: input.type,
-				status: "pending",
-				inputData: JSON.stringify({
-					name: store[0].name,
-					address: store[0].address,
-					city: store[0].city,
-					postalCode: store[0].postalCode,
-					latitude: store[0].latitude,
-					longitude: store[0].longitude,
-				}),
-			});
+		await db.insert(storeEnrichmentTasks).values({
+			id: taskId,
+			storeId: input.storeId,
+			type: input.type,
+			status: "pending",
+			inputData: JSON.stringify({
+				name: store[0].name,
+				address: store[0].address,
+				city: store[0].city,
+				postalCode: store[0].postalCode,
+				latitude: store[0].latitude,
+				longitude: store[0].longitude,
+			}),
+		});
 
 		// Process enrichment directly
 		const ctx: EnrichmentContext = { db };
@@ -814,7 +839,9 @@ export const bulkApproveStores = superadminProcedure
 		}
 
 		// Verify all stores are in pending status
-		const nonPendingStores = existingStores.filter((s) => s.status !== "pending");
+		const nonPendingStores = existingStores.filter(
+			(s) => s.status !== "pending",
+		);
 		if (nonPendingStores.length > 0) {
 			throw new Error(
 				`Only pending stores can be approved. ${nonPendingStores.length} stores are not pending.`,
@@ -868,7 +895,9 @@ export const bulkRejectStores = superadminProcedure
 		}
 
 		// Verify all stores are in pending status
-		const nonPendingStores = existingStores.filter((s) => s.status !== "pending");
+		const nonPendingStores = existingStores.filter(
+			(s) => s.status !== "pending",
+		);
 		if (nonPendingStores.length > 0) {
 			throw new Error(
 				`Only pending stores can be rejected. ${nonPendingStores.length} stores are not pending.`,
@@ -876,9 +905,7 @@ export const bulkRejectStores = superadminProcedure
 		}
 
 		// Delete all stores
-		await db
-			.delete(stores)
-			.where(inArray(stores.id, input.storeIds));
+		await db.delete(stores).where(inArray(stores.id, input.storeIds));
 
 		return {
 			success: true,
@@ -891,12 +918,16 @@ export const bulkRejectStores = superadminProcedure
  * This should only be used with documented justification.
  */
 export const forceApproveStore = superadminProcedure
-	.input(z.object({
-		storeId: z.string(),
-		expectedUpdatedAt: z.string(),
-		approvalNotes: z.string().optional(),
-		justification: z.string().min(1, "Justification is required for force approval"),
-	}))
+	.input(
+		z.object({
+			storeId: z.string(),
+			expectedUpdatedAt: z.string(),
+			approvalNotes: z.string().optional(),
+			justification: z
+				.string()
+				.min(1, "Justification is required for force approval"),
+		}),
+	)
 	.handler(async ({ input, context }) => {
 		const db = getDb();
 
@@ -914,8 +945,13 @@ export const forceApproveStore = superadminProcedure
 
 		// Optimistic locking: verify updatedAt hasn't changed
 		const expectedDate = new Date(input.expectedUpdatedAt);
-		if (!existing[0].updatedAt || existing[0].updatedAt.getTime() !== expectedDate.getTime()) {
-			throw new Error("Store was modified by someone else. Please refresh and try again.");
+		if (
+			!existing[0].updatedAt ||
+			existing[0].updatedAt.getTime() !== expectedDate.getTime()
+		) {
+			throw new Error(
+				"Store was modified by someone else. Please refresh and try again.",
+			);
 		}
 
 		// Get the current user ID from context

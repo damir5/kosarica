@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { Check, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface BulkActionsBarProps {
 	selectedCount: number;
@@ -8,7 +8,12 @@ interface BulkActionsBarProps {
 	isLoading: boolean;
 }
 
-export function BulkActionsBar({ selectedCount, onApprove, onClear, isLoading }: BulkActionsBarProps) {
+export function BulkActionsBar({
+	selectedCount,
+	onApprove,
+	onClear,
+	isLoading,
+}: BulkActionsBarProps) {
 	return (
 		<div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-50 md:relative md:bg-muted/50 md:rounded-lg md:p-3">
 			<div className="flex items-center justify-between max-w-screen-2xl mx-auto">

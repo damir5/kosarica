@@ -151,10 +151,14 @@ export function BulkActionsBar({
 						)}
 
 						<div className="space-y-2">
-							<label className="text-sm font-medium text-foreground">
+							<label
+								htmlFor="approval-notes"
+								className="text-sm font-medium text-foreground"
+							>
 								Approval Notes (Optional)
 							</label>
 							<Textarea
+								id="approval-notes"
 								value={notes}
 								onChange={(e) => setNotes(e.target.value)}
 								placeholder="Add any notes about this bulk approval..."
@@ -177,9 +181,7 @@ export function BulkActionsBar({
 								<li>
 									• All stores will change from "pending" to "active" status
 								</li>
-								<li>
-									• Prices from these sources will be tracked separately
-								</li>
+								<li>• Prices from these sources will be tracked separately</li>
 							</ul>
 						</div>
 					</div>
@@ -232,10 +234,14 @@ export function BulkActionsBar({
 						)}
 
 						<div className="space-y-2">
-							<label className="text-sm font-medium text-foreground">
+							<label
+								htmlFor="rejection-reason"
+								className="text-sm font-medium text-foreground"
+							>
 								Rejection Reason (Optional)
 							</label>
 							<Textarea
+								id="rejection-reason"
 								value={reason}
 								onChange={(e) => setReason(e.target.value)}
 								placeholder="Why are these stores being rejected? (e.g., duplicate data, invalid locations...)"

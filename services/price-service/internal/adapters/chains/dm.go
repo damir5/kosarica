@@ -15,6 +15,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/xlsx"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -174,7 +175,7 @@ func (a *DmAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) 
 	}
 
 	// Primary: Try to discover from web
-	fmt.Printf("[INFO] Discovering DM price list from web portal...\n")
+	log.Info().Msg("Discovering DM price list from web portal")
 
 	resp, err := a.HTTPClient().Get(dmPriceListURL)
 	if err == nil && resp.StatusCode == 200 {
@@ -226,30 +227,30 @@ func (a *DmAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) 
 			},
 		})
 
-		fmt.Printf("[INFO] Found DM price list: %s\n", urlFilename)
+		log.Info().Str("filename", urlFilename).Msg("Found DM price list")
 		return discoveredFiles, nil
 	}
 
 	if err != nil {
-		fmt.Printf("[WARN] Failed to access DM web portal: %v\n", err)
+		log.Warn().Err(err).Msg("Failed to access DM web portal")
 	} else if resp != nil {
-		fmt.Printf("[WARN] DM web portal returned %d, falling back to local files\n", resp.StatusCode)
+		log.Warn().Int("status_code", resp.StatusCode).Msg("DM web portal returned non-200, falling back to local files")
 		resp.Body.Close()
 	}
-	fmt.Printf("[WARN] Falling back to local files...\n")
+	log.Warn().Msg("Falling back to local files")
 
 	// Fallback: Look for local files in ./data/ingestion/dm/ directory
 	dataDir := filepath.Join(".", "data", "ingestion", "dm")
-	fmt.Printf("[DEBUG] Scanning DM local directory: %s\n", dataDir)
+	log.Debug().Str("directory", dataDir).Msg("Scanning DM local directory")
 
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		fmt.Printf("[WARN] DM data directory not found: %s\n", dataDir)
+		log.Warn().Str("directory", dataDir).Msg("DM data directory not found")
 		return discoveredFiles, nil
 	}
 
 	entries, err := os.ReadDir(dataDir)
 	if err != nil {
-		fmt.Printf("[ERROR] Error reading DM data directory: %v\n", err)
+		log.Error().Err(err).Msg("Error reading DM data directory")
 		return discoveredFiles, nil
 	}
 

@@ -1,5 +1,5 @@
-import { useId } from "react";
 import { ExternalLink, MapPin } from "lucide-react";
+import { useId } from "react";
 import { Input } from "@/components/ui/input";
 import { PriceSourceSelect } from "./PriceSourceSelect";
 

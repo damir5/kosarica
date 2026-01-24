@@ -1,10 +1,10 @@
 import { os } from "@orpc/server";
-import { createLogger, errorToObject } from "@/utils/logger";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { getAuth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { user } from "@/db/schema";
+import { getAuth } from "@/lib/auth";
 import { getDb } from "@/utils/bindings";
+import { createLogger, errorToObject } from "@/utils/logger";
 
 const log = createLogger("rpc");
 

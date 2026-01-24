@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
@@ -43,14 +44,14 @@ func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult,
 		// Resolve or register store
 		storeID, err := resolveOrCreateStore(ctx, chainID, storeIdentifier, storeMetadata)
 		if err != nil {
-			fmt.Printf("[WARN] Failed to resolve store %s: %v\n", storeIdentifier, err)
+			log.Warn().Err(err).Str("store_identifier", storeIdentifier).Msg("Failed to resolve store")
 			continue
 		}
 
 		// Persist rows for this store
 		persisted, priceChanges, itemIDs, err := persistRowsForStore(ctx, chainID, storeID, storeIdentifier, rows, archiveID, runID, parseResult.FileID)
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to persist rows for store %s: %v\n", storeIdentifier, err)
+			log.Error().Err(err).Str("store_identifier", storeIdentifier).Msg("Failed to persist rows for store")
 			continue
 		}
 
@@ -62,13 +63,13 @@ func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult,
 	// Link retailer items to archive
 	if archiveID != "" && len(allItemIDs) > 0 {
 		if err := database.UpdateRetailerItemArchiveID(ctx, allItemIDs, archiveID); err != nil {
-			fmt.Printf("[WARN] Failed to link items to archive: %v\n", err)
+			log.Warn().Err(err).Str("archive_id", archiveID).Int("item_count", len(allItemIDs)).Msg("Failed to link items to archive")
 		} else {
-			fmt.Printf("[INFO] Linked %d items to archive %s\n", len(allItemIDs), archiveID)
+			log.Info().Str("archive_id", archiveID).Int("item_count", len(allItemIDs)).Msg("Linked items to archive")
 		}
 	}
 
-	fmt.Printf("[INFO] Persisted %d rows (%d price changes) for %s\n", totalPersisted, totalPriceChanges, file.Filename)
+	log.Info().Str("filename", file.Filename).Int("persisted", totalPersisted).Int("price_changes", totalPriceChanges).Msg("Persisted rows")
 
 	// Collect cleanup errors
 	var persistErrors []error
@@ -186,7 +187,7 @@ func createStore(ctx context.Context, chainID string, storeIdentifier string, me
 		return "", fmt.Errorf("failed to insert store identifier: %w", err)
 	}
 
-	fmt.Printf("[INFO] Auto-registered store: %s (id: %s)\n", name, storeID)
+	log.Info().Str("store_name", name).Str("store_id", storeID).Msg("Auto-registered store")
 	return storeID, nil
 }
 
@@ -213,7 +214,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 
 			// Save failed row for later analysis and re-processing
 			if err := saveFailedRow(ctx, database.Pool(), chainID, runID, fileID, row, validation); err != nil {
-				fmt.Printf("[ERROR] Failed to save failed row %d: %v\n", row.RowNumber, err)
+				log.Error().Err(err).Int("row_number", row.RowNumber).Msg("Failed to save failed row")
 			}
 
 			continue
@@ -222,7 +223,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		// Find or create retailer item
 		retailerItemID, err := findOrCreateRetailerItem(ctx, chainID, row, archiveID)
 		if err != nil {
-			fmt.Printf("[WARN] Failed to find/create retailer item for row %d: %v\n", row.RowNumber, err)
+			log.Warn().Err(err).Int("row_number", row.RowNumber).Msg("Failed to find/create retailer item")
 			continue
 		}
 
@@ -254,7 +255,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 	// If a previous run created the group but failed to insert prices, we have an existing group with 0 items.
 	// We must treat this as a new group to retry the price insertion.
 	if !isNewGroup && len(itemPrices) > 0 && group.ItemCount == 0 {
-		fmt.Printf("[WARN] Detected zombie price group %s (0 items). Attempting repair.\n", group.ID)
+		log.Warn().Str("price_group_id", group.ID).Msg("Detected zombie price group (0 items). Attempting repair")
 		isNewGroup = true
 	}
 
@@ -276,11 +277,11 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		if err := database.BulkInsertGroupPrices(ctx, group.ID, groupPrices); err != nil {
 			return 0, 0, nil, fmt.Errorf("failed to bulk insert group prices: %w", err)
 		}
-		fmt.Printf("[INFO] Created new price group %s with %d items\n", group.ID, len(groupPrices))
+		log.Info().Str("price_group_id", group.ID).Int("item_count", len(groupPrices)).Msg("Created new price group")
 	} else {
 		// Existing group: update last_seen_at
 		if err := database.UpdateGroupLastSeen(ctx, group.ID); err != nil {
-			fmt.Printf("[WARN] Failed to update group last_seen: %v\n", err)
+			log.Warn().Err(err).Str("price_group_id", group.ID).Msg("Failed to update group last_seen")
 		}
 	}
 
@@ -353,7 +354,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 			priceSignature)
 
 		if err != nil {
-			fmt.Printf("[WARN] Failed to upsert store item state for item %s: %v\n", itemID, err)
+			log.Warn().Err(err).Str("retailer_item_id", itemID).Msg("Failed to upsert store item state for item")
 			continue
 		}
 
@@ -381,7 +382,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		return 0, 0, nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	fmt.Printf("[INFO] Assigned store %s to price group %s (%d items)\n", storeID, group.ID, len(itemPrices))
+	log.Info().Str("store_id", storeID).Str("price_group_id", group.ID).Int("item_count", len(itemPrices)).Msg("Assigned store to price group")
 
 	return persisted, priceChanges, itemIDs, nil
 }
@@ -506,7 +507,7 @@ func saveFailedRow(ctx context.Context, pool *pgxpool.Pool, chainID string, runI
 		return fmt.Errorf("failed to save failed row %d: %w", row.RowNumber, err)
 	}
 
-	fmt.Printf("[INFO] Saved failed row %d to retailer_items_failed\n", row.RowNumber)
+	log.Info().Int("row_number", row.RowNumber).Msg("Saved failed row to retailer_items_failed")
 	return nil
 }
 

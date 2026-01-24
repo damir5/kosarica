@@ -23,7 +23,16 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
  * All available logger types for filtering
  * Source of truth for LoggerType - add new types here
  */
-const ALL_LOGGER_TYPES = ["rpc", "http", "auth", "db", "app", "ingestion", "scheduler", "daily-ingestion"] as const;
+const ALL_LOGGER_TYPES = [
+	"rpc",
+	"http",
+	"auth",
+	"db",
+	"app",
+	"ingestion",
+	"scheduler",
+	"daily-ingestion",
+] as const;
 export type LoggerType = (typeof ALL_LOGGER_TYPES)[number];
 
 /**

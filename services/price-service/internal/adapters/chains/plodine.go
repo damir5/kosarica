@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	zipexpand "github.com/kosarica/price-service/internal/ingestion/zip"
@@ -117,18 +119,18 @@ func (a *PlodineAdapter) Discover(targetDate string) ([]types.DiscoveredFile, er
 	}
 	targetDatePattern := fmt.Sprintf("%s_%s_%s", parts[2], parts[1], parts[0])
 
-	fmt.Printf("[DEBUG] Fetching Plodine page: %s\n", a.BaseURL())
-	fmt.Printf("[DEBUG] Looking for date pattern: %s\n", targetDatePattern)
+	log.Debug().Str("url", a.BaseURL()).Msg("Fetching Plodine page")
+	log.Debug().Str("datePattern", targetDatePattern).Msg("Looking for date pattern")
 
 	resp, err := a.HTTPClient().Get(a.BaseURL())
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to fetch Plodine portal: %v\n", err)
+		log.Error().Err(err).Msg("Failed to fetch Plodine portal")
 		return nil, fmt.Errorf("failed to fetch Plodine portal: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("[ERROR] Plodine portal returned status %d\n", resp.StatusCode)
+		log.Error().Int("statusCode", resp.StatusCode).Msg("Plodine portal returned non-200 status")
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -201,9 +203,9 @@ func (a *PlodineAdapter) Discover(targetDate string) ([]types.DiscoveredFile, er
 	}
 
 	if len(discoveredFiles) == 0 {
-		fmt.Printf("[DEBUG] No ZIP files found for date %s\n", date)
+		log.Debug().Str("date", date).Msg("No ZIP files found")
 	} else {
-		fmt.Printf("[DEBUG] Found %d file(s) for date %s\n", len(discoveredFiles), date)
+		log.Debug().Str("date", date).Int("count", len(discoveredFiles)).Msg("Found files")
 	}
 
 	return discoveredFiles, nil

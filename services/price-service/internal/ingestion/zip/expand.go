@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -15,7 +16,10 @@ import (
 
 	"github.com/kosarica/price-service/internal/storage"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog"
 )
+
+var log = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 // ExpandOptions contains options for ZIP expansion
 type ExpandOptions struct {
@@ -168,7 +172,7 @@ func (e *Expander) readFileWithLimit(ctx context.Context, file *zip.File, safeNa
 	defer func() {
 		if closeErr := rc.Close(); closeErr != nil {
 			// Log close error but don't fail the operation
-			fmt.Printf("[WARN] Failed to close ZIP entry %s: %v\n", safeName, closeErr)
+			log.Warn().Str("entry", safeName).Err(closeErr).Msg("Failed to close ZIP entry")
 		}
 	}()
 

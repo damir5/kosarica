@@ -1,4 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "permission": "allow"
+  "permission": "allow",
+  "mcp": {
+    "ade-mailbox": {
+      "type": "remote",
+      "url": "http://localhost:4545/mcp/mailbox"
+    },
+    "ade-terminal": {
+      "type": "remote",
+      "url": "http://localhost:4545/mcp/terminal"
+    }
+  }
 }

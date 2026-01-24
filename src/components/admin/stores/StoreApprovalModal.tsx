@@ -1,4 +1,11 @@
-import { AlertCircle, AlertTriangle, ArrowRight, Check, FileText, RefreshCw, Store } from "lucide-react";
+import {
+	AlertCircle,
+	AlertTriangle,
+	ArrowRight,
+	Check,
+	FileText,
+	Store,
+} from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,7 +56,8 @@ export function StoreApprovalModal({
 }: StoreApprovalModalProps) {
 	const [notes, setNotes] = useState("");
 
-	const isConflictError = error?.includes("modified by someone else") || error?.includes("refresh");
+	const isConflictError =
+		error?.includes("modified by someone else") || error?.includes("refresh");
 
 	const handleClearError = () => {
 		if (onClearError) onClearError();
@@ -86,11 +94,13 @@ export function StoreApprovalModal({
 
 				{/* Error Display */}
 				{error && (
-					<div className={`rounded-md border p-3 ${
-						isConflictError
-							? "bg-amber-50/50 border-amber-300 dark:bg-amber-950/20 dark:border-amber-800"
-							: "bg-destructive/10 border-destructive/30"
-					}`}>
+					<div
+						className={`rounded-md border p-3 ${
+							isConflictError
+								? "bg-amber-50/50 border-amber-300 dark:bg-amber-950/20 dark:border-amber-800"
+								: "bg-destructive/10 border-destructive/30"
+						}`}
+					>
 						<div className="flex items-start gap-3">
 							{isConflictError ? (
 								<AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 mt-0.5 shrink-0" />
@@ -98,18 +108,24 @@ export function StoreApprovalModal({
 								<AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
 							)}
 							<div className="flex-1">
-								<p className={`text-sm font-medium ${
-									isConflictError
-										? "text-amber-800 dark:text-amber-300"
-										: "text-destructive"
-								}`}>
-									{isConflictError ? "Concurrent Modification Detected" : "Error"}
+								<p
+									className={`text-sm font-medium ${
+										isConflictError
+											? "text-amber-800 dark:text-amber-300"
+											: "text-destructive"
+									}`}
+								>
+									{isConflictError
+										? "Concurrent Modification Detected"
+										: "Error"}
 								</p>
-								<p className={`text-sm mt-1 ${
-									isConflictError
-										? "text-amber-700 dark:text-amber-400"
-										: "text-destructive"
-								}`}>
+								<p
+									className={`text-sm mt-1 ${
+										isConflictError
+											? "text-amber-700 dark:text-amber-400"
+											: "text-destructive"
+									}`}
+								>
 									{error}
 								</p>
 							</div>
@@ -134,11 +150,15 @@ export function StoreApprovalModal({
 
 					{/* Approval Notes */}
 					<div className="space-y-2">
-						<label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+						<label
+							htmlFor="approval-notes"
+							className="text-sm font-medium text-foreground flex items-center gap-1.5"
+						>
 							<FileText className="h-3.5 w-3.5" />
 							Approval Notes (Optional)
 						</label>
 						<Textarea
+							id="approval-notes"
 							value={notes}
 							onChange={(e) => setNotes(e.target.value)}
 							placeholder="Add any notes about this approval (e.g., why this store was approved, any special handling needed)..."

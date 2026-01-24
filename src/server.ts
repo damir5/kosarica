@@ -5,18 +5,18 @@
  * the Bree job scheduler for background tasks.
  */
 
-import { config } from "dotenv";
 import tanstackHandler, {
 	type ServerEntry,
 } from "@tanstack/react-start/server-entry";
+import { config } from "dotenv";
+import { closeDatabase } from "@/db";
+import { startScheduler, stopScheduler } from "@/jobs/scheduler";
+import { initTelemetry, shutdownTelemetry } from "@/telemetry";
 import { createLogger } from "@/utils/logger";
 import {
 	ensureRequestContext,
 	extractRequestId,
 } from "@/utils/request-context";
-import { startScheduler, stopScheduler } from "@/jobs/scheduler";
-import { closeDatabase } from "@/db";
-import { initTelemetry, shutdownTelemetry } from "@/telemetry";
 
 // Load environment variables from .env files
 // Priority: .env.development -> .env (later files override)

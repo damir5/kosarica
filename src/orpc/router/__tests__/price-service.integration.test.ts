@@ -5,8 +5,8 @@
  * They verify that the proxy correctly forwards requests to the Go service.
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
 import { createRouterClient } from "@orpc/server";
+import { beforeAll, describe, expect, it } from "vitest";
 import router from "@/orpc/router";
 
 // Skip tests if Go service is not available
@@ -37,7 +37,7 @@ describe.skipIf(!process.env.INTEGRATION_TESTS)(
 				if (!response.ok) {
 					throw new Error("Go service health check failed");
 				}
-			} catch (error) {
+			} catch (_error) {
 				throw new Error(
 					`Go service not reachable at ${GO_SERVICE_URL}. Skipping integration tests.`,
 				);
