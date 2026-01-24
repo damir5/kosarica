@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { beforeAll, afterAll, vi } from "vitest";
 import postgres from "postgres";
+import { afterAll, beforeAll, vi } from "vitest";
 import * as schema from "@/db/schema";
 
 // Global test database instance
@@ -18,7 +18,7 @@ export function getTestDb() {
 	if (!testDb) {
 		const testUrl =
 			process.env.TEST_DATABASE_URL ||
-			"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
+			"postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test";
 		sqlInstance = postgres(testUrl);
 		testDb = drizzle(sqlInstance, { schema });
 	}
@@ -42,7 +42,7 @@ export function closeTestDb() {
 async function cleanupTestDatabase(): Promise<void> {
 	const testUrl =
 		process.env.TEST_DATABASE_URL ||
-		"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
+		"postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test";
 
 	// Create a separate connection for cleanup (without drizzle)
 	const sql = postgres(testUrl);
