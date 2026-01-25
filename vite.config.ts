@@ -38,7 +38,7 @@ const config = defineConfig({
     'process.env.BUILD_ENV': JSON.stringify(buildMetadata.environment),
   },
   server: {
-    port: 3002,
+    port: Number(process.env.PORT ?? 3002),
     strictPort: true,
     watch: {
       ignored: ['**/sample/**', '**/data/**', '**/.pnpm-store/**', '**/node_modules/**'],

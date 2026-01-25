@@ -13,11 +13,11 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Server     ServerConfig     `mapstructure:"server"`
-	Database   DatabaseConfig   `mapstructure:"database"`
-	RateLimit  RateLimitConfig  `mapstructure:"rate_limit"`
-	Storage    StorageConfig    `mapstructure:"storage"`
-	Logging    LoggingConfig    `mapstructure:"logging"`
+	Server    ServerConfig    `mapstructure:"server"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
+	Storage   StorageConfig   `mapstructure:"storage"`
+	Logging   LoggingConfig   `mapstructure:"logging"`
 }
 
 // ServerConfig holds HTTP server configuration
@@ -39,23 +39,23 @@ type DatabaseConfig struct {
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
-	RequestsPerSecond int    `mapstructure:"requests_per_second"`
-	MaxRetries        int    `mapstructure:"max_retries"`
-	InitialBackoffMs  int    `mapstructure:"initial_backoff_ms"`
-	MaxBackoffMs      int    `mapstructure:"max_backoff_ms"`
+	RequestsPerSecond int `mapstructure:"requests_per_second"`
+	MaxRetries        int `mapstructure:"max_retries"`
+	InitialBackoffMs  int `mapstructure:"initial_backoff_ms"`
+	MaxBackoffMs      int `mapstructure:"max_backoff_ms"`
 }
 
 // StorageConfig holds storage configuration
 type StorageConfig struct {
-	Type    string `mapstructure:"type"`
+	Type     string `mapstructure:"type"`
 	BasePath string `mapstructure:"base_path"`
 }
 
 // LoggingConfig holds logging configuration
 type LoggingConfig struct {
-	Level  string `mapstructure:"level"`
-	Format string `mapstructure:"format"`
-	NoColor bool  `mapstructure:"no_color"`
+	Level   string `mapstructure:"level"`
+	Format  string `mapstructure:"format"`
+	NoColor bool   `mapstructure:"no_color"`
 }
 
 var globalConfig *Config
@@ -117,11 +117,14 @@ func loadEnvFile(v *viper.Viper) error {
 	}
 
 	for _, path := range envPaths {
-		envFile := fmt.Sprintf("%s/.env", path)
-		if _, err := os.Stat(envFile); err == nil {
-			// Parse .env file and set environment variables
-			if err := loadDotEnvFile(envFile); err == nil {
-				return nil
+		// check both .env and .env.development so committed dev envs are picked up
+		for _, name := range []string{".env", ".env.development"} {
+			envFile := fmt.Sprintf("%s/%s", path, name)
+			if _, err := os.Stat(envFile); err == nil {
+				// Parse env file and set environment variables
+				if err := loadDotEnvFile(envFile); err == nil {
+					return nil
+				}
 			}
 		}
 	}
