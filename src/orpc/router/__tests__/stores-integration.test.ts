@@ -1,527 +1,358 @@
 /**
  * Integration tests for Store Approval Workflow
  *
- * These tests require a database connection and verify full workflow:
+ * These tests require a database connection and verify the full workflow:
  * - Full workflow from pending to approved
  * - Concurrent conflicts
  * - Merge integrity
  * - Bulk operations
+ *
+ * Set INTEGRATION_TESTS=1 to run these tests.
  */
 
-import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import * as schema from "@/db/schema";
+import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 
-describe("Store Approval Workflow Integration Tests", () => {
-	const testStoreIds: string[] = [];
+describe.skipIf(!process.env.INTEGRATION_TESTS)(
+	"Store Approval Workflow Integration Tests",
+	() => {
+		const testStoreIds: string[] = [];
 
-	beforeAll(async () => {
-		const { getDb } = await import("@/utils/bindings");
-		const db = getDb();
-
-		// Clean up test stores
-		for (const storeId of testStoreIds) {
-			try {
-				await db
-					.delete(schema.stores)
-					.where(eq(schema.stores.id, storeId))
-					.execute();
-			} catch (e) {
-				console.warn(`Failed to cleanup store ${storeId}:`, e);
-			}
-		}
-
-		// Create test chain first (required by foreign key)
-		const now = new Date();
-		await db
-			.insert(schema.chains)
-			.values({
-				slug: "konzum",
-				name: "Integration Test Chain",
-			})
-			.execute();
-
-		// Create test stores
-		// Store 1: Pending store
-		const store1Id = generatePrefixedId("sto");
-		await db
-			.insert(schema.stores)
-			.values({
-				id: store1Id,
-				chainSlug: "konzum",
-				name: "Integration Test Store 1",
-				address: "Test Address 1",
-				city: "Zagreb",
-				postalCode: "10000",
-				latitude: "45.8150",
-				longitude: "15.9819",
-				isVirtual: true,
-				priceSourceStoreId: null,
-				status: "pending",
-				createdAt: now,
-				updatedAt: now,
-			})
-			.execute();
-		testStoreIds.push(store1Id);
-
-		// Store 2: Another pending store for merge testing
-		const store2Id = generatePrefixedId("sto");
-		await db
-			.insert(schema.stores)
-			.values({
-				id: store2Id,
-				chainSlug: "konzum",
-				name: "Integration Test Store 2",
-				address: "Test Address 2",
-				city: "Zagreb",
-				postalCode: "10000",
-				latitude: "45.8150",
-				longitude: "15.9819",
-				isVirtual: true,
-				priceSourceStoreId: null,
-				status: "pending",
-				createdAt: now,
-				updatedAt: now,
-			})
-			.execute();
-		testStoreIds.push(store2Id);
-
-		// Store 3: Active store for merge testing
-		const store3Id = generatePrefixedId("sto");
-		await db
-			.insert(schema.stores)
-			.values({
-				id: store3Id,
-				chainSlug: "konzum",
-				name: "Integration Test Store 3 (Active)",
-				address: "Test Address 3",
-				city: "Zagreb",
-				postalCode: "10000",
-				latitude: "45.8150",
-				longitude: "15.9819",
-				isVirtual: true,
-				priceSourceStoreId: null,
-				status: "active",
-				createdAt: now,
-				updatedAt: now,
-			})
-			.execute();
-		testStoreIds.push(store3Id);
-	});
-
-	afterAll(async () => {
-		const { getDb } = await import("@/utils/bindings");
-		const db = getDb();
-
-		// Clean up test stores
-		for (const storeId of testStoreIds) {
-			try {
-				await db
-					.delete(schema.stores)
-					.where(eq(schema.stores.id, storeId))
-					.execute();
-			} catch (e) {
-				console.warn(`Failed to cleanup store ${storeId}:`, e);
-			}
-		}
-	});
-
-	describe("Full Approval Workflow", () => {
-		it("should transition store from pending to active", async () => {
-			const { getDb } = await import("@/utils/bindings");
+		beforeAll(async () => {
 			const db = getDb();
-			const storeId = testStoreIds[0];
 
-			// Verify initial state
-			const [store] = await db
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.from(schema.stores)
-				.where(eq(schema.stores.id, storeId))
-				.limit(1);
-
-			expect(store).toBeDefined();
-			expect(store.status).toBe("pending");
-
-			// Simulate approval (would normally be done via API)
-			const userId = "integration-test-user";
-			const approvalNotes = "Integration test approval";
-			const now = new Date();
-
+			// Clean up any existing test stores
 			await db
-				.update(schema.stores)
-				.set({
-					status: "active",
-					updatedAt: now,
-					approvalNotes: approvalNotes,
-					approvedBy: userId,
-					approvedAt: now,
+				.delete_from("stores")
+				.where("name", "like", "Integration Test Store%")
+				.execute();
+
+			// Create test stores
+			const now = new Date().toISOString();
+
+			// Store 1: Pending store
+			const store1Id = generatePrefixedId("sto");
+			await db
+				.insert_into("stores")
+				.values({
+					id: store1Id,
+					chain_slug: "konzum",
+					name: "Integration Test Store 1",
+					address: "Test Address 1",
+					city: "Zagreb",
+					postal_code: "10000",
+					latitude: "45.8150",
+					longitude: "15.9819",
+					is_virtual: true,
+					price_source_store_id: null,
+					status: "pending",
+					created_at: now,
+					updated_at: now,
 				})
-				.where(eq(schema.stores.id, storeId))
 				.execute();
+			testStoreIds.push(store1Id);
 
-			// Verify final state
-			// Verify final state
-			const [updatedStore] = await db
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.from(schema.stores)
-				.where(eq(schema.stores.id, storeId))
-				.limit(1)
-				.all();
-
-			expect(updatedStore.status).toBe("active");
-			expect(updatedStore.approvedBy).toBe(userId);
-			expect(updatedStore.approvedNotes).toBe(approvalNotes);
-			expect(updatedStore.approvedAt).toBeDefined();
-		});
-
-		it("should prevent approval of already active store", async () => {
-		it("should prevent approval of already active store", async () => {
-			const { getDb } = await import("@/utils/bindings");
-			const db = getDb();
-			const storeId = testStoreIds[2]; // Already active
-
-			// Verify store is active
-			const [store] = await db
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.from(schema.stores)
-				.where(eq(schema.stores.id, storeId))
-				.limit(1);
-
-			expect(store.status).toBe("active");
-
-			// This would be enforced at API level
-			// This would be enforced at API level
-			// Just verify the state is as expected
-			expect(store.status).not.toBe("pending");
-		});
-	});
-
-	describe("Concurrent Modification Detection", () => {
-		it("should detect when store was modified by another user", async () => {
-			const { getDb } = await import("@/utils/bindings");
-			const db = getDb();
-			const storeId = testStoreIds[1];
-
-			// Get current store
-			// Get current store
-			const [store] = await db
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.from(schema.stores)
-				.where(eq(schema.stores.id, storeId))
-				.limit(1);
-
-			const originalUpdatedAt = store.updatedAt;
-
-			// Simulate another user modifying the store
+			// Store 2: Another pending store for merge testing
+			const store2Id = generatePrefixedId("sto");
 			await db
-				.update(schema.stores)
-				.set({ updatedAt: new Date() })
-				.where(eq(schema.stores.id, storeId))
+				.insert_into("stores")
+				.values({
+					id: store2Id,
+					chain_slug: "konzum",
+					name: "Integration Test Store 2",
+					address: "Test Address 2",
+					city: "Zagreb",
+					postal_code: "10000",
+					latitude: "45.8150",
+					longitude: "15.9819",
+					is_virtual: true,
+					price_source_store_id: null,
+					status: "pending",
+					created_at: now,
+					updated_at: now,
+				})
 				.execute();
+			testStoreIds.push(store2Id);
 
-			// Try to approve with old timestamp
-			const expectedDate = new Date(originalUpdatedAt);
-			const [currentStore] = await db
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.from(schema.stores)
-				.where(eq(schema.stores.id, storeId))
-				.limit(1)
-				.all();
-			const currentDate = new Date(currentStore.updatedAt);
-
-			// Verify timestamps don't match (concurrent modification detected)
-			expect(expectedDate.getTime()).not.toBe(currentDate.getTime());
-		});
-	});
-
-	describe("Merge Operations", () => {
-		it("should prevent merging store into itself", async () => {
-			// This is a validation test - constraint is enforced at API level
-			const storeId = testStoreIds[0];
-
-			// Can't merge into self
-			expect(storeId).toBe(storeId); // Same ID
+			// Store 3: Active store for merge testing
+			const store3Id = generatePrefixedId("sto");
+			await db
+				.insert_into("stores")
+				.values({
+					id: store3Id,
+					chain_slug: "konzum",
+					name: "Integration Test Store 3 (Active)",
+					address: "Test Address 3",
+					city: "Zagreb",
+					postal_code: "10000",
+					latitude: "45.8150",
+					longitude: "15.9819",
+					is_virtual: true,
+					price_source_store_id: null,
+					status: "active",
+					created_at: now,
+					updated_at: now,
+				})
+				.execute();
+			testStoreIds.push(store3Id);
 		});
 
-		it("should verify both stores exist before merge", async () => {
-			const { getDb } = await import("@/utils/bindings");
-			const db = getDb();
-			const sourceId = testStoreIds[0];
-			const targetId = testStoreIds[1];
-
-			// Verify both stores exist
-			const [sourceStore] = await db
-				.select()
-  .limit(1);
-  .limit(1);
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.from(schema.stores)
-				.where(eq(schema.stores.id, sourceId))
-				.limit(1)
-				.all();
-			const [targetStore] = await db
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.from(schema.stores)
-				.where(eq(schema.stores.id, targetId))
-				.limit(1)
-				.all();
-
-			expect(sourceStore).toBeDefined();
-			expect(targetStore).toBeDefined();
-		});
-	});
-
-	describe("Bulk Operations", () => {
-		it("should handle bulk approval of multiple stores", async () => {
-			const { getDb } = await import("@/utils/bindings");
+		afterAll(async () => {
 			const db = getDb();
 
-
-			// Create additional test stores
-			const now = new Date();
-			const bulkStoreIds: string[] = [];
-
-			for (let i = 1; i <= 3; i++) {
-				const storeId = generatePrefixedId("sto");
-				await db
-					.insert(schema.stores)
-					.values({
-						id: storeId,
-						chainSlug: "konzum",
-						name: `Bulk Test Store ${i}`,
-						address: `Bulk Address ${i}`,
-						city: "Zagreb",
-						postalCode: "10000",
-						isVirtual: true,
-						status: "pending",
-						createdAt: now,
-						updatedAt: now,
-					})
-					.execute();
-				bulkStoreIds.push(storeId);
-			}
-
-			// Verify all stores are pending
-			for (const storeId of bulkStoreIds) {
-				const [store] = await db
-					.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-					.from(schema.stores)
-					.where(eq(schema.stores.id, storeId))
-					.limit(1)
-					.all();
-				expect(store.status).toBe("pending");
-			}
-
-			// Simulate bulk approval
-			const userId = "integration-test-user";
-			const bulkNotes = "Bulk approval integration test";
-
-			for (const storeId of bulkStoreIds) {
-				await db
-					.update(schema.stores)
-					.set({
-						status: "active",
-						updatedAt: new Date(),
-						approvalNotes: bulkNotes,
-						approvedBy: userId,
-						approvedAt: new Date(),
-					})
-					.where(eq(schema.stores.id, storeId))
-					.execute();
-			}
-
-			// Verify all stores are now active
-			for (const storeId of bulkStoreIds) {
-				const [store] = await db
-					.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-					.from(schema.stores)
-					.where(eq(schema.stores.id, storeId))
-					.limit(1)
-					.all();
-				expect(store.status).toBe("active");
-				expect(store.approvedBy).toBe(userId);
-				expect(store.approvalNotes).toBe(bulkNotes);
-			}
-
-			// Cleanup
-			for (const storeId of bulkStoreIds) {
+			// Clean up test stores
+			for (const storeId of testStoreIds) {
 				try {
-					await db
-						.delete(schema.stores)
-						.where(eq(schema.stores.id, storeId))
-						.execute();
-				} catch (_e) {
-					// Ignore cleanup errors
+					await db.delete_from("stores").where("id", "=", storeId).execute();
+				} catch (e) {
+					// Ignore errors during cleanup
+					console.warn(`Failed to cleanup store ${storeId}:`, e);
 				}
 			}
 		});
 
-		it("should fail bulk operations when stores are not in pending status", async () => {
-			const { getDb } = await import("@/utils/bindings");
-			const db = getDb();
+		describe("Full Approval Workflow", () => {
+			it("should transition store from pending to active", async () => {
+				const db = getDb();
+				const storeId = testStoreIds[0];
 
-			// Try to get pending stores
-			const pendingStores = await db
-				.select()
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-  .limit(1);
-				.from(schema.stores)
-				.where(eq(schema.stores.status, "pending"))
-				.all();
+				// Verify initial state
+				const [store] = await db
+					.select_from("stores")
+					.where("id", "=", storeId)
+					.all();
 
-			// After our previous tests, there might be no pending stores
-			// This is expected behavior
-			expect(Array.isArray(pendingStores)).toBe(true);
+				expect(store).toBeDefined();
+				expect(store.status).toBe("pending");
+
+				// Simulate approval (would normally be done via API)
+				const userId = "integration-test-user";
+				const approvalNotes = "Integration test approval";
+				const now = new Date().toISOString();
+
+				await db
+					.update("stores")
+					.set({
+						status: "active",
+						updated_at: now,
+						approval_notes: approvalNotes,
+						approved_by: userId,
+						approved_at: now,
+					})
+					.where("id", "=", storeId)
+					.execute();
+
+				// Verify final state
+				const [updatedStore] = await db
+					.select_from("stores")
+					.where("id", "=", storeId)
+					.all();
+
+				expect(updatedStore.status).toBe("active");
+				expect(updatedStore.approved_by).toBe(userId);
+				expect(updatedStore.approval_notes).toBe(approvalNotes);
+				expect(updatedStore.approved_at).toBeDefined();
+			});
+
+			it("should prevent approval of already active store", async () => {
+				const db = getDb();
+				const storeId = testStoreIds[2]; // Already active
+
+				// Verify store is active
+				const [store] = await db
+					.select_from("stores")
+					.where("id", "=", storeId)
+					.all();
+
+				expect(store.status).toBe("active");
+
+				// This would be enforced at the API level
+				// Here we just verify the state is as expected
+				expect(store.status).not.toBe("pending");
+			});
 		});
-	});
 
-	describe("Force Approval", () => {
-		it("should require justification for force approval", async () => {
-			// This is a contract test - API enforces this
-			const input = {
-				justification: "",
-			};
+		describe("Concurrent Modification Detection", () => {
+			it("should detect when store was modified by another user", async () => {
+				const db = getDb();
+				const storeId = testStoreIds[1];
 
-			// Empty string trimmed length is 0, so should be falsy
-			const hasJustification = Boolean(
-				input.justification && input.justification.trim().length > 0,
-			);
-			expect(hasJustification).toBe(false);
+				// Get current store
+				const [store] = await db
+					.select_from("stores")
+					.where("id", "=", storeId)
+					.all();
+
+				const originalUpdatedAt = store.updated_at;
+
+				// Simulate another user modifying the store
+				await db
+					.update("stores")
+					.set({ updated_at: new Date().toISOString() })
+					.where("id", "=", storeId)
+					.execute();
+
+				// Try to approve with old timestamp
+				const expectedDate = new Date(originalUpdatedAt);
+				const [currentStore] = await db
+					.select_from("stores")
+					.where("id", "=", storeId)
+					.all();
+				const currentDate = new Date(currentStore.updated_at);
+
+				// Verify timestamps don't match (concurrent modification detected)
+				expect(expectedDate.getTime()).not.toBe(currentDate.getTime());
+			});
 		});
 
-		it("should combine notes with justification", async () => {
-			const approvalNotes = "Store verified manually";
-			const justification = "Known location from field visit";
+		describe("Merge Operations", () => {
+			it("should prevent merging store into itself", async () => {
+				// This is a validation test - the constraint is enforced at API level
+				const storeId = testStoreIds[0];
 
-			const combinedNotes = approvalNotes
-				? `${approvalNotes}\n\n[FORCE APPROVAL] ${justification}`
-				: `[FORCE APPROVAL] ${justification}`;
+				// Can't merge into self
+				expect(storeId).toBe(storeId); // Same ID
+			});
 
-			expect(combinedNotes).toContain("Store verified manually");
-			expect(combinedNotes).toContain("[FORCE APPROVAL]");
-			expect(combinedNotes).toContain("Known location from field visit");
+			it("should verify both stores exist before merge", async () => {
+				const db = getDb();
+				const sourceId = testStoreIds[0];
+				const targetId = testStoreIds[1];
+
+				// Verify both stores exist
+				const [sourceStore] = await db
+					.select_from("stores")
+					.where("id", "=", sourceId)
+					.all();
+				const [targetStore] = await db
+					.select_from("stores")
+					.where("id", "=", targetId)
+					.all();
+
+				expect(sourceStore).toBeDefined();
+				expect(targetStore).toBeDefined();
+			});
 		});
-	});
-});
+
+		describe("Bulk Operations", () => {
+			it("should handle bulk approval of multiple stores", async () => {
+				const db = getDb();
+
+				// Create additional test stores
+				const now = new Date().toISOString();
+				const bulkStoreIds: string[] = [];
+
+				for (let i = 1; i <= 3; i++) {
+					const storeId = generatePrefixedId("sto");
+					await db
+						.insert_into("stores")
+						.values({
+							id: storeId,
+							chain_slug: "konzum",
+							name: `Bulk Test Store ${i}`,
+							address: `Bulk Address ${i}`,
+							city: "Zagreb",
+							postal_code: "10000",
+							is_virtual: true,
+							status: "pending",
+							created_at: now,
+							updated_at: now,
+						})
+						.execute();
+					bulkStoreIds.push(storeId);
+				}
+
+				// Verify all stores are pending
+				for (const storeId of bulkStoreIds) {
+					const [store] = await db
+						.select_from("stores")
+						.where("id", "=", storeId)
+						.all();
+					expect(store.status).toBe("pending");
+				}
+
+				// Simulate bulk approval
+				const userId = "integration-test-user";
+				const bulkNotes = "Bulk approval integration test";
+
+				for (const storeId of bulkStoreIds) {
+					await db
+						.update("stores")
+						.set({
+							status: "active",
+							updated_at: new Date().toISOString(),
+							approval_notes: bulkNotes,
+							approved_by: userId,
+							approved_at: new Date().toISOString(),
+						})
+						.where("id", "=", storeId)
+						.execute();
+				}
+
+				// Verify all stores are now active
+				for (const storeId of bulkStoreIds) {
+					const [store] = await db
+						.select_from("stores")
+						.where("id", "=", storeId)
+						.all();
+					expect(store.status).toBe("active");
+					expect(store.approved_by).toBe(userId);
+					expect(store.approval_notes).toBe(bulkNotes);
+				}
+
+				// Cleanup
+				for (const storeId of bulkStoreIds) {
+					try {
+						await db.delete_from("stores").where("id", "=", storeId).execute();
+					} catch (_e) {
+						// Ignore cleanup errors
+					}
+				}
+			});
+
+			it("should fail bulk operations when stores are not in pending status", async () => {
+				const db = getDb();
+
+				// Try to get pending stores
+				const pendingStores = await db
+					.select_from("stores")
+					.where("status", "=", "pending")
+					.all();
+
+				// After our previous tests, there might be no pending stores
+				// This is expected behavior
+				expect(Array.isArray(pendingStores)).toBe(true);
+			});
+		});
+
+		describe("Force Approval", () => {
+			it("should require justification for force approval", async () => {
+				// This is a contract test - the API enforces this
+				const input = {
+					justification: "",
+				};
+
+				const hasJustification =
+					input.justification && input.justification.trim().length > 0;
+				expect(hasJustification).toBe(false);
+			});
+
+			it("should combine notes with justification", async () => {
+				const approvalNotes = "Store verified manually";
+				const justification = "Known location from field visit";
+
+				const combinedNotes = approvalNotes
+					? `${approvalNotes}\n\n[FORCE APPROVAL] ${justification}`
+					: `[FORCE APPROVAL] ${justification}`;
+
+				expect(combinedNotes).toContain("Store verified manually");
+				expect(combinedNotes).toContain("[FORCE APPROVAL]");
+				expect(combinedNotes).toContain("Known location from field visit");
+			});
+		});
+	},
+);
 
 // Unit tests that don't require database
 describe("Store Workflow Contract Tests", () => {
