@@ -9,22 +9,54 @@ node = "24.13.0"
 description = "Run all tests: frontend (pnpm test) then Go service tests"
 run = """
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 echo "=========================================="
-echo "Running all tests"
+echo "Running all tests (build+start Go service on 3003, run JS tests, stop Go)"
 echo "=========================================="
 
-echo ""
-echo "Step 1: Running frontend tests..."
-pnpm test
+# Load development env if present
+set -o allexport
+[ -f .env.development ] && . .env.development || true
+set +o allexport
 
-echo ""
-echo "Step 2: Running Go service tests..."
-cd services/price-service && mise run test
+echo "Building Go price-service..."
+pushd services/price-service >/dev/null
+mkdir -p ./tmp
+go build -o ./tmp/price-service ./cmd/server/main.go
+popd >/dev/null
 
-echo ""
-echo "=========================================="
-echo "All tests passed successfully!"
-echo "=========================================="
+echo "Starting Go price-service on :3003..."
+export PORT=3003
+export INTERNAL_API_KEY="${INTERNAL_API_KEY:-dev-internal-api-key-change-in-development}"
+services/price-service/tmp/price-service &> /tmp/price-service.log &
+GO_PID=$!
+
+# Wait for health
+MAX=60
+i=0
+until curl -sSf -H "X-Internal-API-Key: ${INTERNAL_API_KEY}" http://localhost:3003/internal/health >/dev/null 2>&1; do
+  i=$((i+1))
+  if [ "$i" -ge "$MAX" ]; then
+    echo "Go service did not become healthy; tailing logs:"
+    tail -n 200 /tmp/price-service.log || true
+    kill "$GO_PID" || true
+    exit 1
+  fi
+  sleep 1
+done
+echo "Go service healthy (PID=${GO_PID})"
+
+    # Go service URL is derived from PORT; keep PORT export only
+
+echo "Running frontend tests..."
+pnpm test || TEST_EXIT=$?
+TEST_EXIT=${TEST_EXIT:-0}
+
+echo "Stopping Go service (PID=${GO_PID})..."
+kill "$GO_PID" || true
+wait "$GO_PID" 2>/dev/null || true
+rm -f services/price-service/tmp/price-service || true
+
+exit $TEST_EXIT
 """

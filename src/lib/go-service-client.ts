@@ -4,26 +4,24 @@ interface GoServiceResponse {
 	error?: string;
 }
 
-interface IngestOptions {
-	targetDate?: string;
-}
-
 interface FetchWithRetryOptions extends Omit<RequestInit, "timeout"> {
 	timeout?: number;
 	maxRetries?: number;
 	retryDelay?: number;
 }
 
-const GO_SERVICE_BASE_URL =
-	process.env.GO_SERVICE_BASE_URL || "http://localhost:8081";
+// Derive Go service base URL from PORT. No backward compatibility: prefer PORT
+// as the single source of truth for service address in dev/test.
 const INTERNAL_API_KEY =
-	process.env.INTERNAL_API_KEY || "dev-internal-api-key-change-in-production";
+	process.env.INTERNAL_API_KEY || "dev-internal-api-key-change-in-development";
 
 async function goFetch(
 	path: string,
 	options?: RequestInit,
 ): Promise<GoServiceResponse> {
-	const url = `${GO_SERVICE_BASE_URL}${path}`;
+	const port = process.env.PORT || "3003";
+	const base = `http://localhost:${port}`;
+	const url = `${base}${path}`;
 
 	const response = await fetch(url, {
 		...options,
@@ -59,16 +57,17 @@ async function goFetchWithRetry(
 	let lastError: string | undefined;
 
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
 		try {
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), timeout);
+			timeoutId = setTimeout(() => controller.abort(), timeout);
 
 			const response = await goFetch(path, {
 				...fetchOptions,
 				signal: controller.signal,
 			});
 
-			clearTimeout(timeoutId);
+			if (timeoutId) clearTimeout(timeoutId);
 
 			if (response.success || attempt === maxRetries) {
 				return response;
@@ -76,7 +75,7 @@ async function goFetchWithRetry(
 
 			lastError = response.error;
 		} catch (error) {
-			clearTimeout(timeoutId);
+			if (timeoutId) clearTimeout(timeoutId);
 			lastError = error instanceof Error ? error.message : String(error);
 
 			if (attempt < maxRetries) {

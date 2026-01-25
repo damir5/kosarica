@@ -5,63 +5,22 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 export async function startGoService(): Promise<void> {
-	console.log("Starting Go price service for integration tests...");
-
-	const spawn = require("child_process").spawn;
-	const dockerProcess = spawn(
-		"docker",
-		["compose", "up", "-d", "price-service"],
-		{
-			stdio: "inherit",
-		},
-	);
-
-	return new Promise((resolve, reject) => {
-		let retries = 0;
-		const maxRetries = 30;
-		const healthCheck = setInterval(async () => {
-			try {
-				const response = await fetch("http://localhost:8080/health");
-				if (response.ok) {
-					clearInterval(healthCheck);
-					resolve();
-					return;
-				}
-			} catch (error) {
-				retries++;
-				if (retries >= maxRetries) {
-					clearInterval(healthCheck);
-					reject(
-						new Error(
-							"Go service failed to start after " + maxRetries + " attempts",
-						),
-					);
-					return;
-				}
-			}
-		}, 1000);
-
-		dockerProcess.on("error", (error) => {
-			clearInterval(healthCheck);
-			reject(error);
-		});
-	});
+	// Previously this started the Go service via docker-compose for tests.
+	// Test orchestration is now handled by mise which starts the native Go binary.
+	// Keep this function as a no-op to avoid accidental Docker usage in tests.
+	return Promise.resolve();
 }
 
 export async function stopGoService(): Promise<void> {
-	console.log("Stopping Go price service...");
-
-	const { execSync } = require("child_process");
-	try {
-		execSync("docker compose down price-service", { stdio: "inherit" });
-		console.log("Go service stopped successfully");
-	} catch (error) {
-		console.error("Failed to stop Go service:", error);
-	}
+	// Orchestration now handled externally by mise; no-op here.
+	return Promise.resolve();
 }
 
 export function isGoServiceRunning(): boolean {
-	return process.env.GO_SERVICE_FOR_TESTS === "1";
+	// Tests rely on the orchestration to start the Go service on PORT.
+	// We consider the service running if a PORT env var is set — tests
+	// will attempt a health check against that port.
+	return Boolean(process.env.PORT);
 }
 
 import { afterAll, beforeAll, vi } from "vitest";
@@ -78,6 +37,7 @@ let sqlInstance: ReturnType<typeof postgres> | null = null;
 export function getTestDb() {
 	if (!testDb) {
 		const testUrl =
+			process.env.DATABASE_URL ||
 			process.env.TEST_DATABASE_URL ||
 			"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
 		sqlInstance = postgres(testUrl);
@@ -102,6 +62,7 @@ export function closeTestDb() {
  */
 async function cleanupTestDatabase(): Promise<void> {
 	const testUrl =
+		process.env.DATABASE_URL ||
 		process.env.TEST_DATABASE_URL ||
 		"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
 

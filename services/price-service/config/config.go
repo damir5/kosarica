@@ -155,7 +155,12 @@ func loadDotEnvFile(filename string) error {
 			value := strings.TrimSpace(parts[1])
 			// Remove quotes if present
 			value = strings.Trim(value, "\"'")
-			os.Setenv(key, value)
+			// Only set the environment variable if it's not already set in the environment.
+			// This prevents .env files from overriding values explicitly exported by the
+			// caller (for example when tests set PORT=3003 before starting the binary).
+			if existing := os.Getenv(key); existing == "" {
+				os.Setenv(key, value)
+			}
 		}
 	}
 	return scanner.Err()
