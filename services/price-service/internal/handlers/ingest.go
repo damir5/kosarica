@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/pipeline"
-	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -40,7 +40,7 @@ func IngestChain(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Parse optional request body
 	var req IngestChainRequest
 	if c.Request.Body != nil && c.Request.ContentLength > 0 {
@@ -48,7 +48,7 @@ func IngestChain(c *gin.Context) {
 			// Ignore bind errors, use defaults
 		}
 	}
-	
+
 	// Validate chain ID
 	if !chains.IsValidChain(chainID) {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -56,37 +56,37 @@ func IngestChain(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Create run record in database
-	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	pool := database.Pool()
 	ctx := c.Request.Context()
-	
-	_, err := pool.Exec(ctx, `
+
+	var runID int64
+	err := pool.QueryRow(ctx, `
 		INSERT INTO ingestion_runs (
-			id, chain_slug, source, status, started_at, created_at
+			chain_slug, source, status, started_at, created_at
 		) VALUES (
-			$1, $2, 'api', 'running', NOW(), NOW()
-		)
-	`, runID, chainID)
-	
+			$1, 'api', 'running', NOW(), NOW()
+		) RETURNING id
+	`, chainID).Scan(&runID)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("Failed to create ingestion run: %v", err),
 		})
 		return
 	}
-	
+
 	// Spawn goroutine for actual processing
 	go func() {
 		// Acquire semaphore slot (blocks if max concurrent reached)
 		ingestionSem <- struct{}{}
 		defer func() { <-ingestionSem }() // Release semaphore slot when done
-		
+
 		// Use a background context for the goroutine
 		bgCtx := context.Background()
 		result, runErr := pipeline.Run(bgCtx, chainID, req.TargetDate)
-		
+
 		// Update run status based on result
 		if runErr != nil {
 			markRunFailed(bgCtx, runID, runErr.Error())
@@ -96,12 +96,12 @@ func IngestChain(c *gin.Context) {
 			markRunCompleted(bgCtx, runID, result.FilesProcessed, result.EntriesPersisted)
 		}
 	}()
-	
+
 	// Return 202 Accepted immediately
 	c.JSON(http.StatusAccepted, IngestChainStartedResponse{
-		RunID:   runID,
+		RunID:   strconv.FormatInt(runID, 10),
 		Status:  "started",
-		PollURL: fmt.Sprintf("/internal/ingestion/runs/%s", runID),
+		PollURL: fmt.Sprintf("/internal/ingestion/runs/%s", strconv.FormatInt(runID, 10)),
 		Message: fmt.Sprintf("Ingestion started for chain %s", chainID),
 	})
 }
@@ -116,7 +116,7 @@ func GetIngestionStatus(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Look up status from database
 	pool := database.Pool()
 	var status string
@@ -125,10 +125,10 @@ func GetIngestionStatus(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to lookup status"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"runId":   runID,
-		"status":  status,
+		"runId":  runID,
+		"status": status,
 	})
 }
 
@@ -143,7 +143,7 @@ func ListIngestionRuns(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Look up runs from database
 	pool := database.Pool()
 	rows, err := pool.Query(c.Request.Context(), `
@@ -158,16 +158,16 @@ func ListIngestionRuns(c *gin.Context) {
 		return
 	}
 	defer rows.Close()
-	
+
 	var runs []interface{}
 	for rows.Next() {
 		var run struct {
-			ID             string `json:"id"`
-			Status         string `json:"status"`
-			StartedAt      string `json:"startedAt"`
-			CompletedAt    *string `json:"completedAt,omitempty"`
-			FilesProcessed int    `json:"filesProcessed"`
-			EntriesPersisted int   `json:"entriesPersisted"`
+			ID               string  `json:"id"`
+			Status           string  `json:"status"`
+			StartedAt        string  `json:"startedAt"`
+			CompletedAt      *string `json:"completedAt,omitempty"`
+			FilesProcessed   int     `json:"filesProcessed"`
+			EntriesPersisted int     `json:"entriesPersisted"`
 		}
 		err := rows.Scan(
 			&run.ID,
@@ -182,14 +182,15 @@ func ListIngestionRuns(c *gin.Context) {
 		}
 		runs = append(runs, run)
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"chain": chainID,
 		"runs":  runs,
 	})
 }
+
 // markRunFailed marks an ingestion run as failed
-func markRunFailed(ctx context.Context, runID string, errorMsg string) {
+func markRunFailed(ctx context.Context, runID int64, errorMsg string) {
 	pool := database.Pool()
 	_, err := pool.Exec(ctx, `
 		UPDATE ingestion_runs
@@ -199,12 +200,12 @@ func markRunFailed(ctx context.Context, runID string, errorMsg string) {
 		WHERE id = $1
 	`, runID, fmt.Sprintf(`{"error": "%s"}`, errorMsg))
 	if err != nil {
-		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as failed")
+		log.Error().Err(err).Int64("runID", runID).Msg("Failed to mark run as failed")
 	}
 }
 
 // markRunCompleted marks an ingestion run as completed
-func markRunCompleted(ctx context.Context, runID string, filesProcessed int, entriesPersisted int) {
+func markRunCompleted(ctx context.Context, runID int64, filesProcessed int, entriesPersisted int) {
 	pool := database.Pool()
 	_, err := pool.Exec(ctx, `
 		UPDATE ingestion_runs
@@ -215,6 +216,6 @@ func markRunCompleted(ctx context.Context, runID string, filesProcessed int, ent
 		WHERE id = $1
 	`, runID, filesProcessed, entriesPersisted)
 	if err != nil {
-		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as completed")
+		log.Error().Err(err).Int64("runID", runID).Msg("Failed to mark run as completed")
 	}
 }
