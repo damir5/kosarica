@@ -96,8 +96,7 @@ docker compose logs price-service
 
 | Variable | Description | Default | When to Set |
 |-----------|-------------|---------|-------------|
-| `GO_SERVICE_FOR_TESTS` | Enable Go service for tests | 0 | Set to 1 to start Go service automatically in tests |
-| `START_GO_SERVICE_FOR_TESTS` | Override test start behavior | 0 | Set to 1 to force Go service start (for debugging) |
+| `GO_SERVICE_FOR_TESTS` / `START_GO_SERVICE_FOR_TESTS` | (removed) | - | Do not use; orchestration handles Go service startup — use `GO_SERVICE_URL` and `mise run test-all` |
 | `TEST_MOCK_GO_SERVICE` | Mock Go service (legacy, unused) | 0 | Legacy variable, no longer used |
 
 ## Test Scripts
@@ -116,19 +115,19 @@ docker compose logs price-service
 
 ### Expected Results
 
-**With `GO_SERVICE_FOR_TESTS=1`:**
+**With an explicitly set `GO_SERVICE_URL`:**
 - All 63 tests pass (unit + integration + price service)
-- Go service starts automatically via test setup
+- Go service is expected to be running at `GO_SERVICE_URL` (orchestrated via `mise run test-all`)
 - Tests exercise real integration endpoints
 - Full coverage of codebase
 - Tests complete in ~2-3 seconds
 
-**With `GO_SERVICE_FOR_TESTS=0` (default):**
+**When GO service orchestration is external (default):**
 - Unit tests pass (40 tests)
 - Store integration tests pass (12 tests)
-- Price service tests skip (9 tests) - Go service not started
+- Price service tests require a running Go service at `GO_SERVICE_URL` and will run when it is available
 - Developer can iterate quickly on unit tests
-- No wait time for Go service startup
+- No automatic Go service startup within tests; use `mise run test-all` to run full suite
 
 ## Troubleshooting
 
@@ -250,6 +249,6 @@ The previous mock implementation (`TEST_MOCK_GO_SERVICE=1`) is now **legacy**.
 To migrate:
 1. Remove references to `TEST_MOCK_GO_SERVICE` from code
 2. Delete `/workspace/src/test/go-service-mocks.ts` if no longer needed
-3. Use `GO_SERVICE_FOR_TESTS` environment variable instead
+3. Use `GO_SERVICE_URL` environment variable to point tests at a running Go service
 
-The new approach uses real Go service instances controlled via environment variables, providing true integration testing.
+The new approach uses real Go service instances controlled via orchestration (`mise run test-all`), providing true integration testing.

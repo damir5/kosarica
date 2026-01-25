@@ -167,8 +167,8 @@ DB_PASSWORD=$(generate_secret)
 
 cat > "$ENV_FILE" << EOF
 # Database
+# Tests and runtime now use DATABASE_URL; do not create TEST_DATABASE_URL to avoid confusion
 DATABASE_URL=postgresql://kosarica:${DB_PASSWORD}@localhost:5432/kosarica
-TEST_DATABASE_URL=postgresql://kosarica:${DB_PASSWORD}@localhost:5432/kosarica_test
 
 # Storage
 STORAGE_PATH=./data/storage

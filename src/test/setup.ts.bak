@@ -68,9 +68,9 @@ let sqlInstance: ReturnType<typeof postgres> | null = null;
  */
 export function getTestDb() {
 	if (!testDb) {
-		const testUrl =
-			process.env.TEST_DATABASE_URL ||
-			"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
+    const testUrl =
+        process.env.DATABASE_URL ||
+        "postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
 		sqlInstance = postgres(testUrl);
 		testDb = drizzle(sqlInstance, { schema });
 	}
@@ -92,9 +92,9 @@ export function closeTestDb() {
  * Clean up the test database by dropping all tables, types, enums, and the drizzle schema.
  */
 async function cleanupTestDatabase(): Promise<void> {
-	const testUrl =
-		process.env.TEST_DATABASE_URL ||
-		"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
+    const testUrl =
+        process.env.DATABASE_URL ||
+        "postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
 
 	// Create a separate connection for cleanup (without drizzle)
 	const sql = postgres(testUrl);

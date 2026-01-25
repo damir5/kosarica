@@ -38,7 +38,6 @@ export function getTestDb() {
 	if (!testDb) {
 		const testUrl =
 			process.env.DATABASE_URL ||
-			process.env.TEST_DATABASE_URL ||
 			"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
 		sqlInstance = postgres(testUrl);
 		testDb = drizzle(sqlInstance, { schema });
@@ -63,7 +62,6 @@ export function closeTestDb() {
 async function cleanupTestDatabase(): Promise<void> {
 	const testUrl =
 		process.env.DATABASE_URL ||
-		process.env.TEST_DATABASE_URL ||
 		"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
 
 	// Create a separate connection for cleanup (without drizzle)

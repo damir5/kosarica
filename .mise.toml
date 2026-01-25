@@ -29,6 +29,7 @@ popd >/dev/null
 echo "Starting Go price-service on :3003..."
 export PORT=3003
 export INTERNAL_API_KEY="${INTERNAL_API_KEY:-dev-internal-api-key-change-in-development}"
+export GO_SERVICE_URL="${GO_SERVICE_URL:-http://localhost:3003}"
 services/price-service/tmp/price-service &> /tmp/price-service.log &
 GO_PID=$!
 

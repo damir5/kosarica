@@ -18,7 +18,7 @@ User wants to:
 - **User decision**: Keep `/.mise.toml` only, delete `/workspace/mise.toml`
 - **Test composition**: Run Unit + Integration + E2E (full test suite)
 - **Service startup**: Background processes with PID tracking (no docker-compose)
-- **Database**: Use `TEST_DATABASE_URL` (currently `postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test`)
+- **Database**: Use `DATABASE_URL` for tests and runtime (remove `TEST_DATABASE_URL`)
 - **Ports**: Go service on 8081, Node.js on 3002 (from `.env.development`)
 
 **Research Findings**:
@@ -26,7 +26,7 @@ User wants to:
 - Current integration test setup: `src/test/setup.ts` uses `docker compose up -d price-service` and `docker compose down price-service`
 - Integration tests found: `src/orpc/router/__tests__/price-service.integration.test.ts`, `src/orpc/router/__tests__/stores-integration.test.ts`
 - E2E tests found: `services/price-service/tests/e2e/pipeline_test.go`
-- Environment variables: `START_GO_SERVICE_FOR_TESTS`, `GO_SERVICE_URL`, `TEST_DATABASE_URL`
+  - Environment variables: `START_GO_SERVICE_FOR_TESTS`, `GO_SERVICE_URL`
 
 ### Metis Review
 **Identified Gaps** (addressed in this plan):
@@ -446,7 +446,7 @@ None - tasks must run sequentially to verify before implementing.
     13. Kill Go service process: `kill $go_pid; sleep 5; ps -p $go_pid >/dev/null || kill -9 $go_pid`
     14. Report success/failure
   - Use bash trap handlers to ensure cleanup happens on failure or interruption (Ctrl+C): `trap 'cleanup; exit 1' INT TERM`
-  - Set environment variables: `TEST_DATABASE_URL` (use existing value from .env), `GO_SERVICE_URL=http://localhost:8080`
+  - Set environment variables: `DATABASE_URL` (use existing value from .env), `GO_SERVICE_URL=http://localhost:8080`
   - Exit code: 0 if all tests pass, 1 if any test fails
   - **NOTE on ports**:
     - Port 3000: Go service default (from config.go), not used in tests
@@ -459,7 +459,7 @@ None - tasks must run sequentially to verify before implementing.
   - Do NOT use docker-compose commands
   - Do NOT modify test logic or test files
   - Do NOT change test behavior or test expectations
-  - Do NOT change environment variable names (use existing TEST_DATABASE_URL, GO_SERVICE_URL)
+  - Do NOT change environment variable names (use `DATABASE_URL`, `GO_SERVICE_URL`)
   - Do NOT change ports (8081 for Go, 3002 for Node)
 
   **Parallelizable**: NO
@@ -716,4 +716,4 @@ ls /.mise.toml                   # Should succeed: file exists
 - [ ] No zombie processes remain
 - [ ] `src/test/setup.ts` docker-compose functions removed
 - [ ] Manual test runs still work (`pnpm test`, `go test`)
-- [ ] Environment variables unchanged (TEST_DATABASE_URL, GO_SERVICE_URL)
+- [ ] Environment variables unchanged (DATABASE_URL, GO_SERVICE_URL)

@@ -9,8 +9,7 @@ import { createRouterClient } from "@orpc/server";
 import { beforeAll, describe, expect, it } from "vitest";
 import router from "@/orpc/router";
 
-const port = process.env.PORT || "3003";
-const GO_SERVICE_URL = process.env.GO_SERVICE_URL || `http://localhost:${port}`;
+const GO_SERVICE_URL = process.env.GO_SERVICE_URL || "http://localhost:3003";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "test-key";
 
 describe("Price Service Proxy Integration Tests", () => {

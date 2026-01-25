@@ -43,7 +43,6 @@ export function createDb(connectionString: string): DatabaseType {
 export function createInMemoryDb(): DatabaseType {
 	const testUrl =
 		process.env.DATABASE_URL ||
-		process.env.TEST_DATABASE_URL ||
 		"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
 	return createDb(testUrl);
 }

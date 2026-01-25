@@ -10,8 +10,9 @@ interface FetchWithRetryOptions extends Omit<RequestInit, "timeout"> {
 	retryDelay?: number;
 }
 
-// Derive Go service base URL from PORT. No backward compatibility: prefer PORT
-// as the single source of truth for service address in dev/test.
+// Use GO_SERVICE_URL as the canonical address for the Go price-service in
+// development and tests. Do not infer the Go service location from the
+// frontend PORT value.
 const INTERNAL_API_KEY =
 	process.env.INTERNAL_API_KEY || "dev-internal-api-key-change-in-development";
 
@@ -19,8 +20,7 @@ async function goFetch(
 	path: string,
 	options?: RequestInit,
 ): Promise<GoServiceResponse> {
-	const port = process.env.PORT || "3003";
-	const base = `http://localhost:${port}`;
+	const base = process.env.GO_SERVICE_URL || "http://localhost:3003";
 	const url = `${base}${path}`;
 
 	const response = await fetch(url, {
