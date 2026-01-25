@@ -12,8 +12,8 @@ import (
 
 // GetStorePricesRequest represents query parameters for getting store prices
 type GetStorePricesRequest struct {
-	ChainSlug string `form:"chainSlug" binding:"required"`
-	StoreID   string `form:"storeId" binding:"required"`
+	ChainSlug string `form:"chainSlug"`
+	StoreID   string `form:"storeId"`
 	Limit     int    `form:"limit" binding:"min=1,max=500"`
 	Offset    int    `form:"offset" binding:"min=0"`
 }
