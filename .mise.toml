@@ -15,9 +15,10 @@ echo "=========================================="
 echo "Running all tests (build+start Go service on 3003, run JS tests, stop Go)"
 echo "=========================================="
 
-# Load development env if present
+# Load development env if present, then overlay .env.test for test DB
 set -o allexport
 [ -f .env.development ] && . .env.development || true
+[ -f .env.test ] && . .env.test || true
 set +o allexport
 
 echo "Building Go price-service..."
@@ -26,12 +27,12 @@ mkdir -p ./tmp
 go build -o ./tmp/price-service ./cmd/server/main.go
 popd >/dev/null
 
-echo "Starting Go price-service on :3003..."
-export PORT=3003
-export INTERNAL_API_KEY="${INTERNAL_API_KEY:-dev-internal-api-key-change-in-development}"
-export GO_SERVICE_URL="${GO_SERVICE_URL:-http://localhost:3003}"
-services/price-service/tmp/price-service &> /tmp/price-service.log &
-GO_PID=$!
+# Start Go service via nested mise so the service picks up its own .env files
+echo "Starting Go price-service via nested mise (service will load its env files)..."
+pushd services/price-service >/dev/null
+mise run test-service &> /tmp/price-service-mise.log &
+GO_MISE_PID=$!
+popd >/dev/null
 
 # Wait for health
 MAX=60
@@ -41,12 +42,14 @@ until curl -sSf -H "X-Internal-API-Key: ${INTERNAL_API_KEY}" http://localhost:30
   if [ "$i" -ge "$MAX" ]; then
     echo "Go service did not become healthy; tailing logs:"
     tail -n 200 /tmp/price-service.log || true
-    kill "$GO_PID" || true
+    echo "--- nested mise logs ---"
+    tail -n 200 /tmp/price-service-mise.log || true
+    kill "$GO_MISE_PID" || true
     exit 1
   fi
   sleep 1
 done
-echo "Go service healthy (PID=${GO_PID})"
+echo "Go service healthy (PID=${GO_MISE_PID})"
 
     # Go service URL is derived from PORT; keep PORT export only
 
@@ -54,9 +57,9 @@ echo "Running frontend tests..."
 pnpm test || TEST_EXIT=$?
 TEST_EXIT=${TEST_EXIT:-0}
 
-echo "Stopping Go service (PID=${GO_PID})..."
-kill "$GO_PID" || true
-wait "$GO_PID" 2>/dev/null || true
+echo "Stopping Go service (PID=${GO_MISE_PID})..."
+kill "$GO_MISE_PID" || true
+wait "$GO_MISE_PID" 2>/dev/null || true
 rm -f services/price-service/tmp/price-service || true
 
 exit $TEST_EXIT

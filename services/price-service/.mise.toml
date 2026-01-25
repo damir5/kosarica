@@ -11,11 +11,11 @@ run = "go build -o ./server ./cmd/server/main.go"
 
 [tasks.run]
 description = "Run the Go service directly"
-run = "go run ./cmd/server/main.go"
+run = "set -o allexport; [ -f .env.development ] && . .env.development || true; [ -f .env.test ] && . .env.test || true; go run ./cmd/server/main.go"
 
 [tasks.dev]
 description = "Run the Go service"
-run = "go run ./cmd/server/main.go"
+run = "set -o allexport; [ -f .env.development ] && . .env.development || true; [ -f .env.test ] && . .env.test || true; go run ./cmd/server/main.go"
 
 # ==============================================================================
 # TEST TASKS
@@ -23,27 +23,27 @@ run = "go run ./cmd/server/main.go"
 
 [tasks.test]
 description = "Run Go unit tests (without testcontainers)"
-run = "go test ./tests/unit/... ./internal/pkg/... ./internal/pricegroups/..."
+run = "set -o allexport; [ -f .env.development ] && . .env.development || true; [ -f .env.test ] && . .env.test || true; go test ./tests/unit/... ./internal/pkg/... ./internal/pricegroups/..."
 
 [tasks.test-unit]
 description = "Run unit tests only"
-run = "go test ./tests/unit/..."
+run = "set -o allexport; [ -f .env.development ] && . .env.development || true; [ -f .env.test ] && . .env.test || true; go test ./tests/unit/..."
 
 [tasks.test-integration]
 description = "Run integration tests"
-run = "go test ./tests/integration/..."
+run = "set -o allexport; [ -f .env.development ] && . .env.development || true; [ -f .env.test ] && . .env.test || true; go test ./tests/integration/..."
 
 [tasks.test-e2e]
 description = "Run e2e tests (requires Docker)"
-run = "go test ./tests/e2e/..."
+run = "set -o allexport; [ -f .env.development ] && . .env.development || true; [ -f .env.test ] && . .env.test || true; go test ./tests/e2e/..."
 
 [tasks.test-short]
 description = "Run quick tests (skip e2e)"
-run = "go test -short ./..."
+run = "set -o allexport; [ -f .env.development ] && . .env.development || true; [ -f .env.test ] && . .env.test || true; go test -short ./..."
 
 [tasks.test-verbose]
 description = "Run tests with verbose output"
-run = "go test -v ./..."
+run = "set -o allexport; [ -f .env.development ] && . .env.development || true; [ -f .env.test ] && . .env.test || true; go test -v ./..."
 
 [tasks.test-coverage]
 description = "Run tests with coverage"
@@ -254,6 +254,7 @@ export POSTGRES_PORT="5433"
 export POSTGRES_USER="test"
 export POSTGRES_PASSWORD="test"
 export POSTGRES_DB="testdb"
+export INTERNAL_API_KEY=${INTERNAL_API_KEY:-dev-internal-api-key-change-in-development}
 
 # Run e2e tests with verbose output
 go test -v ./tests/e2e/... -timeout 10m
@@ -374,6 +375,27 @@ run = "go mod download"
 [tasks.mod-verify]
 description = "Verify go module dependencies"
 run = "go mod verify"
+
+[tasks.test-service]
+description = "Build and run the Go service for tests (foreground, loads .env.development + .env.test)"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Load env files (development then test overrides)
+set -o allexport
+[ -f .env.development ] && . .env.development || true
+[ -f .env.test ] && . .env.test || true
+set +o allexport
+
+# Ensure build output exists
+mkdir -p ./tmp
+go build -o ./tmp/price-service ./cmd/server/main.go
+
+# Exec the binary in foreground so nested mise PID maps to the service process.
+# Redirect stdout/stderr to a known log for the root orchestration to tail.
+exec ./tmp/price-service &> /tmp/price-service.log
+"""
 
 # ==============================================================================
 # LINTING & FORMATTING
