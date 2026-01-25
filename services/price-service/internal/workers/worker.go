@@ -4,15 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/kosarica/price-service/internal/taskqueue"
-	"github.com/rs/zerolog"
 )
-
-var log = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 type WorkerConfig struct {
 	WorkerID   string

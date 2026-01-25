@@ -22,8 +22,8 @@ run = "go run ./cmd/server/main.go"
 # ==============================================================================
 
 [tasks.test]
-description = "Run all Go tests"
-run = "go test ./..."
+description = "Run Go unit tests (without testcontainers)"
+run = "go test ./tests/unit/... ./internal/pkg/... ./internal/pricegroups/..."
 
 [tasks.test-unit]
 description = "Run unit tests only"

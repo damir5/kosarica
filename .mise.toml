@@ -1,2 +1,30 @@
 [tools]
 node = "24.13.0"
+
+# ==============================================================================
+# TEST TASKS
+# ==============================================================================
+
+[tasks.test-all]
+description = "Run all tests: frontend (pnpm test) then Go service tests"
+run = """
+#!/usr/bin/env bash
+set -e
+
+echo "=========================================="
+echo "Running all tests"
+echo "=========================================="
+
+echo ""
+echo "Step 1: Running frontend tests..."
+pnpm test
+
+echo ""
+echo "Step 2: Running Go service tests..."
+cd services/price-service && mise run test
+
+echo ""
+echo "=========================================="
+echo "All tests passed successfully!"
+echo "=========================================="
+"""
