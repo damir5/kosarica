@@ -1,0 +1,26 @@
+# Test Docker Compose configuration
+# Overrides for running full backend test suite
+
+services:
+  # Test PostgreSQL Database
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: kosarica-postgres-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kosarica_test
+      POSTGRES_USER: kosarica_test
+      POSTGRES_PASSWORD: kosarica_test
+    ports:
+      - "15432:5432"
+    networks:
+      - kosarica-test
+    profiles: ["test"]
+
+networks:
+  kosarica-test:
+    driver: bridge
+
+volumes:
+  kosarica_test_data:
+    name: kosarica_postgres_test_data

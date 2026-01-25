@@ -8,6 +8,12 @@ interface IngestOptions {
 	targetDate?: string;
 }
 
+interface FetchWithRetryOptions extends Omit<RequestInit, "timeout"> {
+	timeout?: number;
+	maxRetries?: number;
+	retryDelay?: number;
+}
+
 const GO_SERVICE_BASE_URL =
 	process.env.GO_SERVICE_BASE_URL || "http://localhost:8081";
 const INTERNAL_API_KEY =
@@ -38,6 +44,54 @@ async function goFetch(
 	const data = await response.json();
 	return data;
 }
+
+async function goFetchWithRetry(
+	path: string,
+	options?: FetchWithRetryOptions,
+): Promise<GoServiceResponse> {
+	const {
+		maxRetries = 3,
+		retryDelay = 1000,
+		timeout = 5000,
+		...fetchOptions
+	} = options || {};
+
+	let lastError: string | undefined;
+
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+			const response = await goFetch(path, {
+				...fetchOptions,
+				signal: controller.signal,
+			});
+
+			clearTimeout(timeoutId);
+
+			if (response.success || attempt === maxRetries) {
+				return response;
+			}
+
+			lastError = response.error;
+		} catch (error) {
+			clearTimeout(timeoutId);
+			lastError = error instanceof Error ? error.message : String(error);
+
+			if (attempt < maxRetries) {
+				await new Promise((resolve) => setTimeout(resolve, retryDelay));
+			}
+		}
+	}
+
+	return {
+		success: false,
+		error: lastError || `Failed after ${maxRetries + 1} attempts`,
+	};
+}
+
+export { goFetch, goFetchWithRetry };
 
 export async function scheduleIngestion(
 	chainId: string,
