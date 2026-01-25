@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -558,64 +559,11 @@ func setupTestData(ctx context.Context, t *testing.T, db *pgxpool.Pool) {
 	require.NoError(t, tx.Commit(ctx))
 }
 
-// setupMultiStoreTestData sets up test data for multi-store optimization.
-func setupMultiStoreTestData(ctx context.Context, t *testing.T, db *pgxpool.Pool) {
-	tx, err := db.Begin(ctx)
-	require.NoError(t, err)
-	defer tx.Rollback(ctx)
+func TestMain(m *testing.M) {
+	if os.Getenv("TESTCONTAINERS_ENABLED") == "false" {
+		os.Exit(m.Run())
+	}
 
-	// Create chain
-	_, err = tx.Exec(ctx, `INSERT INTO chains (slug, name) VALUES ('test-chain', 'Test Chain')`)
-	require.NoError(t, err)
-
-	// Create price groups with different prices
-	_, err = tx.Exec(ctx, `
-		INSERT INTO price_groups (id, chain_slug, price_hash, hash_version, store_count, item_count)
-		VALUES
-			('group-1', 'test-chain', 'hash1', 1, 1, 2),
-			('group-2', 'test-chain', 'hash2', 1, 1, 2)
-	`)
-	require.NoError(t, err)
-
-	// Create stores at different locations
-	_, err = tx.Exec(ctx, `
-		INSERT INTO stores (id, chain_slug, name, status, latitude, longitude)
-		VALUES
-			('sto-aaa-111', 'test-chain', 'Store A', 'active', '45.0', '16.0'),
-			('sto-bbb-222', 'test-chain', 'Store B', 'active', '45.1', '16.1'),
-			('sto-ccc-333', 'test-chain', 'Store C', 'active', '45.2', '16.2')
-	`)
-	require.NoError(t, err)
-
-	// Map stores to groups
-	_, err = tx.Exec(ctx, `
-		INSERT INTO store_group_history (id, store_id, price_group_id, valid_from, created_at)
-		VALUES
-			('hist-1', 'sto-aaa-111', 'group-1', NOW(), NOW()),
-			('hist-2', 'sto-bbb-222', 'group-1', NOW(), NOW()),
-			('hist-3', 'sto-ccc-333', 'group-2', NOW(), NOW())
-	`)
-	require.NoError(t, err)
-
-	// Create items
-	_, err = tx.Exec(ctx, `
-		INSERT INTO retailer_items (id, chain_slug, name)
-		VALUES
-			('rit-aaa-111', 'test-chain', 'Item A'),
-			('rit-bbb-222', 'test-chain', 'Item B')
-	`)
-	require.NoError(t, err)
-
-	// Create prices - group-1 has cheaper prices for A, group-2 has cheaper for B
-	_, err = tx.Exec(ctx, `
-		INSERT INTO group_prices (price_group_id, retailer_item_id, price, discount_price, created_at)
-		VALUES
-			('group-1', 'rit-aaa-111', 1000, NULL, NOW()),
-			('group-1', 'rit-bbb-222', 2000, 1500, NOW()),
-			('group-2', 'rit-aaa-111', 1200, NULL, NOW()),
-			('group-2', 'rit-bbb-222', 1800, 1700, NOW())
-	`)
-	require.NoError(t, err)
-
-	require.NoError(t, tx.Commit(ctx))
+	os.Exit(m.Run())
 }
+

@@ -3,6 +3,7 @@ package matching
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -536,4 +537,15 @@ func TestEmbeddingCaching(t *testing.T) {
 	// Note: In real scenario, second run would have fewer calls due to cache hits
 	// This test verifies the cache mechanism exists
 	t.Logf("Embedding caching test: first run=%d calls, second run=%d calls", firstRunCalls, callCount)
+}
+
+func TestMain(m *testing.M) {
+	// Check if testcontainers is available
+	if os.Getenv("TESTCONTAINERS_ENABLED") == "false" {
+		// Run without container tests
+		os.Exit(m.Run())
+	}
+
+	// Run all tests
+	os.Exit(m.Run())
 }

@@ -4,6 +4,7 @@ package optimizer
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -547,4 +548,12 @@ func runTestMigrations(ctx context.Context, db *pgxpool.Pool) error {
 
 	_, err := db.Exec(ctx, schema)
 	return err
+}
+
+func TestMain(m *testing.M) {
+	if os.Getenv("TESTCONTAINERS_ENABLED") == "false" {
+		os.Exit(m.Run())
+	}
+
+	os.Exit(m.Run())
 }
