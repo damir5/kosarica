@@ -7,6 +7,13 @@
       "when": 1769239023525,
       "tag": "0000_warm_molecule_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769365888198,
+      "tag": "0001_chemical_ultimatum",
+      "breakpoints": true
     }
   ]
 }

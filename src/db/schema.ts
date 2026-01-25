@@ -184,6 +184,16 @@ export const retailerItems = pgTable(
 		barcode: text("barcode").notNull(), // EAN-13, EAN-8, etc.
 		isPrimary: boolean("is_primary").default(false),
 		createdAt: timestamp("created_at").defaultNow(),
+		name: text("name").notNull(),
+		externalId: text("external_id"),
+		description: text("description"),
+		brand: text("brand"),
+		category: text("category"),
+		subcategory: text("subcategory"),
+		unit: text("unit"),
+		unitQuantity: text("unit_quantity"),
+		imageUrl: text("image_url"),
+		chainSlug: text("chain_slug"),
 	},
 	(table) => ({
 		barcodeIdx: index("retailer_item_barcodes_barcode_idx").on(table.barcode),
