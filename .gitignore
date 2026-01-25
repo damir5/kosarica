@@ -59,3 +59,6 @@ main-ugi/
 # Go workspace
 go.work
 go.work.sum
+
+# Sisyphus work session tracking
+.sisyphus/

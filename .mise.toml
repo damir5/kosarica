@@ -27,6 +27,25 @@ mkdir -p ./tmp
 go build -o ./tmp/price-service ./cmd/server/main.go
 popd >/dev/null
 
+# Apply migrations to the test database before starting the service. Run inside
+# the service dir so the service's mise tasks and env files are picked up.
+echo "Applying DB migrations to test database..."
+pushd services/price-service >/dev/null
+# Load env files for migration (development then test overrides)
+set -o allexport
+[ -f .env.development ] && . .env.development || true
+[ -f .env.test ] && . .env.test || true
+set +o allexport
+
+# Run migrations via the service's migrate-up task so migrations stay consistent
+mise run migrate-up &> /tmp/price-service-migrate.log || {
+  echo "Migrations failed; showing last 200 lines of migration log:" 
+  tail -n 200 /tmp/price-service-migrate.log || true
+  popd >/dev/null
+  exit 1
+}
+popd >/dev/null
+
 # Start Go service via nested mise so the service picks up its own .env files
 echo "Starting Go price-service via nested mise (service will load its env files)..."
 pushd services/price-service >/dev/null
