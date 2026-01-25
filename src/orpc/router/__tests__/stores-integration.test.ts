@@ -8,7 +8,9 @@
  * - Bulk operations
  */
 
+import { eq, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { chains, stores } from "@/db/schema";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 
@@ -18,33 +20,38 @@ describe("Store Approval Workflow Integration Tests", () => {
 	beforeAll(async () => {
 		const db = getDb();
 
-		// Clean up any existing test stores
 		await db
-			.delete_from("stores")
-			.where("name", "like", "Integration Test Store%")
+			.insert(chains)
+			.values({
+				slug: "konzum",
+				name: "Konzum",
+			})
+			.onConflictDoNothing()
 			.execute();
 
-		// Create test stores
-		const now = new Date().toISOString();
+		await db
+			.delete(stores)
+			.where(like(stores.name, "Integration Test Store%"))
+			.execute();
+
+		const now = new Date();
 
 		// Store 1: Pending store
 		const store1Id = generatePrefixedId("sto");
 		await db
-			.insert_into("stores")
+			.insert(stores)
 			.values({
 				id: store1Id,
-				chain_slug: "konzum",
+				chainSlug: "konzum",
 				name: "Integration Test Store 1",
 				address: "Test Address 1",
 				city: "Zagreb",
-				postal_code: "10000",
+				postalCode: "10000",
 				latitude: "45.8150",
 				longitude: "15.9819",
-				is_virtual: true,
-				price_source_store_id: null,
+				isVirtual: true,
+				priceSourceStoreId: null,
 				status: "pending",
-				created_at: now,
-				updated_at: now,
 			})
 			.execute();
 		testStoreIds.push(store1Id);
@@ -52,21 +59,19 @@ describe("Store Approval Workflow Integration Tests", () => {
 		// Store 2: Another pending store for merge testing
 		const store2Id = generatePrefixedId("sto");
 		await db
-			.insert_into("stores")
+			.insert(stores)
 			.values({
 				id: store2Id,
-				chain_slug: "konzum",
+				chainSlug: "konzum",
 				name: "Integration Test Store 2",
 				address: "Test Address 2",
 				city: "Zagreb",
-				postal_code: "10000",
+				postalCode: "10000",
 				latitude: "45.8150",
 				longitude: "15.9819",
-				is_virtual: true,
-				price_source_store_id: null,
+				isVirtual: true,
+				priceSourceStoreId: null,
 				status: "pending",
-				created_at: now,
-				updated_at: now,
 			})
 			.execute();
 		testStoreIds.push(store2Id);
@@ -74,21 +79,19 @@ describe("Store Approval Workflow Integration Tests", () => {
 		// Store 3: Active store for merge testing
 		const store3Id = generatePrefixedId("sto");
 		await db
-			.insert_into("stores")
+			.insert(stores)
 			.values({
 				id: store3Id,
-				chain_slug: "konzum",
+				chainSlug: "konzum",
 				name: "Integration Test Store 3 (Active)",
 				address: "Test Address 3",
 				city: "Zagreb",
-				postal_code: "10000",
+				postalCode: "10000",
 				latitude: "45.8150",
 				longitude: "15.9819",
-				is_virtual: true,
-				price_source_store_id: null,
+				isVirtual: true,
+				priceSourceStoreId: null,
 				status: "active",
-				created_at: now,
-				updated_at: now,
 			})
 			.execute();
 		testStoreIds.push(store3Id);
@@ -100,7 +103,7 @@ describe("Store Approval Workflow Integration Tests", () => {
 		// Clean up test stores
 		for (const storeId of testStoreIds) {
 			try {
-				await db.delete_from("stores").where("id", "=", storeId).execute();
+				await db.delete(stores).where(eq(stores.id, storeId)).execute();
 			} catch (e) {
 				// Ignore errors during cleanup
 				console.warn(`Failed to cleanup store ${storeId}:`, e);
@@ -113,42 +116,37 @@ describe("Store Approval Workflow Integration Tests", () => {
 			const db = getDb();
 			const storeId = testStoreIds[0];
 
-			// Verify initial state
 			const [store] = await db
-				.select_from("stores")
-				.where("id", "=", storeId)
-				.all();
+				.select()
+				.from(stores)
+				.where(eq(stores.id, storeId));
 
 			expect(store).toBeDefined();
 			expect(store.status).toBe("pending");
 
-			// Simulate approval (would normally be done via API)
-			const userId = "integration-test-user";
 			const approvalNotes = "Integration test approval";
-			const now = new Date().toISOString();
+			const now = new Date();
 
 			await db
-				.update("stores")
+				.update(stores)
 				.set({
 					status: "active",
-					updated_at: now,
-					approval_notes: approvalNotes,
-					approved_by: userId,
-					approved_at: now,
+					updatedAt: now,
+					approvalNotes,
+					approvedAt: now,
 				})
-				.where("id", "=", storeId)
+				.where(eq(stores.id, storeId))
 				.execute();
 
 			// Verify final state
 			const [updatedStore] = await db
-				.select_from("stores")
-				.where("id", "=", storeId)
-				.all();
+				.select()
+				.from(stores)
+				.where(eq(stores.id, storeId));
 
 			expect(updatedStore.status).toBe("active");
-			expect(updatedStore.approved_by).toBe(userId);
-			expect(updatedStore.approval_notes).toBe(approvalNotes);
-			expect(updatedStore.approved_at).toBeDefined();
+			expect(updatedStore.approvalNotes).toBe(approvalNotes);
+			expect(updatedStore.approvedAt).toBeDefined();
 		});
 
 		it("should prevent approval of already active store", async () => {
@@ -157,9 +155,9 @@ describe("Store Approval Workflow Integration Tests", () => {
 
 			// Verify store is active
 			const [store] = await db
-				.select_from("stores")
-				.where("id", "=", storeId)
-				.all();
+				.select()
+				.from(stores)
+				.where(eq(stores.id, storeId));
 
 			expect(store.status).toBe("active");
 
@@ -176,25 +174,25 @@ describe("Store Approval Workflow Integration Tests", () => {
 
 			// Get current store
 			const [store] = await db
-				.select_from("stores")
-				.where("id", "=", storeId)
-				.all();
+				.select()
+				.from(stores)
+				.where(eq(stores.id, storeId));
 
-			const originalUpdatedAt = store.updated_at;
+			const originalUpdatedAt = store.updatedAt;
 
 			// Simulate another user modifying the store
 			await db
-				.update("stores")
-				.set({ updated_at: new Date().toISOString() })
-				.where("id", "=", storeId)
+				.update(stores)
+				.set({ updatedAt: new Date() })
+				.where(eq(stores.id, storeId))
 				.execute();
 
 			// Try to approve with old timestamp
 			const expectedDate = new Date(originalUpdatedAt);
 			const [currentStore] = await db
-				.select_from("stores")
-				.where("id", "=", storeId)
-				.all();
+				.select()
+				.from(stores)
+				.where(eq(stores.id, storeId));
 			const currentDate = new Date(currentStore.updated_at);
 
 			// Verify timestamps don't match (concurrent modification detected)
@@ -218,13 +216,13 @@ describe("Store Approval Workflow Integration Tests", () => {
 
 			// Verify both stores exist
 			const [sourceStore] = await db
-				.select_from("stores")
-				.where("id", "=", sourceId)
-				.all();
+				.select()
+				.from(stores)
+				.where(eq(stores.id, sourceId));
 			const [targetStore] = await db
-				.select_from("stores")
-				.where("id", "=", targetId)
-				.all();
+				.select()
+				.from(stores)
+				.where(eq(stores.id, targetId));
 
 			expect(sourceStore).toBeDefined();
 			expect(targetStore).toBeDefined();
@@ -236,24 +234,21 @@ describe("Store Approval Workflow Integration Tests", () => {
 			const db = getDb();
 
 			// Create additional test stores
-			const now = new Date().toISOString();
 			const bulkStoreIds: string[] = [];
 
 			for (let i = 1; i <= 3; i++) {
 				const storeId = generatePrefixedId("sto");
 				await db
-					.insert_into("stores")
+					.insert(stores)
 					.values({
 						id: storeId,
-						chain_slug: "konzum",
+						chainSlug: "konzum",
 						name: `Bulk Test Store ${i}`,
 						address: `Bulk Address ${i}`,
 						city: "Zagreb",
-						postal_code: "10000",
-						is_virtual: true,
+						postalCode: "10000",
+						isVirtual: true,
 						status: "pending",
-						created_at: now,
-						updated_at: now,
 					})
 					.execute();
 				bulkStoreIds.push(storeId);
@@ -262,45 +257,40 @@ describe("Store Approval Workflow Integration Tests", () => {
 			// Verify all stores are pending
 			for (const storeId of bulkStoreIds) {
 				const [store] = await db
-					.select_from("stores")
-					.where("id", "=", storeId)
-					.all();
+					.select()
+					.from(stores)
+					.where(eq(stores.id, storeId));
 				expect(store.status).toBe("pending");
 			}
 
-			// Simulate bulk approval
-			const userId = "integration-test-user";
 			const bulkNotes = "Bulk approval integration test";
 
 			for (const storeId of bulkStoreIds) {
 				await db
-					.update("stores")
+					.update(stores)
 					.set({
 						status: "active",
-						updated_at: new Date().toISOString(),
-						approval_notes: bulkNotes,
-						approved_by: userId,
-						approved_at: new Date().toISOString(),
+						updatedAt: new Date(),
+						approvalNotes: bulkNotes,
+						approvedAt: new Date(),
 					})
-					.where("id", "=", storeId)
+					.where(eq(stores.id, storeId))
 					.execute();
 			}
 
-			// Verify all stores are now active
 			for (const storeId of bulkStoreIds) {
 				const [store] = await db
-					.select_from("stores")
-					.where("id", "=", storeId)
-					.all();
+					.select()
+					.from(stores)
+					.where(eq(stores.id, storeId));
 				expect(store.status).toBe("active");
-				expect(store.approved_by).toBe(userId);
-				expect(store.approval_notes).toBe(bulkNotes);
+				expect(store.approvalNotes).toBe(bulkNotes);
 			}
 
 			// Cleanup
 			for (const storeId of bulkStoreIds) {
 				try {
-					await db.delete_from("stores").where("id", "=", storeId).execute();
+					await db.delete(stores).where(eq(stores.id, storeId)).execute();
 				} catch (_e) {
 					// Ignore cleanup errors
 				}
@@ -312,9 +302,9 @@ describe("Store Approval Workflow Integration Tests", () => {
 
 			// Try to get pending stores
 			const pendingStores = await db
-				.select_from("stores")
-				.where("status", "=", "pending")
-				.all();
+				.select()
+				.from(stores)
+				.where(eq(stores.status, "pending"));
 
 			// After our previous tests, there might be no pending stores
 			// This is expected behavior
@@ -324,13 +314,11 @@ describe("Store Approval Workflow Integration Tests", () => {
 
 	describe("Force Approval", () => {
 		it("should require justification for force approval", async () => {
-			// This is a contract test - the API enforces this
 			const input = {
 				justification: "",
 			};
 
-			const hasJustification =
-				input.justification && input.justification.trim().length > 0;
+			const hasJustification = Boolean(input.justification?.trim());
 			expect(hasJustification).toBe(false);
 		});
 

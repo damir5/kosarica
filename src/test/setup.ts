@@ -5,56 +5,65 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 export async function startGoService(): Promise<void> {
-  console.log("Starting Go price service for integration tests...");
-  
-  const spawn = require("child_process").spawn;
-  const dockerProcess = spawn("docker", ["compose", "up", "-d", "price-service"], {
-    stdio: "inherit"
-  });
+	console.log("Starting Go price service for integration tests...");
 
-  return new Promise((resolve, reject) => {
-    let retries = 0;
-    const maxRetries = 30;
-    const healthCheck = setInterval(async () => {
-      try {
-        const response = await fetch("http://localhost:8080/health");
-        if (response.ok) {
-          clearInterval(healthCheck);
-          resolve();
-          return;
-        }
-      } catch (error) {
-        retries++;
-        if (retries >= maxRetries) {
-          clearInterval(healthCheck);
-          reject(new Error("Go service failed to start after " + maxRetries + " attempts"));
-          return;
-        }
-      }
-    }, 1000);
+	const spawn = require("child_process").spawn;
+	const dockerProcess = spawn(
+		"docker",
+		["compose", "up", "-d", "price-service"],
+		{
+			stdio: "inherit",
+		},
+	);
 
-    dockerProcess.on("error", (error) => {
-      clearInterval(healthCheck);
-      reject(error);
-    });
-  });
+	return new Promise((resolve, reject) => {
+		let retries = 0;
+		const maxRetries = 30;
+		const healthCheck = setInterval(async () => {
+			try {
+				const response = await fetch("http://localhost:8080/health");
+				if (response.ok) {
+					clearInterval(healthCheck);
+					resolve();
+					return;
+				}
+			} catch (error) {
+				retries++;
+				if (retries >= maxRetries) {
+					clearInterval(healthCheck);
+					reject(
+						new Error(
+							"Go service failed to start after " + maxRetries + " attempts",
+						),
+					);
+					return;
+				}
+			}
+		}, 1000);
+
+		dockerProcess.on("error", (error) => {
+			clearInterval(healthCheck);
+			reject(error);
+		});
+	});
 }
 
 export async function stopGoService(): Promise<void> {
-  console.log("Stopping Go price service...");
-  
-  const { execSync } = require("child_process");
-  try {
-    execSync("docker compose down price-service", { stdio: "inherit" });
-    console.log("Go service stopped successfully");
-  } catch (error) {
-    console.error("Failed to stop Go service:", error);
-  }
+	console.log("Stopping Go price service...");
+
+	const { execSync } = require("child_process");
+	try {
+		execSync("docker compose down price-service", { stdio: "inherit" });
+		console.log("Go service stopped successfully");
+	} catch (error) {
+		console.error("Failed to stop Go service:", error);
+	}
 }
 
 export function isGoServiceRunning(): boolean {
-  return process.env.GO_SERVICE_FOR_TESTS === "1";
+	return process.env.GO_SERVICE_FOR_TESTS === "1";
 }
+
 import { afterAll, beforeAll, vi } from "vitest";
 import * as schema from "@/db/schema";
 
