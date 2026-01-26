@@ -6,7 +6,7 @@
  */
 
 import * as z from "zod";
-import { goFetch, goFetchWithRetry } from "@/lib/go-service-client";
+import { goFetchWithRetry } from "@/lib/go-service-client";
 import { procedure } from "../base";
 
 // ============================================================================
@@ -141,7 +141,7 @@ export const optimizeMulti = procedure
  * or when cache data is stale.
  */
 export const cacheWarmup = procedure.handler(async () => {
-	return goFetch("/internal/basket/cache/warmup", {
+	return goFetchWithRetry("/internal/basket/cache/warmup", {
 		method: "POST",
 		timeout: 30000, // 30s timeout - warmup can take time
 	});
@@ -160,10 +160,13 @@ export const cacheRefresh = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		return goFetch(`/internal/basket/cache/refresh/${input.chainSlug}`, {
-			method: "POST",
-			timeout: 10000, // 10s timeout for single chain refresh
-		});
+		return goFetchWithRetry(
+			`/internal/basket/cache/refresh/${input.chainSlug}`,
+			{
+				method: "POST",
+				timeout: 10000, // 10s timeout for single chain refresh
+			},
+		);
 	});
 
 /**

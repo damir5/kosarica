@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { orpc } from "@/orpc";
-import { createReactQueryHooks } from "@/orpc/react";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { MatchReviewCard } from "./MatchReviewCard";
 
@@ -54,8 +53,6 @@ interface MatchReviewQueueResponse {
 	hasMore: boolean;
 }
 
-const _hooks = createReactQueryHooks(orpc);
-
 export function MatchReviewQueue() {
 	const queryClient = useQueryClient();
 	const [cursor, setCursor] = useState<string>();
@@ -68,7 +65,7 @@ export function MatchReviewQueue() {
 	} = useQuery({
 		queryKey: ["admin", "products", "pendingMatches", cursor],
 		queryFn: async () => {
-			const result = await orpc.admin.products.getPendingMatches({
+			const result = await orpc.admin.products.getPendingMatches.call({
 				limit: 20,
 				cursor,
 			});
@@ -78,13 +75,13 @@ export function MatchReviewQueue() {
 
 	const { data: count } = useQuery({
 		queryKey: ["admin", "products", "pendingMatchCount"],
-		queryFn: () => orpc.admin.products.getPendingMatchCount(),
+		queryFn: () => orpc.admin.products.getPendingMatchCount.call(),
 		refetchInterval: 30000, // Refresh every 30 seconds
 	});
 
 	const bulkApprove = useMutation({
 		mutationFn: async (queueIds: string[]) => {
-			return await orpc.admin.products.bulkApprove({ queueIds });
+			return await orpc.admin.products.bulkApprove.call({ queueIds });
 		},
 		onSuccess: () => {
 			setSelectedIds(new Set());

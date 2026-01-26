@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { getDatabase } from "../src/db/index";
-import * as schema from "../src/db/schema.js";
 import { sql } from "drizzle-orm";
 
 async function seedTestData() {

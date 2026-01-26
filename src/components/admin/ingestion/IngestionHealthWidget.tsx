@@ -1,28 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 interface ChainHealth {
 	chainSlug: string;
 	chainName: string;
 	totalRows: number;
-	validRows: number;
 	failedRows: number;
 	errorRate: number;
 	status: "healthy" | "degraded" | "critical";
-	last24hTrend: number[];
 }
 
 interface ErrorSummary {
 	errorRate: number;
+	status: "healthy" | "degraded" | "critical";
 	totalRows: number;
 	failedRows: number;
 	topErrors: { error: string; count: number; percentage: number }[];
-	affectedChains: string[];
+	affectedChains: ChainHealth[];
 	timeRange: string;
 }
 
 export default function IngestionHealthWidget() {
 	const [data, setData] = useState<ErrorSummary | null>(null);
-	const [loading, setLoading] = useState(true);
+	const [loading] = useState(true);
 	const [lastPollTime, setLastPollTime] = useState<number>(Date.now());
 
 	useEffect(() => {
@@ -216,6 +217,7 @@ export default function IngestionHealthWidget() {
 			{/* Actions */}
 			<div className="flex gap-3 mt-6">
 				<button
+					type="button"
 					className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
 					onClick={() =>
 						(window.location.href = "/admin/ingestion/failed-rows")
@@ -225,6 +227,7 @@ export default function IngestionHealthWidget() {
 				</button>
 
 				<button
+					type="button"
 					className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
 					onClick={() =>
 						(window.location.href =

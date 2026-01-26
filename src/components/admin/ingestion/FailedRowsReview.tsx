@@ -130,7 +130,7 @@ export default function FailedRowsReview() {
 		}
 	};
 
-	const handleAddReviewNotes = async (id: string, notes: string) => {
+	const _handleAddReviewNotes = async (id: string, notes: string) => {
 		try {
 			const response = await fetch(
 				`/internal/admin/ingestion/failed-rows/${id}/notes`,

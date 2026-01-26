@@ -50,8 +50,8 @@ export function CreateProductModal({
 	const createMutation = useMutation({
 		mutationFn: async (data: typeof formData) => {
 			// This would be a new endpoint to create a product and link it
-			// For now, we'll use the approveMatch with a special flag
-			return await orpc.admin.products.approveMatch({
+			// For now, we'll use of approveMatch with a special flag
+			return await orpc.admin.products.approveMatch.call({
 				queueId: retailerItemId,
 				notes: `Created new product: ${data.name}`,
 				version: 1,

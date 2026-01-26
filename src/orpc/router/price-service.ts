@@ -6,7 +6,7 @@
  */
 
 import * as z from "zod";
-import { goFetch, goFetchWithRetry } from "@/lib/go-service-client";
+import { goFetchWithRetry } from "@/lib/go-service-client";
 import { procedure } from "../base";
 
 // ============================================================================
@@ -166,7 +166,7 @@ export const triggerChain = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		return goFetch(`/internal/admin/ingest/${input.chain}`, {
+		return goFetchWithRetry(`/internal/admin/ingest/${input.chain}`, {
 			method: "POST",
 			body: input.targetDate
 				? JSON.stringify({ targetDate: input.targetDate })
@@ -182,7 +182,7 @@ export const triggerChain = procedure
 export const rerunRun = procedure
 	.input(z.object({ runId: z.string() }))
 	.handler(async ({ input }) => {
-		return goFetch(`/internal/ingestion/runs/${input.runId}/rerun`, {
+		return goFetchWithRetry(`/internal/ingestion/runs/${input.runId}/rerun`, {
 			method: "POST",
 			timeout: 10000,
 		});
@@ -195,7 +195,7 @@ export const rerunRun = procedure
 export const deleteRun = procedure
 	.input(z.object({ runId: z.string() }))
 	.handler(async ({ input }) => {
-		return goFetch(`/internal/ingestion/runs/${input.runId}`, {
+		return goFetchWithRetry(`/internal/ingestion/runs/${input.runId}`, {
 			method: "DELETE",
 			timeout: 5000,
 		});

@@ -30,7 +30,7 @@ export function ProductSearch({
 
 	const { data: results, isLoading } = useQuery({
 		queryKey: ["admin", "products", "search", query],
-		queryFn: () => orpc.admin.products.searchProducts({ query, limit }),
+		queryFn: () => orpc.admin.products.searchProducts.call({ query, limit }),
 		enabled: query.length >= minLength,
 	});
 

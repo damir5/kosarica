@@ -43,7 +43,7 @@ set -o allexport
 set +o allexport
 
 # Run drizzle migrations via pnpm
-pnpm db:migrate &> /tmp/price-service-migrate.log || {
+pnpm db:migrate || {
   echo "Migrations failed; showing last 200 lines of migration log:" 
   tail -n 200 /tmp/price-service-migrate.log || true
   exit 1
@@ -100,7 +100,7 @@ pushd services/price-service >/dev/null
 # Ensure service mise config is trusted (no-op if already trusted). If trust
 # fails, abort so the user can inspect the trust log.
 echo "Ensuring mise trusts service config..."
-mise trust ./.mise.toml &> /tmp/price-service-mise-trust.log || {
+mise trust ./.mise.toml || {
   echo "mise trust failed; tailing trust log:" 
   tail -n 200 /tmp/price-service-mise-trust.log || true
   echo "You can trust the service config manually with: mise trust services/price-service/.mise.toml"
@@ -109,7 +109,7 @@ mise trust ./.mise.toml &> /tmp/price-service-mise-trust.log || {
 }
 
 # Start nested mise which will run `go run` (ensures latest sources).
-mise run test-service &> /tmp/price-service-mise.log &
+mise run test-service &
 MISE_PID=$!
 sleep 1
 if ! kill -0 "$MISE_PID" 2>/dev/null; then
@@ -146,14 +146,12 @@ echo "Go service healthy (PID=${GO_MISE_PID})"
     # Go service URL is derived from PORT; keep PORT export only
 
 echo "Running frontend tests... (output -> /tmp/frontend-test.log)"
-pnpm test &> /tmp/frontend-test.log || TEST_EXIT=$?
+pnpm test || TEST_EXIT=$?
 TEST_EXIT=${TEST_EXIT:-0}
 
 if [ "$TEST_EXIT" -ne 0 ]; then
-  echo "Frontend tests failed; generating report: /tmp/frontend-test-report.txt"
-  echo "--- Vitest tail (last 1000 lines) ---" > /tmp/frontend-test-report.txt || true
-  tail -n 1000 /tmp/frontend-test.log >> /tmp/frontend-test-report.txt || true
-  echo "Report written to /tmp/frontend-test-report.txt" >&2 || true
+  echo "Frontend tests failed; showing tail of vitest output"
+  echo "--- Vitest tail (last 200 lines) ---"; tail -n 200 /tmp/frontend-test.log || true
 fi
 
 echo "Stopping Go service (PID=${GO_MISE_PID})..."

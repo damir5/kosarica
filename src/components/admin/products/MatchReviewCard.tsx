@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, Check, ChevronRight, X } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +89,6 @@ export function MatchReviewCard({
 	onSelect,
 	onApprove,
 }: MatchReviewCardProps) {
-	const _queryClient = useQueryClient();
 	const [selectedProductId, setSelectedProductId] = useState<string | null>(
 		item.linkedProductId || (item.candidates[0]?.candidateProductId ?? null),
 	);
@@ -98,7 +97,7 @@ export function MatchReviewCard({
 
 	const approveMutation = useMutation({
 		mutationFn: async (productId: string) => {
-			return await orpc.admin.products.approveMatch({
+			return await orpc.admin.products.approveMatch.call({
 				queueId: item.id,
 				productId,
 				notes: notes || undefined,
@@ -112,7 +111,7 @@ export function MatchReviewCard({
 
 	const rejectMutation = useMutation({
 		mutationFn: async (productId: string | null) => {
-			return await orpc.admin.products.rejectMatch({
+			return await orpc.admin.products.rejectMatch.call({
 				queueId: item.id,
 				productId: productId ?? undefined,
 				reason: "rejected",
@@ -126,7 +125,7 @@ export function MatchReviewCard({
 
 	const resolveSuspiciousMutation = useMutation({
 		mutationFn: async (productId: string) => {
-			return await orpc.admin.products.resolveSuspicious({
+			return await orpc.admin.products.resolveSuspicious.call({
 				queueId: item.id,
 				productId,
 				notes: notes || "Resolved suspicious barcode match",
@@ -169,11 +168,7 @@ export function MatchReviewCard({
 		<Card className={isSelected ? "ring-2 ring-primary" : ""}>
 			<CardHeader>
 				<div className="flex items-start gap-3">
-					<Checkbox
-						checked={isSelected}
-						onCheckedChange={onSelect}
-						className="mt-1"
-					/>
+					<Checkbox checked={isSelected} onChange={onSelect} className="mt-1" />
 					<div className="flex-1 space-y-2">
 						<div className="flex items-center justify-between">
 							<CardTitle className="text-lg">{retailerItem.name}</CardTitle>
@@ -261,6 +256,13 @@ export function MatchReviewCard({
 									onClick={() =>
 										setSelectedProductId(candidate.candidateProductId)
 									}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											setSelectedProductId(candidate.candidateProductId);
+										}
+									}}
+									role="button"
+									tabIndex={0}
 								>
 									<div className="flex items-start gap-4">
 										{/* Product Image */}
@@ -420,7 +422,7 @@ function ProductSearchModal({
 		if (!searchQuery || searchQuery.length < 3) return;
 		setIsLoading(true);
 		try {
-			const response = await orpc.admin.products.searchProducts({
+			const response = await orpc.admin.products.searchProducts.call({
 				query: searchQuery,
 				limit: 20,
 			});
@@ -465,6 +467,13 @@ function ProductSearchModal({
 								key={product.id}
 								className="border rounded-lg p-3 hover:border-primary cursor-pointer"
 								onClick={() => onSelect(product.id)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										onSelect(product.id);
+									}
+								}}
+								role="button"
+								tabIndex={0}
 							>
 								<div className="font-medium">{product.name}</div>
 								<div className="text-sm text-muted-foreground">

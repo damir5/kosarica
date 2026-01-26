@@ -34,8 +34,6 @@ describe("Store Approval Workflow Integration Tests", () => {
 			.where(like(stores.name, "Integration Test Store%"))
 			.execute();
 
-		const now = new Date();
-
 		// Store 1: Pending store
 		const store1Id = generatePrefixedId("sto");
 		await db
@@ -188,12 +186,16 @@ describe("Store Approval Workflow Integration Tests", () => {
 				.execute();
 
 			// Try to approve with old timestamp
+			if (!originalUpdatedAt)
+				throw new Error("originalUpdatedAt should not be null");
 			const expectedDate = new Date(originalUpdatedAt);
 			const [currentStore] = await db
 				.select()
 				.from(stores)
 				.where(eq(stores.id, storeId));
-			const currentDate = new Date(currentStore.updated_at);
+			if (!currentStore.updatedAt)
+				throw new Error("currentStore.updatedAt should not be null");
+			const currentDate = new Date(currentStore.updatedAt);
 
 			// Verify timestamps don't match (concurrent modification detected)
 			expect(expectedDate.getTime()).not.toBe(currentDate.getTime());
