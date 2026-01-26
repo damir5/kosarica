@@ -100,13 +100,8 @@ export function closeTestDb() {
  */
 async function cleanupTestDatabase(): Promise<void> {
 	const testUrl =
-<<<<<<< HEAD
 		process.env.DATABASE_URL ||
-		"postgresql://kosarica_test:kosarica_test@host.docker.internal:5432/kosarica_test";
-=======
-		process.env.TEST_DATABASE_URL ||
 		"postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test";
->>>>>>> 4cf1a6197380f6001a4004baeedc425d1fef28af
 
 	// Create a separate connection for cleanup (without drizzle)
 	const sql = postgres(testUrl);

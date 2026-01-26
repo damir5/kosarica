@@ -6,7 +6,7 @@
  */
 
 import * as z from "zod";
-import { goFetchWithRetry } from "@/lib/go-service-client";
+import { goFetchWithRetry, unwrapResponse } from "@/lib/go-service-client";
 import { procedure } from "../base";
 
 // ============================================================================
@@ -57,9 +57,10 @@ export const listRuns = procedure
 			params.set("status", input.status);
 		}
 
-		return goFetchWithRetry(`/internal/ingestion/runs?${params.toString()}`, {
+		const response = await goFetchWithRetry(`/internal/ingestion/runs?${params.toString()}`, {
 			timeout: 5000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -69,9 +70,10 @@ export const listRuns = procedure
 export const getRun = procedure
 	.input(z.object({ runId: z.string() }))
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(`/internal/ingestion/runs/${input.runId}`, {
+		const response = await goFetchWithRetry(`/internal/ingestion/runs/${input.runId}`, {
 			timeout: 5000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -92,10 +94,11 @@ export const listFiles = procedure
 			offset: input.offset.toString(),
 		});
 
-		return goFetchWithRetry(
+		const response = await goFetchWithRetry(
 			`/internal/ingestion/runs/${input.runId}/files?${params.toString()}`,
 			{ timeout: 5000 },
 		);
+		return unwrapResponse(response);
 	});
 
 /**
@@ -144,10 +147,11 @@ export const getStats = procedure
 			params.set("to", input.to);
 		}
 
-		return goFetchWithRetry(
+		const response = await goFetchWithRetry(
 			`/internal/ingestion/stats${params.toString() ? `?${params.toString()}` : ""}`,
 			{ timeout: 10000 }, // Longer timeout for stats
 		);
+		return unwrapResponse(response);
 	});
 
 // ============================================================================
@@ -166,13 +170,15 @@ export const triggerChain = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(`/internal/admin/ingest/${input.chain}`, {
+		const response = await goFetchWithRetry(`/internal/admin/ingest/${input.chain}`, {
 			method: "POST",
 			body: input.targetDate
 				? JSON.stringify({ targetDate: input.targetDate })
 				: undefined,
 			timeout: 10000, // 10s timeout - should return 202 immediately
 		});
+		console.log("triggerChain response:", JSON.stringify(response, null, 2));
+		return unwrapResponse(response);
 	});
 
 /**
@@ -344,9 +350,10 @@ export const searchItems = procedure
 			params.set("chainSlug", input.chainSlug);
 		}
 
-		return goFetchWithRetry(`/internal/items/search?${params.toString()}`, {
+		const response = await goFetchWithRetry(`/internal/items/search?${params.toString()}`, {
 			timeout: 5000,
 		});
+		return unwrapResponse(response);
 	});
 
 // ============================================================================
