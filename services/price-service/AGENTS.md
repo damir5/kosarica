@@ -3,56 +3,55 @@
 ## Overview
 
 Go service handling price ingestion, basket optimization, and price queries.
-This service is the source of truth for shared API types between Node.js and Go.
+This service exposes an OpenAPI spec for TypeScript SDK generation.
 
-## Schema Generation
+## OpenAPI Generation
 
-Types with `jsonschema` tags in these files generate schemas for Node.js:
+Handlers with swag annotations generate OpenAPI spec for Node.js SDK:
 
-| File | Types |
-|------|-------|
-| `internal/handlers/optimize.go` | BasketItem, Location, OptimizeRequest, MissingItem, ItemPriceInfo, SingleStoreResult, StoreAllocation, MultiStoreResult |
-| `internal/handlers/prices.go` | GetStorePricesRequest, StorePrice, GetStorePricesResponse, SearchItemsRequest, SearchItem, SearchItemsResponse, GetHistoricalPriceRequest, ListPriceGroupsRequest, PriceGroupSummary |
-| `internal/handlers/runs.go` | ListRunsRequest, ListRunsResponse, IngestionRun, ListFilesRequest, ListFilesResponse, IngestionFile, ListErrorsRequest, ListErrorsResponse, IngestionError, GetStatsRequest, GetStatsResponse, StatsBucket, RerunRunRequest, ListChainsResponse |
+| File | Endpoints |
+|------|-----------|
+| `internal/handlers/optimize.go` | OptimizeSingle, OptimizeMulti, CacheWarmup, CacheRefresh, CacheHealth |
+| `internal/handlers/prices.go` | GetStorePrices, SearchItems |
+| `internal/handlers/runs.go` | ListRuns, GetRun, ListFiles, ListErrors, GetStats, RerunRun, DeleteRun |
 
-### Adding jsonschema Tags
+### Adding Swag Annotations
 
-When adding new types or modifying existing ones, add `jsonschema` tags:
+When adding new handlers, add swag annotations:
 
 ```go
-type ExampleRequest struct {
-    // Required field with validation
-    Name string `json:"name" jsonschema:"required,minLength=1"`
-
-    // Optional field
-    Description *string `json:"description,omitempty"`
-
-    // Required field with min/max
-    Count int `json:"count" jsonschema:"required,minimum=1,maximum=100"`
-
-    // Enum field
-    Status string `json:"status" jsonschema:"required,enum=pending,enum=active,enum=done"`
+// GetExample returns example data
+// @Summary Get example
+// @Description Returns example data for demonstration
+// @Tags examples
+// @Accept json
+// @Produce json
+// @Param id path string true "Example ID"
+// @Success 200 {object} ExampleResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /internal/examples/{id} [get]
+func GetExample(c *gin.Context) {
+    // handler code
 }
 ```
 
-### Regenerating Schemas
+### Regenerating OpenAPI Spec
 
 From this directory:
 ```bash
-go run cmd/schema-gen/main.go
+go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g cmd/server/main.go -o docs
 ```
 
 From project root:
 ```bash
-mise run schema-generate
-# or
-pnpm schema:generate
+mise run swag
 ```
 
 ### Output
 
-- `../../shared/schemas/*.json` - JSON Schema files
-- Node.js converts these to Zod schemas in `src/lib/go-schemas/*.ts`
+- `docs/swagger.json` - OpenAPI spec (used by Node.js SDK generator)
+- `docs/swagger.yaml` - OpenAPI spec (YAML format)
+- Swagger UI served at `/docs/index.html`
 
 ## Development
 
@@ -65,6 +64,9 @@ go test ./...
 
 # Generate sqlc
 sqlc generate
+
+# Generate OpenAPI spec
+mise run swag
 ```
 
 ## Environment Variables

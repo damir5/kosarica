@@ -111,3 +111,22 @@
     - Type definitions are properly generated
   - Updated src/lib/openapi-ts-config.test.ts for new local input path
   - All 34 openapi-ts and SDK migration tests pass, linting passes
+
+- [✓] 2026-01-26 - Deleted redundant schema generation files (Phase 4: Cleanup):
+  - Deleted services/price-service/cmd/schema-gen/ directory (Go schema generator)
+  - Deleted scripts/generate-schemas.ts (Node.js Zod schema generator)
+  - Deleted src/lib/go-schemas/ directory (old generated Zod schemas)
+  - Deleted src/lib/go-rpc.ts (old manual RPC client)
+  - Deleted shared/schemas/ directory (JSON Schema files)
+  - Removed schema:generate script from package.json
+  - Removed json-schema-to-zod from devDependencies
+  - Removed schema-generate and schema-check tasks from mise.toml
+  - Updated AGENTS.md to reference new OpenAPI-based system (mise run swag, mise run generate-go-api)
+  - Updated services/price-service/AGENTS.md to document swag annotations instead of jsonschema tags
+  - Created src/lib/schema-cleanup.test.ts with 15 tests verifying:
+    - Deleted directories do not exist (schema-gen, go-schemas, shared/schemas)
+    - Deleted files do not exist (generate-schemas.ts, go-rpc.ts)
+    - Configuration cleaned up (no schema:generate, no json-schema-to-zod, no schema tasks in mise.toml)
+    - New OpenAPI system in place (go-api dir, swag task, generate-go-api task)
+    - Documentation updated (AGENTS.md references OpenAPI)
+  - All 56 related tests pass (41 SDK + 15 cleanup), linting passes

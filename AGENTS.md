@@ -1,18 +1,19 @@
 # Agent Instructions
 
-## Schema Generation (Go → Node)
+## API Client Generation (Go → Node)
 
 Go is the source of truth for shared API types (basket, prices, ingestion).
+Types are exposed via OpenAPI spec and consumed via generated TypeScript SDK.
 
-- Regenerate schemas: `mise run schema-generate` (or `pnpm schema:generate`)
-- Schemas are generated to `shared/schemas/*.json` (JSON Schema) and `src/lib/go-schemas/*.ts` (Zod)
-- After changing Go types in `services/price-service/internal/handlers/`, run schema generation
-- CI checks for schema drift via `mise run schema-check`
+- Regenerate OpenAPI spec: `mise run swag` (from Go swag annotations)
+- Regenerate TypeScript SDK: `mise run generate-go-api` (or `pnpm generate:go-api`)
+- After changing Go handlers in `services/price-service/internal/handlers/`, run both commands
+- Generated SDK lives in `src/lib/go-api/` with types, SDK functions, and Zod schemas
 
-Types with jsonschema tags:
-- `internal/handlers/optimize.go` - basket optimization types
-- `internal/handlers/prices.go` - price query/search types
-- `internal/handlers/runs.go` - ingestion monitoring types
+Annotated handlers:
+- `internal/handlers/optimize.go` - basket optimization endpoints
+- `internal/handlers/prices.go` - price query/search endpoints
+- `internal/handlers/runs.go` - ingestion monitoring endpoints
 
 ---
 

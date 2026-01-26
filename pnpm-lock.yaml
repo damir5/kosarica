@@ -222,9 +222,6 @@ importers:
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
-      json-schema-to-zod:
-        specifier: ^2.7.0
-        version: 2.7.0
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -3056,10 +3053,6 @@ packages:
   jsesc@3.1.0:
     resolution: {integrity: sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA==}
     engines: {node: '>=6'}
-    hasBin: true
-
-  json-schema-to-zod@2.7.0:
-    resolution: {integrity: sha512-eW59l3NQ6sa3HcB+Ahf7pP6iGU7MY4we5JsPqXQ2ZcIPF8QxSg/lkY8lN0Js/AG0NjMbk+nZGUfHlceiHF+bwQ==}
     hasBin: true
 
   json-schema-typed@8.0.2:
@@ -6833,8 +6826,6 @@ snapshots:
     optional: true
 
   jsesc@3.1.0: {}
-
-  json-schema-to-zod@2.7.0: {}
 
   json-schema-typed@8.0.2: {}
 

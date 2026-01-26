@@ -212,7 +212,7 @@ tasks:
       These are all replaced by:
       - Go swag annotations → OpenAPI spec
       - @hey-api/openapi-ts → SDK + Zod schemas in src/lib/go-api/
-    completed: false
+    completed: true
 
   # ===========================================================================
   # VERIFICATION
