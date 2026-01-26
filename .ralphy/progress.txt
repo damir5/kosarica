@@ -59,3 +59,18 @@
     - createClient function is available
     - SDK and Zod plugins can be configured
   - All 5 new tests pass, linting passes on changed files
+
+- [✓] 2026-01-26 - Configured openapi-ts.config.ts (Phase 2, Task 2):
+  - Created openapi-ts.config.ts at project root with defineConfig
+  - Configuration settings:
+    - input: http://localhost:3003/docs/doc.json (Go service Swagger spec)
+    - output: src/lib/go-api with prettier formatting
+    - plugins: @hey-api/typescript (types), @hey-api/sdk (SDK), zod (runtime validation)
+  - Created src/lib/openapi-ts-config.test.ts with 8 tests verifying:
+    - Config exports valid configuration object
+    - Correct input URL pointing to Go service
+    - Output path to src/lib/go-api
+    - Prettier formatting enabled
+    - All required plugins configured (@hey-api/typescript, @hey-api/sdk, zod)
+    - Zod schemas exported from index
+  - All 13 openapi-ts tests pass (5 installation + 8 config), linting passes

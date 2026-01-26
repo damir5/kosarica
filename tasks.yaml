@@ -150,7 +150,7 @@ tasks:
       Plugins:
       - @hey-api/schemas: Generates Zod schemas for runtime validation
       - @hey-api/sdk: Generates typed SDK functions for each endpoint
-    completed: false
+    completed: true
 
   - title: Add generate script to package.json
     description: |
