@@ -11,14 +11,26 @@ import { chains } from "@/db/schema";
 import router from "@/orpc/router";
 import { getTestDb } from "@/test/setup";
 
-const GO_SERVICE_URL = process.env.GO_SERVICE_URL || "http://localhost:3003";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "test-key";
+
+// Assume service is unavailable unless env var explicitly set to run these tests
+const goServiceAvailable = process.env.GO_SERVICE_FOR_TESTS === "1";
 
 describe("Price Service Proxy Integration Tests", () => {
 	// biome-ignore lint/suspicious/noExplicitAny: oRPC client types are complex
 	let orpc: any;
 
 	beforeAll(async () => {
+		if (!goServiceAvailable) {
+			console.log(
+				`\nSkipping Price Service integration tests - GO_SERVICE_FOR_TESTS not set\n` +
+					`To run these tests:\n` +
+					`  1. Start Go service: docker compose -f docker-compose-test.yml up -d\n` +
+					`  2. Set GO_SERVICE_FOR_TESTS=1 and run tests: GO_SERVICE_FOR_TESTS=1 pnpm test\n`,
+			);
+			return;
+		}
+
 		orpc = createRouterClient(router, {
 			context: () => ({
 				headers: {
@@ -26,24 +38,6 @@ describe("Price Service Proxy Integration Tests", () => {
 				},
 			}),
 		});
-
-		try {
-			const response = await fetch(`${GO_SERVICE_URL}/internal/health`, {
-				headers: {
-					"X-Internal-API-Key": INTERNAL_API_KEY,
-				},
-			});
-			if (!response.ok) {
-				throw new Error("Go service health check failed");
-			}
-		} catch (_error) {
-			throw new Error(
-				`Go service not reachable at ${GO_SERVICE_URL}. Integration tests require Go service to be running. To run these tests:\n` +
-					`1. Start Go service: docker compose -f docker-compose-test.yml up -d\n` +
-					`2. Then run tests: pnpm test\n\n` +
-					`Or skip these tests with: pnpm test:unit`,
-			);
-		}
 
 		// Seed test chains in the JS database
 		const db = getTestDb();
@@ -57,7 +51,7 @@ describe("Price Service Proxy Integration Tests", () => {
 	});
 
 	describe("Health Check", () => {
-		it("should return status: ok", async () => {
+		it.skipIf(!goServiceAvailable)("should return status: ok", async () => {
 			const result = await orpc.admin.ingestion.getStats({
 				from: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
 				to: new Date().toISOString(),
@@ -70,19 +64,22 @@ describe("Price Service Proxy Integration Tests", () => {
 	});
 
 	describe("List Ingestion Runs", () => {
-		it("should return paginated results with runs array and total", async () => {
-			const result = await orpc.admin.ingestion.listRuns({
-				limit: 5,
-				offset: 0,
-			});
+		it.skipIf(!goServiceAvailable)(
+			"should return paginated results with runs array and total",
+			async () => {
+				const result = await orpc.admin.ingestion.listRuns({
+					limit: 5,
+					offset: 0,
+				});
 
-			expect(result).toBeDefined();
-			expect(result.runs).toBeInstanceOf(Array);
-			expect(typeof result.total).toBe("number");
-			expect(result.runs.length).toBeLessThanOrEqual(5);
-		});
+				expect(result).toBeDefined();
+				expect(result.runs).toBeInstanceOf(Array);
+				expect(typeof result.total).toBe("number");
+				expect(result.runs.length).toBeLessThanOrEqual(5);
+			},
+		);
 
-		it("should filter by chainSlug", async () => {
+		it.skipIf(!goServiceAvailable)("should filter by chainSlug", async () => {
 			const result = await orpc.admin.ingestion.listRuns({
 				chainSlug: "konzum",
 				limit: 10,
@@ -96,7 +93,7 @@ describe("Price Service Proxy Integration Tests", () => {
 			});
 		});
 
-		it("should filter by status", async () => {
+		it.skipIf(!goServiceAvailable)("should filter by status", async () => {
 			const result = await orpc.admin.ingestion.listRuns({
 				status: "completed",
 				limit: 10,
@@ -112,74 +109,89 @@ describe("Price Service Proxy Integration Tests", () => {
 	});
 
 	describe("Trigger Ingestion", () => {
-		it("should return 202 with runId and status: started", async () => {
-			const result = await orpc.admin.ingestion.triggerChain({
-				chain: "dm",
-			});
+		it.skipIf(!goServiceAvailable)(
+			"should return 202 with runId and status: started",
+			async () => {
+				const result = await orpc.admin.ingestion.triggerChain({
+					chain: "dm",
+				});
 
-			expect(result).toBeDefined();
-			expect(result.status).toBe("started");
-			expect(result.runId).toBeDefined();
-			expect(typeof result.runId).toBe("string");
-			expect(result.pollUrl).toBeDefined();
-		});
+				expect(result).toBeDefined();
+				expect(result.status).toBe("started");
+				expect(result.runId).toBeDefined();
+				expect(typeof result.runId).toBe("string");
+				expect(result.pollUrl).toBeDefined();
+			},
+		);
 	});
 
 	describe("Search Items", () => {
-		it("should require minimum 3 characters", async () => {
-			await expect(
-				orpc.prices.searchItems({
-					query: "ab", // Only 2 chars
-				}),
-			).rejects.toThrow();
-		});
+		it.skipIf(!goServiceAvailable)(
+			"should require minimum 3 characters",
+			async () => {
+				await expect(
+					orpc.prices.searchItems({
+						query: "ab", // Only 2 chars
+					}),
+				).rejects.toThrow();
+			},
+		);
 
-		it("should return search results for valid query", async () => {
-			const result = await orpc.prices.searchItems({
-				query: "milk",
-				limit: 10,
-			});
+		it.skipIf(!goServiceAvailable)(
+			"should return search results for valid query",
+			async () => {
+				const result = await orpc.prices.searchItems({
+					query: "milk",
+					limit: 10,
+				});
 
-			expect(result).toBeDefined();
-			expect(result.items).toBeInstanceOf(Array);
-			expect(typeof result.total).toBe("number");
-			expect(result.query).toBe("milk");
-		});
+				expect(result).toBeDefined();
+				expect(result.items).toBeInstanceOf(Array);
+				expect(typeof result.total).toBe("number");
+				expect(result.query).toBe("milk");
+			},
+		);
 
-		it("should filter by chainSlug when provided", async () => {
-			const result = await orpc.prices.searchItems({
-				query: "milk",
-				chainSlug: "konzum",
-				limit: 10,
-			});
+		it.skipIf(!goServiceAvailable)(
+			"should filter by chainSlug when provided",
+			async () => {
+				const result = await orpc.prices.searchItems({
+					query: "milk",
+					chainSlug: "konzum",
+					limit: 10,
+				});
 
-			expect(result).toBeDefined();
-			expect(result.items).toBeInstanceOf(Array);
-			// All returned items should have chainSlug = "konzum"
-			result.items.forEach((item: any) => {
-				expect(item.chainSlug).toBe("konzum");
-			});
-		});
+				expect(result).toBeDefined();
+				expect(result.items).toBeInstanceOf(Array);
+				// All returned items should have chainSlug = "konzum"
+				result.items.forEach((item: any) => {
+					expect(item.chainSlug).toBe("konzum");
+				});
+			},
+		);
 	});
 
 	describe("Get Store Prices", () => {
-		it("should return paginated prices for a store", async () => {
-			// This test requires a valid store ID - in real tests, you'd create one first
-			// For now, we'll just test that the endpoint doesn't throw
-			try {
-				const result = await orpc.prices.getStorePrices({
-					chainSlug: "konzum",
-					storeId: "test-store-id",
-					limit: 10,
-				});
-				expect(result).toBeDefined();
-				expect(result.prices).toBeInstanceOf(Array);
-				expect(typeof result.total).toBe("number");
-			} catch (error: any) {
-				// Store might not exist, which is ok for this test
-				expect(error.message).toContain("404");
-			}
-		});
+		it.skipIf(!goServiceAvailable)(
+			"should return paginated prices for a store",
+			async () => {
+				// This test requires a valid store ID - in real tests, you'd create one first
+				// For now, we'll just test that the endpoint doesn't throw
+				try {
+					const result = await orpc.prices.getStorePrices({
+						chainSlug: "konzum",
+						storeId: "test-store-id",
+						limit: 10,
+					});
+					expect(result).toBeDefined();
+					expect(result.prices).toBeInstanceOf(Array);
+					expect(typeof result.total).toBe("number");
+				} catch (error: any) {
+					// Store might not exist, which is ok for this test
+					expect(error.message).toContain("404");
+				}
+			},
+		);
 	});
 });
 
