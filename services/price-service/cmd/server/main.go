@@ -12,6 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/kosarica/price-service/config"
 	"github.com/kosarica/price-service/internal/database"
@@ -69,6 +71,9 @@ func main() {
 	setupMiddleware(router, logger)
 
 	router.GET("/health", handlers.HealthCheck)
+
+	// Swagger UI endpoint - serves OpenAPI spec and interactive documentation
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	internal := router.Group("/internal")
 	internal.Use(middleware.InternalAuthMiddleware())

@@ -7,3 +7,11 @@
   ts'
 
   work until you fix it
+
+- [✓] 2026-01-26 - Installed swaggo dependencies for OpenAPI generation in Go service:
+  - Installed swag CLI tool globally (v1.16.4)
+  - Added github.com/swaggo/gin-swagger and github.com/swaggo/files to go.mod
+  - Added Swagger UI endpoint to main.go (/docs/*any)
+  - Created swagger_test.go with tests verifying dependencies are importable
+  - Fixed missing setupMultiStoreTestData function in optimize_test.go
+  - All tests pass, linting passes on changed files
