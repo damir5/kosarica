@@ -47,7 +47,7 @@ tasks:
       - OptimizeSingle, OptimizeMulti, CacheWarmup, CacheRefresh, CacheHealth
 
       Each needs: @Summary, @Tags, @Accept, @Produce, @Param (per param), @Success, @Router
-    completed: false
+    completed: true
 
   - title: Add main.go annotation for API metadata
     description: |

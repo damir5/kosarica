@@ -15,3 +15,10 @@
   - Created swagger_test.go with tests verifying dependencies are importable
   - Fixed missing setupMultiStoreTestData function in optimize_test.go
   - All tests pass, linting passes on changed files
+
+- [✓] 2026-01-26 - Added swag annotations to all handler functions (~14 handlers):
+  - prices.go: GetStorePrices, SearchItems
+  - runs.go: ListRuns, GetRun, ListFiles, ListErrors, GetStats, RerunRun, DeleteRun
+  - optimize.go: OptimizeSingle, OptimizeMulti, CacheWarmup, CacheRefresh, CacheHealth
+  - Each handler annotated with @Summary, @Description, @Tags, @Accept, @Produce, @Param, @Success, @Failure, @Router
+  - Build passes, unit tests pass, linting passes (only pre-existing lint issues reported)

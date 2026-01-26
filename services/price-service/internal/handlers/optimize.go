@@ -106,7 +106,17 @@ func GetPriceCache() *optimizer.PriceCache {
 }
 
 // OptimizeSingle handles single-store basket optimization
-// POST /internal/basket/optimize/single
+// @Summary Optimize basket for single store
+// @Description Finds the best single store for a basket of items based on price and coverage
+// @Tags basket
+// @Accept json
+// @Produce json
+// @Param request body OptimizeRequest true "Optimization request"
+// @Success 200 {object} map[string]interface{} "Optimization results"
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Failure 503 {object} map[string]string "Cache unavailable"
+// @Router /internal/basket/optimize/single [post]
 func OptimizeSingle(c *gin.Context) {
 	var req OptimizeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -205,7 +215,18 @@ func OptimizeSingle(c *gin.Context) {
 }
 
 // OptimizeMulti handles multi-store basket optimization
-// POST /internal/basket/optimize/multi
+// @Summary Optimize basket across multiple stores
+// @Description Finds the optimal distribution of basket items across multiple stores
+// @Tags basket
+// @Accept json
+// @Produce json
+// @Param request body OptimizeRequest true "Optimization request"
+// @Success 200 {object} MultiStoreResult
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Failure 503 {object} map[string]string "Cache unavailable"
+// @Failure 504 {object} map[string]string "Optimization timed out"
+// @Router /internal/basket/optimize/multi [post]
 func OptimizeMulti(c *gin.Context) {
 	var req OptimizeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -320,7 +341,15 @@ func OptimizeMulti(c *gin.Context) {
 }
 
 // CacheWarmup handles cache warmup requests
-// POST /internal/basket/cache/warmup
+// @Summary Warm up price cache
+// @Description Triggers a full cache warmup for all chains
+// @Tags cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Cache warmed up"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Failure 503 {object} map[string]string "Cache not initialized"
+// @Router /internal/basket/cache/warmup [post]
 func CacheWarmup(c *gin.Context) {
 	if priceCache == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Cache not initialized"})
@@ -340,7 +369,17 @@ func CacheWarmup(c *gin.Context) {
 }
 
 // CacheRefresh handles cache refresh requests for a specific chain
-// POST /internal/basket/cache/refresh/:chainSlug
+// @Summary Refresh chain cache
+// @Description Refreshes the price cache for a specific chain
+// @Tags cache
+// @Accept json
+// @Produce json
+// @Param chainSlug path string true "Chain slug identifier"
+// @Success 200 {object} map[string]interface{} "Cache refreshed"
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Failure 503 {object} map[string]string "Cache not initialized"
+// @Router /internal/basket/cache/refresh/{chainSlug} [post]
 func CacheRefresh(c *gin.Context) {
 	chainSlug := c.Param("chainSlug")
 	if chainSlug == "" {
@@ -367,7 +406,14 @@ func CacheRefresh(c *gin.Context) {
 }
 
 // CacheHealth handles cache health check requests
-// GET /internal/basket/cache/health
+// @Summary Get cache health
+// @Description Returns the health status and freshness information for all cached chains
+// @Tags cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Cache health status"
+// @Failure 503 {object} map[string]string "Cache not initialized"
+// @Router /internal/basket/cache/health [get]
 func CacheHealth(c *gin.Context) {
 	if priceCache == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{

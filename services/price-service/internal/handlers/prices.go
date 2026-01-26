@@ -49,7 +49,19 @@ type GetStorePricesResponse struct {
 }
 
 // GetStorePrices returns prices for a specific store in a chain
-// GET /internal/prices/:chainSlug/:storeId?limit=100&offset=0
+// @Summary Get store prices
+// @Description Returns paginated prices for a specific store in a chain
+// @Tags prices
+// @Accept json
+// @Produce json
+// @Param chainSlug path string true "Chain slug identifier"
+// @Param storeId path string true "Store ID"
+// @Param limit query int false "Number of items to return" default(100) minimum(1) maximum(500)
+// @Param offset query int false "Number of items to skip" default(0) minimum(0)
+// @Success 200 {object} GetStorePricesResponse
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/prices/{chainSlug}/{storeId} [get]
 func GetStorePrices(c *gin.Context) {
 	chainSlug := c.Param("chainSlug")
 	storeID := c.Param("storeId")
@@ -187,8 +199,18 @@ type SearchItemsResponse struct {
 }
 
 // SearchItems searches for items by name
-// GET /internal/items/search?q=&chainSlug=&limit=20
-// MUST require minimum 3 chars for ILIKE queries to prevent full table scan
+// @Summary Search items
+// @Description Search for items by name with optional chain filter. Requires minimum 3 characters.
+// @Tags items
+// @Accept json
+// @Produce json
+// @Param q query string true "Search query (min 3 chars)" minLength(3)
+// @Param chainSlug query string false "Filter by chain slug"
+// @Param limit query int false "Number of items to return" default(20) minimum(1) maximum(100)
+// @Success 200 {object} SearchItemsResponse
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/items/search [get]
 func SearchItems(c *gin.Context) {
 	var req SearchItemsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {

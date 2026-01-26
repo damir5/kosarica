@@ -43,7 +43,19 @@ type IngestionRun struct {
 }
 
 // ListRuns returns a paginated list of ingestion runs with optional filters
-// GET /internal/ingestion/runs?chainSlug=&status=&limit=20&offset=0
+// @Summary List ingestion runs
+// @Description Returns a paginated list of ingestion runs with optional chain and status filters
+// @Tags ingestion
+// @Accept json
+// @Produce json
+// @Param chainSlug query string false "Filter by chain slug"
+// @Param status query string false "Filter by status" Enums(pending, running, completed, failed)
+// @Param limit query int false "Number of items to return" default(20) minimum(1) maximum(100)
+// @Param offset query int false "Number of items to skip" default(0) minimum(0)
+// @Success 200 {object} ListRunsResponse
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/ingestion/runs [get]
 func ListRuns(c *gin.Context) {
 	var req ListRunsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -146,7 +158,17 @@ func ListRuns(c *gin.Context) {
 }
 
 // GetRun returns a single ingestion run by ID
-// GET /internal/ingestion/runs/:runId
+// @Summary Get ingestion run
+// @Description Returns a single ingestion run by its ID
+// @Tags ingestion
+// @Accept json
+// @Produce json
+// @Param runId path string true "Run ID"
+// @Success 200 {object} IngestionRun
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 404 {object} map[string]string "Run not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/ingestion/runs/{runId} [get]
 func GetRun(c *gin.Context) {
 	runID := c.Param("runId")
 	if runID == "" {
@@ -216,7 +238,18 @@ type IngestionFile struct {
 }
 
 // ListFiles returns a paginated list of files for a run
-// GET /internal/ingestion/runs/:runId/files?limit=50&offset=0
+// @Summary List ingestion files
+// @Description Returns a paginated list of files for a specific ingestion run
+// @Tags ingestion
+// @Accept json
+// @Produce json
+// @Param runId path string true "Run ID"
+// @Param limit query int false "Number of items to return" default(50) minimum(1) maximum(100)
+// @Param offset query int false "Number of items to skip" default(0) minimum(0)
+// @Success 200 {object} ListFilesResponse
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/ingestion/runs/{runId}/files [get]
 func ListFiles(c *gin.Context) {
 	runID := c.Param("runId")
 	if runID == "" {
@@ -318,7 +351,18 @@ type IngestionError struct {
 }
 
 // ListErrors returns a paginated list of errors for a run
-// GET /internal/ingestion/runs/:runId/errors?limit=50&offset=0
+// @Summary List ingestion errors
+// @Description Returns a paginated list of errors for a specific ingestion run
+// @Tags ingestion
+// @Accept json
+// @Produce json
+// @Param runId path string true "Run ID"
+// @Param limit query int false "Number of items to return" default(50) minimum(1) maximum(100)
+// @Param offset query int false "Number of items to skip" default(0) minimum(0)
+// @Success 200 {object} ListErrorsResponse
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/ingestion/runs/{runId}/errors [get]
 func ListErrors(c *gin.Context) {
 	runID := c.Param("runId")
 	if runID == "" {
@@ -415,8 +459,17 @@ type GetStatsResponse struct {
 }
 
 // GetStats returns aggregated statistics for a time range
-// GET /internal/ingestion/stats?from=&to=
-// Must match TS aggregation: 24h/7d/30d buckets
+// @Summary Get ingestion stats
+// @Description Returns aggregated statistics for ingestion runs within a time range (24h/7d/30d buckets)
+// @Tags ingestion
+// @Accept json
+// @Produce json
+// @Param from query string true "Start date (RFC3339 format)"
+// @Param to query string true "End date (RFC3339 format)"
+// @Success 200 {object} GetStatsResponse
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/ingestion/stats [get]
 func GetStats(c *gin.Context) {
 	var req GetStatsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -509,7 +562,18 @@ type RerunRunRequest struct {
 }
 
 // RerunRun creates a new run that reruns a specific file/chunk/entry
-// POST /internal/ingestion/runs/:runId/rerun
+// @Summary Rerun ingestion
+// @Description Creates a new run that reruns a specific file, chunk, or entry from an existing run
+// @Tags ingestion
+// @Accept json
+// @Produce json
+// @Param runId path string true "Original run ID"
+// @Param request body RerunRunRequest true "Rerun request"
+// @Success 201 {object} map[string]interface{} "Rerun created"
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 404 {object} map[string]string "Run not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/ingestion/runs/{runId}/rerun [post]
 func RerunRun(c *gin.Context) {
 	runID := c.Param("runId")
 	if runID == "" {
@@ -573,7 +637,17 @@ func RerunRun(c *gin.Context) {
 }
 
 // DeleteRun deletes an ingestion run and its associated data
-// DELETE /internal/ingestion/runs/:runId
+// @Summary Delete ingestion run
+// @Description Deletes an ingestion run and all its associated files and errors
+// @Tags ingestion
+// @Accept json
+// @Produce json
+// @Param runId path string true "Run ID"
+// @Success 200 {object} map[string]interface{} "Run deleted"
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 404 {object} map[string]string "Run not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /internal/ingestion/runs/{runId} [delete]
 func DeleteRun(c *gin.Context) {
 	runID := c.Param("runId")
 	if runID == "" {
