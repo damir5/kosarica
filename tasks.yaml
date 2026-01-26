@@ -80,7 +80,7 @@ tasks:
       ```
 
       The spec will be served at `/docs/doc.json` and UI at `/docs/index.html`.
-    completed: false
+    completed: true
 
   - title: Convert swag from global install to go run via mise
     description: |

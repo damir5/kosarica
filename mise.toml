@@ -60,3 +60,8 @@ pnpm tsx scripts/generate-schemas.ts
 [tasks.schema-check]
 description = "Check if generated schemas are up to date"
 run = "git diff --exit-code shared/schemas/ src/lib/go-schemas/"
+
+[tasks.swag]
+description = "Generate OpenAPI spec from Go annotations"
+dir = "services/price-service"
+run = "go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g cmd/server/main.go -o docs"

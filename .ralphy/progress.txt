@@ -31,3 +31,15 @@
   - Created docs/docs_test.go with tests for metadata verification
   - Tests verify: title, version, basePath, description, valid JSON, endpoints, definitions
   - All unit tests pass, linting passes on changed files
+
+- [✓] 2026-01-26 - Added mise task for swag spec generation and Swagger UI endpoint tests:
+  - Added [tasks.swag] to mise.toml: `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g cmd/server/main.go -o docs`
+  - Extended swagger_test.go with HTTP endpoint tests:
+    - TestSwaggerUIEndpoint: verifies /docs/index.html returns HTML Swagger UI
+    - TestSwaggerJSONEndpoint: verifies /docs/doc.json returns valid OpenAPI spec JSON
+    - TestSwaggerSpecEndpoints: verifies all 12 API endpoints are documented
+    - TestSwaggerSpecDefinitions: verifies 8 request/response type definitions exist
+    - TestSwaggerDocsCSSEndpoint: verifies CSS assets are served
+  - Fixed test issue: use httptest.NewRequest (not http.NewRequest) for proper URL parsing with gin-swagger
+  - Swagger UI served at /docs/index.html, spec at /docs/doc.json
+  - All unit tests pass (go test -short), linting passes (go vet)
