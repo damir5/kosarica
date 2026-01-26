@@ -2,151 +2,41 @@
 node = "24.13.0"
 
 # ==============================================================================
-# TEST TASKS
+# TEST TASKS - Unified interface
 # ==============================================================================
 
+[tasks.test]
+description = "Show test commands help"
+run = "./scripts/test-help.sh"
+
+[tasks.test-node]
+description = "Run all Node.js tests"
+run = "./scripts/test-node.sh all"
+
+[tasks.test-node-unit]
+description = "Run Node.js unit tests (no services needed)"
+run = "./scripts/test-node.sh unit"
+
+[tasks.test-node-int]
+description = "Run Node.js integration tests"
+run = "./scripts/test-node.sh integration"
+
+[tasks.test-go]
+description = "Run Go unit tests"
+run = "./scripts/test-go.sh unit"
+
+[tasks.test-go-int]
+description = "Run Go integration tests"
+run = "./scripts/test-go.sh integration"
+
+[tasks.test-go-e2e]
+description = "Run Go e2e tests (starts containers)"
+run = "./scripts/test-go.sh e2e"
+
+[tasks.test-go-coverage]
+description = "Run Go tests with coverage"
+run = "./scripts/test-go.sh coverage"
+
 [tasks.test-all]
-description = "Run all tests: frontend (pnpm test) then Go service tests"
-run = """
-#!/usr/bin/env bash
-set -euo pipefail
-
-echo "=========================================="
-echo "Running all tests (build+start Go service on 3003, run JS tests, stop Go)"
-echo "=========================================="
-
-# Load development env if present, then overlay .env.test for test DB
-set -o allexport
-[ -f .env.development ] && . .env.development || true
-[ -f .env.test ] && . .env.test || true
-set +o allexport
-
-echo "Building Go price-service..."
-pushd services/price-service >/dev/null
-# Build to catch compile-time errors early but do NOT rely on the binary at runtime.
-# We'll still use `go run` for the actual service to ensure no stale binary runs.
-mkdir -p ./tmp
-go build -o ./tmp/price-service ./cmd/server/main.go || {
-  echo "Go build failed; aborting test run"; popd >/dev/null; exit 1
-}
-popd >/dev/null
-
-
-# Apply migrations to the test database before starting the service.
-# Run migrations from the repository root using the Node `pnpm db:migrate` script
-# so drizzle uses the repo-level `drizzle.config.ts` and .env.test variables.
-echo "Applying DB migrations to test database..."
-# Load env files for migration (development then test overrides)
-set -o allexport
-[ -f .env.development ] && . .env.development || true
-[ -f .env.test ] && . .env.test || true
-set +o allexport
-
-# Run drizzle migrations via pnpm
-pnpm db:migrate || {
-  echo "Migrations failed; showing last 200 lines of migration log:" 
-  tail -n 200 /tmp/price-service-migrate.log || true
-  exit 1
-}
-
-# Start the Go service using `mise run test-service` which itself uses `go run`.
-# If `mise` refuses to run due to untrusted configs, fall back to direct `go run`.
-echo "Starting Go price-service (via mise run test-service)..."
-
-# Load service-specific env files so we pick up PORT, INTERNAL_API_KEY, DATABASE_URL
-# directly from the .env files instead of parsing them manually.
-# Load root-level envs first (so service-specific .env can override them),
-# then load service-local env files so they take precedence.
-set -o allexport
-[ -f .env.development ] && . .env.development || true
-[ -f .env.test ] && . .env.test || true
-[ -f services/price-service/.env ] && . services/price-service/.env || true
-[ -f services/price-service/.env.development ] && . services/price-service/.env.development || true
-set +o allexport
-
-# Use PORT from sourced .env files (or default to 3003)
-PORT=${PORT:-3003}
-echo "Using PORT=$PORT"
-
-# Try to find PIDs listening on the port using lsof, fall back to ss if lsof
-# is not present. If a PID is found, inspect its commandline and only kill
-# it if it appears to be our price-service (safe-guard against killing
-# unrelated processes).
-PIDS="$(lsof -t -i :"$PORT" 2>/dev/null || true)"
-if [ -z "$PIDS" ]; then
-  PIDS="$(ss -ltnp 2>/dev/null | awk -v p=":$PORT" 'index($0,p){for(i=1;i<=NF;i++) if($i ~ /pid=/){gsub(/pid=|,/,"",$i); print $i}}' || true)"
-fi
-
-if [ -n "$PIDS" ]; then
-  echo "Port $PORT is in use by PID(s): $PIDS"
-  for pid in $PIDS; do
-    cmdline="$(ps -p $pid -o args= 2>/dev/null || true)"
-    echo "  PID $pid -> $cmdline"
-    # allow killing known Go run/build artifacts or price-service invocations
-    if echo "$cmdline" | grep -qE 'price-service|cmd/server|go run|main.go|\\.cache/go-build' 2>/dev/null; then
-      echo "  Killing previous price-service process $pid"
-      kill "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
-    else
-      echo "  Process on port $PORT does not look like price-service; aborting to avoid killing unrelated process"
-      echo "  Free the port or set PORT to a different value and re-run tests."
-      exit 1
-    fi
-  done
-fi
-
-pushd services/price-service >/dev/null
-
-# Start Go service directly (not via nested mise to avoid "task failed" noise on kill).
-# Source env files and run go directly.
-(
-  set -o allexport
-  [ -f .env.development ] && . .env.development || true
-  [ -f .env.test ] && . .env.test || true
-  set +o allexport
-  exec go run ./cmd/server/main.go &> /tmp/price-service.log
-) &
-GO_PID=$!
-sleep 1
-
-if ! kill -0 "$GO_PID" 2>/dev/null; then
-  echo "Error: Go service failed to start. Tail of service log:"
-  tail -n 200 /tmp/price-service.log || true
-  popd >/dev/null
-  exit 1
-fi
-
-echo "Go service started with PID=$GO_PID"
-popd >/dev/null
-
-# Wait for health
-MAX=60
-i=0
-until curl -sSf -H "X-Internal-API-Key: ${INTERNAL_API_KEY}" http://localhost:3003/internal/health >/dev/null 2>&1; do
-  i=$((i+1))
-  if [ "$i" -ge "$MAX" ]; then
-    echo "Go service did not become healthy; tailing logs:"
-    tail -n 200 /tmp/price-service.log || true
-    kill "$GO_PID" 2>/dev/null || true
-    exit 1
-  fi
-  sleep 1
-done
-echo "Go service healthy (PID=${GO_PID})"
-
-echo "Running frontend tests..."
-pnpm test || TEST_EXIT=$?
-TEST_EXIT=${TEST_EXIT:-0}
-
-if [ "$TEST_EXIT" -ne 0 ]; then
-  echo "Frontend tests failed; showing tail of vitest output"
-  tail -n 200 /tmp/frontend-test.log || true
-fi
-
-echo "Stopping Go service (PID=${GO_PID})..."
-kill "$GO_PID" 2>/dev/null || true
-wait "$GO_PID" 2>/dev/null || true
-rm -f services/price-service/tmp/price-service || true
-
-# Return the actual test exit code (0 if tests passed)
-exit $TEST_EXIT
-"""
+description = "Run full test suite (orchestrated)"
+run = "./scripts/test-all.sh"
