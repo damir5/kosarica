@@ -7,7 +7,9 @@
 
 import { createRouterClient } from "@orpc/server";
 import { beforeAll, describe, expect, it } from "vitest";
+import { chains } from "@/db/schema";
 import router from "@/orpc/router";
+import { getTestDb } from "@/test/setup";
 
 const GO_SERVICE_URL = process.env.GO_SERVICE_URL || "http://localhost:3003";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "test-key";
@@ -40,6 +42,20 @@ describe("Price Service Proxy Integration Tests", () => {
 					`2. Then run tests: pnpm test\n\n` +
 					`Or skip these tests with: pnpm test:unit`,
 			);
+		}
+
+		// Seed test chains in the JS database
+		const db = getTestDb();
+		try {
+			await db
+				.insert(chains)
+				.values([
+					{ slug: "konzum", name: "Konzum" },
+					{ slug: "dm", name: "DM" },
+				])
+				.onConflictDoNothing();
+		} catch {
+			// Chains might already exist, which is fine
 		}
 	});
 

@@ -166,14 +166,13 @@ export const triggerChain = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const response = await goFetch(`/internal/admin/ingest/${input.chain}`, {
+		return goFetch(`/internal/admin/ingest/${input.chain}`, {
 			method: "POST",
 			body: input.targetDate
 				? JSON.stringify({ targetDate: input.targetDate })
 				: undefined,
 			timeout: 10000, // 10s timeout - should return 202 immediately
 		});
-		return response.data;
 	});
 
 /**
