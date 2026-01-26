@@ -47,17 +47,13 @@ describe("Price Service Proxy Integration Tests", () => {
 
 		// Seed test chains in the JS database
 		const db = getTestDb();
-		try {
-			await db
-				.insert(chains)
-				.values([
-					{ slug: "konzum", name: "Konzum" },
-					{ slug: "dm", name: "DM" },
-				])
-				.onConflictDoNothing();
-		} catch {
-			// Chains might already exist, which is fine
-		}
+		await db
+			.insert(chains)
+			.values([
+				{ slug: "konzum", name: "Konzum" },
+				{ slug: "dm", name: "DM" },
+			])
+			.onConflictDoNothing();
 	});
 
 	describe("Health Check", () => {

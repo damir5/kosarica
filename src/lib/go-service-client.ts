@@ -97,11 +97,9 @@ async function goFetchWithRetry(
  * Helper to extract data from GoServiceResponse or throw error
  */
 function unwrapResponse(response: GoServiceResponse): unknown {
-	console.log("unwrapResponse called with:", JSON.stringify(response, null, 2));
 	if (!response.success) {
 		throw new Error(response.error || "Request failed");
 	}
-	console.log("unwrapResponse returning data:", JSON.stringify(response.data, null, 2));
 	return response.data;
 }
 

@@ -177,7 +177,6 @@ export const triggerChain = procedure
 				: undefined,
 			timeout: 10000, // 10s timeout - should return 202 immediately
 		});
-		console.log("triggerChain response:", JSON.stringify(response, null, 2));
 		return unwrapResponse(response);
 	});
 
