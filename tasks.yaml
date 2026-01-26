@@ -113,7 +113,7 @@ tasks:
       - Version pinned in mise.toml
       - Works in ephemeral containers
       - Consistent across all dev environments
-    completed: false
+    completed: true
 
   # ===========================================================================
   # PHASE 2: Node.js Client Generation

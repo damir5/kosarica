@@ -43,3 +43,9 @@
   - Fixed test issue: use httptest.NewRequest (not http.NewRequest) for proper URL parsing with gin-swagger
   - Swagger UI served at /docs/index.html, spec at /docs/doc.json
   - All unit tests pass (go test -short), linting passes (go vet)
+
+- [✓] 2026-01-26 - Verified swag mise task with go run pattern:
+  - Confirmed mise.toml [tasks.swag] uses `go run github.com/swaggo/swag/cmd/swag@v1.16.4` (no global install)
+  - Ran `mise run swag` successfully - generates docs/docs.go, swagger.json, swagger.yaml
+  - Benefits: no global state, pinned version, works in ephemeral containers
+  - All Go tests pass (go test -short ./...), linting passes (go vet ./...)
