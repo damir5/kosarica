@@ -130,3 +130,24 @@
     - New OpenAPI system in place (go-api dir, swag task, generate-go-api task)
     - Documentation updated (AGENTS.md references OpenAPI)
   - All 56 related tests pass (41 SDK + 15 cleanup), linting passes
+
+- [✓] 2026-01-26 - Verified end-to-end integration (Verification Task):
+  - Ran `mise run swag` - OpenAPI spec generated successfully (swagger.json/yaml)
+  - Verified Swagger UI tests pass (TestSwaggerUIEndpoint, TestSwaggerJSONEndpoint)
+  - Ran `pnpm generate:go-api` - SDK + Zod schemas generated successfully
+  - Note: client-config.ts gets deleted by SDK regeneration, restored from git
+  - Ran `pnpm exec tsc --noEmit` - TypeScript type checking passed
+  - Fixed frontend type errors in admin ingestion routes:
+    - Updated _admin.admin.ingestion.index.tsx to use SDK response format directly
+    - Updated _admin.admin.ingestion.$runId.tsx to use SDK response format directly
+    - Removed references to non-existent parentRunId and rerunType fields
+    - Fixed pagination to compute totalPages from total/pageSize
+    - Updated type definitions to match SDK types (optional fields, string dates)
+  - Ran `mise run test-all` - All 112 tests pass (Go + Node.js)
+  - Created src/lib/go-api/e2e-verification.test.ts with 24 comprehensive tests:
+    - Phase 1 tests: swagger.json exists, valid JSON, correct metadata, all 13 endpoints documented
+    - Phase 2 tests: SDK files generated, Zod schemas exported, SDK functions available
+    - Phase 3 tests: client configuration, unwrapSdkResponse helper works correctly
+    - Phase 4 tests: old schema files/directories deleted
+    - Config tests: openapi-ts.config.ts, package.json script, mise.toml tasks
+  - All verification tests pass, linting passes on changed files

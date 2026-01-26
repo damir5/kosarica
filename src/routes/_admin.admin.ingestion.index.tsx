@@ -86,9 +86,8 @@ interface IngestionRun {
 }
 
 interface RunsResponse {
-	runs: IngestionRun[];
-	total: number;
-	totalPages: number;
+	runs?: IngestionRun[];
+	total?: number;
 }
 
 interface TriggerResponse {
@@ -147,17 +146,16 @@ function IngestionDashboard() {
 		// Poll every 3s when active runs, every 30s otherwise
 		refetchInterval: (query) => {
 			const response = query.state.data;
-			const runsData = response?.success ? (response.data as RunsResponse) : null;
-			const hasActiveRuns = runsData?.runs?.some(
-				(run: IngestionRun) => run.status === "pending" || run.status === "running",
+			const hasActiveRuns = response?.runs?.some(
+				(run) => run.status === "pending" || run.status === "running",
 			);
 			return hasActiveRuns ? 3000 : 30000;
 		},
 	});
 
-	// Extract data from responses
-	const stats = statsResponse?.success ? (statsResponse.data as IngestionStats) : undefined;
-	const runsData = runsResponse?.success ? (runsResponse.data as RunsResponse) : null;
+	// Extract data from responses (SDK returns data directly, not wrapped)
+	const stats = statsResponse as IngestionStats | undefined;
+	const runsData = runsResponse as RunsResponse | null;
 
 	// Compute active status for UI indicator
 	const hasActiveRuns = runsData?.runs?.some(
@@ -167,10 +165,11 @@ function IngestionDashboard() {
 	// Trigger chain mutation
 	const triggerMutation = useMutation({
 		mutationFn: async (chainSlug: string) => {
+			// triggerChain uses goFetchWithRetry which returns {success, data, error}
 			const response = await orpc.admin.ingestion.triggerChain.call({
 				chain: chainSlug,
 				targetDate: selectedDate,
-			});
+			}) as { success: boolean; data?: TriggerResponse; error?: string };
 			if (!response.success) {
 				throw new Error(response.error || "Failed to trigger ingestion");
 			}
@@ -316,12 +315,12 @@ function IngestionDashboard() {
 						/>
 
 						{/* Pagination */}
-						{runsData && runsData.totalPages > 1 && (
+						{runsData && (runsData.total ?? 0) > pageSize && (
 							<div className="mt-4 flex items-center justify-between">
 								<p className="text-sm text-muted-foreground">
 									Showing {(page - 1) * pageSize + 1} to{" "}
-									{Math.min(page * pageSize, runsData.total)} of{" "}
-									{runsData.total} runs
+									{Math.min(page * pageSize, runsData.total ?? 0)} of{" "}
+									{runsData.total ?? 0} runs
 								</p>
 								<div className="flex items-center gap-2">
 									<Button
@@ -334,13 +333,13 @@ function IngestionDashboard() {
 										Previous
 									</Button>
 									<span className="text-sm">
-										Page {page} of {runsData.totalPages}
+										Page {page} of {Math.ceil((runsData.total ?? 0) / pageSize)}
 									</span>
 									<Button
 										variant="outline"
 										size="sm"
 										onClick={() => setPage((p) => p + 1)}
-										disabled={page >= runsData.totalPages}
+										disabled={page >= Math.ceil((runsData.total ?? 0) / pageSize)}
 									>
 										Next
 										<ChevronRight className="h-4 w-4" />

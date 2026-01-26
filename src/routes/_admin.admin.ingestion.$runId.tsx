@@ -13,7 +13,7 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useState } from "react";
-import { IngestionFileList, RerunButton } from "@/components/admin/ingestion";
+import { IngestionFileList } from "@/components/admin/ingestion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,58 +36,61 @@ export const Route = createFileRoute("/_admin/admin/ingestion/$runId")({
 	component: RunDetailPage,
 });
 
-// Types for Go service responses
+// Types for Go service responses (matching SDK HandlersIngestionRun)
 interface RunData {
-	id: string;
-	chainSlug: string;
-	status: string;
-	source: string;
-	totalFiles: number | null;
-	processedFiles: number | null;
-	totalEntries: number | null;
-	processedEntries: number | null;
-	errorCount: number | null;
-	startedAt: Date | null;
-	completedAt: Date | null;
-	parentRunId: string | null;
-	rerunType: string | null;
+	id?: string;
+	chainSlug?: string;
+	status?: string;
+	source?: string;
+	totalFiles?: number | null;
+	processedFiles?: number | null;
+	totalEntries?: number | null;
+	processedEntries?: number | null;
+	errorCount?: number | null;
+	startedAt?: string | null;
+	completedAt?: string | null;
+	createdAt?: string | null;
+	metadata?: string | null;
 }
 
 interface FileData {
-	id: string;
-	runId: string;
-	filename: string;
-	fileType: string;
-	fileSize: number | null;
-	fileHash: string | null;
-	status: string;
-	entryCount: number | null;
-	processedAt: Date | null;
-	metadata: string | null;
-	totalChunks: number | null;
-	processedChunks: number | null;
-	chunkSize: number | null;
-	createdAt: Date | null;
+	id?: string;
+	runId?: string;
+	filename?: string;
+	fileType?: string;
+	fileSize?: number | null;
+	fileHash?: string | null;
+	status?: string;
+	entryCount?: number | null;
+	processedAt?: string | null;
+	metadata?: string | null;
+	totalChunks?: number | null;
+	processedChunks?: number | null;
+	chunkSize?: number | null;
+	createdAt?: string | null;
 }
 
 interface FilesResponse {
-	files: FileData[];
-	total: number;
-	totalPages: number;
+	files?: FileData[];
+	total?: number;
 }
 
 interface ErrorData {
-	id: string;
-	errorType: string;
-	errorMessage: string;
-	severity: string;
-	fileId: string | null;
-	createdAt: Date | null;
+	id?: string;
+	errorType?: string;
+	errorMessage?: string;
+	severity?: string;
+	fileId?: string | null;
+	chunkId?: string | null;
+	entryId?: string | null;
+	runId?: string | null;
+	errorDetails?: string | null;
+	createdAt?: string | null;
 }
 
 interface ErrorsResponse {
-	errors: ErrorData[];
-	total: number;
+	errors?: ErrorData[];
+	total?: number;
 }
 
 const STATUS_ICONS = {
@@ -151,16 +154,6 @@ function RunDetailPage() {
 	const filesData = filesResponse as FilesResponse | null;
 	const errorsData = errorsResponse as ErrorsResponse | null;
 
-	// Rerun mutations
-	const rerunRunMutation = useMutation({
-		mutationFn: async () => {
-			return orpc.admin.ingestion.rerunRun.call({ runId });
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
-		},
-	});
-
 	const [rerunningFileId, setRerunningFileId] = useState<string | null>(null);
 
 	const rerunFileMutation = useMutation({
@@ -177,12 +170,12 @@ function RunDetailPage() {
 		},
 	});
 
-	const formatDate = (date: Date | null) => {
+	const formatDate = (date: string | Date | null | undefined) => {
 		if (!date) return "N/A";
 		return new Date(date).toLocaleString();
 	};
 
-	const formatDuration = (start: Date | null, end: Date | null) => {
+	const formatDuration = (start: string | Date | null | undefined, end: string | Date | null | undefined) => {
 		if (!start) return "N/A";
 		const startTime = new Date(start).getTime();
 		const endTime = end ? new Date(end).getTime() : Date.now();
@@ -267,14 +260,7 @@ function RunDetailPage() {
 								/>
 								{run.status}
 							</Badge>
-							{run.parentRunId && <Badge variant="outline">Rerun</Badge>}
-							{(run.status === "completed" || run.status === "failed") && (
-								<RerunButton
-									onRerun={() => rerunRunMutation.mutate()}
-									isLoading={rerunRunMutation.isPending}
-									label="Rerun"
-								/>
-							)}
+							{/* Note: Run-level rerun removed - API requires specific file/chunk/entry to rerun */}
 						</div>
 					</div>
 				</div>
@@ -384,35 +370,13 @@ function RunDetailPage() {
 								</div>
 								<p className="mt-1">{formatDate(run.completedAt)}</p>
 							</div>
-							{run.parentRunId && (
-								<div>
-									<div className="text-sm font-medium text-muted-foreground">
-										Parent Run
-									</div>
-									<p className="mt-1">
-										<a
-											href={`/admin/ingestion/${run.parentRunId}`}
-											className="text-primary hover:underline font-mono text-sm"
-										>
-											{run.parentRunId}
-										</a>
-									</p>
-								</div>
-							)}
-							{run.rerunType && (
-								<div>
-									<div className="text-sm font-medium text-muted-foreground">
-										Rerun Type
-									</div>
-									<p className="mt-1 capitalize">{run.rerunType}</p>
-								</div>
-							)}
+								{/* Note: parentRunId and rerunType fields are not returned by the SDK */}
 						</div>
 					</CardContent>
 				</Card>
 
 				{/* Recent Errors */}
-				{errorsData && errorsData.errors.length > 0 && (
+				{errorsData && (errorsData.errors?.length ?? 0) > 0 && (
 					<Card className="border-destructive/50">
 						<CardHeader>
 							<CardTitle className="flex items-center gap-2 text-destructive">
@@ -420,12 +384,12 @@ function RunDetailPage() {
 								Recent Errors
 							</CardTitle>
 							<CardDescription>
-								Last {errorsData.errors.length} errors from this run
+								Last {errorsData.errors?.length ?? 0} errors from this run
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<div className="space-y-3">
-								{errorsData.errors.slice(0, 5).map((error) => (
+								{(errorsData.errors ?? []).slice(0, 5).map((error) => (
 									<div
 										key={error.id}
 										className="p-3 rounded-lg border bg-destructive/5 border-destructive/20"
@@ -500,7 +464,22 @@ function RunDetailPage() {
 					</CardHeader>
 					<CardContent>
 						<IngestionFileList
-							files={filesData?.files ?? []}
+							files={(filesData?.files ?? []).map((f) => ({
+								id: f.id ?? "",
+								runId: f.runId ?? "",
+								filename: f.filename ?? "",
+								fileType: f.fileType ?? "",
+								fileSize: f.fileSize ?? null,
+								fileHash: f.fileHash ?? null,
+								status: f.status ?? "pending",
+								entryCount: f.entryCount ?? null,
+								processedAt: f.processedAt ? new Date(f.processedAt) : null,
+								metadata: f.metadata ?? null,
+								totalChunks: f.totalChunks ?? null,
+								processedChunks: f.processedChunks ?? null,
+								chunkSize: f.chunkSize ?? null,
+								createdAt: f.createdAt ? new Date(f.createdAt) : null,
+							}))}
 							runId={runId}
 							isLoading={filesLoading}
 							onRerunFile={(fileId) => rerunFileMutation.mutate(fileId)}
@@ -509,12 +488,12 @@ function RunDetailPage() {
 						/>
 
 						{/* Pagination */}
-						{filesData && filesData.totalPages > 1 && (
+						{filesData && (filesData.total ?? 0) > pageSize && (
 							<div className="mt-4 flex items-center justify-between">
 								<p className="text-sm text-muted-foreground">
 									Showing {(page - 1) * pageSize + 1} to{" "}
-									{Math.min(page * pageSize, filesData.total)} of{" "}
-									{filesData.total} files
+									{Math.min(page * pageSize, filesData.total ?? 0)} of{" "}
+									{filesData.total ?? 0} files
 								</p>
 								<div className="flex items-center gap-2">
 									<Button
@@ -527,13 +506,13 @@ function RunDetailPage() {
 										Previous
 									</Button>
 									<span className="text-sm">
-										Page {page} of {filesData.totalPages}
+										Page {page} of {Math.ceil((filesData.total ?? 0) / pageSize)}
 									</span>
 									<Button
 										variant="outline"
 										size="sm"
 										onClick={() => setPage((p) => p + 1)}
-										disabled={page >= filesData.totalPages}
+										disabled={page >= Math.ceil((filesData.total ?? 0) / pageSize)}
 									>
 										Next
 										<ChevronRight className="h-4 w-4" />

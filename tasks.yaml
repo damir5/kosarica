@@ -226,13 +226,13 @@ tasks:
       2. Go service serves `/docs/` with Swagger UI accessible
       3. `pnpm generate:go-api` - generates SDK + Zod schemas without errors
       4. `pnpm typecheck` - no TypeScript errors
-      5. `mise run test-all` - all 63 tests pass
+      5. `mise run test-all` - all 112 tests pass
 
       Also verify:
       - OpenAPI spec at http://localhost:3003/docs/doc.json is valid
       - Generated files exist in src/lib/go-api/
       - All oRPC handlers work with new SDK
-    completed: false
+    completed: true
 
   # ===========================================================================
   # COLLABORATIVE REVIEW
