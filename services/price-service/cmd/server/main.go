@@ -1,3 +1,8 @@
+// @title Price Service API
+// @version 1.0
+// @description Internal API for price data management, ingestion monitoring, and basket optimization.
+// @BasePath /internal
+
 package main
 
 import (
@@ -16,6 +21,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/kosarica/price-service/config"
+	_ "github.com/kosarica/price-service/docs" // Swagger generated docs
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/handlers"
 	"github.com/kosarica/price-service/internal/middleware"

@@ -60,7 +60,7 @@ tasks:
       ```
 
       This defines the OpenAPI spec metadata.
-    completed: false
+    completed: true
 
   - title: Generate spec and serve Swagger UI
     description: |
@@ -80,6 +80,39 @@ tasks:
       ```
 
       The spec will be served at `/docs/doc.json` and UI at `/docs/index.html`.
+    completed: false
+
+  - title: Convert swag from global install to go run via mise
+    description: |
+      Replace global `go install` with `go run` pattern for container compatibility.
+
+      Dev environment runs inside a container where global tool installation
+      is not available/persistent. Use `go run` with explicit version instead.
+
+      Add to `mise.toml`:
+      ```toml
+      [tasks.swag]
+      description = "Generate OpenAPI spec from Go annotations"
+      dir = "services/price-service"
+      run = "go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/server/main.go -o docs"
+      ```
+
+      Update first task's instructions to use:
+      ```bash
+      mise run swag
+      ```
+
+      Instead of:
+      ```bash
+      go install github.com/swaggo/swag/cmd/swag@latest
+      swag init -g cmd/server/main.go -o docs
+      ```
+
+      Benefits:
+      - No global state required
+      - Version pinned in mise.toml
+      - Works in ephemeral containers
+      - Consistent across all dev environments
     completed: false
 
   # ===========================================================================

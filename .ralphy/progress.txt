@@ -22,3 +22,12 @@
   - optimize.go: OptimizeSingle, OptimizeMulti, CacheWarmup, CacheRefresh, CacheHealth
   - Each handler annotated with @Summary, @Description, @Tags, @Accept, @Produce, @Param, @Success, @Failure, @Router
   - Build passes, unit tests pass, linting passes (only pre-existing lint issues reported)
+
+- [✓] 2026-01-26 - Added main.go annotation for API metadata and generated OpenAPI spec:
+  - Added @title, @version, @description, @BasePath annotations to main.go
+  - Imported generated docs package for swagger handler
+  - Upgraded github.com/swaggo/swag from v1.8.12 to v1.16.4 (CLI compatibility)
+  - Generated docs/docs.go, docs/swagger.json, docs/swagger.yaml via swag init
+  - Created docs/docs_test.go with tests for metadata verification
+  - Tests verify: title, version, basePath, description, valid JSON, endpoints, definitions
+  - All unit tests pass, linting passes on changed files

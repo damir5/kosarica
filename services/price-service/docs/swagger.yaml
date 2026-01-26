@@ -1,0 +1,949 @@
+basePath: /internal
+definitions:
+  handlers.BasketItem:
+    properties:
+      itemId:
+        type: string
+      name:
+        type: string
+      quantity:
+        minimum: 1
+        type: integer
+    required:
+    - itemId
+    - name
+    - quantity
+    type: object
+  handlers.GetStatsResponse:
+    properties:
+      buckets:
+        items:
+          $ref: '#/definitions/handlers.StatsBucket'
+        type: array
+    type: object
+  handlers.GetStorePricesResponse:
+    properties:
+      prices:
+        items:
+          $ref: '#/definitions/handlers.StorePrice'
+        type: array
+      total:
+        type: integer
+    type: object
+  handlers.IngestionError:
+    properties:
+      chunkId:
+        type: string
+      createdAt:
+        type: string
+      entryId:
+        type: string
+      errorDetails:
+        type: string
+      errorMessage:
+        type: string
+      errorType:
+        type: string
+      fileId:
+        type: string
+      id:
+        type: string
+      runId:
+        type: string
+      severity:
+        type: string
+    type: object
+  handlers.IngestionFile:
+    properties:
+      chunkSize:
+        type: integer
+      createdAt:
+        type: string
+      entryCount:
+        type: integer
+      fileHash:
+        type: string
+      fileSize:
+        type: integer
+      fileType:
+        type: string
+      filename:
+        type: string
+      id:
+        type: string
+      metadata:
+        type: string
+      processedAt:
+        type: string
+      processedChunks:
+        type: integer
+      runId:
+        type: string
+      status:
+        type: string
+      totalChunks:
+        type: integer
+    type: object
+  handlers.IngestionRun:
+    properties:
+      chainSlug:
+        type: string
+      completedAt:
+        type: string
+      createdAt:
+        type: string
+      errorCount:
+        type: integer
+      id:
+        type: string
+      metadata:
+        type: string
+      processedEntries:
+        type: integer
+      processedFiles:
+        type: integer
+      source:
+        type: string
+      startedAt:
+        type: string
+      status:
+        type: string
+      totalEntries:
+        type: integer
+      totalFiles:
+        type: integer
+    type: object
+  handlers.ItemPriceInfo:
+    properties:
+      basePrice:
+        type: integer
+      discountPrice:
+        type: integer
+      effectivePrice:
+        type: integer
+      hasDiscount:
+        type: boolean
+      itemId:
+        type: string
+      itemName:
+        type: string
+      lineTotal:
+        type: integer
+      quantity:
+        type: integer
+    type: object
+  handlers.ListErrorsResponse:
+    properties:
+      errors:
+        items:
+          $ref: '#/definitions/handlers.IngestionError'
+        type: array
+      total:
+        type: integer
+    type: object
+  handlers.ListFilesResponse:
+    properties:
+      files:
+        items:
+          $ref: '#/definitions/handlers.IngestionFile'
+        type: array
+      total:
+        type: integer
+    type: object
+  handlers.ListRunsResponse:
+    properties:
+      runs:
+        items:
+          $ref: '#/definitions/handlers.IngestionRun'
+        type: array
+      total:
+        type: integer
+    type: object
+  handlers.Location:
+    properties:
+      latitude:
+        maximum: 90
+        minimum: -90
+        type: number
+      longitude:
+        maximum: 180
+        minimum: -180
+        type: number
+    required:
+    - latitude
+    - longitude
+    type: object
+  handlers.MissingItem:
+    properties:
+      isOptional:
+        type: boolean
+      itemId:
+        type: string
+      itemName:
+        type: string
+      penalty:
+        type: integer
+    type: object
+  handlers.MultiStoreResult:
+    properties:
+      algorithmUsed:
+        type: string
+      combinedTotal:
+        type: integer
+      coverageRatio:
+        type: number
+      stores:
+        items:
+          $ref: '#/definitions/handlers.StoreAllocation'
+        type: array
+      unassignedItems:
+        items:
+          $ref: '#/definitions/handlers.MissingItem'
+        type: array
+    type: object
+  handlers.OptimizeRequest:
+    properties:
+      basketItems:
+        items:
+          $ref: '#/definitions/handlers.BasketItem'
+        maxItems: 100
+        minItems: 1
+        type: array
+      chainSlug:
+        type: string
+      location:
+        $ref: '#/definitions/handlers.Location'
+      maxDistance:
+        type: number
+      maxStores:
+        type: integer
+    required:
+    - basketItems
+    - chainSlug
+    type: object
+  handlers.RerunRunRequest:
+    properties:
+      rerunType:
+        description: '"file", "chunk", "entry"'
+        type: string
+      targetId:
+        description: ID of file/chunk/entry to rerun
+        type: string
+    required:
+    - rerunType
+    - targetId
+    type: object
+  handlers.SearchItem:
+    properties:
+      avgPrice:
+        description: Average price across stores
+        type: integer
+      brand:
+        type: string
+      category:
+        type: string
+      chainSlug:
+        type: string
+      description:
+        type: string
+      externalId:
+        type: string
+      id:
+        type: string
+      imageUrl:
+        type: string
+      name:
+        type: string
+      storeCount:
+        description: Number of stores with this item
+        type: integer
+      subcategory:
+        type: string
+      unit:
+        type: string
+      unitQuantity:
+        type: string
+    type: object
+  handlers.SearchItemsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/handlers.SearchItem'
+        type: array
+      query:
+        type: string
+      total:
+        type: integer
+    type: object
+  handlers.StatsBucket:
+    properties:
+      completed:
+        type: integer
+      failed:
+        type: integer
+      label:
+        description: '"24h", "7d", "30d"'
+        type: string
+      pending:
+        type: integer
+      running:
+        type: integer
+      totalErrors:
+        type: integer
+      totalFiles:
+        type: integer
+      totalRuns:
+        type: integer
+    type: object
+  handlers.StoreAllocation:
+    properties:
+      distance:
+        type: number
+      items:
+        items:
+          $ref: '#/definitions/handlers.ItemPriceInfo'
+        type: array
+      storeId:
+        type: string
+      storeTotal:
+        type: integer
+      visitOrder:
+        type: integer
+    type: object
+  handlers.StorePrice:
+    properties:
+      anchorPrice:
+        type: integer
+      brand:
+        type: string
+      currentPrice:
+        type: integer
+      discountEnd:
+        type: string
+      discountPrice:
+        type: integer
+      discountStart:
+        type: string
+      inStock:
+        type: boolean
+      itemExternalId:
+        type: string
+      itemName:
+        type: string
+      lastSeenAt:
+        type: string
+      lowestPrice30d:
+        type: integer
+      previousPrice:
+        type: integer
+      priceSignature:
+        type: string
+      retailerItemId:
+        type: string
+      unit:
+        type: string
+      unitPrice:
+        type: integer
+      unitPriceBaseQuantity:
+        type: string
+      unitPriceBaseUnit:
+        type: string
+      unitQuantity:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Internal API for price data management, ingestion monitoring, and basket
+    optimization.
+  title: Price Service API
+  version: "1.0"
+paths:
+  /internal/basket/cache/health:
+    get:
+      consumes:
+      - application/json
+      description: Returns the health status and freshness information for all cached
+        chains
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cache health status
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Cache not initialized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get cache health
+      tags:
+      - cache
+  /internal/basket/cache/refresh/{chainSlug}:
+    post:
+      consumes:
+      - application/json
+      description: Refreshes the price cache for a specific chain
+      parameters:
+      - description: Chain slug identifier
+        in: path
+        name: chainSlug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cache refreshed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Cache not initialized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Refresh chain cache
+      tags:
+      - cache
+  /internal/basket/cache/warmup:
+    post:
+      consumes:
+      - application/json
+      description: Triggers a full cache warmup for all chains
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cache warmed up
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Cache not initialized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Warm up price cache
+      tags:
+      - cache
+  /internal/basket/optimize/multi:
+    post:
+      consumes:
+      - application/json
+      description: Finds the optimal distribution of basket items across multiple
+        stores
+      parameters:
+      - description: Optimization request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.OptimizeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MultiStoreResult'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Cache unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "504":
+          description: Optimization timed out
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Optimize basket across multiple stores
+      tags:
+      - basket
+  /internal/basket/optimize/single:
+    post:
+      consumes:
+      - application/json
+      description: Finds the best single store for a basket of items based on price
+        and coverage
+      parameters:
+      - description: Optimization request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.OptimizeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Optimization results
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Cache unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Optimize basket for single store
+      tags:
+      - basket
+  /internal/ingestion/runs:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of ingestion runs with optional chain
+        and status filters
+      parameters:
+      - description: Filter by chain slug
+        in: query
+        name: chainSlug
+        type: string
+      - description: Filter by status
+        enum:
+        - pending
+        - running
+        - completed
+        - failed
+        in: query
+        name: status
+        type: string
+      - default: 20
+        description: Number of items to return
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ListRunsResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ingestion runs
+      tags:
+      - ingestion
+  /internal/ingestion/runs/{runId}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes an ingestion run and all its associated files and errors
+      parameters:
+      - description: Run ID
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Run deleted
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Run not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete ingestion run
+      tags:
+      - ingestion
+    get:
+      consumes:
+      - application/json
+      description: Returns a single ingestion run by its ID
+      parameters:
+      - description: Run ID
+        in: path
+        name: runId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.IngestionRun'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Run not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get ingestion run
+      tags:
+      - ingestion
+  /internal/ingestion/runs/{runId}/errors:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of errors for a specific ingestion run
+      parameters:
+      - description: Run ID
+        in: path
+        name: runId
+        required: true
+        type: string
+      - default: 50
+        description: Number of items to return
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ListErrorsResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ingestion errors
+      tags:
+      - ingestion
+  /internal/ingestion/runs/{runId}/files:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of files for a specific ingestion run
+      parameters:
+      - description: Run ID
+        in: path
+        name: runId
+        required: true
+        type: string
+      - default: 50
+        description: Number of items to return
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ListFilesResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ingestion files
+      tags:
+      - ingestion
+  /internal/ingestion/runs/{runId}/rerun:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new run that reruns a specific file, chunk, or entry
+        from an existing run
+      parameters:
+      - description: Original run ID
+        in: path
+        name: runId
+        required: true
+        type: string
+      - description: Rerun request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RerunRunRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Rerun created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Run not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Rerun ingestion
+      tags:
+      - ingestion
+  /internal/ingestion/stats:
+    get:
+      consumes:
+      - application/json
+      description: Returns aggregated statistics for ingestion runs within a time
+        range (24h/7d/30d buckets)
+      parameters:
+      - description: Start date (RFC3339 format)
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: End date (RFC3339 format)
+        in: query
+        name: to
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.GetStatsResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get ingestion stats
+      tags:
+      - ingestion
+  /internal/items/search:
+    get:
+      consumes:
+      - application/json
+      description: Search for items by name with optional chain filter. Requires minimum
+        3 characters.
+      parameters:
+      - description: Search query (min 3 chars)
+        in: query
+        minLength: 3
+        name: q
+        required: true
+        type: string
+      - description: Filter by chain slug
+        in: query
+        name: chainSlug
+        type: string
+      - default: 20
+        description: Number of items to return
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SearchItemsResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Search items
+      tags:
+      - items
+  /internal/prices/{chainSlug}/{storeId}:
+    get:
+      consumes:
+      - application/json
+      description: Returns paginated prices for a specific store in a chain
+      parameters:
+      - description: Chain slug identifier
+        in: path
+        name: chainSlug
+        required: true
+        type: string
+      - description: Store ID
+        in: path
+        name: storeId
+        required: true
+        type: string
+      - default: 100
+        description: Number of items to return
+        in: query
+        maximum: 500
+        minimum: 1
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.GetStorePricesResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get store prices
+      tags:
+      - prices
+swagger: "2.0"
