@@ -5,7 +5,6 @@ Test Commands (mise run test-*)
 Node.js Tests:
   test-node          All Node tests (vitest)
   test-node-unit     Unit tests only (no services needed)
-  test-node-int      Integration tests
 
 Go Tests:
   test-go            Go unit tests
@@ -19,6 +18,6 @@ Combined:
 
 Dependencies:
   test-node-unit, test-go       → No external services
-  test-node, test-node-int      → Database only
+  test-node                     → Database only
   test-go-e2e, test-all         → Database + Docker
 EOF
