@@ -162,7 +162,8 @@ async function cleanupTestDatabase(): Promise<void> {
  * Apply migrations to the test database.
  */
 async function applyMigrations(): Promise<void> {
-	const db = getTestDb();
+	// Ensure db is initialized
+	getTestDb();
 	const migrationsFolder = path.join(process.cwd(), "drizzle");
 
 	if (fs.existsSync(migrationsFolder)) {

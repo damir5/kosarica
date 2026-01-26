@@ -23,6 +23,7 @@ export interface GeocodingInput {
 }
 
 const PHOTON_BASE_URL = "https://photon.komoot.io/api";
+const USER_AGENT = "Kosarica/1.0 (contact@kosarica.hr)";
 
 /**
  * Geocode an address using Photon (komoot) - OpenStreetMap based

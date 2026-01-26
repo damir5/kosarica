@@ -41,6 +41,61 @@ export const Route = createFileRoute("/_admin/admin/ingestion/" as any)({
 type TimeRange = "24h" | "7d" | "30d";
 type RunStatus = "pending" | "running" | "completed" | "failed";
 
+// Types for Go service responses
+interface IngestionStats {
+	timeRange: "24h" | "7d" | "30d";
+	runs: {
+		total: number;
+		pending: number;
+		running: number;
+		completed: number;
+		failed: number;
+	};
+	files: {
+		total: number;
+		processed: number;
+	};
+	entries: {
+		total: number;
+		processed: number;
+	};
+	errors: {
+		total: number;
+		byType: Record<string, number>;
+		bySeverity: Record<string, number>;
+	};
+}
+
+interface IngestionRun {
+	id: string;
+	chainSlug: string;
+	status: string;
+	source: string;
+	totalFiles: number | null;
+	processedFiles: number | null;
+	totalEntries: number | null;
+	processedEntries: number | null;
+	errorCount: number | null;
+	startedAt: Date | null;
+	completedAt: Date | null;
+	metadata: string | null;
+	parentRunId: string | null;
+	rerunType: string | null;
+	rerunTargetId: string | null;
+	createdAt: Date | null;
+}
+
+interface RunsResponse {
+	runs: IngestionRun[];
+	total: number;
+	totalPages: number;
+}
+
+interface TriggerResponse {
+	runId: string;
+	status: string;
+}
+
 const CHAINS = [
 	{ slug: "konzum", name: "Konzum" },
 	{ slug: "lidl", name: "Lidl" },
@@ -72,45 +127,54 @@ function IngestionDashboard() {
 	});
 
 	// Stats query
-	const { data: stats, isLoading: statsLoading } = useQuery(
+	const { data: statsResponse, isLoading: statsLoading } = useQuery(
 		orpc.admin.ingestion.getStats.queryOptions({
 			input: { timeRange },
 		}),
 	);
 
 	// Runs query with smart auto-refresh when runs are active
-	const { data: runsData, isLoading: runsLoading } = useQuery({
+	const { data: runsResponse, isLoading: runsLoading } = useQuery({
 		...orpc.admin.ingestion.listRuns.queryOptions({
 			input: {
 				chainSlug: chainFilter !== "all" ? chainFilter : undefined,
 				status:
 					statusFilter !== "all" ? (statusFilter as RunStatus) : undefined,
-				page,
-				pageSize,
+				limit: pageSize,
+				offset: (page - 1) * pageSize,
 			},
 		}),
 		// Poll every 3s when active runs, every 30s otherwise
 		refetchInterval: (query) => {
-			const runs = query.state.data?.runs;
-			const hasActiveRuns = runs?.some(
-				(run) => run.status === "pending" || run.status === "running",
+			const response = query.state.data;
+			const runsData = response?.success ? (response.data as RunsResponse) : null;
+			const hasActiveRuns = runsData?.runs?.some(
+				(run: IngestionRun) => run.status === "pending" || run.status === "running",
 			);
 			return hasActiveRuns ? 3000 : 30000;
 		},
 	});
 
+	// Extract data from responses
+	const stats = statsResponse?.success ? (statsResponse.data as IngestionStats) : undefined;
+	const runsData = runsResponse?.success ? (runsResponse.data as RunsResponse) : null;
+
 	// Compute active status for UI indicator
-	const hasActiveRuns = runsData?.runs.some(
+	const hasActiveRuns = runsData?.runs?.some(
 		(run) => run.status === "pending" || run.status === "running",
 	);
 
 	// Trigger chain mutation
 	const triggerMutation = useMutation({
 		mutationFn: async (chainSlug: string) => {
-			return orpc.admin.ingestion.triggerChain.call({
+			const response = await orpc.admin.ingestion.triggerChain.call({
 				chain: chainSlug,
 				targetDate: selectedDate,
 			});
+			if (!response.success) {
+				throw new Error(response.error || "Failed to trigger ingestion");
+			}
+			return response.data as TriggerResponse;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });

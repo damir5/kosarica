@@ -331,7 +331,7 @@ function CatalogPricesPage() {
 				{/* Table */}
 				{data && !isLoading && (
 					<>
-						<CatalogPricesTable prices={data.prices as CatalogPriceRow[]} />
+						<CatalogPricesTable prices={data.prices.map(p => ({ ...p, id: String(p.id) })) as CatalogPriceRow[]} />
 
 						{/* Pagination */}
 						<div className="mt-4 flex items-center justify-between">

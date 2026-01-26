@@ -15,7 +15,8 @@ const GO_SERVICE_URL = process.env.GO_SERVICE_URL || "http://localhost:3003";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "test-key";
 
 describe("Price Service Proxy Integration Tests", () => {
-	let orpc: ReturnType<typeof createRouterClient<typeof router>>;
+	// biome-ignore lint/suspicious/noExplicitAny: oRPC client types are complex
+	let orpc: any;
 
 	beforeAll(async () => {
 		orpc = createRouterClient(router, {

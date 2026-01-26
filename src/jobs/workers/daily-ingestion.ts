@@ -18,10 +18,12 @@ async function main(): Promise<void> {
 	// Fetch chains dynamically from Go service
 	let chains: string[];
 	try {
-		const response = await goFetch<{ chains: string[] }>("/internal/chains", {
-			timeout: 5000,
-		});
-		chains = response.chains;
+		const response = await goFetch("/internal/chains");
+		if (!response.success) {
+			throw new Error(response.error || "Failed to fetch chains");
+		}
+		const data = response.data as { chains: string[] };
+		chains = data.chains;
 		log.info(`Fetched ${chains.length} chains from Go service`);
 	} catch (error) {
 		log.error("Failed to fetch chains from Go service", { error });
@@ -36,14 +38,19 @@ async function main(): Promise<void> {
 			log.info(`Triggering ingestion for chain: ${chain}`);
 
 			// Trigger ingestion via Go service (returns 202 immediately)
-			const result = await goFetch<{
+			const response = await goFetch(`/internal/admin/ingest/${chain}`, {
+				method: "POST",
+			});
+
+			if (!response.success) {
+				throw new Error(response.error || "Failed to trigger ingestion");
+			}
+
+			const result = response.data as {
 				runId: string;
 				status: string;
 				pollUrl: string;
-			}>(`/internal/admin/ingest/${chain}`, {
-				method: "POST",
-				timeout: 10000, // 10 second timeout
-			});
+			};
 
 			log.info(`Ingestion triggered for ${chain}`, {
 				runId: result.runId,

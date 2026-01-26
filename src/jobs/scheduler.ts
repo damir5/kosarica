@@ -50,10 +50,10 @@ export async function startScheduler(): Promise<void> {
 				message: metadata.message,
 			});
 		},
-		errorHandler: (error, workerMetadata) => {
+		errorHandler: (error: unknown, workerMetadata) => {
 			log.error("Worker error", {
 				name: workerMetadata.name,
-				error: error.message,
+				error: error instanceof Error ? error.message : String(error),
 			});
 		},
 	});

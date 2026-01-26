@@ -34,13 +34,14 @@ export async function scheduleTask(
             ${options.maxRetries ?? 3})
     RETURNING id
   `);
-	return { id: result[0].id };
+	const row = result[0] as { id: string };
+	return { id: row.id };
 }
 
 export async function claimTasks(
 	workerId: string,
-	taskTypes?: TaskType[],
 	maxTasks: number,
+	taskTypes?: TaskType[],
 ): Promise<ClaimedTask[]> {
 	const db = getDatabase();
 	const taskTypesArray = taskTypes

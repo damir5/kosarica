@@ -201,6 +201,97 @@ export const deleteRun = procedure
 		});
 	});
 
+/**
+ * Get a single file by ID
+ * GET /internal/ingestion/files/:fileId
+ */
+export const getFile = procedure
+	.input(z.object({ fileId: z.string() }))
+	.handler(async ({ input }) => {
+		return goFetchWithRetry(`/internal/ingestion/files/${input.fileId}`, {
+			timeout: 5000,
+		});
+	});
+
+/**
+ * List chunks for a file with pagination
+ * GET /internal/ingestion/files/:fileId/chunks?status=&page=&pageSize=
+ */
+export const listChunks = procedure
+	.input(
+		z.object({
+			fileId: z.string(),
+			status: z.enum(["pending", "processing", "completed", "failed"]).optional(),
+			page: z.number().int().min(1).default(1),
+			pageSize: z.number().int().min(1).max(100).default(20),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const params = new URLSearchParams({
+			page: input.page.toString(),
+			pageSize: input.pageSize.toString(),
+		});
+
+		if (input.status) {
+			params.set("status", input.status);
+		}
+
+		return goFetchWithRetry(
+			`/internal/ingestion/files/${input.fileId}/chunks?${params.toString()}`,
+			{ timeout: 5000 },
+		);
+	});
+
+/**
+ * Rerun a file
+ * POST /internal/ingestion/files/:fileId/rerun
+ */
+export const rerunFile = procedure
+	.input(z.object({ fileId: z.string() }))
+	.handler(async ({ input }) => {
+		return goFetchWithRetry(`/internal/ingestion/files/${input.fileId}/rerun`, {
+			method: "POST",
+			timeout: 10000,
+		});
+	});
+
+/**
+ * Rerun a chunk
+ * POST /internal/ingestion/chunks/:chunkId/rerun
+ */
+export const rerunChunk = procedure
+	.input(z.object({ chunkId: z.string() }))
+	.handler(async ({ input }) => {
+		return goFetchWithRetry(`/internal/ingestion/chunks/${input.chunkId}/rerun`, {
+			method: "POST",
+			timeout: 10000,
+		});
+	});
+
+/**
+ * List errors for a file with pagination
+ * GET /internal/ingestion/files/:fileId/errors?page=&pageSize=
+ */
+export const listFileErrors = procedure
+	.input(
+		z.object({
+			fileId: z.string(),
+			page: z.number().int().min(1).default(1),
+			pageSize: z.number().int().min(1).max(100).default(10),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const params = new URLSearchParams({
+			page: input.page.toString(),
+			pageSize: input.pageSize.toString(),
+		});
+
+		return goFetchWithRetry(
+			`/internal/ingestion/files/${input.fileId}/errors?${params.toString()}`,
+			{ timeout: 5000 },
+		);
+	});
+
 // ============================================================================
 // Price Routes
 // ============================================================================

@@ -95,35 +95,27 @@ if [ -n "$PIDS" ]; then
 fi
 
 pushd services/price-service >/dev/null
-# service task will source its own .env files (keep the service task self-contained)
 
-# Ensure service mise config is trusted (no-op if already trusted). If trust
-# fails, abort so the user can inspect the trust log.
-echo "Ensuring mise trusts service config..."
-mise trust ./.mise.toml || {
-  echo "mise trust failed; tailing trust log:" 
-  tail -n 200 /tmp/price-service-mise-trust.log || true
-  echo "You can trust the service config manually with: mise trust services/price-service/.mise.toml"
-  popd >/dev/null
-  exit 1
-}
-
-# Start nested mise which will run `go run` (ensures latest sources).
-mise run test-service &
-MISE_PID=$!
+# Start Go service directly (not via nested mise to avoid "task failed" noise on kill).
+# Source env files and run go directly.
+(
+  set -o allexport
+  [ -f .env.development ] && . .env.development || true
+  [ -f .env.test ] && . .env.test || true
+  set +o allexport
+  exec go run ./cmd/server/main.go &> /tmp/price-service.log
+) &
+GO_PID=$!
 sleep 1
-if ! kill -0 "$MISE_PID" 2>/dev/null; then
-  echo "Error: nested mise failed to start the Go service. Tail of mise log:" 
-  tail -n 200 /tmp/price-service-mise.log || true
-  if grep -q -i "not trusted" /tmp/price-service-mise.log 2>/dev/null || grep -q -i "Config files" /tmp/price-service-mise.log 2>/dev/null; then
-    echo "mise refused to run due to untrusted service config. Run 'mise trust services/price-service/.mise.toml' to trust it, then re-run tests."
-  fi
+
+if ! kill -0 "$GO_PID" 2>/dev/null; then
+  echo "Error: Go service failed to start. Tail of service log:"
+  tail -n 200 /tmp/price-service.log || true
   popd >/dev/null
   exit 1
 fi
 
-# nested mise started successfully; use its PID for orchestration
-GO_MISE_PID=$MISE_PID
+echo "Go service started with PID=$GO_PID"
 popd >/dev/null
 
 # Wait for health
@@ -134,30 +126,27 @@ until curl -sSf -H "X-Internal-API-Key: ${INTERNAL_API_KEY}" http://localhost:30
   if [ "$i" -ge "$MAX" ]; then
     echo "Go service did not become healthy; tailing logs:"
     tail -n 200 /tmp/price-service.log || true
-    echo "--- nested mise logs ---"
-    tail -n 200 /tmp/price-service-mise.log || true
-    kill "$GO_MISE_PID" || true
+    kill "$GO_PID" 2>/dev/null || true
     exit 1
   fi
   sleep 1
 done
-echo "Go service healthy (PID=${GO_MISE_PID})"
+echo "Go service healthy (PID=${GO_PID})"
 
-    # Go service URL is derived from PORT; keep PORT export only
-
-echo "Running frontend tests... (output -> /tmp/frontend-test.log)"
+echo "Running frontend tests..."
 pnpm test || TEST_EXIT=$?
 TEST_EXIT=${TEST_EXIT:-0}
 
 if [ "$TEST_EXIT" -ne 0 ]; then
   echo "Frontend tests failed; showing tail of vitest output"
-  echo "--- Vitest tail (last 200 lines) ---"; tail -n 200 /tmp/frontend-test.log || true
+  tail -n 200 /tmp/frontend-test.log || true
 fi
 
-echo "Stopping Go service (PID=${GO_MISE_PID})..."
-kill "$GO_MISE_PID" || true
-wait "$GO_MISE_PID" 2>/dev/null || true
+echo "Stopping Go service (PID=${GO_PID})..."
+kill "$GO_PID" 2>/dev/null || true
+wait "$GO_PID" 2>/dev/null || true
 rm -f services/price-service/tmp/price-service || true
 
+# Return the actual test exit code (0 if tests passed)
 exit $TEST_EXIT
 """

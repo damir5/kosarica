@@ -85,6 +85,11 @@ export default {
 			triggerChain: priceService.triggerChain,
 			rerunRun: priceService.rerunRun,
 			deleteRun: priceService.deleteRun,
+			getFile: priceService.getFile,
+			listChunks: priceService.listChunks,
+			rerunFile: priceService.rerunFile,
+			rerunChunk: priceService.rerunChunk,
+			listFileErrors: priceService.listFileErrors,
 		},
 		stores: {
 			list: listStores,

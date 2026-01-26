@@ -38,6 +38,57 @@ export const Route = createFileRoute("/_admin/admin/ingestion/$runId/$fileId")({
 
 type ChunkStatus = "pending" | "processing" | "completed" | "failed";
 
+// Types for Go service responses
+interface FileData {
+	id: string;
+	filename: string;
+	fileType: string;
+	fileSize: number | null;
+	fileHash: string | null;
+	status: string;
+	entryCount: number | null;
+	totalChunks: number | null;
+	processedChunks: number | null;
+	chunkSize: number | null;
+	createdAt: Date | null;
+	processedAt: Date | null;
+}
+
+interface ChunkData {
+	id: string;
+	fileId: string;
+	chunkIndex: number;
+	startRow: number;
+	endRow: number;
+	rowCount: number;
+	status: string;
+	r2Key: string | null;
+	persistedCount: number | null;
+	errorCount: number | null;
+	processedAt: Date | null;
+	createdAt: Date | null;
+}
+
+interface ChunksResponse {
+	chunks: ChunkData[];
+	total: number;
+	totalPages: number;
+}
+
+interface ErrorData {
+	id: string;
+	errorType: string;
+	errorMessage: string;
+	severity: string;
+	chunkId: string | null;
+	createdAt: Date | null;
+}
+
+interface ErrorsResponse {
+	errors: ErrorData[];
+	total: number;
+}
+
 const STATUS_ICONS = {
 	pending: Clock,
 	processing: Loader2,
@@ -74,7 +125,7 @@ function FileDetailPage() {
 
 	// File query
 	const {
-		data: file,
+		data: fileResponse,
 		isLoading: fileLoading,
 		error: fileError,
 	} = useQuery(
@@ -84,7 +135,7 @@ function FileDetailPage() {
 	);
 
 	// Chunks query
-	const { data: chunksData, isLoading: chunksLoading } = useQuery(
+	const { data: chunksResponse, isLoading: chunksLoading } = useQuery(
 		orpc.admin.ingestion.listChunks.queryOptions({
 			input: {
 				fileId,
@@ -97,8 +148,8 @@ function FileDetailPage() {
 	);
 
 	// Errors query
-	const { data: errorsData } = useQuery(
-		orpc.admin.ingestion.listErrors.queryOptions({
+	const { data: errorsResponse } = useQuery(
+		orpc.admin.ingestion.listFileErrors.queryOptions({
 			input: {
 				fileId,
 				page: 1,
@@ -106,6 +157,11 @@ function FileDetailPage() {
 			},
 		}),
 	);
+
+	// Extract data from responses
+	const file = fileResponse?.success ? (fileResponse.data as FileData) : null;
+	const chunksData = chunksResponse?.success ? (chunksResponse.data as ChunksResponse) : null;
+	const errorsData = errorsResponse?.success ? (errorsResponse.data as ErrorsResponse) : null;
 
 	// Rerun mutations
 	const rerunFileMutation = useMutation({

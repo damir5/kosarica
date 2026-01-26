@@ -11,7 +11,7 @@ import { storeEnrichmentTasks, stores } from "@/db/schema";
 import { type GeocodingInput, geocodeAddress } from "@/lib/geocoding";
 import { createLogger } from "@/utils/logger";
 
-const log = createLogger("store-enrichment");
+const log = createLogger("app");
 
 // ============================================================================
 // Types

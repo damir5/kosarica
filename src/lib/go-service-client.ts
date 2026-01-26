@@ -1,4 +1,4 @@
-interface GoServiceResponse {
+export interface GoServiceResponse {
 	success: boolean;
 	data?: unknown;
 	error?: string;

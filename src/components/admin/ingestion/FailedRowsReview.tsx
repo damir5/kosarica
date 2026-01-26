@@ -35,8 +35,7 @@ export default function FailedRowsReview() {
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 	const [currentChain, setCurrentChain] = useState("konzum");
 
-	// biome-ignore lint/correctness/noInvalidUseBeforeDeclaration: function hoisting
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency on page/currentChain
 	useEffect(() => {
 		loadFailedRows();
 	}, [page, currentChain]);
@@ -127,28 +126,6 @@ export default function FailedRowsReview() {
 			console.error("Error re-processing:", error);
 		} finally {
 			setLoading(false);
-		}
-	};
-
-	const _handleAddReviewNotes = async (id: string, notes: string) => {
-		try {
-			const response = await fetch(
-				`/internal/admin/ingestion/failed-rows/${id}/notes`,
-				{
-					method: "PUT",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ notes, reviewed: false }),
-				},
-			);
-
-			if (!response.ok) {
-				console.error("Failed to add review notes:", response.statusText);
-				return;
-			}
-
-			await loadFailedRows();
-		} catch (error) {
-			console.error("Error adding review notes:", error);
 		}
 	};
 

@@ -69,8 +69,8 @@ export class TaskQueueWorker {
 	private async processTasks() {
 		const tasks = await claimTasks(
 			this.config.workerId,
-			this.config.taskTypes,
 			this.config.maxTasks,
+			this.config.taskTypes.length > 0 ? this.config.taskTypes : undefined,
 		);
 
 		if (tasks.length === 0) {

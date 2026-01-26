@@ -36,7 +36,59 @@ export const Route = createFileRoute("/_admin/admin/ingestion/$runId")({
 	component: RunDetailPage,
 });
 
-type FileStatus = "pending" | "processing" | "completed" | "failed";
+// Types for Go service responses
+interface RunData {
+	id: string;
+	chainSlug: string;
+	status: string;
+	source: string;
+	totalFiles: number | null;
+	processedFiles: number | null;
+	totalEntries: number | null;
+	processedEntries: number | null;
+	errorCount: number | null;
+	startedAt: Date | null;
+	completedAt: Date | null;
+	parentRunId: string | null;
+	rerunType: string | null;
+}
+
+interface FileData {
+	id: string;
+	runId: string;
+	filename: string;
+	fileType: string;
+	fileSize: number | null;
+	fileHash: string | null;
+	status: string;
+	entryCount: number | null;
+	processedAt: Date | null;
+	metadata: string | null;
+	totalChunks: number | null;
+	processedChunks: number | null;
+	chunkSize: number | null;
+	createdAt: Date | null;
+}
+
+interface FilesResponse {
+	files: FileData[];
+	total: number;
+	totalPages: number;
+}
+
+interface ErrorData {
+	id: string;
+	errorType: string;
+	errorMessage: string;
+	severity: string;
+	fileId: string | null;
+	createdAt: Date | null;
+}
+
+interface ErrorsResponse {
+	errors: ErrorData[];
+	total: number;
+}
 
 const STATUS_ICONS = {
 	pending: Clock,
@@ -63,7 +115,7 @@ function RunDetailPage() {
 
 	// Run query
 	const {
-		data: run,
+		data: runResponse,
 		isLoading: runLoading,
 		error: runError,
 	} = useQuery(
@@ -73,28 +125,31 @@ function RunDetailPage() {
 	);
 
 	// Files query
-	const { data: filesData, isLoading: filesLoading } = useQuery(
+	const { data: filesResponse, isLoading: filesLoading } = useQuery(
 		orpc.admin.ingestion.listFiles.queryOptions({
 			input: {
 				runId,
-				status:
-					statusFilter !== "all" ? (statusFilter as FileStatus) : undefined,
-				page,
-				pageSize,
+				limit: pageSize,
+				offset: (page - 1) * pageSize,
 			},
 		}),
 	);
 
 	// Errors query
-	const { data: errorsData } = useQuery(
+	const { data: errorsResponse } = useQuery(
 		orpc.admin.ingestion.listErrors.queryOptions({
 			input: {
 				runId,
-				page: 1,
-				pageSize: 10,
+				limit: 10,
+				offset: 0,
 			},
 		}),
 	);
+
+	// Extract data from responses
+	const run = runResponse?.success ? (runResponse.data as RunData) : null;
+	const filesData = filesResponse?.success ? (filesResponse.data as FilesResponse) : null;
+	const errorsData = errorsResponse?.success ? (errorsResponse.data as ErrorsResponse) : null;
 
 	// Rerun mutations
 	const rerunRunMutation = useMutation({
