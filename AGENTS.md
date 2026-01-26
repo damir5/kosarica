@@ -1,6 +1,22 @@
 # Agent Instructions
 
-Minimal dev & test setup
+## Schema Generation (Go → Node)
+
+Go is the source of truth for shared API types (basket, prices, ingestion).
+
+- Regenerate schemas: `mise run schema-generate` (or `pnpm schema:generate`)
+- Schemas are generated to `shared/schemas/*.json` (JSON Schema) and `src/lib/go-schemas/*.ts` (Zod)
+- After changing Go types in `services/price-service/internal/handlers/`, run schema generation
+- CI checks for schema drift via `mise run schema-check`
+
+Types with jsonschema tags:
+- `internal/handlers/optimize.go` - basket optimization types
+- `internal/handlers/prices.go` - price query/search types
+- `internal/handlers/runs.go` - ingestion monitoring types
+
+---
+
+## Minimal dev & test setup
 
 - Dev .env: create `./.env.development` (or edit) with at least:
   - `DATABASE_URL=postgresql://kosarica:kosarica@localhost:5432/kosarica`

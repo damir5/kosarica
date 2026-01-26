@@ -13,74 +13,74 @@ import (
 
 // BasketItem represents an item in the optimization basket
 type BasketItem struct {
-	ItemID   string `json:"itemId" binding:"required"`
-	Name     string `json:"name" binding:"required"`
-	Quantity int    `json:"quantity" binding:"required,min=1"`
+	ItemID   string `json:"itemId" binding:"required" jsonschema:"required"`
+	Name     string `json:"name" binding:"required" jsonschema:"required"`
+	Quantity int    `json:"quantity" binding:"required,min=1" jsonschema:"required,minimum=1"`
 }
 
 // Location represents a geographic location
 type Location struct {
-	Latitude  float64 `json:"latitude" binding:"required,min=-90,max=90"`
-	Longitude float64 `json:"longitude" binding:"required,min=-180,max=180"`
+	Latitude  float64 `json:"latitude" binding:"required,min=-90,max=90" jsonschema:"required,minimum=-90,maximum=90"`
+	Longitude float64 `json:"longitude" binding:"required,min=-180,max=180" jsonschema:"required,minimum=-180,maximum=180"`
 }
 
 // OptimizeRequest represents the basket optimization request
 type OptimizeRequest struct {
-	ChainSlug  string       `json:"chainSlug" binding:"required"`
-	BasketItems []*BasketItem `json:"basketItems" binding:"required,min=1,max=100"`
-	Location    *Location    `json:"location,omitempty"`
-	MaxDistance float64      `json:"maxDistance,omitempty"`
-	MaxStores   int          `json:"maxStores,omitempty"`
+	ChainSlug   string        `json:"chainSlug" binding:"required" jsonschema:"required"`
+	BasketItems []*BasketItem `json:"basketItems" binding:"required,min=1,max=100" jsonschema:"required,minItems=1,maxItems=100"`
+	Location    *Location     `json:"location,omitempty"`
+	MaxDistance float64       `json:"maxDistance,omitempty"`
+	MaxStores   int           `json:"maxStores,omitempty" jsonschema:"minimum=1,maximum=10"`
 }
 
 // MissingItem represents an item not available at a store
 type MissingItem struct {
-	ItemID     string `json:"itemId"`
-	ItemName   string `json:"itemName"`
-	Penalty    int64  `json:"penalty"`
-	IsOptional bool   `json:"isOptional"`
+	ItemID     string `json:"itemId" jsonschema:"required"`
+	ItemName   string `json:"itemName" jsonschema:"required"`
+	Penalty    int64  `json:"penalty" jsonschema:"required"`
+	IsOptional bool   `json:"isOptional" jsonschema:"required"`
 }
 
 // ItemPriceInfo contains price information for an item
 type ItemPriceInfo struct {
-	ItemID         string `json:"itemId"`
-	ItemName       string `json:"itemName"`
-	Quantity       int    `json:"quantity"`
-	BasePrice      int64  `json:"basePrice"`
-	EffectivePrice int64  `json:"effectivePrice"`
-	HasDiscount    bool   `json:"hasDiscount"`
+	ItemID         string `json:"itemId" jsonschema:"required"`
+	ItemName       string `json:"itemName" jsonschema:"required"`
+	Quantity       int    `json:"quantity" jsonschema:"required"`
+	BasePrice      int64  `json:"basePrice" jsonschema:"required"`
+	EffectivePrice int64  `json:"effectivePrice" jsonschema:"required"`
+	HasDiscount    bool   `json:"hasDiscount" jsonschema:"required"`
 	DiscountPrice  *int64 `json:"discountPrice,omitempty"`
-	LineTotal      int64  `json:"lineTotal"`
+	LineTotal      int64  `json:"lineTotal" jsonschema:"required"`
 }
 
 // SingleStoreResult represents the optimization result for a single store
 type SingleStoreResult struct {
-	StoreID       string        `json:"storeId"`
-	CoverageRatio float64       `json:"coverageRatio"`
-	CoverageBin   int           `json:"coverageBin"`
-	SortingTotal  int64         `json:"sortingTotal"`
-	RealTotal     int64         `json:"realTotal"`
-	MissingItems  []*MissingItem `json:"missingItems,omitempty"`
+	StoreID       string           `json:"storeId" jsonschema:"required"`
+	CoverageRatio float64          `json:"coverageRatio" jsonschema:"required"`
+	CoverageBin   int              `json:"coverageBin" jsonschema:"required"`
+	SortingTotal  int64            `json:"sortingTotal" jsonschema:"required"`
+	RealTotal     int64            `json:"realTotal" jsonschema:"required"`
+	MissingItems  []*MissingItem   `json:"missingItems,omitempty"`
 	Items         []*ItemPriceInfo `json:"items,omitempty"`
-	Distance      float64       `json:"distance"`
+	Distance      float64          `json:"distance" jsonschema:"required"`
 }
 
 // StoreAllocation represents a store in a multi-store optimization
 type StoreAllocation struct {
-	StoreID    string          `json:"storeId"`
-	Items      []*ItemPriceInfo `json:"items"`
-	StoreTotal int64           `json:"storeTotal"`
-	Distance   float64         `json:"distance"`
-	VisitOrder int             `json:"visitOrder"`
+	StoreID    string           `json:"storeId" jsonschema:"required"`
+	Items      []*ItemPriceInfo `json:"items" jsonschema:"required"`
+	StoreTotal int64            `json:"storeTotal" jsonschema:"required"`
+	Distance   float64          `json:"distance" jsonschema:"required"`
+	VisitOrder int              `json:"visitOrder" jsonschema:"required"`
 }
 
 // MultiStoreResult represents the optimization result across multiple stores
 type MultiStoreResult struct {
-	Stores          []*StoreAllocation `json:"stores"`
-	CombinedTotal   int64              `json:"combinedTotal"`
-	CoverageRatio   float64            `json:"coverageRatio"`
+	Stores          []*StoreAllocation `json:"stores" jsonschema:"required"`
+	CombinedTotal   int64              `json:"combinedTotal" jsonschema:"required"`
+	CoverageRatio   float64            `json:"coverageRatio" jsonschema:"required"`
 	UnassignedItems []*MissingItem     `json:"unassignedItems,omitempty"`
-	AlgorithmUsed   string             `json:"algorithmUsed"`
+	AlgorithmUsed   string             `json:"algorithmUsed" jsonschema:"required"`
 }
 
 // Global optimizer instances (initialized by the application)

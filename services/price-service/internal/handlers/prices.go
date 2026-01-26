@@ -11,40 +11,41 @@ import (
 )
 
 // GetStorePricesRequest represents query parameters for getting store prices
+// Note: chainSlug and storeId come from URL path params, not query string
 type GetStorePricesRequest struct {
-	ChainSlug string `form:"chainSlug"`
-	StoreID   string `form:"storeId"`
-	Limit     int    `form:"limit" binding:"min=1,max=500"`
-	Offset    int    `form:"offset" binding:"min=0"`
+	ChainSlug string `form:"chainSlug" json:"chainSlug"`
+	StoreID   string `form:"storeId" json:"storeId"`
+	Limit     int    `form:"limit" json:"limit" binding:"min=1,max=500" jsonschema:"minimum=1,maximum=500"`
+	Offset    int    `form:"offset" json:"offset" binding:"min=0" jsonschema:"minimum=0"`
 }
 
 // StorePrice represents a price entry for a store
 type StorePrice struct {
-	RetailerItemID   string `json:"retailerItemId"`
-	ItemName         string `json:"itemName"`
-	ItemExternalID   *string `json:"itemExternalId"`
-	Brand            *string `json:"brand"`
-	Unit             *string `json:"unit"`
-	UnitQuantity     *string `json:"unitQuantity"`
-	CurrentPrice     *int   `json:"currentPrice"`
-	PreviousPrice    *int   `json:"previousPrice"`
-	DiscountPrice    *int   `json:"discountPrice"`
-	DiscountStart    *string `json:"discountStart"`
-	DiscountEnd      *string `json:"discountEnd"`
-	InStock          bool   `json:"inStock"`
-	UnitPrice        *int   `json:"unitPrice"`
+	RetailerItemID    string  `json:"retailerItemId" jsonschema:"required"`
+	ItemName          string  `json:"itemName" jsonschema:"required"`
+	ItemExternalID    *string `json:"itemExternalId"`
+	Brand             *string `json:"brand"`
+	Unit              *string `json:"unit"`
+	UnitQuantity      *string `json:"unitQuantity"`
+	CurrentPrice      *int    `json:"currentPrice"`
+	PreviousPrice     *int    `json:"previousPrice"`
+	DiscountPrice     *int    `json:"discountPrice"`
+	DiscountStart     *string `json:"discountStart"`
+	DiscountEnd       *string `json:"discountEnd"`
+	InStock           bool    `json:"inStock" jsonschema:"required"`
+	UnitPrice         *int    `json:"unitPrice"`
 	UnitPriceBaseQty  *string `json:"unitPriceBaseQuantity"`
 	UnitPriceBaseUnit *string `json:"unitPriceBaseUnit"`
-	LowestPrice30d   *int   `json:"lowestPrice30d"`
-	AnchorPrice      *int   `json:"anchorPrice"`
-	PriceSignature   *string `json:"priceSignature"`
-	LastSeenAt       string `json:"lastSeenAt"`
+	LowestPrice30d    *int    `json:"lowestPrice30d"`
+	AnchorPrice       *int    `json:"anchorPrice"`
+	PriceSignature    *string `json:"priceSignature"`
+	LastSeenAt        string  `json:"lastSeenAt" jsonschema:"required"`
 }
 
 // GetStorePricesResponse represents the response for store prices
 type GetStorePricesResponse struct {
-	Prices []StorePrice `json:"prices"`
-	Total  int          `json:"total"`
+	Prices []StorePrice `json:"prices" jsonschema:"required"`
+	Total  int          `json:"total" jsonschema:"required"`
 }
 
 // GetStorePrices returns prices for a specific store in a chain
@@ -156,33 +157,33 @@ func GetStorePrices(c *gin.Context) {
 
 // SearchItemsRequest represents query parameters for searching items
 type SearchItemsRequest struct {
-	Query     string `form:"q" binding:"required,min=3"`
-	ChainSlug string `form:"chainSlug"`
-	Limit     int    `form:"limit" binding:"min=1,max=100"`
+	Query     string `form:"q" json:"q" binding:"required,min=3" jsonschema:"required,minLength=3"`
+	ChainSlug string `form:"chainSlug" json:"chainSlug"`
+	Limit     int    `form:"limit" json:"limit" binding:"min=1,max=100" jsonschema:"minimum=1,maximum=100"`
 }
 
 // SearchItem represents a search result item
 type SearchItem struct {
-	ID            string  `json:"id"`
-	ChainSlug     string  `json:"chainSlug"`
-	ExternalID    *string `json:"externalId"`
-	Name          string  `json:"name"`
-	Description   *string `json:"description"`
-	Brand         *string `json:"brand"`
-	Category      *string `json:"category"`
-	Subcategory   *string `json:"subcategory"`
-	Unit          *string `json:"unit"`
-	UnitQuantity  *string `json:"unitQuantity"`
-	ImageURL      *string `json:"imageUrl"`
-	AvgPrice      *int    `json:"avgPrice"`      // Average price across stores
-	StoreCount    int     `json:"storeCount"`    // Number of stores with this item
+	ID           string  `json:"id" jsonschema:"required"`
+	ChainSlug    string  `json:"chainSlug" jsonschema:"required"`
+	ExternalID   *string `json:"externalId"`
+	Name         string  `json:"name" jsonschema:"required"`
+	Description  *string `json:"description"`
+	Brand        *string `json:"brand"`
+	Category     *string `json:"category"`
+	Subcategory  *string `json:"subcategory"`
+	Unit         *string `json:"unit"`
+	UnitQuantity *string `json:"unitQuantity"`
+	ImageURL     *string `json:"imageUrl"`
+	AvgPrice     *int    `json:"avgPrice"`                     // Average price across stores
+	StoreCount   int     `json:"storeCount" jsonschema:"required"` // Number of stores with this item
 }
 
 // SearchItemsResponse represents the response for item search
 type SearchItemsResponse struct {
-	Items  []SearchItem `json:"items"`
-	Total  int          `json:"total"`
-	Query  string       `json:"query"`
+	Items []SearchItem `json:"items" jsonschema:"required"`
+	Total int          `json:"total" jsonschema:"required"`
+	Query string       `json:"query" jsonschema:"required"`
 }
 
 // SearchItems searches for items by name
@@ -368,9 +369,9 @@ func GetStorePricesViaGroup(c *gin.Context) {
 
 // GetHistoricalPriceRequest represents query parameters for historical price lookup
 type GetHistoricalPriceRequest struct {
-	StoreID string `form:"storeId" binding:"required"`
-	ItemID  string `form:"itemId" binding:"required"`
-	AsOf    string `form:"asOf"` // RFC3339 timestamp
+	StoreID string `form:"storeId" json:"storeId" binding:"required" jsonschema:"required"`
+	ItemID  string `form:"itemId" json:"itemId" binding:"required" jsonschema:"required"`
+	AsOf    string `form:"asOf" json:"asOf"` // RFC3339 timestamp
 }
 
 // GetHistoricalPrice returns the historical price for an item at a store
@@ -424,20 +425,20 @@ func GetHistoricalPrice(c *gin.Context) {
 
 // ListPriceGroupsRequest represents query parameters for listing price groups
 type ListPriceGroupsRequest struct {
-	ChainSlug string `form:"chainSlug" binding:"required"`
-	Limit     int    `form:"limit" binding:"min=1,max=100"`
-	Offset    int    `form:"offset" binding:"min=0"`
+	ChainSlug string `form:"chainSlug" json:"chainSlug" binding:"required" jsonschema:"required"`
+	Limit     int    `form:"limit" json:"limit" binding:"min=1,max=100" jsonschema:"minimum=1,maximum=100"`
+	Offset    int    `form:"offset" json:"offset" binding:"min=0" jsonschema:"minimum=0"`
 }
 
 // PriceGroupSummary represents a price group summary for listing
 type PriceGroupSummary struct {
-	ID          string `json:"id"`
-	ChainSlug   string `json:"chainSlug"`
-	PriceHash   string `json:"priceHash"`
-	StoreCount  int    `json:"storeCount"`
-	ItemCount   int    `json:"itemCount"`
-	FirstSeenAt string `json:"firstSeenAt"`
-	LastSeenAt  string `json:"lastSeenAt"`
+	ID          string `json:"id" jsonschema:"required"`
+	ChainSlug   string `json:"chainSlug" jsonschema:"required"`
+	PriceHash   string `json:"priceHash" jsonschema:"required"`
+	StoreCount  int    `json:"storeCount" jsonschema:"required"`
+	ItemCount   int    `json:"itemCount" jsonschema:"required"`
+	FirstSeenAt string `json:"firstSeenAt" jsonschema:"required"`
+	LastSeenAt  string `json:"lastSeenAt" jsonschema:"required"`
 }
 
 // ListPriceGroups lists price groups for a chain

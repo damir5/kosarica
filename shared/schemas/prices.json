@@ -1,0 +1,323 @@
+{
+  "$defs": {
+    "GetHistoricalPriceRequest": {
+      "properties": {
+        "storeId": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": "string"
+        },
+        "asOf": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "storeId",
+        "itemId",
+        "asOf"
+      ]
+    },
+    "GetStorePricesRequest": {
+      "properties": {
+        "chainSlug": {
+          "type": "string"
+        },
+        "storeId": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "maximum": 500,
+          "minimum": 1
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "chainSlug",
+        "storeId",
+        "limit",
+        "offset"
+      ]
+    },
+    "GetStorePricesResponse": {
+      "properties": {
+        "prices": {
+          "items": {
+            "$ref": "#/$defs/StorePrice"
+          },
+          "type": "array"
+        },
+        "total": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "prices",
+        "total"
+      ]
+    },
+    "ListPriceGroupsRequest": {
+      "properties": {
+        "chainSlug": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "maximum": 100,
+          "minimum": 1
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "chainSlug",
+        "limit",
+        "offset"
+      ]
+    },
+    "PriceGroupSummary": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "chainSlug": {
+          "type": "string"
+        },
+        "priceHash": {
+          "type": "string"
+        },
+        "storeCount": {
+          "type": "integer"
+        },
+        "itemCount": {
+          "type": "integer"
+        },
+        "firstSeenAt": {
+          "type": "string"
+        },
+        "lastSeenAt": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "chainSlug",
+        "priceHash",
+        "storeCount",
+        "itemCount",
+        "firstSeenAt",
+        "lastSeenAt"
+      ]
+    },
+    "SearchItem": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "chainSlug": {
+          "type": "string"
+        },
+        "externalId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "brand": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "subcategory": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "unitQuantity": {
+          "type": "string"
+        },
+        "imageUrl": {
+          "type": "string"
+        },
+        "avgPrice": {
+          "type": "integer"
+        },
+        "storeCount": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "chainSlug",
+        "externalId",
+        "name",
+        "description",
+        "brand",
+        "category",
+        "subcategory",
+        "unit",
+        "unitQuantity",
+        "imageUrl",
+        "avgPrice",
+        "storeCount"
+      ]
+    },
+    "SearchItemsRequest": {
+      "properties": {
+        "q": {
+          "type": "string",
+          "minLength": 3
+        },
+        "chainSlug": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "q",
+        "chainSlug",
+        "limit"
+      ]
+    },
+    "SearchItemsResponse": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/SearchItem"
+          },
+          "type": "array"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "items",
+        "total",
+        "query"
+      ]
+    },
+    "StorePrice": {
+      "properties": {
+        "retailerItemId": {
+          "type": "string"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "itemExternalId": {
+          "type": "string"
+        },
+        "brand": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "unitQuantity": {
+          "type": "string"
+        },
+        "currentPrice": {
+          "type": "integer"
+        },
+        "previousPrice": {
+          "type": "integer"
+        },
+        "discountPrice": {
+          "type": "integer"
+        },
+        "discountStart": {
+          "type": "string"
+        },
+        "discountEnd": {
+          "type": "string"
+        },
+        "inStock": {
+          "type": "boolean"
+        },
+        "unitPrice": {
+          "type": "integer"
+        },
+        "unitPriceBaseQuantity": {
+          "type": "string"
+        },
+        "unitPriceBaseUnit": {
+          "type": "string"
+        },
+        "lowestPrice30d": {
+          "type": "integer"
+        },
+        "anchorPrice": {
+          "type": "integer"
+        },
+        "priceSignature": {
+          "type": "string"
+        },
+        "lastSeenAt": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "retailerItemId",
+        "itemName",
+        "itemExternalId",
+        "brand",
+        "unit",
+        "unitQuantity",
+        "currentPrice",
+        "previousPrice",
+        "discountPrice",
+        "discountStart",
+        "discountEnd",
+        "inStock",
+        "unitPrice",
+        "unitPriceBaseQuantity",
+        "unitPriceBaseUnit",
+        "lowestPrice30d",
+        "anchorPrice",
+        "priceSignature",
+        "lastSeenAt"
+      ]
+    }
+  },
+  "$id": "https://kosarica.hr/schemas/prices.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "JSON Schema for prices API types generated from Go structs",
+  "title": "Prices API Types"
+}

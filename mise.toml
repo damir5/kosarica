@@ -49,3 +49,14 @@ run = "pg_dump --schema-only --no-owner --no-privileges $DATABASE_URL > src/db/t
 [tasks.sqlc-generate]
 description = "Generate sqlc Go code from queries"
 run = "cd services/price-service && sqlc generate"
+
+[tasks.schema-generate]
+description = "Generate schemas from Go types and create Zod types"
+run = """
+(cd services/price-service && go run cmd/schema-gen/main.go)
+pnpm tsx scripts/generate-schemas.ts
+"""
+
+[tasks.schema-check]
+description = "Check if generated schemas are up to date"
+run = "git diff --exit-code shared/schemas/ src/lib/go-schemas/"

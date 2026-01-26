@@ -1,0 +1,252 @@
+{
+  "$defs": {
+    "BasketItem": {
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "itemId",
+        "name",
+        "quantity"
+      ]
+    },
+    "ItemPriceInfo": {
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "basePrice": {
+          "type": "integer"
+        },
+        "effectivePrice": {
+          "type": "integer"
+        },
+        "hasDiscount": {
+          "type": "boolean"
+        },
+        "discountPrice": {
+          "type": "integer"
+        },
+        "lineTotal": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "itemId",
+        "itemName",
+        "quantity",
+        "basePrice",
+        "effectivePrice",
+        "hasDiscount",
+        "lineTotal"
+      ]
+    },
+    "Location": {
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "maximum": 90,
+          "minimum": -90
+        },
+        "longitude": {
+          "type": "number",
+          "maximum": 180,
+          "minimum": -180
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "latitude",
+        "longitude"
+      ]
+    },
+    "MissingItem": {
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "penalty": {
+          "type": "integer"
+        },
+        "isOptional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "itemId",
+        "itemName",
+        "penalty",
+        "isOptional"
+      ]
+    },
+    "MultiStoreResult": {
+      "properties": {
+        "stores": {
+          "items": {
+            "$ref": "#/$defs/StoreAllocation"
+          },
+          "type": "array"
+        },
+        "combinedTotal": {
+          "type": "integer"
+        },
+        "coverageRatio": {
+          "type": "number"
+        },
+        "unassignedItems": {
+          "items": {
+            "$ref": "#/$defs/MissingItem"
+          },
+          "type": "array"
+        },
+        "algorithmUsed": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "stores",
+        "combinedTotal",
+        "coverageRatio",
+        "algorithmUsed"
+      ]
+    },
+    "OptimizeRequest": {
+      "properties": {
+        "chainSlug": {
+          "type": "string"
+        },
+        "basketItems": {
+          "items": {
+            "$ref": "#/$defs/BasketItem"
+          },
+          "type": "array",
+          "maxItems": 100,
+          "minItems": 1
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        },
+        "maxDistance": {
+          "type": "number"
+        },
+        "maxStores": {
+          "type": "integer",
+          "maximum": 10,
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "chainSlug",
+        "basketItems"
+      ]
+    },
+    "SingleStoreResult": {
+      "properties": {
+        "storeId": {
+          "type": "string"
+        },
+        "coverageRatio": {
+          "type": "number"
+        },
+        "coverageBin": {
+          "type": "integer"
+        },
+        "sortingTotal": {
+          "type": "integer"
+        },
+        "realTotal": {
+          "type": "integer"
+        },
+        "missingItems": {
+          "items": {
+            "$ref": "#/$defs/MissingItem"
+          },
+          "type": "array"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ItemPriceInfo"
+          },
+          "type": "array"
+        },
+        "distance": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "storeId",
+        "coverageRatio",
+        "coverageBin",
+        "sortingTotal",
+        "realTotal",
+        "distance"
+      ]
+    },
+    "StoreAllocation": {
+      "properties": {
+        "storeId": {
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ItemPriceInfo"
+          },
+          "type": "array"
+        },
+        "storeTotal": {
+          "type": "integer"
+        },
+        "distance": {
+          "type": "number"
+        },
+        "visitOrder": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "storeId",
+        "items",
+        "storeTotal",
+        "distance",
+        "visitOrder"
+      ]
+    }
+  },
+  "$id": "https://kosarica.hr/schemas/basket.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "JSON Schema for basket API types generated from Go structs",
+  "title": "Basket API Types"
+}

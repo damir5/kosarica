@@ -13,24 +13,24 @@ import (
 
 // ListRunsRequest represents query parameters for listing ingestion runs
 type ListRunsRequest struct {
-	ChainSlug string `form:"chainSlug"`
-	Status    string `form:"status"`
-	Limit     int    `form:"limit" binding:"min=1,max=100"`
-	Offset    int    `form:"offset" binding:"min=0"`
+	ChainSlug string `form:"chainSlug" json:"chainSlug"`
+	Status    string `form:"status" json:"status" jsonschema:"enum=pending,enum=running,enum=completed,enum=failed"`
+	Limit     int    `form:"limit" json:"limit" binding:"min=1,max=100" jsonschema:"minimum=1,maximum=100"`
+	Offset    int    `form:"offset" json:"offset" binding:"min=0" jsonschema:"minimum=0"`
 }
 
 // ListRunsResponse represents the response for listing ingestion runs
 type ListRunsResponse struct {
-	Runs []IngestionRun `json:"runs"`
-	Total int            `json:"total"`
+	Runs  []IngestionRun `json:"runs" jsonschema:"required"`
+	Total int            `json:"total" jsonschema:"required"`
 }
 
 // IngestionRun represents an ingestion run response
 type IngestionRun struct {
-	ID               string     `json:"id"`
-	ChainSlug        string     `json:"chainSlug"`
-	Source           string     `json:"source"`
-	Status           string     `json:"status"`
+	ID               string     `json:"id" jsonschema:"required"`
+	ChainSlug        string     `json:"chainSlug" jsonschema:"required"`
+	Source           string     `json:"source" jsonschema:"required"`
+	Status           string     `json:"status" jsonschema:"required,enum=pending,enum=running,enum=completed,enum=failed"`
 	StartedAt        *time.Time `json:"startedAt"`
 	CompletedAt      *time.Time `json:"completedAt"`
 	TotalFiles       *int       `json:"totalFiles"`
@@ -39,7 +39,7 @@ type IngestionRun struct {
 	ProcessedEntries *int       `json:"processedEntries"`
 	ErrorCount       *int       `json:"errorCount"`
 	Metadata         *string    `json:"metadata"`
-	CreatedAt        time.Time  `json:"createdAt"`
+	CreatedAt        time.Time  `json:"createdAt" jsonschema:"required"`
 }
 
 // ListRuns returns a paginated list of ingestion runs with optional filters
@@ -187,32 +187,32 @@ func GetRun(c *gin.Context) {
 
 // ListFilesRequest represents query parameters for listing ingestion files
 type ListFilesRequest struct {
-	Limit  int `form:"limit" binding:"min=1,max=100"`
-	Offset int `form:"offset" binding:"min=0"`
+	Limit  int `form:"limit" json:"limit" binding:"min=1,max=100" jsonschema:"minimum=1,maximum=100"`
+	Offset int `form:"offset" json:"offset" binding:"min=0" jsonschema:"minimum=0"`
 }
 
 // ListFilesResponse represents the response for listing ingestion files
 type ListFilesResponse struct {
-	Files []IngestionFile `json:"files"`
-	Total int             `json:"total"`
+	Files []IngestionFile `json:"files" jsonschema:"required"`
+	Total int             `json:"total" jsonschema:"required"`
 }
 
 // IngestionFile represents an ingestion file response
 type IngestionFile struct {
 	ID              *string    `json:"id"`
-	RunID           string     `json:"runId"`
-	Filename        string     `json:"filename"`
-	FileType        string     `json:"fileType"`
+	RunID           string     `json:"runId" jsonschema:"required"`
+	Filename        string     `json:"filename" jsonschema:"required"`
+	FileType        string     `json:"fileType" jsonschema:"required"`
 	FileSize        *int       `json:"fileSize"`
 	FileHash        *string    `json:"fileHash"`
-	Status          string     `json:"status"`
+	Status          string     `json:"status" jsonschema:"required,enum=pending,enum=processing,enum=completed,enum=failed"`
 	EntryCount      *int       `json:"entryCount"`
 	ProcessedAt     *time.Time `json:"processedAt"`
 	Metadata        *string    `json:"metadata"`
 	TotalChunks     *int       `json:"totalChunks"`
 	ProcessedChunks *int       `json:"processedChunks"`
 	ChunkSize       *int       `json:"chunkSize"`
-	CreatedAt       time.Time  `json:"createdAt"`
+	CreatedAt       time.Time  `json:"createdAt" jsonschema:"required"`
 }
 
 // ListFiles returns a paginated list of files for a run
@@ -293,28 +293,28 @@ func ListFiles(c *gin.Context) {
 
 // ListErrorsRequest represents query parameters for listing ingestion errors
 type ListErrorsRequest struct {
-	Limit  int `form:"limit" binding:"min=1,max=100"`
-	Offset int `form:"offset" binding:"min=0"`
+	Limit  int `form:"limit" json:"limit" binding:"min=1,max=100" jsonschema:"minimum=1,maximum=100"`
+	Offset int `form:"offset" json:"offset" binding:"min=0" jsonschema:"minimum=0"`
 }
 
 // ListErrorsResponse represents the response for listing ingestion errors
 type ListErrorsResponse struct {
-	Errors []IngestionError `json:"errors"`
-	Total  int              `json:"total"`
+	Errors []IngestionError `json:"errors" jsonschema:"required"`
+	Total  int              `json:"total" jsonschema:"required"`
 }
 
 // IngestionError represents an ingestion error response
 type IngestionError struct {
-	ID           string     `json:"id"`
-	RunID        string     `json:"runId"`
-	FileID       *string    `json:"fileId"`
-	ChunkID      *string    `json:"chunkId"`
-	EntryID      *string    `json:"entryId"`
-	ErrorType    string     `json:"errorType"`
-	ErrorMessage string     `json:"errorMessage"`
-	ErrorDetails *string    `json:"errorDetails"`
-	Severity     string     `json:"severity"`
-	CreatedAt    time.Time  `json:"createdAt"`
+	ID           string    `json:"id" jsonschema:"required"`
+	RunID        string    `json:"runId" jsonschema:"required"`
+	FileID       *string   `json:"fileId"`
+	ChunkID      *string   `json:"chunkId"`
+	EntryID      *string   `json:"entryId"`
+	ErrorType    string    `json:"errorType" jsonschema:"required"`
+	ErrorMessage string    `json:"errorMessage" jsonschema:"required"`
+	ErrorDetails *string   `json:"errorDetails"`
+	Severity     string    `json:"severity" jsonschema:"required,enum=warning,enum=error,enum=critical"`
+	CreatedAt    time.Time `json:"createdAt" jsonschema:"required"`
 }
 
 // ListErrors returns a paginated list of errors for a run
@@ -393,25 +393,25 @@ func ListErrors(c *gin.Context) {
 
 // GetStatsRequest represents query parameters for getting ingestion stats
 type GetStatsRequest struct {
-	From string `form:"from" binding:"required"`
-	To   string `form:"to" binding:"required"`
+	From string `form:"from" json:"from" binding:"required" jsonschema:"required"`
+	To   string `form:"to" json:"to" binding:"required" jsonschema:"required"`
 }
 
 // StatsBucket represents a single time bucket in stats
 type StatsBucket struct {
-	Label       string `json:"label"`        // "24h", "7d", "30d"
-	TotalRuns   int    `json:"totalRuns"`
-	Completed   int    `json:"completed"`
-	Failed      int    `json:"failed"`
-	Running     int    `json:"running"`
-	Pending     int    `json:"pending"`
-	TotalFiles  int    `json:"totalFiles"`
-	TotalErrors int    `json:"totalErrors"`
+	Label       string `json:"label" jsonschema:"required"` // "24h", "7d", "30d"
+	TotalRuns   int    `json:"totalRuns" jsonschema:"required"`
+	Completed   int    `json:"completed" jsonschema:"required"`
+	Failed      int    `json:"failed" jsonschema:"required"`
+	Running     int    `json:"running" jsonschema:"required"`
+	Pending     int    `json:"pending" jsonschema:"required"`
+	TotalFiles  int    `json:"totalFiles" jsonschema:"required"`
+	TotalErrors int    `json:"totalErrors" jsonschema:"required"`
 }
 
 // GetStatsResponse represents the response for ingestion stats
 type GetStatsResponse struct {
-	Buckets []StatsBucket `json:"buckets"`
+	Buckets []StatsBucket `json:"buckets" jsonschema:"required"`
 }
 
 // GetStats returns aggregated statistics for a time range
@@ -504,8 +504,8 @@ func GetStats(c *gin.Context) {
 
 // RerunRunRequest represents the request for rerunning a run
 type RerunRunRequest struct {
-	RerunType string `json:"rerunType" binding:"required"` // "file", "chunk", "entry"
-	TargetID  string `json:"targetId" binding:"required"`  // ID of file/chunk/entry to rerun
+	RerunType string `json:"rerunType" binding:"required" jsonschema:"required,enum=file,enum=chunk,enum=entry"` // "file", "chunk", "entry"
+	TargetID  string `json:"targetId" binding:"required" jsonschema:"required"`                                  // ID of file/chunk/entry to rerun
 }
 
 // RerunRun creates a new run that reruns a specific file/chunk/entry
@@ -637,7 +637,7 @@ func DeleteRun(c *gin.Context) {
 
 // ListChainsResponse represents the response for listing valid chains
 type ListChainsResponse struct {
-	Chains []string `json:"chains"`
+	Chains []string `json:"chains" jsonschema:"required"`
 }
 
 // ListChains returns the list of valid chain slugs
