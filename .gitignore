@@ -16,8 +16,7 @@ count.txt
 todos.json
 .pnpm-store
 
-# bv (beads viewer) local config and caches
-.bv/
+
 
 # Local data files
 data/
