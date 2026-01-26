@@ -74,3 +74,17 @@
     - All required plugins configured (@hey-api/typescript, @hey-api/sdk, zod)
     - Zod schemas exported from index
   - All 13 openapi-ts tests pass (5 installation + 8 config), linting passes
+
+- [✓] 2026-01-26 - Added generate:go-api script to package.json (Phase 2, Task 3):
+  - Added "generate:go-api": "openapi-ts" script to package.json
+  - Added [tasks.generate-go-api] to mise.toml with description and run command
+  - Created src/lib/generate-go-api-script.test.ts with 8 tests verifying:
+    - package.json has generate:go-api script defined
+    - Script uses openapi-ts command
+    - @hey-api/openapi-ts is a dev dependency
+    - mise.toml has generate-go-api task defined
+    - Task has correct description
+    - Task runs pnpm generate:go-api command
+    - openapi-ts.config.ts exists at project root
+    - Config exports valid configuration
+  - All 21 openapi-ts related tests pass, linting passes

@@ -20,6 +20,7 @@
     "test:unit": "vitest run --run src/orpc/router/__tests__/stores*.test.ts src/db/queries/*.test.ts",
     "test:price-service": "vitest run --run src/orpc/router/__tests__/price-service.integration.test.ts",
     "schema:generate": "cd services/price-service && go run cmd/schema-gen/main.go && cd ../.. && pnpm tsx scripts/generate-schemas.ts",
+    "generate:go-api": "openapi-ts",
     "dev:start": "docker compose up -d price-service",
     "dev:stop": "docker compose down",
     "dev:start-services": "docker compose up -d",

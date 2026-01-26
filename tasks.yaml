@@ -162,7 +162,7 @@ tasks:
       ```
 
       Also add to mise.toml if using mise for task running.
-    completed: false
+    completed: true
 
   # ===========================================================================
   # PHASE 3: Migrate Handlers
