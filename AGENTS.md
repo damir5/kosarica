@@ -1,31 +1,30 @@
 # Agent Instructions
 
-## Chain Price List Sources
+Minimal dev & test setup
 
-| Chain | Price List URL | Format | Status |
-|-------|---------------|--------|--------|
-| Konzum | https://www.konzum.hr/cjenici | CSV | ✅ Done |
-| Lidl | https://tvrtka.lidl.hr/cijene | CSV (ZIP) | ✅ Done |
-| Plodine | https://www.plodine.hr/info-o-cijenama | CSV | Pending |
-| Interspar | https://www.spar.hr/usluge/cjenici | CSV | Pending |
-| Eurospin | https://www.eurospin.hr/cjenik/ | CSV | Pending |
-| Kaufland | https://www.kaufland.hr/akcije-novosti/popis-mpc.html | CSV | Pending |
-| KTC | https://www.ktc.hr/cjenici | CSV | ✅ Done |
-| Metro | https://metrocjenik.com.hr/ | CSV | Pending |
-| Studenac | https://www.studenac.hr/popis-maloprodajnih-cijena | XML | Pending |
-| Trgocentar | https://trgocentar.com/Trgovine-cjenik/ | XML | Pending |
-| DM | https://www.dm.hr/novo/promocije/nove-oznake-cijena-i-vazeci-cjenik-u-dm-u-2906632 | XLSX | Pending |
+- Dev .env: create `./.env.development` (or edit) with at least:
+  - `DATABASE_URL=postgresql://kosarica:kosarica@localhost:5432/kosarica`
+  - `PORT=3002` (frontend dev) and `GO_SERVICE_URL=http://localhost:3003`
+  - `INTERNAL_API_KEY=dev-internal-api-key-change-in-development`
 
-| Chain | Price List URL | Format | Status |
-|-------|---------------|--------|--------|
-| Konzum | https://www.konzum.hr/cjenici | CSV | ✅ Done |
-| Lidl | https://tvrtka.lidl.hr/cijene | CSV (ZIP) | ✅ Done |
-| Plodine | https://www.plodine.hr/info-o-cijenama | CSV | Pending |
-| Interspar | https://www.spar.hr/usluge/cjenici | CSV | Pending |
-| Eurospin | https://www.eurospin.hr/cjenik/ | CSV | Pending |
-| Kaufland | https://www.kaufland.hr/akcije-novosti/popis-mpc.html | CSV | Pending |
-| KTC | https://www.ktc.hr/cjenici | CSV | ✅ Done |
-| Metro | https://metrocjenik.com.hr/ | CSV | Pending |
-| Studenac | https://www.studenac.hr/popis-maloprodajnih-cijena | XML | Pending |
-| Trgocentar | https://trgocentar.com/Trgovine-cjenik/ | XML | Pending |
-| DM | https://www.dm.hr/novo/promocije/nove-oznake-cijena-i-vazeci-cjenik-u-dm-u-2906632 | XLSX | Pending |
+- Test .env: create `./.env.test` with at least:
+  - `DATABASE_URL=postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test`
+
+Very brief test commands
+
+- Apply migrations: `pnpm db:migrate` (uses `drizzle.config.ts` and `.env.test` when present)
+- Start Go service for tests: `mise run test-service` (service runs via `go run`)
+- Run full workflow (build, migrate, start service, run JS tests): `mise run test-all`
+- Run frontend tests only: `pnpm test` (reports written to `/tmp/frontend-test-report.txt` on failures)
+
+
+Go service env (services/price-service)
+
+- `PORT` - port the service listens on (default `3003`)
+- `HOST` - bind address (default `0.0.0.0`)
+- `LOG_LEVEL` - logging verbosity (eg. `info`)
+- `STORAGE_PATH` - path for archived files (eg. `./data/archives`)
+- `INTERNAL_API_KEY` - internal auth key used by other services
+- `DATABASE_URL` - Postgres connection string for the service (override in `.env.test` for tests)
+
+These are set in `services/price-service/.env` and `services/price-service/.env.development`.

@@ -23,34 +23,107 @@ set +o allexport
 
 echo "Building Go price-service..."
 pushd services/price-service >/dev/null
+# Build to catch compile-time errors early but do NOT rely on the binary at runtime.
+# We'll still use `go run` for the actual service to ensure no stale binary runs.
 mkdir -p ./tmp
-go build -o ./tmp/price-service ./cmd/server/main.go
+go build -o ./tmp/price-service ./cmd/server/main.go || {
+  echo "Go build failed; aborting test run"; popd >/dev/null; exit 1
+}
 popd >/dev/null
 
-# Apply migrations to the test database before starting the service. Run inside
-# the service dir so the service's mise tasks and env files are picked up.
+
+# Apply migrations to the test database before starting the service.
+# Run migrations from the repository root using the Node `pnpm db:migrate` script
+# so drizzle uses the repo-level `drizzle.config.ts` and .env.test variables.
 echo "Applying DB migrations to test database..."
-pushd services/price-service >/dev/null
 # Load env files for migration (development then test overrides)
 set -o allexport
 [ -f .env.development ] && . .env.development || true
 [ -f .env.test ] && . .env.test || true
 set +o allexport
 
-# Run migrations via the service's migrate-up task so migrations stay consistent
-mise run migrate-up &> /tmp/price-service-migrate.log || {
+# Run drizzle migrations via pnpm
+pnpm db:migrate &> /tmp/price-service-migrate.log || {
   echo "Migrations failed; showing last 200 lines of migration log:" 
   tail -n 200 /tmp/price-service-migrate.log || true
+  exit 1
+}
+
+# Start the Go service using `mise run test-service` which itself uses `go run`.
+# If `mise` refuses to run due to untrusted configs, fall back to direct `go run`.
+echo "Starting Go price-service (via mise run test-service)..."
+
+# Load service-specific env files so we pick up PORT, INTERNAL_API_KEY, DATABASE_URL
+# directly from the .env files instead of parsing them manually.
+# Load root-level envs first (so service-specific .env can override them),
+# then load service-local env files so they take precedence.
+set -o allexport
+[ -f .env.development ] && . .env.development || true
+[ -f .env.test ] && . .env.test || true
+[ -f services/price-service/.env ] && . services/price-service/.env || true
+[ -f services/price-service/.env.development ] && . services/price-service/.env.development || true
+set +o allexport
+
+# Use PORT from sourced .env files (or default to 3003)
+PORT=${PORT:-3003}
+echo "Using PORT=$PORT"
+
+# Try to find PIDs listening on the port using lsof, fall back to ss if lsof
+# is not present. If a PID is found, inspect its commandline and only kill
+# it if it appears to be our price-service (safe-guard against killing
+# unrelated processes).
+PIDS="$(lsof -t -i :"$PORT" 2>/dev/null || true)"
+if [ -z "$PIDS" ]; then
+  PIDS="$(ss -ltnp 2>/dev/null | awk -v p=":$PORT" 'index($0,p){for(i=1;i<=NF;i++) if($i ~ /pid=/){gsub(/pid=|,/,"",$i); print $i}}' || true)"
+fi
+
+if [ -n "$PIDS" ]; then
+  echo "Port $PORT is in use by PID(s): $PIDS"
+  for pid in $PIDS; do
+    cmdline="$(ps -p $pid -o args= 2>/dev/null || true)"
+    echo "  PID $pid -> $cmdline"
+    # allow killing known Go run/build artifacts or price-service invocations
+    if echo "$cmdline" | grep -qE 'price-service|cmd/server|go run|main.go|\\.cache/go-build' 2>/dev/null; then
+      echo "  Killing previous price-service process $pid"
+      kill "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+    else
+      echo "  Process on port $PORT does not look like price-service; aborting to avoid killing unrelated process"
+      echo "  Free the port or set PORT to a different value and re-run tests."
+      exit 1
+    fi
+  done
+fi
+
+pushd services/price-service >/dev/null
+# service task will source its own .env files (keep the service task self-contained)
+
+# Ensure service mise config is trusted (no-op if already trusted). If trust
+# fails, abort so the user can inspect the trust log.
+echo "Ensuring mise trusts service config..."
+mise trust ./.mise.toml &> /tmp/price-service-mise-trust.log || {
+  echo "mise trust failed; tailing trust log:" 
+  tail -n 200 /tmp/price-service-mise-trust.log || true
+  echo "You can trust the service config manually with: mise trust services/price-service/.mise.toml"
   popd >/dev/null
   exit 1
 }
-popd >/dev/null
 
-# Start Go service via nested mise so the service picks up its own .env files
-echo "Starting Go price-service via nested mise (service will load its env files)..."
-pushd services/price-service >/dev/null
+# Start nested mise which will run `go run` (ensures latest sources).
 mise run test-service &> /tmp/price-service-mise.log &
-GO_MISE_PID=$!
+MISE_PID=$!
+sleep 1
+if ! kill -0 "$MISE_PID" 2>/dev/null; then
+  echo "Error: nested mise failed to start the Go service. Tail of mise log:" 
+  tail -n 200 /tmp/price-service-mise.log || true
+  if grep -q -i "not trusted" /tmp/price-service-mise.log 2>/dev/null || grep -q -i "Config files" /tmp/price-service-mise.log 2>/dev/null; then
+    echo "mise refused to run due to untrusted service config. Run 'mise trust services/price-service/.mise.toml' to trust it, then re-run tests."
+  fi
+  popd >/dev/null
+  exit 1
+fi
+
+# nested mise started successfully; use its PID for orchestration
+GO_MISE_PID=$MISE_PID
 popd >/dev/null
 
 # Wait for health
@@ -72,9 +145,16 @@ echo "Go service healthy (PID=${GO_MISE_PID})"
 
     # Go service URL is derived from PORT; keep PORT export only
 
-echo "Running frontend tests..."
-pnpm test || TEST_EXIT=$?
+echo "Running frontend tests... (output -> /tmp/frontend-test.log)"
+pnpm test &> /tmp/frontend-test.log || TEST_EXIT=$?
 TEST_EXIT=${TEST_EXIT:-0}
+
+if [ "$TEST_EXIT" -ne 0 ]; then
+  echo "Frontend tests failed; generating report: /tmp/frontend-test-report.txt"
+  echo "--- Vitest tail (last 1000 lines) ---" > /tmp/frontend-test-report.txt || true
+  tail -n 1000 /tmp/frontend-test.log >> /tmp/frontend-test-report.txt || true
+  echo "Report written to /tmp/frontend-test-report.txt" >&2 || true
+fi
 
 echo "Stopping Go service (PID=${GO_MISE_PID})..."
 kill "$GO_MISE_PID" || true

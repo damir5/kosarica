@@ -377,7 +377,10 @@ description = "Verify go module dependencies"
 run = "go mod verify"
 
 [tasks.test-service]
-description = "Build and run the Go service for tests (foreground, loads .env.development + .env.test)"
+description = "Run the Go service for tests (foreground, loads .env.development + .env.test)"
+# Use `go run` to avoid accidentally executing a stale binary. The orchestration
+# script will attempt to run this task via nested `mise run`, and fall back to
+# a direct `go run` if `mise` refuses to trust the service config.
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
@@ -388,13 +391,8 @@ set -o allexport
 [ -f .env.test ] && . .env.test || true
 set +o allexport
 
-# Ensure build output exists
-mkdir -p ./tmp
-go build -o ./tmp/price-service ./cmd/server/main.go
-
-# Exec the binary in foreground so nested mise PID maps to the service process.
-# Redirect stdout/stderr to a known log for the root orchestration to tail.
-exec ./tmp/price-service &> /tmp/price-service.log
+# Run the service using go run so the latest sources are always used.
+exec go run ./cmd/server/main.go &> /tmp/price-service.log
 """
 
 # ==============================================================================
