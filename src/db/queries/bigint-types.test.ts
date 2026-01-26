@@ -131,6 +131,7 @@ describe("bigint ID type verification", () => {
 				id: "rit-test",
 				retailerItemId: 789,
 				barcode: "5555555555555",
+				name: "Test Retailer Item",
 			})
 			.returning();
 
@@ -174,6 +175,7 @@ describe("bigint ID type verification", () => {
 				id: "rit-period-test",
 				retailerItemId: 456,
 				barcode: "9876543210987",
+				name: "Period Test Item",
 			})
 			.returning();
 
@@ -208,6 +210,7 @@ describe("bigint ID type verification", () => {
 				id: "rit-pmq-test",
 				retailerItemId: 123,
 				barcode: "1234567890123",
+				name: "Match Audit Test Item",
 			})
 			.returning();
 
