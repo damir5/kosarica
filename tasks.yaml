@@ -129,7 +129,7 @@ tasks:
       ```
 
       This enables automatic SDK + Zod schema generation from OpenAPI spec.
-    completed: false
+    completed: true
 
   - title: Configure openapi-ts.config.ts
     description: |

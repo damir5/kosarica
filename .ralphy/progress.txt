@@ -49,3 +49,13 @@
   - Ran `mise run swag` successfully - generates docs/docs.go, swagger.json, swagger.yaml
   - Benefits: no global state, pinned version, works in ephemeral containers
   - All Go tests pass (go test -short ./...), linting passes (go vet ./...)
+
+- [✓] 2026-01-26 - Installed @hey-api/openapi-ts dependencies (Phase 2, Task 1):
+  - Installed @hey-api/openapi-ts v0.90.10 as dev dependency
+  - Note: @hey-api/client-fetch is now bundled inside openapi-ts (v0.73.0+), no separate install needed
+  - Created src/lib/openapi-ts.test.ts with tests verifying:
+    - Package is importable
+    - defineConfig function exists and returns valid configuration
+    - createClient function is available
+    - SDK and Zod plugins can be configured
+  - All 5 new tests pass, linting passes on changed files
