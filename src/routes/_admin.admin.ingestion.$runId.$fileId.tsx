@@ -158,10 +158,10 @@ function FileDetailPage() {
 		}),
 	);
 
-	// Extract data from responses
-	const file = fileResponse?.success ? (fileResponse.data as FileData) : null;
-	const chunksData = chunksResponse?.success ? (chunksResponse.data as ChunksResponse) : null;
-	const errorsData = errorsResponse?.success ? (errorsResponse.data as ErrorsResponse) : null;
+	// Extract data from responses (handlers now return unwrapped data directly)
+	const file = fileResponse as FileData | null;
+	const chunksData = chunksResponse as ChunksResponse | null;
+	const errorsData = errorsResponse as ErrorsResponse | null;
 
 	// Rerun mutations
 	const rerunFileMutation = useMutation({

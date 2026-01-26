@@ -146,10 +146,10 @@ function RunDetailPage() {
 		}),
 	);
 
-	// Extract data from responses
-	const run = runResponse?.success ? (runResponse.data as RunData) : null;
-	const filesData = filesResponse?.success ? (filesResponse.data as FilesResponse) : null;
-	const errorsData = errorsResponse?.success ? (errorsResponse.data as ErrorsResponse) : null;
+	// Extract data from responses (handlers now return unwrapped data directly)
+	const run = runResponse as RunData | null;
+	const filesData = filesResponse as FilesResponse | null;
+	const errorsData = errorsResponse as ErrorsResponse | null;
 
 	// Rerun mutations
 	const rerunRunMutation = useMutation({

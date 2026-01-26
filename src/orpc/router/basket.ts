@@ -6,7 +6,7 @@
  */
 
 import * as z from "zod";
-import { goFetchWithRetry } from "@/lib/go-service-client";
+import { goFetchWithRetry, unwrapResponse } from "@/lib/go-service-client";
 import { procedure } from "../base";
 
 // ============================================================================
@@ -101,11 +101,12 @@ const CacheFreshnessSchema = z.object({
 export const optimizeSingle = procedure
 	.input(OptimizeRequestSchema)
 	.handler(async ({ input }) => {
-		return goFetchWithRetry("/internal/basket/optimize/single", {
+		const response = await goFetchWithRetry("/internal/basket/optimize/single", {
 			method: "POST",
 			body: JSON.stringify(input),
 			timeout: 2000, // 2s timeout for single-store optimization
 		});
+		return unwrapResponse(response);
 	});
 
 // ============================================================================
@@ -122,11 +123,12 @@ export const optimizeSingle = procedure
 export const optimizeMulti = procedure
 	.input(OptimizeRequestSchema)
 	.handler(async ({ input }) => {
-		return goFetchWithRetry("/internal/basket/optimize/multi", {
+		const response = await goFetchWithRetry("/internal/basket/optimize/multi", {
 			method: "POST",
 			body: JSON.stringify(input),
 			timeout: 5000, // 5s timeout for multi-store optimization
 		});
+		return unwrapResponse(response);
 	});
 
 // ============================================================================
@@ -141,10 +143,11 @@ export const optimizeMulti = procedure
  * or when cache data is stale.
  */
 export const cacheWarmup = procedure.handler(async () => {
-	return goFetchWithRetry("/internal/basket/cache/warmup", {
+	const response = await goFetchWithRetry("/internal/basket/cache/warmup", {
 		method: "POST",
 		timeout: 30000, // 30s timeout - warmup can take time
 	});
+	return unwrapResponse(response);
 });
 
 /**
@@ -160,13 +163,14 @@ export const cacheRefresh = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(
+		const response = await goFetchWithRetry(
 			`/internal/basket/cache/refresh/${input.chainSlug}`,
 			{
 				method: "POST",
 				timeout: 10000, // 10s timeout for single chain refresh
 			},
 		);
+		return unwrapResponse(response);
 	});
 
 /**
@@ -177,9 +181,10 @@ export const cacheRefresh = procedure
  * freshness information for each chain.
  */
 export const cacheHealth = procedure.handler(async () => {
-	return goFetchWithRetry("/internal/basket/cache/health", {
+	const response = await goFetchWithRetry("/internal/basket/cache/health", {
 		timeout: 5000,
 	});
+	return unwrapResponse(response);
 });
 
 // ============================================================================

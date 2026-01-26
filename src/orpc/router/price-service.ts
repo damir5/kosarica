@@ -119,10 +119,11 @@ export const listErrors = procedure
 			offset: input.offset.toString(),
 		});
 
-		return goFetchWithRetry(
+		const response = await goFetchWithRetry(
 			`/internal/ingestion/runs/${input.runId}/errors?${params.toString()}`,
 			{ timeout: 5000 },
 		);
+		return unwrapResponse(response);
 	});
 
 /**
@@ -187,10 +188,11 @@ export const triggerChain = procedure
 export const rerunRun = procedure
 	.input(z.object({ runId: z.string() }))
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(`/internal/ingestion/runs/${input.runId}/rerun`, {
+		const response = await goFetchWithRetry(`/internal/ingestion/runs/${input.runId}/rerun`, {
 			method: "POST",
 			timeout: 10000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -200,10 +202,11 @@ export const rerunRun = procedure
 export const deleteRun = procedure
 	.input(z.object({ runId: z.string() }))
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(`/internal/ingestion/runs/${input.runId}`, {
+		const response = await goFetchWithRetry(`/internal/ingestion/runs/${input.runId}`, {
 			method: "DELETE",
 			timeout: 5000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -213,9 +216,10 @@ export const deleteRun = procedure
 export const getFile = procedure
 	.input(z.object({ fileId: z.string() }))
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(`/internal/ingestion/files/${input.fileId}`, {
+		const response = await goFetchWithRetry(`/internal/ingestion/files/${input.fileId}`, {
 			timeout: 5000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -241,10 +245,11 @@ export const listChunks = procedure
 			params.set("status", input.status);
 		}
 
-		return goFetchWithRetry(
+		const response = await goFetchWithRetry(
 			`/internal/ingestion/files/${input.fileId}/chunks?${params.toString()}`,
 			{ timeout: 5000 },
 		);
+		return unwrapResponse(response);
 	});
 
 /**
@@ -254,10 +259,11 @@ export const listChunks = procedure
 export const rerunFile = procedure
 	.input(z.object({ fileId: z.string() }))
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(`/internal/ingestion/files/${input.fileId}/rerun`, {
+		const response = await goFetchWithRetry(`/internal/ingestion/files/${input.fileId}/rerun`, {
 			method: "POST",
 			timeout: 10000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -267,10 +273,11 @@ export const rerunFile = procedure
 export const rerunChunk = procedure
 	.input(z.object({ chunkId: z.string() }))
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(`/internal/ingestion/chunks/${input.chunkId}/rerun`, {
+		const response = await goFetchWithRetry(`/internal/ingestion/chunks/${input.chunkId}/rerun`, {
 			method: "POST",
 			timeout: 10000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -291,10 +298,11 @@ export const listFileErrors = procedure
 			pageSize: input.pageSize.toString(),
 		});
 
-		return goFetchWithRetry(
+		const response = await goFetchWithRetry(
 			`/internal/ingestion/files/${input.fileId}/errors?${params.toString()}`,
 			{ timeout: 5000 },
 		);
+		return unwrapResponse(response);
 	});
 
 // ============================================================================
@@ -320,10 +328,11 @@ export const getStorePrices = procedure
 			offset: input.offset.toString(),
 		});
 
-		return goFetchWithRetry(
+		const response = await goFetchWithRetry(
 			`/internal/prices/${input.chainSlug}/${input.storeId}?${params.toString()}`,
 			{ timeout: 5000 },
 		);
+		return unwrapResponse(response);
 	});
 
 /**
@@ -370,9 +379,10 @@ export const getStorePricesGroup = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		return goFetchWithRetry(`/internal/prices/group/${input.storeId}`, {
+		const response = await goFetchWithRetry(`/internal/prices/group/${input.storeId}`, {
 			timeout: 5000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -397,9 +407,10 @@ export const getHistoricalPrice = procedure
 			params.set("asOf", input.asOf);
 		}
 
-		return goFetchWithRetry(`/internal/prices/history?${params.toString()}`, {
+		const response = await goFetchWithRetry(`/internal/prices/history?${params.toString()}`, {
 			timeout: 5000,
 		});
+		return unwrapResponse(response);
 	});
 
 /**
@@ -420,10 +431,11 @@ export const listPriceGroups = procedure
 			offset: input.offset.toString(),
 		});
 
-		return goFetchWithRetry(
+		const response = await goFetchWithRetry(
 			`/internal/price-groups/${input.chainSlug}?${params.toString()}`,
 			{ timeout: 5000 },
 		);
+		return unwrapResponse(response);
 	});
 
 // ============================================================================
@@ -435,5 +447,6 @@ export const listPriceGroups = procedure
  * GET /internal/chains
  */
 export const listChains = procedure.handler(async () => {
-	return goFetchWithRetry("/internal/chains", { timeout: 5000 });
+	const response = await goFetchWithRetry("/internal/chains", { timeout: 5000 });
+	return unwrapResponse(response);
 });
