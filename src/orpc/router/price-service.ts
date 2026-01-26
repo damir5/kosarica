@@ -1,11 +1,30 @@
 /**
  * Price Service Proxy Router
  *
- * Proxies requests to the Go price-service via internal API.
- * Uses goFetch/goFetchWithRetry for resilient communication.
+ * Proxies requests to the Go price-service via generated SDK.
+ * Uses goFetchWithRetry for endpoints not yet in the OpenAPI spec.
  */
 
 import * as z from "zod";
+import {
+	deleteInternalIngestionRunsByRunId,
+	getInternalIngestionRuns,
+	getInternalIngestionRunsByRunId,
+	getInternalIngestionRunsByRunIdErrors,
+	getInternalIngestionRunsByRunIdFiles,
+	getInternalIngestionStats,
+	getInternalItemsSearch,
+	getInternalPricesByChainSlugByStoreId,
+	type HandlersGetStatsResponse,
+	type HandlersGetStorePricesResponse,
+	type HandlersIngestionRun,
+	type HandlersListErrorsResponse,
+	type HandlersListFilesResponse,
+	type HandlersListRunsResponse,
+	type HandlersSearchItemsResponse,
+	postInternalIngestionRunsByRunIdRerun,
+} from "@/lib/go-api";
+import { unwrapSdkResponse } from "@/lib/go-api/client-config";
 import { goFetchWithRetry, unwrapResponse } from "@/lib/go-service-client";
 import { procedure } from "../base";
 
@@ -24,7 +43,7 @@ const IngestionStatusSchema = z.enum([
 ]);
 
 // ============================================================================
-// Ingestion Routes - Monitoring (idempotent, use retry)
+// Ingestion Routes - Monitoring (idempotent, use SDK)
 // ============================================================================
 
 /**
@@ -43,24 +62,15 @@ export const listRuns = procedure
 			.optional(),
 	)
 	.handler(async ({ input = {} }) => {
-		const limit = input.limit ?? 20;
-		const offset = input.offset ?? 0;
-		const params = new URLSearchParams({
-			limit: limit.toString(),
-			offset: offset.toString(),
+		const result = await getInternalIngestionRuns({
+			query: {
+				chainSlug: input.chainSlug,
+				status: input.status,
+				limit: input.limit ?? 20,
+				offset: input.offset ?? 0,
+			},
 		});
-
-		if (input.chainSlug) {
-			params.set("chainSlug", input.chainSlug);
-		}
-		if (input.status) {
-			params.set("status", input.status);
-		}
-
-		const response = await goFetchWithRetry(`/internal/ingestion/runs?${params.toString()}`, {
-			timeout: 5000,
-		});
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersListRunsResponse>(result);
 	});
 
 /**
@@ -70,10 +80,10 @@ export const listRuns = procedure
 export const getRun = procedure
 	.input(z.object({ runId: z.string() }))
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(`/internal/ingestion/runs/${input.runId}`, {
-			timeout: 5000,
+		const result = await getInternalIngestionRunsByRunId({
+			path: { runId: input.runId },
 		});
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersIngestionRun>(result);
 	});
 
 /**
@@ -89,16 +99,14 @@ export const listFiles = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const params = new URLSearchParams({
-			limit: input.limit.toString(),
-			offset: input.offset.toString(),
+		const result = await getInternalIngestionRunsByRunIdFiles({
+			path: { runId: input.runId },
+			query: {
+				limit: input.limit,
+				offset: input.offset,
+			},
 		});
-
-		const response = await goFetchWithRetry(
-			`/internal/ingestion/runs/${input.runId}/files?${params.toString()}`,
-			{ timeout: 5000 },
-		);
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersListFilesResponse>(result);
 	});
 
 /**
@@ -114,16 +122,14 @@ export const listErrors = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const params = new URLSearchParams({
-			limit: input.limit.toString(),
-			offset: input.offset.toString(),
+		const result = await getInternalIngestionRunsByRunIdErrors({
+			path: { runId: input.runId },
+			query: {
+				limit: input.limit,
+				offset: input.offset,
+			},
 		});
-
-		const response = await goFetchWithRetry(
-			`/internal/ingestion/runs/${input.runId}/errors?${params.toString()}`,
-			{ timeout: 5000 },
-		);
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersListErrorsResponse>(result);
 	});
 
 /**
@@ -140,28 +146,26 @@ export const getStats = procedure
 			.optional(),
 	)
 	.handler(async ({ input = {} }) => {
-		const params = new URLSearchParams();
-		if (input.from) {
-			params.set("from", input.from);
-		}
-		if (input.to) {
-			params.set("to", input.to);
-		}
-
-		const response = await goFetchWithRetry(
-			`/internal/ingestion/stats${params.toString() ? `?${params.toString()}` : ""}`,
-			{ timeout: 10000 }, // Longer timeout for stats
-		);
-		return unwrapResponse(response);
+		// The SDK requires from/to - provide defaults if not specified
+		const now = new Date();
+		const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+		const result = await getInternalIngestionStats({
+			query: {
+				from: input.from ?? thirtyDaysAgo.toISOString(),
+				to: input.to ?? now.toISOString(),
+			},
+		});
+		return unwrapSdkResponse<HandlersGetStatsResponse>(result);
 	});
 
 // ============================================================================
-// Ingestion Routes - Actions (non-idempotent, no retry)
+// Ingestion Routes - Actions (non-idempotent)
 // ============================================================================
 
 /**
  * Trigger ingestion for a chain
  * POST /internal/admin/ingest/:chain
+ * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const triggerChain = procedure
 	.input(
@@ -171,13 +175,16 @@ export const triggerChain = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(`/internal/admin/ingest/${input.chain}`, {
-			method: "POST",
-			body: input.targetDate
-				? JSON.stringify({ targetDate: input.targetDate })
-				: undefined,
-			timeout: 10000, // 10s timeout - should return 202 immediately
-		});
+		const response = await goFetchWithRetry(
+			`/internal/admin/ingest/${input.chain}`,
+			{
+				method: "POST",
+				body: input.targetDate
+					? JSON.stringify({ targetDate: input.targetDate })
+					: undefined,
+				timeout: 10000, // 10s timeout - should return 202 immediately
+			},
+		);
 		return unwrapResponse(response);
 	});
 
@@ -186,13 +193,22 @@ export const triggerChain = procedure
  * POST /internal/ingestion/runs/:runId/rerun
  */
 export const rerunRun = procedure
-	.input(z.object({ runId: z.string() }))
+	.input(
+		z.object({
+			runId: z.string(),
+			rerunType: z.enum(["file", "chunk", "entry"]).default("file"),
+			targetId: z.string(),
+		}),
+	)
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(`/internal/ingestion/runs/${input.runId}/rerun`, {
-			method: "POST",
-			timeout: 10000,
+		const result = await postInternalIngestionRunsByRunIdRerun({
+			path: { runId: input.runId },
+			body: {
+				rerunType: input.rerunType,
+				targetId: input.targetId,
+			},
 		});
-		return unwrapResponse(response);
+		return unwrapSdkResponse(result);
 	});
 
 /**
@@ -202,35 +218,41 @@ export const rerunRun = procedure
 export const deleteRun = procedure
 	.input(z.object({ runId: z.string() }))
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(`/internal/ingestion/runs/${input.runId}`, {
-			method: "DELETE",
-			timeout: 5000,
+		const result = await deleteInternalIngestionRunsByRunId({
+			path: { runId: input.runId },
 		});
-		return unwrapResponse(response);
+		return unwrapSdkResponse(result);
 	});
 
 /**
  * Get a single file by ID
  * GET /internal/ingestion/files/:fileId
+ * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const getFile = procedure
 	.input(z.object({ fileId: z.string() }))
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(`/internal/ingestion/files/${input.fileId}`, {
-			timeout: 5000,
-		});
+		const response = await goFetchWithRetry(
+			`/internal/ingestion/files/${input.fileId}`,
+			{
+				timeout: 5000,
+			},
+		);
 		return unwrapResponse(response);
 	});
 
 /**
  * List chunks for a file with pagination
  * GET /internal/ingestion/files/:fileId/chunks?status=&page=&pageSize=
+ * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const listChunks = procedure
 	.input(
 		z.object({
 			fileId: z.string(),
-			status: z.enum(["pending", "processing", "completed", "failed"]).optional(),
+			status: z
+				.enum(["pending", "processing", "completed", "failed"])
+				.optional(),
 			page: z.number().int().min(1).default(1),
 			pageSize: z.number().int().min(1).max(100).default(20),
 		}),
@@ -255,34 +277,43 @@ export const listChunks = procedure
 /**
  * Rerun a file
  * POST /internal/ingestion/files/:fileId/rerun
+ * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const rerunFile = procedure
 	.input(z.object({ fileId: z.string() }))
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(`/internal/ingestion/files/${input.fileId}/rerun`, {
-			method: "POST",
-			timeout: 10000,
-		});
+		const response = await goFetchWithRetry(
+			`/internal/ingestion/files/${input.fileId}/rerun`,
+			{
+				method: "POST",
+				timeout: 10000,
+			},
+		);
 		return unwrapResponse(response);
 	});
 
 /**
  * Rerun a chunk
  * POST /internal/ingestion/chunks/:chunkId/rerun
+ * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const rerunChunk = procedure
 	.input(z.object({ chunkId: z.string() }))
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(`/internal/ingestion/chunks/${input.chunkId}/rerun`, {
-			method: "POST",
-			timeout: 10000,
-		});
+		const response = await goFetchWithRetry(
+			`/internal/ingestion/chunks/${input.chunkId}/rerun`,
+			{
+				method: "POST",
+				timeout: 10000,
+			},
+		);
 		return unwrapResponse(response);
 	});
 
 /**
  * List errors for a file with pagination
  * GET /internal/ingestion/files/:fileId/errors?page=&pageSize=
+ * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const listFileErrors = procedure
 	.input(
@@ -323,16 +354,17 @@ export const getStorePrices = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const params = new URLSearchParams({
-			limit: input.limit.toString(),
-			offset: input.offset.toString(),
+		const result = await getInternalPricesByChainSlugByStoreId({
+			path: {
+				chainSlug: input.chainSlug,
+				storeId: input.storeId,
+			},
+			query: {
+				limit: input.limit,
+				offset: input.offset,
+			},
 		});
-
-		const response = await goFetchWithRetry(
-			`/internal/prices/${input.chainSlug}/${input.storeId}?${params.toString()}`,
-			{ timeout: 5000 },
-		);
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersGetStorePricesResponse>(result);
 	});
 
 /**
@@ -349,23 +381,19 @@ export const searchItems = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const params = new URLSearchParams({
-			q: input.query,
-			limit: input.limit.toString(),
+		const result = await getInternalItemsSearch({
+			query: {
+				q: input.query,
+				chainSlug: input.chainSlug,
+				limit: input.limit,
+			},
 		});
-
-		if (input.chainSlug) {
-			params.set("chainSlug", input.chainSlug);
-		}
-
-		const response = await goFetchWithRetry(`/internal/items/search?${params.toString()}`, {
-			timeout: 5000,
-		});
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersSearchItemsResponse>(result);
 	});
 
 // ============================================================================
 // Price Groups Routes
+// Note: Not in OpenAPI spec yet - using goFetchWithRetry
 // ============================================================================
 
 /**
@@ -379,9 +407,12 @@ export const getStorePricesGroup = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(`/internal/prices/group/${input.storeId}`, {
-			timeout: 5000,
-		});
+		const response = await goFetchWithRetry(
+			`/internal/prices/group/${input.storeId}`,
+			{
+				timeout: 5000,
+			},
+		);
 		return unwrapResponse(response);
 	});
 
@@ -407,9 +438,12 @@ export const getHistoricalPrice = procedure
 			params.set("asOf", input.asOf);
 		}
 
-		const response = await goFetchWithRetry(`/internal/prices/history?${params.toString()}`, {
-			timeout: 5000,
-		});
+		const response = await goFetchWithRetry(
+			`/internal/prices/history?${params.toString()}`,
+			{
+				timeout: 5000,
+			},
+		);
 		return unwrapResponse(response);
 	});
 
@@ -440,6 +474,7 @@ export const listPriceGroups = procedure
 
 // ============================================================================
 // Chains Routes
+// Note: Not in OpenAPI spec yet - using goFetchWithRetry
 // ============================================================================
 
 /**
@@ -447,6 +482,8 @@ export const listPriceGroups = procedure
  * GET /internal/chains
  */
 export const listChains = procedure.handler(async () => {
-	const response = await goFetchWithRetry("/internal/chains", { timeout: 5000 });
+	const response = await goFetchWithRetry("/internal/chains", {
+		timeout: 5000,
+	});
 	return unwrapResponse(response);
 });

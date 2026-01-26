@@ -2,11 +2,19 @@
  * Basket Optimization Router
  *
  * Provides basket optimization endpoints using the Go price-service.
- * Uses goFetch/goFetchWithRetry for resilient communication.
+ * Uses generated SDK for type-safe API communication.
  */
 
 import * as z from "zod";
-import { goFetchWithRetry, unwrapResponse } from "@/lib/go-service-client";
+import {
+	getInternalBasketCacheHealth,
+	type HandlersMultiStoreResult,
+	postInternalBasketCacheRefreshByChainSlug,
+	postInternalBasketCacheWarmup,
+	postInternalBasketOptimizeMulti,
+	postInternalBasketOptimizeSingle,
+} from "@/lib/go-api";
+import { unwrapSdkResponse } from "@/lib/go-api/client-config";
 import { procedure } from "../base";
 
 // ============================================================================
@@ -101,12 +109,16 @@ const CacheFreshnessSchema = z.object({
 export const optimizeSingle = procedure
 	.input(OptimizeRequestSchema)
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry("/internal/basket/optimize/single", {
-			method: "POST",
-			body: JSON.stringify(input),
-			timeout: 2000, // 2s timeout for single-store optimization
+		const result = await postInternalBasketOptimizeSingle({
+			body: {
+				chainSlug: input.chainSlug,
+				basketItems: input.basketItems,
+				location: input.location,
+				maxDistance: input.maxDistance,
+				maxStores: input.maxStores,
+			},
 		});
-		return unwrapResponse(response);
+		return unwrapSdkResponse(result);
 	});
 
 // ============================================================================
@@ -123,12 +135,16 @@ export const optimizeSingle = procedure
 export const optimizeMulti = procedure
 	.input(OptimizeRequestSchema)
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry("/internal/basket/optimize/multi", {
-			method: "POST",
-			body: JSON.stringify(input),
-			timeout: 5000, // 5s timeout for multi-store optimization
+		const result = await postInternalBasketOptimizeMulti({
+			body: {
+				chainSlug: input.chainSlug,
+				basketItems: input.basketItems,
+				location: input.location,
+				maxDistance: input.maxDistance,
+				maxStores: input.maxStores,
+			},
 		});
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersMultiStoreResult>(result);
 	});
 
 // ============================================================================
@@ -143,11 +159,8 @@ export const optimizeMulti = procedure
  * or when cache data is stale.
  */
 export const cacheWarmup = procedure.handler(async () => {
-	const response = await goFetchWithRetry("/internal/basket/cache/warmup", {
-		method: "POST",
-		timeout: 30000, // 30s timeout - warmup can take time
-	});
-	return unwrapResponse(response);
+	const result = await postInternalBasketCacheWarmup();
+	return unwrapSdkResponse(result);
 });
 
 /**
@@ -163,14 +176,10 @@ export const cacheRefresh = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(
-			`/internal/basket/cache/refresh/${input.chainSlug}`,
-			{
-				method: "POST",
-				timeout: 10000, // 10s timeout for single chain refresh
-			},
-		);
-		return unwrapResponse(response);
+		const result = await postInternalBasketCacheRefreshByChainSlug({
+			path: { chainSlug: input.chainSlug },
+		});
+		return unwrapSdkResponse(result);
 	});
 
 /**
@@ -181,10 +190,8 @@ export const cacheRefresh = procedure
  * freshness information for each chain.
  */
 export const cacheHealth = procedure.handler(async () => {
-	const response = await goFetchWithRetry("/internal/basket/cache/health", {
-		timeout: 5000,
-	});
-	return unwrapResponse(response);
+	const result = await getInternalBasketCacheHealth();
+	return unwrapSdkResponse(result);
 });
 
 // ============================================================================

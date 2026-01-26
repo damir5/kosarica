@@ -17,11 +17,12 @@ describe("openapi-ts.config.ts configuration", () => {
 		expect(typeof config).toBe("object");
 	});
 
-	it("should have correct input URL pointing to Go service Swagger spec", async () => {
+	it("should have correct input path pointing to Go service Swagger spec", async () => {
 		const configModule = await import("../../openapi-ts.config");
 		const config = await configModule.default;
 
-		expect(config.input).toBe("http://localhost:3003/docs/doc.json");
+		// Now uses local file instead of HTTP URL for better CI/offline support
+		expect(config.input).toBe("./services/price-service/docs/swagger.json");
 	});
 
 	it("should output to src/lib/go-api directory", async () => {

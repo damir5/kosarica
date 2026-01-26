@@ -88,3 +88,26 @@
     - openapi-ts.config.ts exists at project root
     - Config exports valid configuration
   - All 21 openapi-ts related tests pass, linting passes
+
+- [✓] 2026-01-26 - Migrated oRPC handlers to use generated SDK (Phase 3):
+  - Generated TypeScript SDK from OpenAPI spec using `pnpm generate:go-api`
+  - Updated openapi-ts.config.ts to use local swagger.json file for offline/CI compatibility
+  - Created src/lib/go-api/client-config.ts with:
+    - Client configuration with baseUrl and X-Internal-API-Key header
+    - unwrapSdkResponse helper to extract data or throw errors
+  - Migrated src/orpc/router/price-service.ts (9 handlers migrated to SDK):
+    - listRuns, getRun, listFiles, listErrors, getStats (monitoring)
+    - rerunRun, deleteRun (actions)
+    - getStorePrices, searchItems (prices)
+    - Handlers for undocumented endpoints remain using goFetchWithRetry
+  - Migrated src/orpc/router/basket.ts (5 handlers migrated to SDK):
+    - optimizeSingle, optimizeMulti (optimization)
+    - cacheWarmup, cacheRefresh, cacheHealth (cache management)
+  - Created src/lib/go-api/sdk-migration.test.ts with 13 tests verifying:
+    - Client configuration (baseUrl, headers, methods)
+    - unwrapSdkResponse error handling
+    - SDK functions are exported
+    - Zod schemas are exported
+    - Type definitions are properly generated
+  - Updated src/lib/openapi-ts-config.test.ts for new local input path
+  - All 34 openapi-ts and SDK migration tests pass, linting passes
