@@ -1,9 +1,11 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
-	"vcs": {
-		"enabled": false,
-		"clientKind": "git",
-		"useIgnoreFile": false
+	"$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
 	},
 	"files": {
 		"ignoreUnknown": false,
@@ -20,7 +22,11 @@
 		"enabled": true,
 		"indentStyle": "tab"
 	},
-	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
@@ -30,9 +36,9 @@
 			}
 		}
 	},
-	"javascript": {
-		"formatter": {
-			"quoteStyle": "double"
-		}
+	"vcs": {
+		"clientKind": "git",
+		"enabled": false,
+		"useIgnoreFile": false
 	}
 }

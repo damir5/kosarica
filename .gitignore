@@ -9,6 +9,7 @@ count.txt
 .env.*.local
 !.env.example
 !.env.development
+!.env.test
 .nitro
 .tanstack
 .output
