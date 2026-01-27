@@ -45,3 +45,21 @@ Go service env (services/price-service)
 - `DATABASE_URL` - Postgres connection string for the service (override in `.env.test` for tests)
 
 These are set in `services/price-service/.env` and `services/price-service/.env.development`.
+
+---
+
+## ORPC Serialization
+
+ORPC's default JSON serializer natively supports:
+- BigInt, Date, Map, Set, RegExp, URL, Blob, File
+
+Do NOT manually convert these types to strings. Return them directly from handlers.
+
+```typescript
+// Correct - ORPC handles BigInt automatically
+return { prices };
+
+// Wrong - unnecessary conversion
+const transformed = prices.map(p => ({ ...p, id: String(p.id) }));
+return { prices: transformed };
+```

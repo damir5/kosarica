@@ -14,7 +14,7 @@ const currencyFormatter = new Intl.NumberFormat("hr-HR", {
 });
 
 export type CatalogPriceRow = {
-	id: string;
+	id: bigint;
 	productName: string;
 	brand: string | null;
 	category: string | null;
@@ -69,7 +69,7 @@ export function CatalogPricesTable({ prices }: CatalogPricesTableProps) {
 					</TableRow>
 				) : (
 					prices.map((price) => (
-						<TableRow key={price.id}>
+						<TableRow key={String(price.id)}>
 							<TableCell>
 								<div className="font-medium text-foreground">
 									{price.productName}
