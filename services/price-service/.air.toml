@@ -1,0 +1,58 @@
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+  # Command to build the Go binary
+  cmd = "go build -o ./tmp/server ./cmd/server/main.go"
+  # Binary output path (entrypoint replaces deprecated bin)
+  entrypoint = ["./tmp/server"]
+  # Include these file extensions
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  # Ignore these file extensions
+  exclude_ext = ["_test.go"]
+  # Include these directories
+  include_dir = []
+  # Exclude these directories
+  exclude_dir = ["tmp", "vendor", "testdata", "data"]
+  # Exclude these files
+  exclude_file = []
+  # Exclude specific regex
+  exclude_regex = ["_test.go"]
+  # Watch these files (when they change, air will rebuild)
+  exclude_unchanged = false
+  # Follow symbolic links
+  follow_symlink = false
+  # Polling interval for file changes (ms)
+  poll = false
+  # Poll interval (only if poll = true)
+  poll_interval = 500
+  # Delay before starting build (ms)
+  delay = 0
+  # Stop old binary when new build starts
+  stop_on_root = false
+  # Send interrupt signal before killing process
+  send_interrupt = false
+  # Delay before sending interrupt (ms)
+  kill_delay = 0
+
+[log]
+  # Show log time
+  time = true
+  # Only show main log (silences build logs)
+  main_only = false
+
+[color]
+  # Customize colors
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  # Clean up tmp directory on exit
+  clean_on_exit = false
+
+[screen]
+  clear_on_rebuild = false
+  keep_scroll = true
