@@ -59,7 +59,7 @@ export function CreateProductModal({
 		},
 		onSuccess: (result) => {
 			onOpenChange(false);
-			onSuccess?.((result as unknown as { productId: string }).productId ?? "");
+			onSuccess?.(result.productId ?? "");
 		},
 	});
 

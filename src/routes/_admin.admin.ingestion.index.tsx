@@ -41,58 +41,35 @@ export const Route = createFileRoute("/_admin/admin/ingestion/" as any)({
 type TimeRange = "24h" | "7d" | "30d";
 type RunStatus = "pending" | "running" | "completed" | "failed";
 
-// Types for Go service responses
-interface IngestionStats {
-	timeRange: "24h" | "7d" | "30d";
-	runs: {
-		total: number;
-		pending: number;
-		running: number;
-		completed: number;
-		failed: number;
-	};
-	files: {
-		total: number;
-		processed: number;
-	};
-	entries: {
-		total: number;
-		processed: number;
-	};
-	errors: {
-		total: number;
-		byType: Record<string, number>;
-		bySeverity: Record<string, number>;
-	};
-}
-
-interface IngestionRun {
-	id: string;
-	chainSlug: string;
-	status: string;
-	source: string;
-	totalFiles: number | null;
-	processedFiles: number | null;
-	totalEntries: number | null;
-	processedEntries: number | null;
-	errorCount: number | null;
-	startedAt: Date | null;
-	completedAt: Date | null;
-	metadata: string | null;
-	parentRunId: string | null;
-	rerunType: string | null;
-	rerunTargetId: string | null;
-	createdAt: Date | null;
-}
-
-interface RunsResponse {
-	runs?: IngestionRun[];
-	total?: number;
-}
+// Import types from Go service SDK
+import type { HandlersIngestionRun } from "@/lib/go-api";
+import type { IngestionRun } from "@/components/admin/ingestion";
 
 interface TriggerResponse {
 	runId: string;
 	status: string;
+}
+
+// Map SDK response to component's expected interface
+function mapToIngestionRun(run: HandlersIngestionRun): IngestionRun {
+	return {
+		id: run.id ?? "",
+		chainSlug: run.chainSlug ?? "",
+		source: run.source ?? "",
+		status: run.status ?? "pending",
+		startedAt: run.startedAt ? new Date(run.startedAt) : null,
+		completedAt: run.completedAt ? new Date(run.completedAt) : null,
+		totalFiles: run.totalFiles ?? null,
+		processedFiles: run.processedFiles ?? null,
+		totalEntries: run.totalEntries ?? null,
+		processedEntries: run.processedEntries ?? null,
+		errorCount: run.errorCount ?? null,
+		metadata: run.metadata ?? null,
+		parentRunId: null, // Not in SDK response
+		rerunType: null, // Not in SDK response
+		rerunTargetId: null, // Not in SDK response
+		createdAt: run.createdAt ? new Date(run.createdAt) : null,
+	};
 }
 
 const CHAINS = [
@@ -153,9 +130,9 @@ function IngestionDashboard() {
 		},
 	});
 
-	// Extract data from responses (SDK returns data directly, not wrapped)
-	const stats = statsResponse as IngestionStats | undefined;
-	const runsData = runsResponse as RunsResponse | null;
+	// Extract data from responses - now properly typed from ORPC handlers
+	const stats = statsResponse;
+	const runsData = runsResponse;
 
 	// Compute active status for UI indicator
 	const hasActiveRuns = runsData?.runs?.some(
@@ -246,7 +223,7 @@ function IngestionDashboard() {
 				<IngestionStatsCards stats={stats} isLoading={statsLoading} />
 
 				{/* Error Categories */}
-				{stats && stats.errors.total > 0 && (
+				{stats && (stats.errors?.total ?? 0) > 0 && (
 					<ErrorCategoryView errors={stats.errors} isLoading={statsLoading} />
 				)}
 
@@ -306,7 +283,7 @@ function IngestionDashboard() {
 					</CardHeader>
 					<CardContent>
 						<IngestionRunList
-							runs={runsData?.runs ?? []}
+							runs={(runsData?.runs ?? []).map(mapToIngestionRun)}
 							isLoading={runsLoading}
 							onDelete={(runId) => deleteMutation.mutate(runId)}
 							deletingRunId={

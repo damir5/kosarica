@@ -34,7 +34,7 @@ export function ProductSearch({
 		enabled: query.length >= minLength,
 	});
 
-	const products = (results as unknown as Product[]) ?? [];
+	const products = results ?? [];
 
 	return (
 		<div className="space-y-4">

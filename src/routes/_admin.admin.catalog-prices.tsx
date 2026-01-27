@@ -2,10 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, DollarSign, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import {
-	type CatalogPriceRow,
-	CatalogPricesTable,
-} from "@/components/admin/CatalogPricesTable";
+import { CatalogPricesTable } from "@/components/admin/CatalogPricesTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -331,7 +328,7 @@ function CatalogPricesPage() {
 				{/* Table */}
 				{data && !isLoading && (
 					<>
-						<CatalogPricesTable prices={data.prices.map(p => ({ ...p, id: String(p.id) })) as CatalogPriceRow[]} />
+						<CatalogPricesTable prices={data.prices} />
 
 						{/* Pagination */}
 						<div className="mt-4 flex items-center justify-between">

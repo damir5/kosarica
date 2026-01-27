@@ -20,30 +20,20 @@ import {
 } from "@/components/ui/select";
 import { orpc } from "@/orpc/client";
 
-type PendingStore = {
-	id: string;
-	chainSlug: string;
-	name: string;
-	address: string | null;
-	city: string | null;
-	postalCode: string | null;
-	latitude: string | null;
-	longitude: string | null;
-	isVirtual: boolean | null;
-	priceSourceStoreId: string | null;
-	status: string | null;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-};
-
 type TargetStore = {
 	id: string;
 	name: string;
 	updatedAt: Date | null;
 };
 
+// Accept any store-like object with required fields for display and merge
 interface StoreMergeModalProps {
-	store: PendingStore | null;
+	store: {
+		id: string;
+		name: string;
+		chainSlug: string;
+		updatedAt: Date | null;
+	} | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onConfirm: (

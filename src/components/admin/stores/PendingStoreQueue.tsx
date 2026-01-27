@@ -4,7 +4,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PendingStoreCard } from "./PendingStoreCard";
 import type { PendingStoreSortOption } from "./PendingStoresFilters";
 
-export type PendingStore = {
+/**
+ * Base store fields used across store-related components.
+ * This interface matches the shape returned by ORPC store queries.
+ */
+export interface PendingStore {
 	id: string;
 	chainSlug: string;
 	name: string;
@@ -18,7 +22,11 @@ export type PendingStore = {
 	status: string | null;
 	createdAt: Date | null;
 	updatedAt: Date | null;
-};
+	// Fields from ORPC getPending response (may be null for non-approved stores)
+	approvalNotes: string | null;
+	approvedBy: string | null;
+	approvedAt: Date | null;
+}
 
 interface PendingStoreQueueProps {
 	stores: PendingStore[];

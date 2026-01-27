@@ -18,32 +18,14 @@ export const Route = createFileRoute("/_admin/admin/stores/$storeId")({
 	component: StoreDetailPage,
 });
 
-type StoreData = {
-	id: string;
-	chainSlug: string;
-	name: string;
-	address: string | null;
-	city: string | null;
-	postalCode: string | null;
-	latitude: string | null;
-	longitude: string | null;
-	isVirtual: boolean | null;
-	priceSourceStoreId: string | null;
-	status: string | null;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-};
-
 function StoreDetailPage() {
 	const { storeId } = Route.useParams();
 
-	const { data, isLoading, error } = useQuery(
+	const { data: store, isLoading, error } = useQuery(
 		orpc.admin.stores.get.queryOptions({
 			input: { storeId },
 		}),
 	);
-
-	const store = data as StoreData | undefined;
 
 	if (isLoading) {
 		return (

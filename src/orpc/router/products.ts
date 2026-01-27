@@ -36,6 +36,46 @@ const resolveSuspiciousSchema = z.object({
 	notes: z.string().optional(),
 });
 
+// Types for getPendingMatches response
+interface RetailerItemData {
+	id: string;
+	name: string;
+	barcode: string;
+	brand: string;
+	unit: string;
+	unitQuantity: string;
+	imageUrl: string;
+	chainName: string;
+	chainSlug: string;
+}
+
+interface ProductCandidateData {
+	candidateProductId: string;
+	similarity: string;
+	rank: number;
+	matchType: string;
+	flags: string | null;
+	product: {
+		id: string;
+		name: string;
+		brand: string | null;
+		category: string | null;
+		imageUrl: string | null;
+	};
+}
+
+interface QueueItemData {
+	id: string;
+	status: string;
+	decision: string | null;
+	linkedProductId: string | null;
+	reviewNotes: string | null;
+	created_at: string;
+	version: number;
+	retailer_item: RetailerItemData;
+	candidates: ProductCandidateData[];
+}
+
 // Get pending matches with candidates for review
 // Uses set-based query with JSON aggregation to avoid N+1
 export const getPendingMatches = superadminProcedure
@@ -67,8 +107,8 @@ export const getPendingMatches = superadminProcedure
 					q.id,
 					q.status,
 					q.decision,
-					q.linked_product_id,
-					q.review_notes,
+					q.linked_product_id AS "linkedProductId",
+					q.review_notes AS "reviewNotes",
 					q.created_at,
 					q.version,
 					jsonb_build_object(
@@ -118,7 +158,7 @@ export const getPendingMatches = superadminProcedure
 			`,
 		);
 
-		const rows: any[] = (result as any).rows ?? [];
+		const rows = ((result as { rows?: unknown[] }).rows ?? []) as QueueItemData[];
 
 		// Check if there are more results
 		const hasMore = rows.length > input.limit;
@@ -443,7 +483,7 @@ export const searchProducts = superadminProcedure
 					p.name,
 					p.brand,
 					p.category,
-					p.image_url,
+					p.image_url AS "imageUrl",
 					similarity(lower(p.name), lower(${input.query})) as sim_score
 				FROM products p
 				WHERE similarity(lower(p.name), lower(${input.query})) > 0.1
@@ -452,8 +492,15 @@ export const searchProducts = superadminProcedure
 			`,
 		);
 
-		const rows: any[] = (searchResult as any).rows ?? [];
-		return rows;
+		const rows = (searchResult as { rows?: unknown[] }).rows ?? [];
+		return rows as Array<{
+			id: string;
+			name: string;
+			brand: string | null;
+			category: string | null;
+			imageUrl: string | null;
+			sim_score: number;
+		}>;
 	});
 
 // Get matching statistics

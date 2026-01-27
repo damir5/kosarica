@@ -42,53 +42,6 @@ import { StoreLocationMap } from "./StoreLocationMap";
 import { StoreStatusBadge } from "./StoreStatusBadge";
 import { VerifyLocationModal } from "./VerifyLocationModal";
 
-type StoreDetail = {
-	id: string;
-	chainSlug: string;
-	name: string;
-	address: string | null;
-	city: string | null;
-	postalCode: string | null;
-	latitude: string | null;
-	longitude: string | null;
-	isVirtual: boolean | null;
-	priceSourceStoreId: string | null;
-	status: string | null;
-	approvalNotes: string | null;
-	approvedBy: string | null;
-	approvedAt: Date | null;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-};
-
-type EnrichmentTaskData = {
-	id: string;
-	storeId: string;
-	type: "geocode" | "verify_address" | "ai_categorize";
-	status: "pending" | "processing" | "completed" | "failed";
-	inputData: string | null;
-	outputData: string | null;
-	confidence: string | null;
-	verifiedBy: string | null;
-	verifiedAt: Date | null;
-	errorMessage: string | null;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-};
-
-type SimilarStore = {
-	id: string;
-	name: string;
-	address: string | null;
-	city: string | null;
-};
-
-type LinkedStore = {
-	id: string;
-	name: string;
-	address: string | null;
-	city: string | null;
-};
 
 interface StoreDetailDrawerProps {
 	storeId: string | null;
@@ -130,22 +83,20 @@ export function StoreDetailDrawer({
 	const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 	const [isConflictError, setIsConflictError] = useState(false);
 
-	// Fetch store detail - use any type to avoid oRPC type issues
+	// Fetch store detail
 	const { data: detailData, isLoading: isLoadingDetail } = useQuery({
 		queryKey: ["admin", "stores", "getDetail", storeId],
 		queryFn: async () => {
 			if (!storeId) return null;
-			return orpc.admin.stores.getDetail.call({ storeId }) as any;
+			return orpc.admin.stores.getDetail.call({ storeId });
 		},
 		enabled: !!storeId && open,
 	});
 
-	const store = detailData?.store as StoreDetail | undefined;
-	const enrichmentTasks = (detailData?.enrichmentTasks ||
-		[]) as EnrichmentTaskData[];
-	const linkedPhysicalStores = (detailData?.linkedPhysicalStores ||
-		[]) as LinkedStore[];
-	const similarStores = (detailData?.similarStores || []) as SimilarStore[];
+	const store = detailData?.store;
+	const enrichmentTasks = detailData?.enrichmentTasks ?? [];
+	const linkedPhysicalStores = detailData?.linkedPhysicalStores ?? [];
+	const similarStores = detailData?.similarStores ?? [];
 
 	// Verify enrichment mutation
 	const verifyMutation = useMutation({

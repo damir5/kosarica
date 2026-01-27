@@ -1,89 +1,57 @@
 /**
  * Job Scheduler for Ingestion Pipeline
  *
- * Uses Bree for scheduling background jobs. Replaces Cloudflare Queues
- * with direct function calls for a single-server Node.js deployment.
+ * Uses node-cron for scheduling background jobs.
+ * Runs in the main process - works with Vite bundling.
  */
 
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import Bree from "bree";
+import cron from "node-cron";
+import { runDailyIngestion } from "./workers/daily-ingestion";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("scheduler");
 
-// Get directory of this file for worker paths
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-let bree: Bree | null = null;
+let scheduledTask: cron.ScheduledTask | null = null;
 
 /**
  * Initialize and start the job scheduler.
  *
- * Jobs are defined with cron schedules and run as worker threads.
- * For development, jobs can also be triggered manually via API.
+ * Jobs run in the main process. For development, jobs can
+ * also be triggered manually via API.
  */
-export async function startScheduler(): Promise<void> {
-	if (bree) {
+export function startScheduler(): void {
+	if (scheduledTask) {
 		log.warn("Scheduler already running");
 		return;
 	}
 
-	const workerPath = path.join(__dirname, "workers");
-
-	bree = new Bree({
-		root: workerPath,
-		// Disable default error handler as we handle errors ourselves
-		hasSeconds: false,
-		jobs: [
-			{
-				name: "daily-ingestion",
-				// Run at 6 AM every day (Croatian time is typically UTC+1 or UTC+2)
-				cron: "0 6 * * *",
-				// Also allow manual triggering
-			},
-		],
-		workerMessageHandler: (metadata) => {
-			log.info("Worker message received", {
-				name: metadata.name,
-				message: metadata.message,
-			});
-		},
-		errorHandler: (error: unknown, workerMetadata) => {
-			log.error("Worker error", {
-				name: workerMetadata.name,
+	// Run at 6 AM every day (Croatian time is typically UTC+1 or UTC+2)
+	scheduledTask = cron.schedule("0 6 * * *", async () => {
+		log.info("Starting scheduled daily ingestion");
+		try {
+			const result = await runDailyIngestion();
+			log.info("Scheduled ingestion completed", { ...result });
+		} catch (error) {
+			log.error("Scheduled ingestion failed", {
 				error: error instanceof Error ? error.message : String(error),
 			});
-		},
+		}
 	});
 
-	// Handle job start/stop events
-	bree.on("worker created", (name) => {
-		log.info("Worker created", { name });
-	});
-
-	bree.on("worker deleted", (name) => {
-		log.info("Worker deleted", { name });
-	});
-
-	await bree.start();
-	log.info("Scheduler started", {
-		jobs: bree.config.jobs.map((j) => (typeof j === "string" ? j : j.name)),
-	});
+	log.info("Scheduler started", { jobs: ["daily-ingestion"] });
 }
 
 /**
  * Stop the job scheduler gracefully.
  */
-export async function stopScheduler(): Promise<void> {
-	if (!bree) {
+export function stopScheduler(): void {
+	if (!scheduledTask) {
 		return;
 	}
 
 	log.info("Stopping scheduler...");
-	await bree.stop();
-	bree = null;
+	scheduledTask.stop();
+	scheduledTask = null;
 	log.info("Scheduler stopped");
 }
 
@@ -94,17 +62,19 @@ export async function stopScheduler(): Promise<void> {
  * @param jobName - Name of the job to run
  */
 export async function runJob(jobName: string): Promise<void> {
-	if (!bree) {
-		throw new Error("Scheduler not running");
-	}
-
 	log.info("Manually triggering job", { jobName });
-	await bree.run(jobName);
+
+	if (jobName === "daily-ingestion") {
+		const result = await runDailyIngestion();
+		log.info("Manual job completed", { jobName, ...result });
+	} else {
+		throw new Error(`Unknown job: ${jobName}`);
+	}
 }
 
 /**
  * Check if the scheduler is running.
  */
 export function isSchedulerRunning(): boolean {
-	return bree !== null;
+	return scheduledTask !== null;
 }

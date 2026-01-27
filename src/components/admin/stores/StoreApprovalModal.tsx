@@ -19,24 +19,14 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
-type PendingStore = {
-	id: string;
-	chainSlug: string;
-	name: string;
-	address: string | null;
-	city: string | null;
-	postalCode: string | null;
-	latitude: string | null;
-	longitude: string | null;
-	isVirtual: boolean | null;
-	priceSourceStoreId: string | null;
-	status: string | null;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-};
-
+// Accept any store-like object with required fields for display
 interface StoreApprovalModalProps {
-	store: PendingStore | null;
+	store: {
+		id: string;
+		name: string;
+		chainSlug: string;
+		updatedAt: Date | null;
+	} | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onConfirm: (notes?: string) => Promise<void>;

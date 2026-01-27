@@ -1,18 +1,27 @@
 /**
  * Daily Ingestion Worker
  *
- * Bree worker that triggers ingestion for all configured chains via the Go service.
+ * Triggers ingestion for all configured chains via the Go service.
  * The Go service handles the actual ingestion asynchronously.
- * Executed via cron schedule (6 AM daily) or manual trigger.
+ * Can be called via cron schedule (6 AM daily) or manual trigger.
  */
 
-import { parentPort } from "node:worker_threads";
 import { goFetch } from "@/lib/go-service-client";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("daily-ingestion");
 
-async function main(): Promise<void> {
+export interface DailyIngestionResult {
+	totalChains: number;
+	successful: number;
+	failed: number;
+}
+
+/**
+ * Run daily ingestion for all chains.
+ * Fetches chain list from Go service and triggers ingestion for each.
+ */
+export async function runDailyIngestion(): Promise<DailyIngestionResult> {
 	log.info("Starting daily ingestion job");
 
 	// Fetch chains dynamically from Go service
@@ -70,24 +79,13 @@ async function main(): Promise<void> {
 		}
 	}
 
-	const summary = {
+	const summary: DailyIngestionResult = {
 		totalChains: chains.length,
 		successful,
 		failed,
 	};
 
-	log.info("Daily ingestion triggers completed", summary);
+	log.info("Daily ingestion triggers completed", { ...summary });
 
-	// Send completion message to parent
-	if (parentPort) {
-		parentPort.postMessage({
-			type: "completed",
-			summary,
-		});
-	}
+	return summary;
 }
-
-main().catch((error) => {
-	console.error("Unexpected error in daily ingestion worker:", error);
-	process.exit(1);
-});

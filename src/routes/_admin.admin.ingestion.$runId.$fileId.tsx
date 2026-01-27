@@ -38,55 +38,56 @@ export const Route = createFileRoute("/_admin/admin/ingestion/$runId/$fileId")({
 
 type ChunkStatus = "pending" | "processing" | "completed" | "failed";
 
-// Types for Go service responses
+// Types for Go service responses (not in OpenAPI spec - using goFetchWithRetry)
+// All date fields are ISO strings from the API, converted to Date when needed
 interface FileData {
-	id: string;
-	filename: string;
-	fileType: string;
-	fileSize: number | null;
-	fileHash: string | null;
-	status: string;
-	entryCount: number | null;
-	totalChunks: number | null;
-	processedChunks: number | null;
-	chunkSize: number | null;
-	createdAt: Date | null;
-	processedAt: Date | null;
+	id?: string;
+	filename?: string;
+	fileType?: string;
+	fileSize?: number | null;
+	fileHash?: string | null;
+	status?: string;
+	entryCount?: number | null;
+	totalChunks?: number | null;
+	processedChunks?: number | null;
+	chunkSize?: number | null;
+	createdAt?: string | null;
+	processedAt?: string | null;
 }
 
 interface ChunkData {
-	id: string;
-	fileId: string;
-	chunkIndex: number;
-	startRow: number;
-	endRow: number;
-	rowCount: number;
-	status: string;
-	r2Key: string | null;
-	persistedCount: number | null;
-	errorCount: number | null;
-	processedAt: Date | null;
-	createdAt: Date | null;
+	id?: string;
+	fileId?: string;
+	chunkIndex?: number;
+	startRow?: number;
+	endRow?: number;
+	rowCount?: number;
+	status?: string;
+	r2Key?: string | null;
+	persistedCount?: number | null;
+	errorCount?: number | null;
+	processedAt?: string | null;
+	createdAt?: string | null;
 }
 
 interface ChunksResponse {
-	chunks: ChunkData[];
-	total: number;
-	totalPages: number;
+	chunks?: ChunkData[];
+	total?: number;
+	totalPages?: number;
 }
 
 interface ErrorData {
-	id: string;
-	errorType: string;
-	errorMessage: string;
-	severity: string;
-	chunkId: string | null;
-	createdAt: Date | null;
+	id?: string;
+	errorType?: string;
+	errorMessage?: string;
+	severity?: string;
+	chunkId?: string | null;
+	createdAt?: string | null;
 }
 
 interface ErrorsResponse {
-	errors: ErrorData[];
-	total: number;
+	errors?: ErrorData[];
+	total?: number;
 }
 
 const STATUS_ICONS = {
@@ -189,12 +190,12 @@ function FileDetailPage() {
 		},
 	});
 
-	const formatDate = (date: Date | null) => {
+	const formatDate = (date: string | null | undefined) => {
 		if (!date) return "N/A";
 		return new Date(date).toLocaleString();
 	};
 
-	const formatFileSize = (bytes: number | null) => {
+	const formatFileSize = (bytes: number | null | undefined) => {
 		if (bytes === null || bytes === undefined) return "Unknown";
 		if (bytes < 1024) return `${bytes} B`;
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -265,9 +266,9 @@ function FileDetailPage() {
 						</div>
 						<div className="flex items-center gap-2">
 							<span
-								className={`px-2 py-1 rounded text-xs font-medium ${FILE_TYPE_COLORS[file.fileType.toLowerCase()] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"}`}
+								className={`px-2 py-1 rounded text-xs font-medium ${FILE_TYPE_COLORS[(file.fileType ?? "").toLowerCase()] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"}`}
 							>
-								{file.fileType.toUpperCase()}
+								{(file.fileType ?? "").toUpperCase()}
 							</span>
 							<Badge
 								variant={
@@ -425,7 +426,7 @@ function FileDetailPage() {
 				</Card>
 
 				{/* Recent Errors */}
-				{errorsData && errorsData.errors.length > 0 && (
+				{errorsData && (errorsData.errors?.length ?? 0) > 0 && (
 					<Card className="border-destructive/50">
 						<CardHeader>
 							<CardTitle className="flex items-center gap-2 text-destructive">
@@ -438,7 +439,7 @@ function FileDetailPage() {
 						</CardHeader>
 						<CardContent>
 							<div className="space-y-3">
-								{errorsData.errors.map((error) => (
+								{(errorsData.errors ?? []).map((error) => (
 									<div
 										key={error.id}
 										className="p-3 rounded-lg border bg-destructive/5 border-destructive/20"
@@ -515,7 +516,20 @@ function FileDetailPage() {
 					</CardHeader>
 					<CardContent>
 						<IngestionChunkList
-							chunks={chunksData?.chunks ?? []}
+							chunks={(chunksData?.chunks ?? []).map((c) => ({
+								id: c.id ?? "",
+								fileId: c.fileId ?? "",
+								chunkIndex: c.chunkIndex ?? 0,
+								startRow: c.startRow ?? 0,
+								endRow: c.endRow ?? 0,
+								rowCount: c.rowCount ?? 0,
+								status: c.status ?? "pending",
+								r2Key: c.r2Key ?? null,
+								persistedCount: c.persistedCount ?? null,
+								errorCount: c.errorCount ?? null,
+								processedAt: c.processedAt ? new Date(c.processedAt) : null,
+								createdAt: c.createdAt ? new Date(c.createdAt) : null,
+							}))}
 							isLoading={chunksLoading}
 							onRerunChunk={(chunkId) => rerunChunkMutation.mutate(chunkId)}
 							isRerunning={rerunChunkMutation.isPending}
@@ -523,12 +537,12 @@ function FileDetailPage() {
 						/>
 
 						{/* Pagination */}
-						{chunksData && chunksData.totalPages > 1 && (
+						{chunksData && (chunksData.totalPages ?? 0) > 1 && (
 							<div className="mt-4 flex items-center justify-between">
 								<p className="text-sm text-muted-foreground">
 									Showing {(page - 1) * pageSize + 1} to{" "}
-									{Math.min(page * pageSize, chunksData.total)} of{" "}
-									{chunksData.total} chunks
+									{Math.min(page * pageSize, chunksData.total ?? 0)} of{" "}
+									{chunksData.total ?? 0} chunks
 								</p>
 								<div className="flex items-center gap-2">
 									<Button
@@ -541,13 +555,13 @@ function FileDetailPage() {
 										Previous
 									</Button>
 									<span className="text-sm">
-										Page {page} of {chunksData.totalPages}
+										Page {page} of {chunksData.totalPages ?? 1}
 									</span>
 									<Button
 										variant="outline"
 										size="sm"
 										onClick={() => setPage((p) => p + 1)}
-										disabled={page >= chunksData.totalPages}
+										disabled={page >= (chunksData.totalPages ?? 1)}
 									>
 										Next
 										<ChevronRight className="h-4 w-4" />

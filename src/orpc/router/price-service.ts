@@ -132,30 +132,94 @@ export const listErrors = procedure
 		return unwrapSdkResponse<HandlersListErrorsResponse>(result);
 	});
 
+// Type for transformed stats response matching frontend expectations
+export interface IngestionStats {
+	timeRange: "24h" | "7d" | "30d";
+	runs: {
+		total: number;
+		pending: number;
+		running: number;
+		completed: number;
+		failed: number;
+	};
+	files: {
+		total: number;
+		processed: number;
+	};
+	entries: {
+		total: number;
+		processed: number;
+	};
+	errors: {
+		total: number;
+		byType: Record<string, number>;
+		bySeverity: Record<string, number>;
+	};
+}
+
+const TIME_RANGE_MS = {
+	"24h": 24 * 60 * 60 * 1000,
+	"7d": 7 * 24 * 60 * 60 * 1000,
+	"30d": 30 * 24 * 60 * 60 * 1000,
+} as const;
+
 /**
  * Get ingestion statistics
  * GET /internal/ingestion/stats?from=&to=
+ *
+ * Accepts timeRange (24h/7d/30d) and transforms the buckets response
+ * into a flat structure matching the frontend's IngestionStats interface.
  */
 export const getStats = procedure
 	.input(
 		z
 			.object({
-				from: z.string().optional(), // ISO date string
-				to: z.string().optional(), // ISO date string
+				timeRange: z.enum(["24h", "7d", "30d"]).default("24h"),
 			})
 			.optional(),
 	)
-	.handler(async ({ input = {} }) => {
-		// The SDK requires from/to - provide defaults if not specified
+	.handler(async ({ input = {} }): Promise<IngestionStats> => {
+		const timeRange = input.timeRange ?? "24h";
 		const now = new Date();
-		const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+		const from = new Date(now.getTime() - TIME_RANGE_MS[timeRange]);
+
 		const result = await getInternalIngestionStats({
 			query: {
-				from: input.from ?? thirtyDaysAgo.toISOString(),
-				to: input.to ?? now.toISOString(),
+				from: from.toISOString(),
+				to: now.toISOString(),
 			},
 		});
-		return unwrapSdkResponse<HandlersGetStatsResponse>(result);
+		const response = unwrapSdkResponse<HandlersGetStatsResponse>(result);
+
+		// Find the matching bucket or use the first one
+		const bucket =
+			response.buckets?.find((b) => b.label === timeRange) ??
+			response.buckets?.[0];
+
+		// Transform buckets response to flat IngestionStats structure
+		return {
+			timeRange,
+			runs: {
+				total: bucket?.totalRuns ?? 0,
+				pending: bucket?.pending ?? 0,
+				running: bucket?.running ?? 0,
+				completed: bucket?.completed ?? 0,
+				failed: bucket?.failed ?? 0,
+			},
+			files: {
+				total: bucket?.totalFiles ?? 0,
+				processed: bucket?.totalFiles ?? 0, // API doesn't distinguish processed
+			},
+			entries: {
+				total: 0, // Not provided by API
+				processed: 0,
+			},
+			errors: {
+				total: bucket?.totalErrors ?? 0,
+				byType: {}, // Not provided by bucket API
+				bySeverity: {},
+			},
+		};
 	});
 
 // ============================================================================

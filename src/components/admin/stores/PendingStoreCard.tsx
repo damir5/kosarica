@@ -9,23 +9,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import type { PendingStore } from "./PendingStoreQueue";
 import { StoreStatusBadge } from "./StoreStatusBadge";
-
-type PendingStore = {
-	id: string;
-	chainSlug: string;
-	name: string;
-	address: string | null;
-	city: string | null;
-	postalCode: string | null;
-	latitude: string | null;
-	longitude: string | null;
-	isVirtual: boolean | null;
-	priceSourceStoreId: string | null;
-	status: string | null;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-};
 
 interface PendingStoreCardProps {
 	index: number;

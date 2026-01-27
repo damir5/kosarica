@@ -8,44 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/orpc";
 
-interface RetailerItem {
-	id: string;
-	name: string;
-	barcode: string;
-	brand: string;
-	unit: string;
-	unitQuantity: string;
-	imageUrl: string;
-	chainName: string;
-	chainSlug: string;
-}
-
-interface ProductCandidate {
-	candidateProductId: string;
-	similarity: string;
-	rank: number;
-	matchType: string;
-	flags: string | null;
-	product: {
-		id: string;
-		name: string;
-		brand: string | null;
-		category: string | null;
-		imageUrl: string | null;
-	};
-}
-
-interface QueueItem {
-	id: string;
-	status: string;
-	decision: string | null;
-	linkedProductId: string | null;
-	reviewNotes: string | null;
-	created_at: string;
-	version: number;
-	retailer_item: RetailerItem;
-	candidates: ProductCandidate[];
-}
+// Infer types from ORPC handler response
+type PendingMatchesResponse = Awaited<
+	ReturnType<typeof orpc.admin.products.getPendingMatches.call>
+>;
+type QueueItem = PendingMatchesResponse["items"][number];
 
 interface MatchReviewCardProps {
 	item: QueueItem;

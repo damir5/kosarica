@@ -98,8 +98,14 @@ export const listCatalogPrices = procedure
 
 		const total = totalResult[0]?.count ?? 0;
 
+		// Transform bigint ids to strings for JSON serialization
+		const transformedPrices = prices.map((p) => ({
+			...p,
+			id: String(p.id),
+		}));
+
 		return {
-			prices,
+			prices: transformedPrices,
 			total,
 			page: input.page,
 			pageSize: input.pageSize,

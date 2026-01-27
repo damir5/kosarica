@@ -18,22 +18,10 @@ export const Route = createFileRoute("/_admin/admin/stores/pending")({
 	component: PendingStoresPage,
 });
 
-// Type imported from PendingStoreQueue
-type PendingStore = {
-	id: string;
-	chainSlug: string;
-	name: string;
-	address: string | null;
-	city: string | null;
-	postalCode: string | null;
-	latitude: string | null;
-	longitude: string | null;
-	isVirtual: boolean | null;
-	priceSourceStoreId: string | null;
-	status: string | null;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-};
+// Use ORPC inferred type for PendingStore
+type PendingStore = NonNullable<
+	Awaited<ReturnType<typeof orpc.admin.stores.getPending.call>>
+>["stores"][number];
 
 function PendingStoresPage() {
 	const queryClient = useQueryClient();
@@ -169,7 +157,7 @@ function PendingStoresPage() {
 	});
 
 	// Process stores: filter, sort, paginate
-	const allStores = (data?.stores ?? []) as PendingStore[];
+	const allStores = data?.stores ?? [];
 
 	const processedStores = useMemo(() => {
 		let result = [...allStores];

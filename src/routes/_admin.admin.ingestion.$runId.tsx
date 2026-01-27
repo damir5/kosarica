@@ -36,63 +36,6 @@ export const Route = createFileRoute("/_admin/admin/ingestion/$runId")({
 	component: RunDetailPage,
 });
 
-// Types for Go service responses (matching SDK HandlersIngestionRun)
-interface RunData {
-	id?: string;
-	chainSlug?: string;
-	status?: string;
-	source?: string;
-	totalFiles?: number | null;
-	processedFiles?: number | null;
-	totalEntries?: number | null;
-	processedEntries?: number | null;
-	errorCount?: number | null;
-	startedAt?: string | null;
-	completedAt?: string | null;
-	createdAt?: string | null;
-	metadata?: string | null;
-}
-
-interface FileData {
-	id?: string;
-	runId?: string;
-	filename?: string;
-	fileType?: string;
-	fileSize?: number | null;
-	fileHash?: string | null;
-	status?: string;
-	entryCount?: number | null;
-	processedAt?: string | null;
-	metadata?: string | null;
-	totalChunks?: number | null;
-	processedChunks?: number | null;
-	chunkSize?: number | null;
-	createdAt?: string | null;
-}
-
-interface FilesResponse {
-	files?: FileData[];
-	total?: number;
-}
-
-interface ErrorData {
-	id?: string;
-	errorType?: string;
-	errorMessage?: string;
-	severity?: string;
-	fileId?: string | null;
-	chunkId?: string | null;
-	entryId?: string | null;
-	runId?: string | null;
-	errorDetails?: string | null;
-	createdAt?: string | null;
-}
-
-interface ErrorsResponse {
-	errors?: ErrorData[];
-	total?: number;
-}
-
 const STATUS_ICONS = {
 	pending: Clock,
 	running: Loader2,
@@ -149,10 +92,10 @@ function RunDetailPage() {
 		}),
 	);
 
-	// Extract data from responses (handlers now return unwrapped data directly)
-	const run = runResponse as RunData | null;
-	const filesData = filesResponse as FilesResponse | null;
-	const errorsData = errorsResponse as ErrorsResponse | null;
+	// Extract data from responses - now properly typed from ORPC handlers
+	const run = runResponse;
+	const filesData = filesResponse;
+	const errorsData = errorsResponse;
 
 	const [rerunningFileId, setRerunningFileId] = useState<string | null>(null);
 

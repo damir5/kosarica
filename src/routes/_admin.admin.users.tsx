@@ -223,7 +223,7 @@ function UsersPage() {
 				{data && !isLoading && (
 					<>
 						<UserTable
-							users={data.users as User[]}
+							users={data.users}
 							currentUserId={session?.user?.id || ""}
 							onViewUser={(user) => handleOpenModal(user, "view")}
 							onEditRole={(user) => handleOpenModal(user, "edit")}

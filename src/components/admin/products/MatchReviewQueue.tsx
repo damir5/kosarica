@@ -8,50 +8,6 @@ import { orpc } from "@/orpc";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { MatchReviewCard } from "./MatchReviewCard";
 
-interface RetailerItem {
-	id: string;
-	name: string;
-	barcode: string;
-	brand: string;
-	unit: string;
-	unitQuantity: string;
-	imageUrl: string;
-	chainName: string;
-	chainSlug: string;
-}
-
-interface ProductCandidate {
-	candidateProductId: string;
-	similarity: string;
-	rank: number;
-	matchType: string;
-	flags: string | null;
-	product: {
-		id: string;
-		name: string;
-		brand: string | null;
-		category: string | null;
-		imageUrl: string | null;
-	};
-}
-
-interface QueueItem {
-	id: string;
-	status: string;
-	decision: string | null;
-	linkedProductId: string | null;
-	reviewNotes: string | null;
-	created_at: string;
-	version: number;
-	retailer_item: RetailerItem;
-	candidates: ProductCandidate[];
-}
-
-interface MatchReviewQueueResponse {
-	items: QueueItem[];
-	nextCursor: string | undefined;
-	hasMore: boolean;
-}
 
 export function MatchReviewQueue() {
 	const queryClient = useQueryClient();
@@ -64,13 +20,11 @@ export function MatchReviewQueue() {
 		refetch,
 	} = useQuery({
 		queryKey: ["admin", "products", "pendingMatches", cursor],
-		queryFn: async () => {
-			const result = await orpc.admin.products.getPendingMatches.call({
+		queryFn: () =>
+			orpc.admin.products.getPendingMatches.call({
 				limit: 20,
 				cursor,
-			});
-			return result as MatchReviewQueueResponse;
-		},
+			}),
 	});
 
 	const { data: count } = useQuery({
