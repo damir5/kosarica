@@ -202,6 +202,35 @@ export const retailerItems = pgTable(
 	(table) => ({
 		barcodeIdx: index("retailer_item_barcodes_barcode_idx").on(table.barcode),
 		archiveIdIdx: index("idx_retailer_items_archive_id").on(table.archiveId),
+		// Unique index for finding items by chain and external ID
+		chainExternalIdUnique: uniqueIndex(
+			"retailer_items_chain_slug_external_id_unique",
+		).on(table.chainSlug, table.externalId),
+	}),
+);
+
+export const retailerItemBarcodes = pgTable(
+	"retailer_item_barcodes",
+	{
+		id: cuid2("rib").primaryKey(),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		barcode: text("barcode").notNull(), // EAN-13, EAN-8, GTIN codes
+		isPrimary: boolean("is_primary").default(false),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => ({
+		retailerItemIdIdx: index("retailer_item_barcodes_retailer_item_id_idx").on(
+			table.retailerItemId,
+		),
+		barcodeIdx: index("retailer_item_barcodes_barcode_new_idx").on(
+			table.barcode,
+		),
+		// Ensure unique barcode per retailer item
+		retailerItemBarcodeUnique: uniqueIndex(
+			"retailer_item_barcodes_item_barcode_unique",
+		).on(table.retailerItemId, table.barcode),
 	}),
 );
 

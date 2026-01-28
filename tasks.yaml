@@ -22,7 +22,7 @@ tasks:
     description: |
       In `src/db/schema.ts`:
       Add unique index on `retailer_items(chain_slug, external_id)`
-    completed: false
+    completed: true
 
   - title: Add unique index on store_item_state(store_id, retailer_item_id)
     description: |

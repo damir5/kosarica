@@ -214,3 +214,14 @@
     - retailer_item_barcodes_item_barcode_unique unique index on (retailerItemId, barcode)
   - Tests exist in src/db/schema/retailer-item-barcodes.test.ts (16 tests covering all columns and constraints)
   - All 16 tests pass, TypeScript type checking passes
+
+- [✓] 2026-01-28 - Phase 1 Task 4: Added unique index on retailer_items(chain_slug, external_id)
+  - Modified src/db/schema.ts: added uniqueIndex to retailerItems table
+  - Index defined as: `chainExternalIdUnique: uniqueIndex("retailer_items_chain_slug_external_id_unique").on(table.chainSlug, table.externalId)`
+  - Extended src/db/schema/retailer-items.test.ts with 5 additional tests verifying:
+    - Unique index on chain_slug and external_id exists
+    - Index is marked as unique
+    - Index has correct 2 columns
+    - Barcode index exists
+    - Archive_id index exists
+  - All 14 tests pass, linting passes on changed files
