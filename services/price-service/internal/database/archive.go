@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 )
 
@@ -39,145 +42,86 @@ type ArchiveFilterOptions struct {
 
 // CreateArchive creates a new archive record in the database
 func CreateArchive(ctx context.Context, archive *Archive) error {
-	pool := Pool()
+	queries := sqlcgen.New(Pool())
 
 	now := time.Now()
 	archive.CreatedAt = now
 	archive.UpdatedAt = now
 
-	query := `
-		INSERT INTO archives (
-			id, chain_slug, source_url, filename, original_format,
-			archive_path, archive_type, content_type, file_size,
-			compressed_size, checksum, downloaded_at, metadata,
-			created_at, updated_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
-		)
-		ON CONFLICT (id) DO UPDATE SET
-			source_url = EXCLUDED.source_url,
-			filename = EXCLUDED.filename,
-			archive_path = EXCLUDED.archive_path,
-			original_format = EXCLUDED.original_format,
-			archive_type = EXCLUDED.archive_type,
-			content_type = EXCLUDED.content_type,
-			file_size = EXCLUDED.file_size,
-			compressed_size = EXCLUDED.compressed_size,
-			checksum = EXCLUDED.checksum,
-			downloaded_at = EXCLUDED.downloaded_at,
-			metadata = EXCLUDED.metadata,
-			updated_at = EXCLUDED.updated_at
-	`
-
-	_, err := pool.Exec(ctx, query,
-		archive.ID, archive.ChainSlug, archive.SourceURL, archive.Filename,
-		archive.OriginalFormat, archive.ArchivePath, archive.ArchiveType,
-		archive.ContentType, archive.FileSize, archive.CompressedSize,
-		archive.Checksum, archive.DownloadedAt, archive.Metadata,
-		archive.CreatedAt, archive.UpdatedAt,
-	)
-
-	return err
+	return queries.UpsertArchive(ctx, sqlcgen.UpsertArchiveParams{
+		ID:             archive.ID,
+		ChainSlug:      archive.ChainSlug,
+		SourceUrl:      archive.SourceURL,
+		Filename:       archive.Filename,
+		OriginalFormat: archive.OriginalFormat,
+		ArchivePath:    archive.ArchivePath,
+		ArchiveType:    archive.ArchiveType,
+		ContentType:    stringPtrToPgText(archive.ContentType),
+		FileSize:       int64PtrToPgInt8(archive.FileSize),
+		CompressedSize: int64PtrToPgInt8(archive.CompressedSize),
+		Checksum:       archive.Checksum,
+		DownloadedAt: pgtype.Timestamptz{
+			Time:  archive.DownloadedAt,
+			Valid: true,
+		},
+		Metadata: stringPtrToBytes(archive.Metadata),
+		CreatedAt: pgtype.Timestamptz{
+			Time:  archive.CreatedAt,
+			Valid: true,
+		},
+		UpdatedAt: pgtype.Timestamptz{
+			Time:  archive.UpdatedAt,
+			Valid: true,
+		},
+	})
 }
 
 // GetArchiveByChecksum looks up an archive by its checksum for deduplication
 func GetArchiveByChecksum(ctx context.Context, checksum string) (*Archive, error) {
-	pool := Pool()
+	queries := sqlcgen.New(Pool())
 
-	query := `
-		SELECT id, chain_slug, source_url, filename, original_format,
-			archive_path, archive_type, content_type, file_size,
-			compressed_size, checksum, downloaded_at, metadata,
-			created_at, updated_at
-		FROM archives
-		WHERE checksum = $1
-		LIMIT 1
-	`
-
-	row := pool.QueryRow(ctx, query, checksum)
-
-	var archive Archive
-	err := row.Scan(
-		&archive.ID, &archive.ChainSlug, &archive.SourceURL, &archive.Filename,
-		&archive.OriginalFormat, &archive.ArchivePath, &archive.ArchiveType,
-		&archive.ContentType, &archive.FileSize, &archive.CompressedSize,
-		&archive.Checksum, &archive.DownloadedAt, &archive.Metadata,
-		&archive.CreatedAt, &archive.UpdatedAt,
-	)
-
+	row, err := queries.GetArchiveByChecksum(ctx, checksum)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, err
+		}
 		return nil, err
 	}
 
-	return &archive, nil
+	return convertSqlcArchive(row), nil
 }
 
 // GetArchiveByID retrieves an archive by its ID
 func GetArchiveByID(ctx context.Context, id string) (*Archive, error) {
-	pool := Pool()
+	queries := sqlcgen.New(Pool())
 
-	query := `
-		SELECT id, chain_slug, source_url, filename, original_format,
-			archive_path, archive_type, content_type, file_size,
-			compressed_size, checksum, downloaded_at, metadata,
-			created_at, updated_at
-		FROM archives
-		WHERE id = $1
-	`
-
-	row := pool.QueryRow(ctx, query, id)
-
-	var archive Archive
-	err := row.Scan(
-		&archive.ID, &archive.ChainSlug, &archive.SourceURL, &archive.Filename,
-		&archive.OriginalFormat, &archive.ArchivePath, &archive.ArchiveType,
-		&archive.ContentType, &archive.FileSize, &archive.CompressedSize,
-		&archive.Checksum, &archive.DownloadedAt, &archive.Metadata,
-		&archive.CreatedAt, &archive.UpdatedAt,
-	)
-
+	row, err := queries.GetArchiveById(ctx, id)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, err
+		}
 		return nil, err
 	}
 
-	return &archive, nil
+	return convertSqlcArchive(row), nil
 }
 
 // GetArchivesByChain retrieves archives for a chain with pagination
 func GetArchivesByChain(ctx context.Context, chainSlug string, limit, offset int) ([]Archive, error) {
-	pool := Pool()
+	queries := sqlcgen.New(Pool())
 
-	query := `
-		SELECT id, chain_slug, source_url, filename, original_format,
-			archive_path, archive_type, content_type, file_size,
-			compressed_size, checksum, downloaded_at, metadata,
-			created_at, updated_at
-		FROM archives
-		WHERE chain_slug = $1
-		ORDER BY downloaded_at DESC
-		LIMIT $2 OFFSET $3
-	`
-
-	rows, err := pool.Query(ctx, query, chainSlug, limit, offset)
+	rows, err := queries.ListArchivesByChain(ctx, sqlcgen.ListArchivesByChainParams{
+		ChainSlug: chainSlug,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	archives := make([]Archive, 0)
-	for rows.Next() {
-		var archive Archive
-		err := rows.Scan(
-			&archive.ID, &archive.ChainSlug, &archive.SourceURL, &archive.Filename,
-			&archive.OriginalFormat, &archive.ArchivePath, &archive.ArchiveType,
-			&archive.ContentType, &archive.FileSize, &archive.CompressedSize,
-			&archive.Checksum, &archive.DownloadedAt, &archive.Metadata,
-			&archive.CreatedAt, &archive.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		archives = append(archives, archive)
+	archives := make([]Archive, len(rows))
+	for i, row := range rows {
+		archives[i] = *convertSqlcArchive(row)
 	}
 
 	return archives, nil
@@ -186,19 +130,12 @@ func GetArchivesByChain(ctx context.Context, chainSlug string, limit, offset int
 // LinkArchiveToIngestionRun associates an archive with an ingestion run
 // It also sets the source_url from the archive's source_url
 func LinkArchiveToIngestionRun(ctx context.Context, archiveID, runID string) error {
-	pool := Pool()
+	queries := sqlcgen.New(Pool())
 
-	query := `
-		UPDATE ingestion_runs
-		SET archive_id = $1,
-		    source_url = (
-		        SELECT source_url FROM archives WHERE id = $1
-		    )
-		WHERE id = $2
-	`
-
-	_, err := pool.Exec(ctx, query, archiveID, runID)
-	return err
+	return queries.LinkArchiveToRun(ctx, sqlcgen.LinkArchiveToRunParams{
+		ArchiveID: pgtype.Text{String: archiveID, Valid: true},
+		ID:        runID,
+	})
 }
 
 // UpdateRetailerItemArchiveID links retailer items to their source archive
@@ -207,16 +144,12 @@ func UpdateRetailerItemArchiveID(ctx context.Context, itemIDs []string, archiveI
 		return nil
 	}
 
-	pool := Pool()
+	queries := sqlcgen.New(Pool())
 
-	query := `
-		UPDATE retailer_items
-		SET archive_id = $1
-		WHERE id = ANY($2)
-	`
-
-	_, err := pool.Exec(ctx, query, archiveID, itemIDs)
-	return err
+	return queries.UpdateRetailerItemsArchiveId(ctx, sqlcgen.UpdateRetailerItemsArchiveIdParams{
+		ArchiveID: pgtype.Text{String: archiveID, Valid: true},
+		Column2:   itemIDs,
+	})
 }
 
 // CalculateChecksum calculates SHA-256 checksum for data
@@ -228,4 +161,69 @@ func CalculateChecksum(data []byte) string {
 // GenerateArchiveID generates a new archive ID with arc_ prefix
 func GenerateArchiveID() string {
 	return cuid2.GeneratePrefixedId("arc", cuid2.PrefixedIdOptions{})
+}
+
+// Helper functions for type conversion
+
+func convertSqlcArchive(a sqlcgen.Archive) *Archive {
+	return &Archive{
+		ID:             a.ID,
+		ChainSlug:      a.ChainSlug,
+		SourceURL:      a.SourceUrl,
+		Filename:       a.Filename,
+		OriginalFormat: a.OriginalFormat,
+		ArchivePath:    a.ArchivePath,
+		ArchiveType:    a.ArchiveType,
+		ContentType:    pgTextToStringPtr(a.ContentType),
+		FileSize:       pgInt8ToInt64Ptr(a.FileSize),
+		CompressedSize: pgInt8ToInt64Ptr(a.CompressedSize),
+		Checksum:       a.Checksum,
+		DownloadedAt:   a.DownloadedAt.Time,
+		Metadata:       bytesToStringPtr(a.Metadata),
+		CreatedAt:      a.CreatedAt.Time,
+		UpdatedAt:      a.UpdatedAt.Time,
+	}
+}
+
+func stringPtrToPgText(s *string) pgtype.Text {
+	if s == nil {
+		return pgtype.Text{Valid: false}
+	}
+	return pgtype.Text{String: *s, Valid: true}
+}
+
+func pgTextToStringPtr(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	return &t.String
+}
+
+func int64PtrToPgInt8(p *int64) pgtype.Int8 {
+	if p == nil {
+		return pgtype.Int8{Valid: false}
+	}
+	return pgtype.Int8{Int64: *p, Valid: true}
+}
+
+func pgInt8ToInt64Ptr(p pgtype.Int8) *int64 {
+	if !p.Valid {
+		return nil
+	}
+	return &p.Int64
+}
+
+func stringPtrToBytes(s *string) []byte {
+	if s == nil {
+		return nil
+	}
+	return []byte(*s)
+}
+
+func bytesToStringPtr(b []byte) *string {
+	if b == nil {
+		return nil
+	}
+	s := string(b)
+	return &s
 }

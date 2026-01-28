@@ -337,3 +337,56 @@
   - All Go tests pass (`go test ./... -short`)
   - go vet linting passes on all files
   - Phase 3 Task 1 complete - persist.go migrated to sqlc with barcode fix
+
+- [✓] 2026-01-28 - Phase 4 (Partial): Convert price_groups.go and archive.go to sqlc
+  - Migrated `internal/database/price_groups.go` to use sqlc:
+    - `FindOrCreatePriceGroup`: now uses `queries.FindPriceGroupByHash()` and `queries.CreatePriceGroup()`
+    - `BulkInsertGroupPrices`: now uses `txQueries.UpsertGroupPrice()` and `txQueries.UpdatePriceGroupItemCount()`
+    - `AssignStoreToGroup`: now uses `txQueries.GetCurrentStoreGroupId()`, `txQueries.CloseStoreGroupMembership()`,
+      `txQueries.CreateStoreGroupHistory()`, `txQueries.DecrementPriceGroupStoreCount()`, `txQueries.IncrementPriceGroupStoreCount()`
+    - `GetCurrentPriceForStore`: now uses `queries.GetStorePriceException()` and `queries.GetStorePriceFromGroup()`
+    - `GetHistoricalPriceForStore`: now uses `queries.GetHistoricalStorePrice()`
+    - `UpdateGroupLastSeen`: now uses `queries.UpdatePriceGroupLastSeen()`
+    - `CleanupExpiredExceptions`: now uses `queries.DeleteExpiredPriceExceptions()`
+    - `GetPriceGroupByID`: now uses `queries.GetPriceGroupById()`
+    - `GetGroupPrices`: now uses `queries.ListGroupPrices()`
+    - `GetStorePrices`: now uses `queries.ListStorePricesViaGroup()`
+    - `ListPriceGroups`: now uses `queries.ListPriceGroupsByChain()`
+    - Added `CountPriceGroups` function using `queries.CountPriceGroupsByChain()`
+  - Added helper functions for type conversion:
+    - `convertSqlcPriceGroup()`: converts sqlcgen.PriceGroup to database.PriceGroup
+    - `convertSqlcGroupPrice()`: converts sqlcgen.GroupPrice to database.GroupPrice
+    - `intPtrToPgInt4()`: converts *int to pgtype.Int4
+    - `pgInt4ToIntPtr()`: converts pgtype.Int4 to *int
+  - Migrated `internal/database/archive.go` to use sqlc:
+    - `CreateArchive`: now uses `queries.UpsertArchive()`
+    - `GetArchiveByChecksum`: now uses `queries.GetArchiveByChecksum()`
+    - `GetArchiveByID`: now uses `queries.GetArchiveById()`
+    - `GetArchivesByChain`: now uses `queries.ListArchivesByChain()`
+    - `LinkArchiveToIngestionRun`: now uses `queries.LinkArchiveToRun()`
+    - `UpdateRetailerItemArchiveID`: now uses `queries.UpdateRetailerItemsArchiveId()`
+  - Added helper functions for archive type conversion:
+    - `convertSqlcArchive()`: converts sqlcgen.Archive to database.Archive
+    - `stringPtrToPgText()`, `pgTextToStringPtr()`: handle nullable text fields
+    - `int64PtrToPgInt8()`, `pgInt8ToInt64Ptr()`: handle nullable int64 fields
+    - `stringPtrToBytes()`, `bytesToStringPtr()`: handle metadata field
+  - Created `internal/database/price_groups_test.go` with 10 tests:
+    - Verifies sqlcgen types are used
+    - Tests conversion functions
+    - Verifies type field structure
+  - Created `internal/database/archive_test.go` with 18 tests:
+    - Verifies sqlcgen types are used
+    - Tests all conversion helper functions
+    - Tests CalculateChecksum determinism
+    - Tests GenerateArchiveID prefix
+  - All 28 new database tests pass
+  - Go build passes: `go build ./...`
+  - Go vet passes: `go vet ./...`
+  - All Go tests pass: `go test -short ./...`
+  - NOTE: Phase 4 is partially complete (2 of 14+ files converted)
+  - Remaining files to convert in future sessions:
+    - handlers/prices.go, handlers/runs.go, handlers/ingest.go
+    - handlers/failed_rows.go, handlers/error_summary.go
+    - pipeline/parse.go, pipeline/discover.go, pipeline/pipeline.go
+    - workers/worker.go, jobs/cleanup_database.go
+    - sweepers/taskqueue.go, taskqueue/queue.go
