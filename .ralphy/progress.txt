@@ -484,3 +484,34 @@
     - Exceptions section for stored procedures exists
     - All 5 stored procedure exceptions documented
   - All 13 tests pass, go vet linting passes
+
+- [✓] 2026-01-28 - Phase 5 Task 2: Verified no raw SQL remains (with documented exceptions)
+  - Converted remaining raw SQL in handlers/prices.go and handlers/runs.go to sqlc
+  - handlers/prices.go SearchItems function:
+    - Created CountSearchItems query with optional chain filter
+    - Created SearchItemsWithStats query with ILIKE search and aggregation
+    - Used @search_query::text and @chain_filter::text for proper parameter naming
+    - Handles optional chain filter via ($1 = '' OR chain_slug = $1) pattern
+  - handlers/runs.go ListRuns function:
+    - Created CountIngestionRunsFiltered query with optional chain and status filters
+    - Created ListIngestionRunsFiltered query with pagination
+    - Used @chain_filter::text and @status_filter::text for proper parameter naming
+  - All handler files now use sqlc instead of raw pool.Query/Exec
+  - Created internal/database/raw_sql_verification_test.go with 11 tests:
+    - TestNoRawSQLInHandlers - verifies handlers use sqlc
+    - TestNoRawSQLInPipeline - verifies pipeline files use sqlc
+    - TestNoRawSQLInDatabase - verifies database files use sqlc
+    - TestNoRawSQLInWorkers - verifies worker files use sqlc
+    - TestNoRawSQLInJobs - verifies job files use sqlc
+    - TestRawSQLExceptionsDocumented - verifies stored procedure exceptions are documented
+    - TestAllHandlersUseSqlc - verifies all handlers import and use sqlcgen
+    - TestSearchItemsUsesSqlc - verifies SearchItems uses sqlc queries
+    - TestListRunsUsesSqlc - verifies ListRuns uses sqlc queries
+    - TestSqlcQueriesForSearchExist - verifies search queries exist in prices.sql
+    - TestSqlcQueriesForListRunsExist - verifies list runs queries exist in runs.sql
+  - Documented exceptions (stored procedures that cannot use sqlc):
+    - sweepers/taskqueue.go: recover_orphaned_tasks()
+    - taskqueue/queue.go: claim_tasks, complete_task, fail_task, cleanup_old_tasks
+  - All Go tests pass: `go test -short ./...`
+  - go vet linting passes: `go vet ./...`
+  - go build passes: `go build ./...`

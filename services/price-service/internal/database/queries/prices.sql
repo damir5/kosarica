@@ -32,3 +32,37 @@ JOIN stores s ON sis.store_id = s.id
 WHERE s.id = $1 AND s.chain_slug = $2
 ORDER BY ri.name
 LIMIT $3 OFFSET $4;
+
+-- name: CountSearchItems :one
+-- Counts items matching search query with optional chain filter
+-- Pass empty string for chain_slug to search all chains
+SELECT COUNT(DISTINCT ri.id)
+FROM retailer_items ri
+WHERE ri.name ILIKE '%' || @search_query::text || '%'
+  AND (@chain_filter::text = '' OR ri.chain_slug = @chain_filter::text);
+
+-- name: SearchItemsWithStats :many
+-- Search items by name with aggregated stats, optional chain filter
+-- Pass empty string for chain_slug to search all chains
+SELECT DISTINCT
+    ri.id,
+    ri.chain_slug::text as chain_slug,
+    ri.external_id,
+    ri.name,
+    ri.description,
+    ri.brand,
+    ri.category,
+    ri.subcategory,
+    ri.unit,
+    ri.unit_quantity,
+    ri.image_url,
+    COALESCE(AVG(sis.current_price), 0)::int as avg_price,
+    COUNT(DISTINCT sis.store_id)::int as store_count
+FROM retailer_items ri
+LEFT JOIN store_item_state sis ON ri.id = sis.retailer_item_id
+WHERE ri.name ILIKE '%' || @search_query::text || '%'
+  AND (@chain_filter::text = '' OR ri.chain_slug = @chain_filter::text)
+GROUP BY ri.id, ri.chain_slug, ri.external_id, ri.name, ri.description,
+         ri.brand, ri.category, ri.subcategory, ri.unit, ri.unit_quantity, ri.image_url
+ORDER BY ri.name
+LIMIT @result_limit::int;

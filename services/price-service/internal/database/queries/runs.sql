@@ -43,3 +43,23 @@ SELECT
     COALESCE(SUM(total_files), 0) as total_files
 FROM ingestion_runs
 WHERE created_at >= $1 AND created_at <= $2;
+
+-- name: CountIngestionRunsFiltered :one
+-- Count ingestion runs with optional chain and status filters
+-- Pass empty string for chain_slug or status to not filter by that field
+SELECT COUNT(*)
+FROM ingestion_runs
+WHERE (@chain_filter::text = '' OR chain_slug = @chain_filter::text)
+  AND (@status_filter::text = '' OR status = @status_filter::text);
+
+-- name: ListIngestionRunsFiltered :many
+-- List ingestion runs with optional chain and status filters, paginated
+-- Pass empty string for chain_slug or status to not filter by that field
+SELECT id, chain_slug, source, status, started_at, completed_at,
+       total_files, processed_files, total_entries, processed_entries,
+       error_count, metadata, created_at
+FROM ingestion_runs
+WHERE (@chain_filter::text = '' OR chain_slug = @chain_filter::text)
+  AND (@status_filter::text = '' OR status = @status_filter::text)
+ORDER BY created_at DESC
+LIMIT @result_limit::int OFFSET @result_offset::int;

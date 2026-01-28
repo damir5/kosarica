@@ -70,92 +70,83 @@ func ListRuns(c *gin.Context) {
 		req.Limit = 20
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
-	// Build query with dynamic filters
-	query := `
-		SELECT id, chain_slug, source, status, started_at, completed_at,
-		       total_files, processed_files, total_entries, processed_entries,
-		       error_count, metadata, created_at
-		FROM ingestion_runs
-		WHERE 1=1
-	`
-	args := []interface{}{}
-	argIdx := 1
-
-	if req.ChainSlug != "" {
-		query += fmt.Sprintf(" AND chain_slug = $%d", argIdx)
-		args = append(args, req.ChainSlug)
-		argIdx++
-	}
-
-	if req.Status != "" {
-		query += fmt.Sprintf(" AND status = $%d", argIdx)
-		args = append(args, req.Status)
-		argIdx++
-	}
-
-	// Get total count
-	countQuery := "SELECT COUNT(*) FROM ingestion_runs WHERE 1=1"
-	countArgs := []interface{}{}
-	countArgIdx := 1
-
-	if req.ChainSlug != "" {
-		countQuery += fmt.Sprintf(" AND chain_slug = $%d", countArgIdx)
-		countArgs = append(countArgs, req.ChainSlug)
-		countArgIdx++
-	}
-
-	if req.Status != "" {
-		countQuery += fmt.Sprintf(" AND status = $%d", countArgIdx)
-		countArgs = append(countArgs, req.Status)
-		countArgIdx++
-	}
-
-	var total int
-	err := pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total)
+	// Get total count using sqlc (empty string means no filter)
+	total, err := queries.CountIngestionRunsFiltered(ctx, sqlcgen.CountIngestionRunsFilteredParams{
+		ChainFilter:  req.ChainSlug, // empty string = no filter
+		StatusFilter: req.Status,    // empty string = no filter
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count runs"})
 		return
 	}
 
-	// Add ordering and pagination
-	query += " ORDER BY created_at DESC"
-	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
-	args = append(args, req.Limit, req.Offset)
-
-	rows, err := pool.Query(ctx, query, args...)
+	// Get runs with pagination using sqlc
+	runRows, err := queries.ListIngestionRunsFiltered(ctx, sqlcgen.ListIngestionRunsFilteredParams{
+		ChainFilter:  req.ChainSlug, // empty string = no filter
+		StatusFilter: req.Status,    // empty string = no filter
+		ResultLimit:  int32(req.Limit),
+		ResultOffset: int32(req.Offset),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch runs"})
 		return
 	}
-	defer rows.Close()
 
-	runs := []IngestionRun{}
-	for rows.Next() {
-		var run IngestionRun
-		err := rows.Scan(
-			&run.ID, &run.ChainSlug, &run.Source, &run.Status,
-			&run.StartedAt, &run.CompletedAt, &run.TotalFiles, &run.ProcessedFiles,
-			&run.TotalEntries, &run.ProcessedEntries, &run.ErrorCount,
-			&run.Metadata, &run.CreatedAt,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan run"})
-			return
+	// Convert sqlcgen rows to IngestionRun
+	runs := make([]IngestionRun, 0, len(runRows))
+	for _, row := range runRows {
+		run := IngestionRun{
+			ID:        row.ID,
+			ChainSlug: row.ChainSlug,
+			Source:    row.Source,
+			Status:    row.Status,
 		}
-		runs = append(runs, run)
-	}
 
-	if rows.Err() != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iterating runs"})
-		return
+		// Convert pgtype fields
+		if row.StartedAt.Valid {
+			t := row.StartedAt.Time
+			run.StartedAt = &t
+		}
+		if row.CompletedAt.Valid {
+			t := row.CompletedAt.Time
+			run.CompletedAt = &t
+		}
+		if row.TotalFiles.Valid {
+			v := int(row.TotalFiles.Int32)
+			run.TotalFiles = &v
+		}
+		if row.ProcessedFiles.Valid {
+			v := int(row.ProcessedFiles.Int32)
+			run.ProcessedFiles = &v
+		}
+		if row.TotalEntries.Valid {
+			v := int(row.TotalEntries.Int32)
+			run.TotalEntries = &v
+		}
+		if row.ProcessedEntries.Valid {
+			v := int(row.ProcessedEntries.Int32)
+			run.ProcessedEntries = &v
+		}
+		if row.ErrorCount.Valid {
+			v := int(row.ErrorCount.Int32)
+			run.ErrorCount = &v
+		}
+		if row.Metadata.Valid {
+			run.Metadata = &row.Metadata.String
+		}
+		if row.CreatedAt.Valid {
+			run.CreatedAt = row.CreatedAt.Time
+		}
+
+		runs = append(runs, run)
 	}
 
 	c.JSON(http.StatusOK, ListRunsResponse{
 		Runs:  runs,
-		Total: total,
+		Total: int(total),
 	})
 }
 

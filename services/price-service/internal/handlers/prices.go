@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -246,97 +245,77 @@ func SearchItems(c *gin.Context) {
 		req.Limit = 20
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
-	// Build query with dynamic chain filter
-	countQuery := `
-		SELECT COUNT(DISTINCT ri.id)
-		FROM retailer_items ri
-		WHERE 1=1
-	`
-	searchQuery := `
-		SELECT DISTINCT
-			ri.id,
-			ri.chain_slug,
-			ri.external_id,
-			ri.name,
-			ri.description,
-			ri.brand,
-			ri.category,
-			ri.subcategory,
-			ri.unit,
-			ri.unit_quantity,
-			ri.image_url,
-			AVG(sis.current_price) as avg_price,
-			COUNT(DISTINCT sis.store_id) as store_count
-		FROM retailer_items ri
-		LEFT JOIN store_item_state sis ON ri.id = sis.retailer_item_id
-		WHERE 1=1
-	`
-
-	args := []interface{}{}
-	argIdx := 1
-
-	if req.ChainSlug != "" {
-		countQuery += " AND ri.chain_slug = $" + strconv.Itoa(argIdx)
-		searchQuery += " AND ri.chain_slug = $" + strconv.Itoa(argIdx)
-		args = append(args, req.ChainSlug)
-		argIdx++
-	}
-
-	// Add search term with ILIKE
-	countQuery += " AND LENGTH($" + strconv.Itoa(argIdx) + ") >= 3 AND ri.name ILIKE $" + strconv.Itoa(argIdx+1)
-	searchQuery += " AND LENGTH($" + strconv.Itoa(argIdx) + ") >= 3 AND ri.name ILIKE $" + strconv.Itoa(argIdx+1)
-	args = append(args, req.Query, "%"+req.Query+"%")
-	argIdx += 2
-
-	searchQuery += " GROUP BY ri.id, ri.chain_slug, ri.external_id, ri.name, ri.description, ri.brand, ri.category, ri.subcategory, ri.unit, ri.unit_quantity, ri.image_url"
-	searchQuery += " ORDER BY ri.name"
-	searchQuery += " LIMIT $" + strconv.Itoa(argIdx)
-	args = append(args, req.Limit)
-
-	// Get total count
-	var total int
-	err := pool.QueryRow(ctx, countQuery, args[:len(args)-1]...).Scan(&total)
+	// Get total count using sqlc (empty string means no chain filter)
+	total, err := queries.CountSearchItems(ctx, sqlcgen.CountSearchItemsParams{
+		SearchQuery: req.Query,
+		ChainFilter: req.ChainSlug, // empty string = no filter
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count items"})
 		return
 	}
 
-	// Search items
-	rows, err := pool.Query(ctx, searchQuery, args...)
+	// Search items using sqlc
+	itemRows, err := queries.SearchItemsWithStats(ctx, sqlcgen.SearchItemsWithStatsParams{
+		SearchQuery: req.Query,
+		ChainFilter: req.ChainSlug, // empty string = no filter
+		ResultLimit: int32(req.Limit),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search items"})
 		return
 	}
-	defer rows.Close()
 
-	items := []SearchItem{}
-	for rows.Next() {
-		var item SearchItem
-		err := rows.Scan(
-			&item.ID, &item.ChainSlug, &item.ExternalID, &item.Name,
-			&item.Description, &item.Brand, &item.Category, &item.Subcategory,
-			&item.Unit, &item.UnitQuantity, &item.ImageURL,
-			&item.AvgPrice, &item.StoreCount,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan item"})
-			return
+	// Convert sqlc rows to response type
+	items := make([]SearchItem, 0, len(itemRows))
+	for _, row := range itemRows {
+		item := SearchItem{
+			ID:         row.ID,
+			ChainSlug:  row.ChainSlug,
+			Name:       row.Name,
+			StoreCount: int(row.StoreCount),
 		}
+
+		// Convert pgtype fields to *string/*int
+		if row.ExternalID.Valid {
+			item.ExternalID = &row.ExternalID.String
+		}
+		if row.Description.Valid {
+			item.Description = &row.Description.String
+		}
+		if row.Brand.Valid {
+			item.Brand = &row.Brand.String
+		}
+		if row.Category.Valid {
+			item.Category = &row.Category.String
+		}
+		if row.Subcategory.Valid {
+			item.Subcategory = &row.Subcategory.String
+		}
+		if row.Unit.Valid {
+			item.Unit = &row.Unit.String
+		}
+		if row.UnitQuantity.Valid {
+			item.UnitQuantity = &row.UnitQuantity.String
+		}
+		if row.ImageUrl.Valid {
+			item.ImageURL = &row.ImageUrl.String
+		}
+		if row.AvgPrice != 0 {
+			avgPrice := int(row.AvgPrice)
+			item.AvgPrice = &avgPrice
+		}
+
 		items = append(items, item)
 	}
 
-	if rows.Err() != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iterating items"})
-		return
-	}
-
 	c.JSON(http.StatusOK, SearchItemsResponse{
-		Items:  items,
-		Total:  total,
-		Query:  req.Query,
+		Items: items,
+		Total: int(total),
+		Query: req.Query,
 	})
 }
 

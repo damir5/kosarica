@@ -22,6 +22,27 @@ func (q *Queries) CheckRunExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const countIngestionRunsFiltered = `-- name: CountIngestionRunsFiltered :one
+SELECT COUNT(*)
+FROM ingestion_runs
+WHERE ($1::text = '' OR chain_slug = $1::text)
+  AND ($2::text = '' OR status = $2::text)
+`
+
+type CountIngestionRunsFilteredParams struct {
+	ChainFilter  string `db:"chain_filter" json:"chain_filter"`
+	StatusFilter string `db:"status_filter" json:"status_filter"`
+}
+
+// Count ingestion runs with optional chain and status filters
+// Pass empty string for chain_slug or status to not filter by that field
+func (q *Queries) CountIngestionRunsFiltered(ctx context.Context, arg CountIngestionRunsFilteredParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countIngestionRunsFiltered, arg.ChainFilter, arg.StatusFilter)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createReprocessingRun = `-- name: CreateReprocessingRun :exec
 INSERT INTO ingestion_runs (id, chain_slug, source, status, started_at, created_at)
 VALUES ($1, $2, 'reprocess', 'running', NOW(), NOW())
@@ -187,4 +208,79 @@ func (q *Queries) GetRunStats(ctx context.Context, arg GetRunStatsParams) (GetRu
 		&i.TotalFiles,
 	)
 	return i, err
+}
+
+const listIngestionRunsFiltered = `-- name: ListIngestionRunsFiltered :many
+SELECT id, chain_slug, source, status, started_at, completed_at,
+       total_files, processed_files, total_entries, processed_entries,
+       error_count, metadata, created_at
+FROM ingestion_runs
+WHERE ($1::text = '' OR chain_slug = $1::text)
+  AND ($2::text = '' OR status = $2::text)
+ORDER BY created_at DESC
+LIMIT $4::int OFFSET $3::int
+`
+
+type ListIngestionRunsFilteredParams struct {
+	ChainFilter  string `db:"chain_filter" json:"chain_filter"`
+	StatusFilter string `db:"status_filter" json:"status_filter"`
+	ResultOffset int32  `db:"result_offset" json:"result_offset"`
+	ResultLimit  int32  `db:"result_limit" json:"result_limit"`
+}
+
+type ListIngestionRunsFilteredRow struct {
+	ID               string           `db:"id" json:"id"`
+	ChainSlug        string           `db:"chain_slug" json:"chain_slug"`
+	Source           string           `db:"source" json:"source"`
+	Status           string           `db:"status" json:"status"`
+	StartedAt        pgtype.Timestamp `db:"started_at" json:"started_at"`
+	CompletedAt      pgtype.Timestamp `db:"completed_at" json:"completed_at"`
+	TotalFiles       pgtype.Int4      `db:"total_files" json:"total_files"`
+	ProcessedFiles   pgtype.Int4      `db:"processed_files" json:"processed_files"`
+	TotalEntries     pgtype.Int4      `db:"total_entries" json:"total_entries"`
+	ProcessedEntries pgtype.Int4      `db:"processed_entries" json:"processed_entries"`
+	ErrorCount       pgtype.Int4      `db:"error_count" json:"error_count"`
+	Metadata         pgtype.Text      `db:"metadata" json:"metadata"`
+	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
+}
+
+// List ingestion runs with optional chain and status filters, paginated
+// Pass empty string for chain_slug or status to not filter by that field
+func (q *Queries) ListIngestionRunsFiltered(ctx context.Context, arg ListIngestionRunsFilteredParams) ([]ListIngestionRunsFilteredRow, error) {
+	rows, err := q.db.Query(ctx, listIngestionRunsFiltered,
+		arg.ChainFilter,
+		arg.StatusFilter,
+		arg.ResultOffset,
+		arg.ResultLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListIngestionRunsFilteredRow{}
+	for rows.Next() {
+		var i ListIngestionRunsFilteredRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChainSlug,
+			&i.Source,
+			&i.Status,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.TotalFiles,
+			&i.ProcessedFiles,
+			&i.TotalEntries,
+			&i.ProcessedEntries,
+			&i.ErrorCount,
+			&i.Metadata,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

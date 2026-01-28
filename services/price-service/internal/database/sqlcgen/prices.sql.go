@@ -11,6 +11,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countSearchItems = `-- name: CountSearchItems :one
+SELECT COUNT(DISTINCT ri.id)
+FROM retailer_items ri
+WHERE ri.name ILIKE '%' || $1::text || '%'
+  AND ($2::text = '' OR ri.chain_slug = $2::text)
+`
+
+type CountSearchItemsParams struct {
+	SearchQuery string `db:"search_query" json:"search_query"`
+	ChainFilter string `db:"chain_filter" json:"chain_filter"`
+}
+
+// Counts items matching search query with optional chain filter
+// Pass empty string for chain_slug to search all chains
+func (q *Queries) CountSearchItems(ctx context.Context, arg CountSearchItemsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSearchItems, arg.SearchQuery, arg.ChainFilter)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countStorePrices = `-- name: CountStorePrices :one
 SELECT COUNT(*)
 FROM store_item_state sis
@@ -123,6 +144,89 @@ func (q *Queries) ListStorePricesWithDetails(ctx context.Context, arg ListStoreP
 			&i.AnchorPrice,
 			&i.PriceSignature,
 			&i.LastSeenAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchItemsWithStats = `-- name: SearchItemsWithStats :many
+SELECT DISTINCT
+    ri.id,
+    ri.chain_slug::text as chain_slug,
+    ri.external_id,
+    ri.name,
+    ri.description,
+    ri.brand,
+    ri.category,
+    ri.subcategory,
+    ri.unit,
+    ri.unit_quantity,
+    ri.image_url,
+    COALESCE(AVG(sis.current_price), 0)::int as avg_price,
+    COUNT(DISTINCT sis.store_id)::int as store_count
+FROM retailer_items ri
+LEFT JOIN store_item_state sis ON ri.id = sis.retailer_item_id
+WHERE ri.name ILIKE '%' || $1::text || '%'
+  AND ($2::text = '' OR ri.chain_slug = $2::text)
+GROUP BY ri.id, ri.chain_slug, ri.external_id, ri.name, ri.description,
+         ri.brand, ri.category, ri.subcategory, ri.unit, ri.unit_quantity, ri.image_url
+ORDER BY ri.name
+LIMIT $3::int
+`
+
+type SearchItemsWithStatsParams struct {
+	SearchQuery string `db:"search_query" json:"search_query"`
+	ChainFilter string `db:"chain_filter" json:"chain_filter"`
+	ResultLimit int32  `db:"result_limit" json:"result_limit"`
+}
+
+type SearchItemsWithStatsRow struct {
+	ID           string      `db:"id" json:"id"`
+	ChainSlug    string      `db:"chain_slug" json:"chain_slug"`
+	ExternalID   pgtype.Text `db:"external_id" json:"external_id"`
+	Name         string      `db:"name" json:"name"`
+	Description  pgtype.Text `db:"description" json:"description"`
+	Brand        pgtype.Text `db:"brand" json:"brand"`
+	Category     pgtype.Text `db:"category" json:"category"`
+	Subcategory  pgtype.Text `db:"subcategory" json:"subcategory"`
+	Unit         pgtype.Text `db:"unit" json:"unit"`
+	UnitQuantity pgtype.Text `db:"unit_quantity" json:"unit_quantity"`
+	ImageUrl     pgtype.Text `db:"image_url" json:"image_url"`
+	AvgPrice     int32       `db:"avg_price" json:"avg_price"`
+	StoreCount   int32       `db:"store_count" json:"store_count"`
+}
+
+// Search items by name with aggregated stats, optional chain filter
+// Pass empty string for chain_slug to search all chains
+func (q *Queries) SearchItemsWithStats(ctx context.Context, arg SearchItemsWithStatsParams) ([]SearchItemsWithStatsRow, error) {
+	rows, err := q.db.Query(ctx, searchItemsWithStats, arg.SearchQuery, arg.ChainFilter, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchItemsWithStatsRow{}
+	for rows.Next() {
+		var i SearchItemsWithStatsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChainSlug,
+			&i.ExternalID,
+			&i.Name,
+			&i.Description,
+			&i.Brand,
+			&i.Category,
+			&i.Subcategory,
+			&i.Unit,
+			&i.UnitQuantity,
+			&i.ImageUrl,
+			&i.AvgPrice,
+			&i.StoreCount,
 		); err != nil {
 			return nil, err
 		}
