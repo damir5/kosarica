@@ -191,3 +191,12 @@
     - id is primary key
     - name is not null
   - All 6 tests pass, linting passes on changed files
+
+- [✓] 2026-01-28 - Phase 1 Task 2: Made retailer_items.retailer_item_id nullable
+  - Modified src/db/schema.ts: removed .notNull() from retailerItemId column
+  - Column now defined as: `retailerItemId: integer("retailer_item_id")` (nullable - legacy column, not used)
+  - Extended src/db/schema/retailer-items.test.ts with 3 additional tests verifying:
+    - retailerItemId column is defined
+    - retailerItemId column is nullable (notNull === false)
+    - retailerItemId is integer type (dataType === "number")
+  - All 9 tests pass, linting passes on changed files

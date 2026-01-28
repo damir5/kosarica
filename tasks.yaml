@@ -10,7 +10,7 @@ tasks:
     description: |
       In `src/db/schema.ts`:
       Make `retailer_items.retailer_item_id` nullable (legacy column, not used)
-    completed: false
+    completed: true
 
   - title: Add retailer_item_barcodes table definition
     description: |

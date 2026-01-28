@@ -27,6 +27,25 @@ describe("retailerItems schema", () => {
 		});
 	});
 
+	describe("retailerItemId column", () => {
+		it("should have retailerItemId column defined", () => {
+			const columns = getTableColumns(retailerItems);
+			expect(columns.retailerItemId).toBeDefined();
+		});
+
+		it("should have retailerItemId column as nullable (legacy column)", () => {
+			const columns = getTableColumns(retailerItems);
+			// In Drizzle, notNull property indicates if the column is NOT NULL
+			// When notNull is false/undefined, the column accepts NULL values
+			expect(columns.retailerItemId.notNull).toBe(false);
+		});
+
+		it("should have retailerItemId as integer type", () => {
+			const columns = getTableColumns(retailerItems);
+			expect(columns.retailerItemId.dataType).toBe("number");
+		});
+	});
+
 	describe("table structure", () => {
 		it("should have all expected columns", () => {
 			const columns = getTableColumns(retailerItems);

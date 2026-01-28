@@ -180,7 +180,7 @@ export const retailerItems = pgTable(
 	"retailer_items",
 	{
 		id: cuid2("rit").primaryKey(),
-		retailerItemId: integer("retailer_item_id").notNull(),
+		retailerItemId: integer("retailer_item_id"), // nullable - legacy column, not used
 		barcode: text("barcode"), // EAN-13, EAN-8, etc. (nullable - legacy column, not used)
 		isPrimary: boolean("is_primary").default(false),
 		createdAt: timestamp("created_at").defaultNow(),
