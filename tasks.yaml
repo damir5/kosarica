@@ -73,7 +73,7 @@ tasks:
       mise run sqlc-generate  # should generate all types
       go build ./...          # should compile
       ```
-    completed: false
+    completed: true
 
   # Phase 3: Update persist.go (Barcode Fix)
   - title: Update persist.go to use sqlc and fix barcode saving
