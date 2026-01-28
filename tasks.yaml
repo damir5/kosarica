@@ -1,244 +1,204 @@
-# Generated from: ~/.claude/plans/cryptic-moseying-river.md
-# Type-Safe Go Service Client: OpenAPI Migration
-
 tasks:
-  # ===========================================================================
-  # PHASE 1: Add OpenAPI to Go Service
-  # ===========================================================================
-
-  - title: Install swaggo dependencies
+  # Phase 1: Schema Fixes (enables ingestion)
+  - title: Make retailer_items.barcode nullable
     description: |
-      Install swaggo/swag for OpenAPI generation in Go service.
-
-      Commands:
-      ```bash
-      go install github.com/swaggo/swag/cmd/swag@latest
-      go get github.com/swaggo/gin-swagger
-      go get github.com/swaggo/files
-      ```
-
-      This enables annotation-based OpenAPI spec generation from Go handler comments.
+      In `src/db/schema.ts`:
+      Make `retailer_items.barcode` nullable (legacy column, not used)
     completed: true
 
-  - title: Add swag annotations to handlers (~13 functions)
+  - title: Make retailer_items.retailer_item_id nullable
     description: |
-      Annotate all handler functions with swag comments for OpenAPI generation.
+      In `src/db/schema.ts`:
+      Make `retailer_items.retailer_item_id` nullable (legacy column, not used)
+    completed: false
 
-      Example for `GetStorePrices`:
+  - title: Add retailer_item_barcodes table definition
+    description: |
+      In `src/db/schema.ts`:
+      Add `retailer_item_barcodes` table definition
+    completed: false
+
+  - title: Add unique index on retailer_items(chain_slug, external_id)
+    description: |
+      In `src/db/schema.ts`:
+      Add unique index on `retailer_items(chain_slug, external_id)`
+    completed: false
+
+  - title: Add unique index on store_item_state(store_id, retailer_item_id)
+    description: |
+      In `src/db/schema.ts`:
+      Make `store_item_state(store_id, retailer_item_id)` unique index
+    completed: false
+
+  - title: Generate and apply schema migration
+    description: |
+      Test Phase 1 schema changes:
+      ```bash
+      pnpm db:generate  # creates migration
+      pnpm db:migrate   # applies to DB
+      ```
+    completed: false
+
+  # Phase 2: sqlc Query Files
+  - title: Create sqlc query files for all Go queries
+    description: |
+      Goal: Create .sql files for ALL queries currently in Go
+
+      New files in `services/price-service/internal/database/queries/`:
+
+      | File | Queries from |
+      |------|--------------|
+      | `stores.sql` | persist.go (createStore, findStoreByIdentifier) |
+      | `store_identifiers.sql` | persist.go |
+      | `retailer_items.sql` | persist.go (findOrCreate, update) |
+      | `retailer_item_barcodes.sql` | persist.go (insert barcode) |
+      | `store_item_state.sql` | persist.go (upsert) |
+      | `price_groups.sql` | price_groups.go (all 13 queries) |
+      | `archives.sql` | archive.go (all 6 queries) |
+      | `ingestion.sql` | existing + ingest.go, parse.go, discover.go, pipeline.go |
+      | `prices.sql` | handlers/prices.go (7 queries) |
+      | `runs.sql` | handlers/runs.go (11 queries) |
+      | `failed_rows.sql` | handlers/failed_rows.go (6 queries) |
+      | `errors.sql` | handlers/error_summary.go |
+      | `workers.sql` | workers/worker.go |
+      | `jobs.sql` | jobs/cleanup_database.go |
+      | `sweepers.sql` | sweepers/taskqueue.go |
+    completed: false
+
+  - title: Generate and verify sqlc types
+    description: |
+      Test Phase 2:
+      ```bash
+      cd services/price-service
+      mise run sqlc-generate  # should generate all types
+      go build ./...          # should compile
+      ```
+    completed: false
+
+  # Phase 3: Update persist.go (Barcode Fix)
+  - title: Update persist.go to use sqlc and fix barcode saving
+    description: |
+      Goal: Replace raw SQL with sqlc, ensure barcode saved
+
+      Key changes:
+      1. Import `sqlcgen` package
+      2. Replace `pool.Exec/Query` with `queries.XXX()`
+      3. In `findOrCreateRetailerItem`: after creating item, insert first barcode to `retailer_item_barcodes`
+      4. Remove duplicate barcode insertion loop (was inserting to non-existent table)
+
+      Barcode flow:
       ```go
-      // GetStorePrices returns prices for a specific store
-      // @Summary Get store prices
-      // @Tags prices
-      // @Accept json
-      // @Produce json
-      // @Param chainSlug path string true "Chain slug"
-      // @Param storeId path string true "Store ID"
-      // @Param limit query int false "Limit" default(100)
-      // @Param offset query int false "Offset" default(0)
-      // @Success 200 {object} GetStorePricesResponse
-      // @Router /internal/prices/{chainSlug}/{storeId} [get]
-      func GetStorePrices(c *gin.Context) { ... }
+      // In persistRowsForStore or findOrCreateRetailerItem:
+      if len(row.Barcodes) > 0 && row.Barcodes[0] != "" {
+          queries.InsertRetailerItemBarcode(ctx, sqlcgen.InsertRetailerItemBarcodeParams{
+              ID:             cuid2.Generate("rib"),
+              RetailerItemID: itemID,
+              Barcode:        row.Barcodes[0],
+              IsPrimary:      true,
+          })
+      }
       ```
+    completed: false
 
-      Handlers to annotate (~13 total):
-      - GetStorePrices, SearchItems
-      - ListRuns, GetRun, ListFiles, ListErrors, GetStats
-      - TriggerChain, RerunRun, DeleteRun, RerunFile, RerunChunk
-      - OptimizeSingle, OptimizeMulti, CacheWarmup, CacheRefresh, CacheHealth
-
-      Each needs: @Summary, @Tags, @Accept, @Produce, @Param (per param), @Success, @Router
-    completed: true
-
-  - title: Add main.go annotation for API metadata
+  - title: Test barcode ingestion
     description: |
-      Add swag metadata annotation to main.go for API title and base path.
-
-      ```go
-      // @title Price Service API
-      // @version 1.0
-      // @BasePath /internal
-      ```
-
-      This defines the OpenAPI spec metadata.
-    completed: true
-
-  - title: Generate spec and serve Swagger UI
-    description: |
-      Wire up swag spec generation and Swagger UI endpoint.
-
-      In main.go or server setup:
-      ```go
-      import "github.com/swaggo/gin-swagger"
-      import swaggerFiles "github.com/swaggo/files"
-
-      router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-      ```
-
-      Add to mise.toml or Makefile:
+      Test Phase 3:
       ```bash
-      swag init -g cmd/server/main.go -o docs
+      DATABASE_URL=... ./cli ingest konzum
+      psql -c "SELECT COUNT(*) FROM retailer_item_barcodes"  # should have barcodes
       ```
+    completed: false
 
-      The spec will be served at `/docs/doc.json` and UI at `/docs/index.html`.
-    completed: true
-
-  - title: Convert swag from global install to go run via mise
+  # Phase 4: Update All Other Go Files
+  - title: Convert all remaining raw SQL queries to sqlc
     description: |
-      Replace global `go install` with `go run` pattern for container compatibility.
-
-      Dev environment runs inside a container where global tool installation
-      is not available/persistent. Use `go run` with explicit version instead.
-
-      Add to `mise.toml`:
-      ```toml
-      [tasks.swag]
-      description = "Generate OpenAPI spec from Go annotations"
-      dir = "services/price-service"
-      run = "go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/server/main.go -o docs"
-      ```
-
-      Update first task's instructions to use:
-      ```bash
-      mise run swag
-      ```
-
-      Instead of:
-      ```bash
-      go install github.com/swaggo/swag/cmd/swag@latest
-      swag init -g cmd/server/main.go -o docs
-      ```
-
-      Benefits:
-      - No global state required
-      - Version pinned in mise.toml
-      - Works in ephemeral containers
-      - Consistent across all dev environments
-    completed: true
-
-  # ===========================================================================
-  # PHASE 2: Node.js Client Generation
-  # ===========================================================================
-
-  - title: Install @hey-api/openapi-ts dependencies
-    description: |
-      Install the OpenAPI TypeScript client generator and fetch client.
-
-      ```bash
-      pnpm add -D @hey-api/openapi-ts
-      pnpm add @hey-api/client-fetch
-      ```
-
-      This enables automatic SDK + Zod schema generation from OpenAPI spec.
-    completed: true
-
-  - title: Configure openapi-ts.config.ts
-    description: |
-      Create configuration file for @hey-api/openapi-ts.
-
-      File: `openapi-ts.config.ts`
-      ```typescript
-      import { defineConfig } from '@hey-api/openapi-ts';
-
-      export default defineConfig({
-        client: '@hey-api/client-fetch',
-        input: 'http://localhost:3003/docs/doc.json',
-        output: { path: 'src/lib/go-api', format: 'prettier' },
-        plugins: ['@hey-api/schemas', '@hey-api/sdk'],
-      });
-      ```
-
-      Plugins:
-      - @hey-api/schemas: Generates Zod schemas for runtime validation
-      - @hey-api/sdk: Generates typed SDK functions for each endpoint
-    completed: true
-
-  - title: Add generate script to package.json
-    description: |
-      Add npm script to generate the Go API client.
-
-      In package.json scripts:
-      ```json
-      "generate:go-api": "openapi-ts"
-      ```
-
-      Also add to mise.toml if using mise for task running.
-    completed: true
-
-  # ===========================================================================
-  # PHASE 3: Migrate Handlers
-  # ===========================================================================
-
-  - title: Migrate oRPC handlers to use generated SDK
-    description: |
-      Replace manual `goFetchWithRetry` calls in price-service.ts and basket.ts
-      with the generated SDK functions.
-
-      Before (manual):
-      ```typescript
-      const response = await goFetchWithRetry(`/internal/prices/${chainSlug}/${storeId}`);
-      return unwrapResponse(response);
-      ```
-
-      After (generated SDK):
-      ```typescript
-      import { getStorePrices } from '@/lib/go-api';
-      const { data, error } = await getStorePrices({ path: { chainSlug, storeId } });
-      if (error) throw error;
-      return data;
-      ```
+      Goal: Convert remaining 70+ raw queries
 
       Files to update:
-      - src/orpc/router/price-service.ts (~13 handlers)
-      - src/orpc/router/basket.ts (~5 handlers)
+      - `internal/database/price_groups.go` → use queries from price_groups.sql
+      - `internal/database/archive.go` → use queries from archives.sql
+      - `internal/handlers/prices.go` → use queries from prices.sql
+      - `internal/handlers/runs.go` → use queries from runs.sql
+      - `internal/handlers/ingest.go` → use queries from ingestion.sql
+      - `internal/handlers/failed_rows.go` → use queries from failed_rows.sql
+      - `internal/handlers/error_summary.go` → use queries from errors.sql
+      - `internal/pipeline/parse.go` → use queries from ingestion.sql
+      - `internal/pipeline/discover.go` → use queries from ingestion.sql
+      - `internal/pipeline/pipeline.go` → use queries from ingestion.sql
+      - `internal/workers/worker.go` → use queries from workers.sql
+      - `internal/jobs/cleanup_database.go` → use queries from jobs.sql
+      - `internal/sweepers/taskqueue.go` → use queries from sweepers.sql
+      - `internal/taskqueue/queue.go` → use queries from taskqueue.sql
+    completed: false
 
-      Total: ~18 procedure updates
-    completed: true
-
-  # ===========================================================================
-  # PHASE 4: Cleanup
-  # ===========================================================================
-
-  - title: Delete redundant schema generation files
+  - title: Build and test all Go code
     description: |
-      Remove files that are now replaced by OpenAPI + @hey-api approach.
+      Test Phase 4:
+      ```bash
+      go build ./...
+      go test ./...
+      ```
+    completed: false
 
-      Delete:
-      - `services/price-service/cmd/schema-gen/` (entire directory)
-      - `scripts/generate-schemas.ts`
-      - `src/lib/go-schemas/` (entire directory)
-      - `src/lib/go-rpc.ts`
-      - `shared/schemas/` (entire directory with *.json files)
-
-      These are all replaced by:
-      - Go swag annotations → OpenAPI spec
-      - @hey-api/openapi-ts → SDK + Zod schemas in src/lib/go-api/
-    completed: true
-
-  # ===========================================================================
-  # VERIFICATION
-  # ===========================================================================
-
-  - title: Verify end-to-end integration
+  # Phase 5: Documentation
+  - title: Update AGENTS.md with sqlc-only rule
     description: |
-      Run verification steps to ensure the migration is complete and working.
+      Goal: Forbid raw SQL, document sqlc-only rule
 
-      1. `swag init` in Go service - generates OpenAPI spec without errors
-      2. Go service serves `/docs/` with Swagger UI accessible
-      3. `pnpm generate:go-api` - generates SDK + Zod schemas without errors
-      4. `pnpm typecheck` - no TypeScript errors
-      5. `mise run test-all` - all 112 tests pass
+      Update `services/price-service/AGENTS.md`:
 
-      Also verify:
-      - OpenAPI spec at http://localhost:3003/docs/doc.json is valid
-      - Generated files exist in src/lib/go-api/
-      - All oRPC handlers work with new SDK
-    completed: true
+      Add section:
+      ```markdown
+      ## Database Access Rules
 
-  # ===========================================================================
-  # COLLABORATIVE REVIEW
-  # ===========================================================================
+      ### REQUIRED: Use sqlc for ALL queries
 
-  - title: "Collaborative Review: OpenAPI Migration"
+      ```go
+      // CORRECT - type-safe, compile-time validated
+      store, err := queries.CreateStore(ctx, sqlcgen.CreateStoreParams{...})
+      ```
+
+      ```go
+      // FORBIDDEN - compiles with wrong columns, fails at runtime
+      pool.Exec(ctx, `INSERT INTO stores ...`)
+      ```
+
+      ### Adding New Queries
+
+      1. Add SQL to `internal/database/queries/*.sql`
+      2. Run `mise run sqlc-generate`
+      3. Use generated functions from `internal/database/sqlcgen/`
+
+      ### Why?
+      - Raw SQL compiles even with wrong column names
+      - Errors only appear at runtime
+      - sqlc catches ALL mismatches at compile time
+      ```
+    completed: false
+
+  - title: Verify no raw SQL remains
+    description: |
+      Test Phase 5:
+      ```bash
+      grep -r "pool\.\(Exec\|Query\)" internal/  # should return 0 results
+      ```
+    completed: false
+
+  # Final Verification
+  - title: Run full verification checklist
+    description: |
+      After all phases, verify:
+      - [ ] `go build ./...` passes
+      - [ ] `go test ./...` passes
+      - [ ] `grep -r "pool\.\(Exec\|Query\)" internal/` returns nothing
+      - [ ] Ingestion creates stores: `SELECT COUNT(*) FROM stores WHERE chain_slug='konzum'`
+      - [ ] Ingestion creates items: `SELECT COUNT(*) FROM retailer_items WHERE chain_slug='konzum'`
+      - [ ] Barcodes saved: `SELECT COUNT(*) FROM retailer_item_barcodes`
+      - [ ] AGENTS.md has sqlc-only rule
+    completed: false
+
+  # Collaborative Review
+  - title: "Collaborative Review: Schema Type Safety Migration"
     description: |
       Multi-model collaborative review with weighted consensus.
 
@@ -259,10 +219,10 @@ tasks:
       - Document consensus and any dissenting opinions
 
       ## Review Focus Areas
-      - Go swag annotations are complete and accurate
-      - OpenAPI spec matches actual handler behavior
-      - Generated SDK types are correct
-      - Handler migration preserves all functionality
-      - No security regressions (auth, validation)
-      - Cleanup didn't remove anything still in use
-    completed: true
+      - Bugs and logic errors in sqlc query conversions
+      - Security vulnerabilities (SQL injection prevention)
+      - Code quality and patterns consistency
+      - Architecture alignment with existing codebase
+      - Edge cases in barcode handling
+      - Migration safety (nullable columns, indexes)
+    completed: false

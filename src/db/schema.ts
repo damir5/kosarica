@@ -181,7 +181,7 @@ export const retailerItems = pgTable(
 	{
 		id: cuid2("rit").primaryKey(),
 		retailerItemId: integer("retailer_item_id").notNull(),
-		barcode: text("barcode").notNull(), // EAN-13, EAN-8, etc.
+		barcode: text("barcode"), // EAN-13, EAN-8, etc. (nullable - legacy column, not used)
 		isPrimary: boolean("is_primary").default(false),
 		createdAt: timestamp("created_at").defaultNow(),
 		name: text("name").notNull(),

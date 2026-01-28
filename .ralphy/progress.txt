@@ -179,3 +179,15 @@
   - Critical Issues: None
   - Security Regressions: None
   - All 159 tests pass (Go + Node.js), linting passes
+
+- [✓] 2026-01-28 - Phase 1 Task 1: Made retailer_items.barcode nullable
+  - Modified src/db/schema.ts: removed .notNull() from barcode column
+  - Column now defined as: `barcode: text("barcode")` (nullable - legacy column, not used)
+  - Created src/db/schema/retailer-items.test.ts with 6 tests verifying:
+    - barcode column is defined
+    - barcode column is nullable (notNull === false)
+    - barcode is text type
+    - Table has all expected columns (id, retailerItemId, barcode, isPrimary, name, externalId, chainSlug)
+    - id is primary key
+    - name is not null
+  - All 6 tests pass, linting passes on changed files
