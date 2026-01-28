@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -295,7 +296,27 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 	if err != nil {
 		return 0, 0, nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+
+	// Track commit state to prevent rollback after commit
+	txCommitted := false
+
+	// Defer rollback with SEPARATE context
+	defer func() {
+		if txCommitted {
+			return // Already committed, don't rollback
+		}
+
+		// Create a new context with timeout for rollback
+		// This ensures rollback can complete even if original ctx is canceled
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := tx.Rollback(rollbackCtx); err != nil {
+			log.Error().Err(err).Msg("Failed to rollback transaction (connection may be closed)")
+		}
+	}()
+
+	log.Debug().Str("operation", "persistRowsForStore").Msg("Transaction began")
 
 	// Use sqlc queries with transaction
 	txQueries := sqlcgen.New(tx)
@@ -378,6 +399,9 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 	if err := tx.Commit(ctx); err != nil {
 		return 0, 0, nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	txCommitted = true
+
+	log.Debug().Str("operation", "persistRowsForStore").Msg("Transaction committed")
 
 	log.Info().Str("store_id", storeID).Str("price_group_id", group.ID).Int("item_count", len(itemPrices)).Msg("Assigned store to price group")
 

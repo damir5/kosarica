@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
+	"github.com/rs/zerolog/log"
 )
 
 // FindOrCreatePriceGroup finds an existing price group by hash or creates a new one
@@ -80,7 +81,27 @@ func BulkInsertGroupPrices(ctx context.Context, groupID string, prices []GroupPr
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+
+	// Track commit state to prevent rollback after commit
+	txCommitted := false
+
+	// Defer rollback with SEPARATE context
+	defer func() {
+		if txCommitted {
+			return // Already committed, don't rollback
+		}
+
+		// Create a new context with timeout for rollback
+		// This ensures rollback can complete even if original ctx is canceled
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := tx.Rollback(rollbackCtx); err != nil {
+			log.Error().Err(err).Msg("Failed to rollback transaction (connection may be closed)")
+		}
+	}()
+
+	log.Debug().Str("operation", "BulkInsertGroupPrices").Msg("Transaction began")
 
 	txQueries := sqlcgen.New(tx)
 	now := time.Now()
@@ -113,6 +134,9 @@ func BulkInsertGroupPrices(ctx context.Context, groupID string, prices []GroupPr
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	txCommitted = true
+
+	log.Debug().Str("operation", "BulkInsertGroupPrices").Msg("Transaction committed")
 
 	return nil
 }
@@ -127,7 +151,27 @@ func AssignStoreToGroup(ctx context.Context, storeID, groupID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+
+	// Track commit state to prevent rollback after commit
+	txCommitted := false
+
+	// Defer rollback with SEPARATE context
+	defer func() {
+		if txCommitted {
+			return // Already committed, don't rollback
+		}
+
+		// Create a new context with timeout for rollback
+		// This ensures rollback can complete even if original ctx is canceled
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := tx.Rollback(rollbackCtx); err != nil {
+			log.Error().Err(err).Msg("Failed to rollback transaction (connection may be closed)")
+		}
+	}()
+
+	log.Debug().Str("operation", "AssignStoreToGroup").Msg("Transaction began")
 
 	txQueries := sqlcgen.New(tx)
 	now := time.Now()
@@ -177,6 +221,9 @@ func AssignStoreToGroup(ctx context.Context, storeID, groupID string) error {
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	txCommitted = true
+
+	log.Debug().Str("operation", "AssignStoreToGroup").Msg("Transaction committed")
 
 	return nil
 }

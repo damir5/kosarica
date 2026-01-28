@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
+	"github.com/rs/zerolog/log"
 )
 
 // ListRunsRequest represents query parameters for listing ingestion runs
@@ -708,7 +710,27 @@ func DeleteRun(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to begin transaction"})
 		return
 	}
-	defer tx.Rollback(ctx)
+
+	// Track commit state to prevent rollback after commit
+	txCommitted := false
+
+	// Defer rollback with SEPARATE context
+	defer func() {
+		if txCommitted {
+			return // Already committed, don't rollback
+		}
+
+		// Create a new context with timeout for rollback
+		// This ensures rollback can complete even if original ctx is canceled
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := tx.Rollback(rollbackCtx); err != nil {
+			log.Error().Err(err).Msg("Failed to rollback transaction (connection may be closed)")
+		}
+	}()
+
+	log.Debug().Str("operation", "DeleteRun").Msg("Transaction began")
 
 	// Use sqlc queries with transaction
 	txQueries := sqlcgen.New(tx)
@@ -750,6 +772,9 @@ func DeleteRun(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
 		return
 	}
+	txCommitted = true
+
+	log.Debug().Str("operation", "DeleteRun").Msg("Transaction committed")
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Run deleted successfully",
