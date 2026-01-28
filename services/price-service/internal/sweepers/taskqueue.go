@@ -9,6 +9,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Note: This file uses raw SQL for the recover_orphaned_tasks() stored procedure
+// because sqlc cannot infer the return type of PL/pgSQL functions that return TABLE types.
+// The stored procedure returns TABLE(recovered_count integer, failed_count integer).
+
 // TaskQueueSweeper periodically recovers orphaned tasks
 type TaskQueueSweeper struct {
 	pool     *pgxpool.Pool

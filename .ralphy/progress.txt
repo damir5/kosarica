@@ -430,3 +430,32 @@
     - jobs/cleanup_database.go
     - sweepers/taskqueue.go
     - taskqueue/queue.go
+
+- [✓] 2026-01-28 - Phase 4 (Complete): Convert remaining 4 Go files to sqlc
+  - Migrated `internal/workers/worker.go` to use sqlc:
+    - `processTask`: now uses `queries.SetTaskProcessingAny()` instead of raw SQL
+    - Added sqlcgen import
+  - Migrated `internal/jobs/cleanup_database.go` to use sqlc:
+    - `cleanupExpiredExceptionsImpl`: now uses `queries.DeleteExpiredPriceExceptions()`
+    - `cleanupOrphanPriceGroupsImpl`: now uses `queries.DeleteOrphanGroupPrices()` and `queries.DeleteOrphanPriceGroups()`
+    - Added pgtype import for timestamp conversion
+  - Updated `internal/sweepers/taskqueue.go`:
+    - Kept raw SQL for `recover_orphaned_tasks()` stored procedure
+    - Added documentation explaining why raw SQL is needed (sqlc can't infer TABLE return types)
+  - Migrated `internal/taskqueue/queue.go` to use sqlc:
+    - `ScheduleTask`: now uses `queries.ScheduleTask()` with sqlcgen.ScheduleTaskParams
+    - `CancelTask`: now uses `queries.CancelTask()`
+    - `GetTask`: now uses `queries.GetTask()` with type conversion from sqlcgen.TaskQueue
+    - Kept raw SQL for stored procedures: ClaimTasks, CompleteTask, FailTask, CleanupOldTasks
+    - Added documentation explaining which methods use sqlc vs raw SQL
+  - Added sqlc query `SetTaskProcessingAny` to taskqueue.sql (without WHERE status clause)
+  - Regenerated sqlc types with `sqlc generate`
+  - Created 4 test files verifying sqlc migration:
+    - `internal/workers/worker_sqlc_test.go` (4 tests)
+    - `internal/jobs/cleanup_database_sqlc_test.go` (5 tests)
+    - `internal/taskqueue/queue_sqlc_test.go` (8 tests)
+    - `internal/sweepers/taskqueue_sqlc_test.go` (4 tests)
+  - All Go tests pass: `go test -short ./...`
+  - go vet linting passes: `go vet ./...`
+  - go build passes: `go build ./...`
+  - Phase 4 complete: 14/14 files converted to sqlc (with documented exceptions for stored procedures)

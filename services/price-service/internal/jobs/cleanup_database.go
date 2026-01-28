@@ -2,27 +2,24 @@ package jobs
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 )
 
 // cleanupExpiredExceptionsImpl removes expired price exceptions from the database
 // Returns the number of exceptions deleted
 func cleanupExpiredExceptionsImpl(ctx context.Context) (int, error) {
 	pool := getPool()
+	queries := sqlcgen.New(pool)
 
-	result, err := pool.Exec(ctx, `
-		DELETE FROM store_price_exceptions
-		WHERE expires_at <= NOW()
-	`)
-
+	rowsAffected, err := queries.DeleteExpiredPriceExceptions(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup expired exceptions: %w", err)
+		return 0, err
 	}
 
-	rowsAffected := result.RowsAffected()
 	return int(rowsAffected), nil
 }
 
@@ -31,51 +28,27 @@ func cleanupExpiredExceptionsImpl(ctx context.Context) (int, error) {
 // Returns the number of groups deleted
 func cleanupOrphanPriceGroupsImpl(ctx context.Context, age time.Duration) (int, error) {
 	pool := getPool()
+	queries := sqlcgen.New(pool)
 
 	// Delete price groups that:
 	// 1. Have no active store memberships (store_count = 0)
 	// 2. Haven't been seen in the specified age period
 	// 3. Are not referenced by any historical store_group_history entries
 	cutoffTime := time.Now().Add(-age)
+	pgCutoffTime := pgtype.Timestamp{Time: cutoffTime, Valid: true}
 
 	// First, delete orphan group prices
-	_, err := pool.Exec(ctx, `
-		DELETE FROM group_prices
-		WHERE price_group_id IN (
-			SELECT pg.id
-			FROM price_groups pg
-			WHERE pg.store_count = 0
-			  AND pg.last_seen_at < $1
-			  AND NOT EXISTS (
-				  SELECT 1
-				  FROM store_group_history sgh
-				  WHERE sgh.price_group_id = pg.id
-				    AND sgh.valid_to IS NULL
-			  )
-		)
-	`, cutoffTime)
+	err := queries.DeleteOrphanGroupPrices(ctx, pgCutoffTime)
 	if err != nil {
-		return 0, fmt.Errorf("failed to delete orphan group prices: %w", err)
+		return 0, err
 	}
 
 	// Then, delete the orphan price groups
-	result, err := pool.Exec(ctx, `
-		DELETE FROM price_groups
-		WHERE store_count = 0
-		  AND last_seen_at < $1
-		  AND NOT EXISTS (
-			  SELECT 1
-			  FROM store_group_history sgh
-			  WHERE sgh.price_group_id = price_groups.id
-			    AND sgh.valid_to IS NULL
-		  )
-	`, cutoffTime)
-
+	rowsAffected, err := queries.DeleteOrphanPriceGroups(ctx, pgCutoffTime)
 	if err != nil {
-		return 0, fmt.Errorf("failed to delete orphan price groups: %w", err)
+		return 0, err
 	}
 
-	rowsAffected := result.RowsAffected()
 	return int(rowsAffected), nil
 }
 

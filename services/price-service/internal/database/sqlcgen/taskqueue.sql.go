@@ -22,6 +22,63 @@ func (q *Queries) CancelTask(ctx context.Context, id string) error {
 	return err
 }
 
+const claimTasks = `-- name: ClaimTasks :many
+SELECT claim_tasks FROM claim_tasks($1, $2, $3)
+`
+
+type ClaimTasksParams struct {
+	PWorkerID  string `db:"p_worker_id" json:"p_worker_id"`
+	PTaskTypes string `db:"p_task_types" json:"p_task_types"`
+	PMaxTasks  int32  `db:"p_max_tasks" json:"p_max_tasks"`
+}
+
+func (q *Queries) ClaimTasks(ctx context.Context, arg ClaimTasksParams) ([]interface{}, error) {
+	rows, err := q.db.Query(ctx, claimTasks, arg.PWorkerID, arg.PTaskTypes, arg.PMaxTasks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []interface{}{}
+	for rows.Next() {
+		var claim_tasks interface{}
+		if err := rows.Scan(&claim_tasks); err != nil {
+			return nil, err
+		}
+		items = append(items, claim_tasks)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const cleanupOldTasksFunc = `-- name: CleanupOldTasksFunc :one
+SELECT cleanup_old_tasks($1)
+`
+
+func (q *Queries) CleanupOldTasksFunc(ctx context.Context, pDaysToKeep int32) (int32, error) {
+	row := q.db.QueryRow(ctx, cleanupOldTasksFunc, pDaysToKeep)
+	var cleanup_old_tasks int32
+	err := row.Scan(&cleanup_old_tasks)
+	return cleanup_old_tasks, err
+}
+
+const completeTaskFunc = `-- name: CompleteTaskFunc :one
+SELECT complete_task($1, $2::jsonb)
+`
+
+type CompleteTaskFuncParams struct {
+	PTaskID string `db:"p_task_id" json:"p_task_id"`
+	Column2 []byte `db:"column_2" json:"column_2"`
+}
+
+func (q *Queries) CompleteTaskFunc(ctx context.Context, arg CompleteTaskFuncParams) (bool, error) {
+	row := q.db.QueryRow(ctx, completeTaskFunc, arg.PTaskID, arg.Column2)
+	var complete_task bool
+	err := row.Scan(&complete_task)
+	return complete_task, err
+}
+
 const countTasksByStatus = `-- name: CountTasksByStatus :one
 SELECT COUNT(*) FROM task_queue WHERE status = $1
 `
@@ -31,6 +88,23 @@ func (q *Queries) CountTasksByStatus(ctx context.Context, status string) (int64,
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const failTaskFunc = `-- name: FailTaskFunc :one
+SELECT fail_task($1, $2, $3)
+`
+
+type FailTaskFuncParams struct {
+	PTaskID       string `db:"p_task_id" json:"p_task_id"`
+	PErrorMessage string `db:"p_error_message" json:"p_error_message"`
+	PRetry        bool   `db:"p_retry" json:"p_retry"`
+}
+
+func (q *Queries) FailTaskFunc(ctx context.Context, arg FailTaskFuncParams) (bool, error) {
+	row := q.db.QueryRow(ctx, failTaskFunc, arg.PTaskID, arg.PErrorMessage, arg.PRetry)
+	var fail_task bool
+	err := row.Scan(&fail_task)
+	return fail_task, err
 }
 
 const getTask = `-- name: GetTask :one
@@ -188,6 +262,17 @@ WHERE id = $1 AND status = 'claimed'
 
 func (q *Queries) SetTaskProcessing(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, setTaskProcessing, id)
+	return err
+}
+
+const setTaskProcessingAny = `-- name: SetTaskProcessingAny :exec
+UPDATE task_queue
+SET status = 'processing', updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) SetTaskProcessingAny(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, setTaskProcessingAny, id)
 	return err
 }
 

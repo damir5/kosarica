@@ -125,13 +125,18 @@ tasks:
       - `internal/pipeline/parse.go` → use queries from ingestion.sql ✅
       - `internal/pipeline/discover.go` → use queries from ingestion.sql ✅
       - `internal/pipeline/pipeline.go` → use queries from ingestion.sql ✅
-      - `internal/workers/worker.go` → use queries from workers.sql
-      - `internal/jobs/cleanup_database.go` → use queries from jobs.sql
-      - `internal/sweepers/taskqueue.go` → use queries from sweepers.sql
-      - `internal/taskqueue/queue.go` → use queries from taskqueue.sql
+      - `internal/workers/worker.go` → use queries from taskqueue.sql ✅
+      - `internal/jobs/cleanup_database.go` → use queries from price_groups.sql ✅
+      - `internal/sweepers/taskqueue.go` → raw SQL (stored procedure limitation) ✅
+      - `internal/taskqueue/queue.go` → use queries from taskqueue.sql ✅
 
-      Progress: 10/14 files converted (handlers, pipeline, database modules done)
-    completed: false
+      Progress: 14/14 files converted
+
+      Note: sweepers/taskqueue.go and parts of taskqueue/queue.go still use raw SQL
+      for stored procedure calls (claim_tasks, complete_task, fail_task, cleanup_old_tasks,
+      recover_orphaned_tasks) because sqlc cannot properly infer return types from
+      PL/pgSQL functions that return TABLE or record types.
+    completed: true
 
   - title: Build and test all Go code
     description: |
@@ -140,7 +145,7 @@ tasks:
       go build ./...
       go test ./...
       ```
-    completed: false
+    completed: true
 
   # Phase 5: Documentation
   - title: Update AGENTS.md with sqlc-only rule

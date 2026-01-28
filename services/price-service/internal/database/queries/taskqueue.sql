@@ -36,3 +36,23 @@ LIMIT $2 OFFSET $3;
 
 -- name: CountTasksByStatus :one
 SELECT COUNT(*) FROM task_queue WHERE status = $1;
+
+-- name: SetTaskProcessingAny :exec
+UPDATE task_queue
+SET status = 'processing', updated_at = NOW()
+WHERE id = $1;
+
+-- name: ClaimTasks :many
+SELECT * FROM claim_tasks($1, $2, $3);
+
+-- name: CompleteTaskFunc :one
+SELECT complete_task($1, $2::jsonb);
+
+-- name: FailTaskFunc :one
+SELECT fail_task($1, $2, $3);
+
+-- name: CleanupOldTasksFunc :one
+SELECT cleanup_old_tasks($1);
+
+-- Note: recover_orphaned_tasks() is a stored procedure that returns TABLE(recovered_count, failed_count)
+-- sqlc cannot infer the return type, so it must be called directly via pool.QueryRow

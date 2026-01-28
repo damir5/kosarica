@@ -4,8 +4,15 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 )
+
+// Note: Some methods in this file use raw SQL for stored procedure calls
+// because sqlc cannot properly infer return types for PL/pgSQL functions.
+// Methods using sqlc: ScheduleTask, CancelTask, GetTask
+// Methods using raw SQL: ClaimTasks, CompleteTask, FailTask, CleanupOldTasks
 
 type TaskQueue struct {
 	pool *pgxpool.Pool
@@ -48,20 +55,14 @@ func (q *TaskQueue) ScheduleTask(ctx context.Context, input ScheduleTaskInput) S
 		priority = input.Priority
 	}
 
-	var id string
-	if input.ScheduledAt != nil {
-		err = q.pool.QueryRow(ctx, `
-			INSERT INTO task_queue (task_type, payload, priority, scheduled_for, max_retries)
-			VALUES ($1, $2, $3, $4, $5)
-			RETURNING id
-		`, input.TaskType, payload, priority, input.ScheduledAt, maxRetries).Scan(&id)
-	} else {
-		err = q.pool.QueryRow(ctx, `
-			INSERT INTO task_queue (task_type, payload, priority, scheduled_for, max_retries)
-			VALUES ($1, $2, $3, NOW(), $4)
-			RETURNING id
-		`, input.TaskType, payload, priority, maxRetries).Scan(&id)
-	}
+	queries := sqlcgen.New(q.pool)
+	id, err := queries.ScheduleTask(ctx, sqlcgen.ScheduleTaskParams{
+		TaskType:   input.TaskType,
+		Payload:    payload,
+		Priority:   pgtype.Int4{Int32: int32(priority), Valid: true},
+		Column4:    input.ScheduledAt, // nil means NOW() via COALESCE
+		MaxRetries: pgtype.Int4{Int32: int32(maxRetries), Valid: true},
+	})
 
 	if err != nil {
 		return ScheduleTaskResult{Err: err}
@@ -128,31 +129,57 @@ func (q *TaskQueue) CleanupOldTasks(ctx context.Context, daysToKeep int) (int, e
 }
 
 func (q *TaskQueue) CancelTask(ctx context.Context, taskID string) error {
-	_, err := q.pool.Exec(ctx, `
-		UPDATE task_queue
-		SET status = 'cancelled', updated_at = NOW()
-		WHERE id = $1 AND status IN ('pending', 'claimed')
-	`, taskID)
-	return err
+	queries := sqlcgen.New(q.pool)
+	return queries.CancelTask(ctx, taskID)
 }
 
 func (q *TaskQueue) GetTask(ctx context.Context, taskID string) (*Task, error) {
-	var task Task
-	err := q.pool.QueryRow(ctx, `
-		SELECT id, task_type, payload, priority, status,
-		       scheduled_for, started_at, completed_at, failed_at,
-		       worker_id, retry_count, max_retries, error_message,
-		       created_at, updated_at
-		FROM task_queue
-		WHERE id = $1
-	`, taskID).Scan(
-		&task.ID, &task.TaskType, &task.Payload, &task.Priority, &task.Status,
-		&task.ScheduledFor, &task.StartedAt, &task.CompletedAt, &task.FailedAt,
-		&task.WorkerID, &task.RetryCount, &task.MaxRetries, &task.ErrorMessage,
-		&task.CreatedAt, &task.UpdatedAt,
-	)
+	queries := sqlcgen.New(q.pool)
+	sqlcTask, err := queries.GetTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
-	return &task, nil
+
+	// Convert sqlcgen.TaskQueue to taskqueue.Task
+	task := &Task{
+		ID:         sqlcTask.ID,
+		TaskType:   sqlcTask.TaskType,
+		Payload:    sqlcTask.Payload,
+		Priority:   int(sqlcTask.Priority.Int32),
+		Status:     TaskStatus(sqlcTask.Status),
+		RetryCount: int(sqlcTask.RetryCount.Int32),
+		MaxRetries: int(sqlcTask.MaxRetries.Int32),
+	}
+
+	// Handle nullable timestamp fields
+	if sqlcTask.ScheduledFor.Valid {
+		s := sqlcTask.ScheduledFor.Time.Format("2006-01-02 15:04:05")
+		task.ScheduledFor = &s
+	}
+	if sqlcTask.StartedAt.Valid {
+		s := sqlcTask.StartedAt.Time.Format("2006-01-02 15:04:05")
+		task.StartedAt = &s
+	}
+	if sqlcTask.CompletedAt.Valid {
+		s := sqlcTask.CompletedAt.Time.Format("2006-01-02 15:04:05")
+		task.CompletedAt = &s
+	}
+	if sqlcTask.FailedAt.Valid {
+		s := sqlcTask.FailedAt.Time.Format("2006-01-02 15:04:05")
+		task.FailedAt = &s
+	}
+	if sqlcTask.WorkerID.Valid {
+		task.WorkerID = &sqlcTask.WorkerID.String
+	}
+	if sqlcTask.ErrorMessage.Valid {
+		task.ErrorMessage = &sqlcTask.ErrorMessage.String
+	}
+	if sqlcTask.CreatedAt.Valid {
+		task.CreatedAt = sqlcTask.CreatedAt.Time.Format("2006-01-02 15:04:05")
+	}
+	if sqlcTask.UpdatedAt.Valid {
+		task.UpdatedAt = sqlcTask.UpdatedAt.Time.Format("2006-01-02 15:04:05")
+	}
+
+	return task, nil
 }

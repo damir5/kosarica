@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/taskqueue"
 )
 
@@ -147,11 +148,8 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 
 	// Transition to 'processing' status
 	pool := w.queue.GetPool()
-	_, err := pool.Exec(ctx, `
-		UPDATE task_queue
-		SET status = 'processing', updated_at = NOW()
-		WHERE id = $1
-		`, task.ID)
+	queries := sqlcgen.New(pool)
+	err := queries.SetTaskProcessingAny(ctx, task.ID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to mark task as processing")
 		w.queue.FailTask(ctx, task.ID, fmt.Sprintf("Status update failed: %v", err), false)
