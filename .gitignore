@@ -62,3 +62,4 @@ go.work.sum
 
 # Sisyphus work session tracking
 .sisyphus/
+log/
