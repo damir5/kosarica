@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/pipeline"
+	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -61,14 +62,16 @@ func IngestChain(c *gin.Context) {
 	pool := database.Pool()
 	ctx := c.Request.Context()
 
-	var runID int64
-	err := pool.QueryRow(ctx, `
+	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
+	now := time.Now()
+
+	_, err := pool.Exec(ctx, `
 		INSERT INTO ingestion_runs (
-			chain_slug, source, status, started_at, created_at
+			id, chain_slug, source, status, started_at, created_at
 		) VALUES (
-			$1, 'api', 'running', NOW(), NOW()
-		) RETURNING id
-	`, chainID).Scan(&runID)
+			$1, $2, 'api', 'running', $3, $4
+		)
+	`, runID, chainID, now, now)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -99,9 +102,9 @@ func IngestChain(c *gin.Context) {
 
 	// Return 202 Accepted immediately
 	c.JSON(http.StatusAccepted, IngestChainStartedResponse{
-		RunID:   strconv.FormatInt(runID, 10),
+		RunID:   runID,
 		Status:  "started",
-		PollURL: fmt.Sprintf("/internal/ingestion/runs/%s", strconv.FormatInt(runID, 10)),
+		PollURL: fmt.Sprintf("/internal/ingestion/runs/%s", runID),
 		Message: fmt.Sprintf("Ingestion started for chain %s", chainID),
 	})
 }
@@ -190,7 +193,7 @@ func ListIngestionRuns(c *gin.Context) {
 }
 
 // markRunFailed marks an ingestion run as failed
-func markRunFailed(ctx context.Context, runID int64, errorMsg string) {
+func markRunFailed(ctx context.Context, runID string, errorMsg string) {
 	pool := database.Pool()
 	_, err := pool.Exec(ctx, `
 		UPDATE ingestion_runs
@@ -200,12 +203,12 @@ func markRunFailed(ctx context.Context, runID int64, errorMsg string) {
 		WHERE id = $1
 	`, runID, fmt.Sprintf(`{"error": "%s"}`, errorMsg))
 	if err != nil {
-		log.Error().Err(err).Int64("runID", runID).Msg("Failed to mark run as failed")
+		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as failed")
 	}
 }
 
 // markRunCompleted marks an ingestion run as completed
-func markRunCompleted(ctx context.Context, runID int64, filesProcessed int, entriesPersisted int) {
+func markRunCompleted(ctx context.Context, runID string, filesProcessed int, entriesPersisted int) {
 	pool := database.Pool()
 	_, err := pool.Exec(ctx, `
 		UPDATE ingestion_runs
@@ -216,6 +219,6 @@ func markRunCompleted(ctx context.Context, runID int64, filesProcessed int, entr
 		WHERE id = $1
 	`, runID, filesProcessed, entriesPersisted)
 	if err != nil {
-		log.Error().Err(err).Int64("runID", runID).Msg("Failed to mark run as completed")
+		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as completed")
 	}
 }

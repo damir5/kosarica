@@ -39,6 +39,7 @@ const STUCK_RUN_TIMEOUT_MS = 30 * 60 * 1000;
 export async function claimDueJobs(): Promise<ClaimedJob[]> {
 	const db = getDb();
 	const now = new Date();
+	const nowIso = now.toISOString();
 
 	// Use raw SQL for the atomic claim with FOR UPDATE SKIP LOCKED
 	// Drizzle doesn't support FOR UPDATE SKIP LOCKED natively
@@ -50,7 +51,7 @@ export async function claimDueJobs(): Promise<ClaimedJob[]> {
 		WHERE id IN (
 			SELECT id FROM cron_jobs
 			WHERE enabled = true
-			AND next_run_at <= ${now}
+			AND next_run_at <= ${nowIso}::timestamptz
 			FOR UPDATE SKIP LOCKED
 		)
 		RETURNING

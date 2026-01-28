@@ -1,80 +1,83 @@
 /**
  * Job Scheduler for Ingestion Pipeline
  *
- * Uses node-cron for scheduling background jobs.
- * Runs in the main process - works with Vite bundling.
+ * Postgres-coordinated distributed cron scheduler.
+ *
+ * Architecture:
+ * - Uses node-cron for tick scheduling (every 10 seconds)
+ * - PostgreSQL advisory locks ensure single-leader execution
+ * - Jobs synced to cron_jobs table when instance becomes leader
+ * - Execution history stored in cron_runs table
+ *
+ * See AGENTS.md for details on adding new jobs.
  */
 
-import cron from "node-cron";
-import { runDailyIngestion } from "./workers/daily-ingestion";
 import { createLogger } from "@/utils/logger";
+import {
+	registerAllCronJobs,
+	startTickLoop,
+	stopTickLoop,
+	getSchedulerHealth,
+	executeJobManually,
+} from "./cron";
 
 const log = createLogger("scheduler");
-
-let scheduledTask: cron.ScheduledTask | null = null;
 
 /**
  * Initialize and start the job scheduler.
  *
- * Jobs run in the main process. For development, jobs can
- * also be triggered manually via API.
+ * Execution flow:
+ * 1. registerAllCronJobs() populates in-memory registry (no DB access)
+ * 2. startTickLoop() starts node-cron ticking every 10 seconds
+ * 3. First tick: try advisory lock -> if leader, sync jobs to DB
+ * 4. Subsequent ticks: find due jobs, execute them
  */
 export function startScheduler(): void {
-	if (scheduledTask) {
-		log.warn("Scheduler already running");
-		return;
-	}
+	// 1. Register all job handlers in memory (no DB access)
+	registerAllCronJobs();
 
-	// Run at 6 AM every day (Croatian time is typically UTC+1 or UTC+2)
-	scheduledTask = cron.schedule("0 6 * * *", async () => {
-		log.info("Starting scheduled daily ingestion");
-		try {
-			const result = await runDailyIngestion();
-			log.info("Scheduled ingestion completed", { ...result });
-		} catch (error) {
-			log.error("Scheduled ingestion failed", {
-				error: error instanceof Error ? error.message : String(error),
-			});
-		}
-	});
+	// 2. Start tick loop (uses node-cron to tick every 10 seconds)
+	startTickLoop();
 
-	log.info("Scheduler started", { jobs: ["daily-ingestion"] });
+	log.info("Cron scheduler started");
 }
 
 /**
  * Stop the job scheduler gracefully.
+ *
+ * Note: Advisory lock is released automatically when the tick loop stops.
  */
 export function stopScheduler(): void {
-	if (!scheduledTask) {
-		return;
-	}
-
-	log.info("Stopping scheduler...");
-	scheduledTask.stop();
-	scheduledTask = null;
+	stopTickLoop();
 	log.info("Scheduler stopped");
 }
 
 /**
  * Manually trigger a job by name.
- * Useful for API-triggered ingestion runs.
+ * Useful for API-triggered runs.
  *
- * @param jobName - Name of the job to run
+ * @param jobName - Name/ID of the job to run
+ * @returns The run ID
  */
-export async function runJob(jobName: string): Promise<void> {
+export async function runJob(jobName: string): Promise<bigint> {
 	log.info("Manually triggering job", { jobName });
 
-	if (jobName === "daily-ingestion") {
-		const result = await runDailyIngestion();
-		log.info("Manual job completed", { jobName, ...result });
-	} else {
-		throw new Error(`Unknown job: ${jobName}`);
-	}
+	const runId = await executeJobManually(jobName);
+
+	log.info("Manual job completed", { jobName, runId });
+	return runId;
 }
 
 /**
  * Check if the scheduler is running.
  */
 export function isSchedulerRunning(): boolean {
-	return scheduledTask !== null;
+	return getSchedulerHealth().isRunning;
+}
+
+/**
+ * Check if this instance is the scheduler leader.
+ */
+export function isSchedulerLeader(): boolean {
+	return getSchedulerHealth().isLeader;
 }

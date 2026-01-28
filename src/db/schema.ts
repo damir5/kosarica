@@ -194,9 +194,14 @@ export const retailerItems = pgTable(
 		unitQuantity: text("unit_quantity"),
 		imageUrl: text("image_url"),
 		chainSlug: text("chain_slug"),
+		// Archive tracking for traceability
+		archiveId: text("archive_id").references(() => archives.id, {
+			onDelete: "set null",
+		}),
 	},
 	(table) => ({
 		barcodeIdx: index("retailer_item_barcodes_barcode_idx").on(table.barcode),
+		archiveIdIdx: index("idx_retailer_items_archive_id").on(table.archiveId),
 	}),
 );
 
@@ -331,34 +336,83 @@ export const storeItemPricePeriods = pgTable(
 );
 
 // ============================================================================
+// Archives: track all downloaded files
+// ============================================================================
+
+export const archives = pgTable(
+	"archives",
+	{
+		id: text("id").primaryKey(),
+		chainSlug: text("chain_slug").notNull(),
+		sourceUrl: text("source_url").notNull(),
+		filename: text("filename").notNull(),
+		originalFormat: text("original_format").notNull(),
+		archivePath: text("archive_path").notNull(),
+		archiveType: text("archive_type").notNull(),
+		contentType: text("content_type"),
+		fileSize: bigint("file_size", { mode: "number" }),
+		compressedSize: bigint("compressed_size", { mode: "number" }),
+		checksum: text("checksum").notNull(),
+		downloadedAt: timestamp("downloaded_at", { withTimezone: true }).notNull(),
+		metadata: jsonb("metadata").default({}),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		chainSlugIdx: index("idx_archives_chain_slug").on(table.chainSlug),
+		downloadedAtIdx: index("idx_archives_downloaded_at").on(table.downloadedAt),
+		checksumIdx: index("idx_archives_checksum").on(table.checksum),
+		chainDownloadedIdx: index("idx_archives_chain_downloaded").on(
+			table.chainSlug,
+			table.downloadedAt,
+		),
+	}),
+);
+
+// ============================================================================
 // Ingestion: ingestion_runs, ingestion_files, ingestion_file_entries, ingestion_errors
 // ============================================================================
 
-export const ingestionRuns = pgTable("ingestion_runs", {
-	id: bigserial({ mode: "bigint" }).primaryKey(),
-	chainSlug: text("chain_slug")
-		.notNull()
-		.references(() => chains.slug, { onDelete: "cascade" }),
-	source: text("source").notNull(), // 'cli', 'worker', 'scheduled'
-	status: text("status").notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
-	startedAt: timestamp("started_at"),
-	completedAt: timestamp("completed_at"),
-	totalFiles: integer("total_files").default(0),
-	processedFiles: integer("processed_files").default(0),
-	totalEntries: integer("total_entries").default(0),
-	processedEntries: integer("processed_entries").default(0),
-	errorCount: integer("error_count").default(0),
-	metadata: text("metadata"), // JSON for additional run info
-	// Rerun support
-	parentRunId: bigint("parent_run_id", { mode: "bigint" }), // FK to ingestionRuns.id for rerun tracking
-	rerunType: text("rerun_type"), // 'file', 'chunk', 'entry', null for original runs
-	rerunTargetId: text("rerun_target_id"), // ID of file/chunk/entry being rerun
-	createdAt: timestamp("created_at").defaultNow(),
-});
+export const ingestionRuns = pgTable(
+	"ingestion_runs",
+	{
+		id: text("id").primaryKey(), // CUID2 format: run_xxx
+		chainSlug: text("chain_slug")
+			.notNull()
+			.references(() => chains.slug, { onDelete: "cascade" }),
+		source: text("source").notNull(), // 'cli', 'worker', 'scheduled'
+		status: text("status").notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
+		startedAt: timestamp("started_at"),
+		completedAt: timestamp("completed_at"),
+		totalFiles: integer("total_files").default(0),
+		processedFiles: integer("processed_files").default(0),
+		totalEntries: integer("total_entries").default(0),
+		processedEntries: integer("processed_entries").default(0),
+		errorCount: integer("error_count").default(0),
+		metadata: text("metadata"), // JSON for additional run info
+		// Archive tracking
+		archiveId: text("archive_id").references(() => archives.id, {
+			onDelete: "set null",
+		}),
+		sourceUrl: text("source_url"),
+		// Rerun support
+		parentRunId: text("parent_run_id"), // FK to ingestionRuns.id for rerun tracking
+		rerunType: text("rerun_type"), // 'file', 'chunk', 'entry', null for original runs
+		rerunTargetId: text("rerun_target_id"), // ID of file/chunk/entry being rerun
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => ({
+		archiveIdIdx: index("idx_ingestion_runs_archive_id").on(table.archiveId),
+	}),
+);
 
 export const ingestionFiles = pgTable("ingestion_files", {
 	id: bigserial({ mode: "bigint" }).primaryKey(),
-	runId: bigint("run_id", { mode: "bigint" })
+	runId: text("run_id")
 		.notNull()
 		.references(() => ingestionRuns.id, { onDelete: "cascade" }),
 	filename: text("filename").notNull(),
@@ -422,7 +476,7 @@ export const ingestionFileEntries = pgTable("ingestion_file_entries", {
 
 export const ingestionErrors = pgTable("ingestion_errors", {
 	id: bigserial({ mode: "bigint" }).primaryKey(),
-	runId: bigint("run_id", { mode: "bigint" })
+	runId: text("run_id")
 		.notNull()
 		.references(() => ingestionRuns.id, { onDelete: "cascade" }),
 	fileId: bigint("file_id", { mode: "bigint" }).references(
@@ -448,12 +502,9 @@ export const ingestionErrors = pgTable("ingestion_errors", {
 export const retailerItemsFailed = pgTable("retailer_items_failed", {
 	id: cuid2("id").primaryKey(),
 	chainSlug: text("chain_slug").notNull(),
-	runId: bigint("run_id", { mode: "bigint" }).references(
-		() => ingestionRuns.id,
-		{
-			onDelete: "cascade",
-		},
-	),
+	runId: text("run_id").references(() => ingestionRuns.id, {
+		onDelete: "cascade",
+	}),
 	fileId: bigint("file_id", { mode: "bigint" }).references(
 		() => ingestionFiles.id,
 		{
@@ -760,6 +811,104 @@ export const canonicalBarcodes = pgTable(
 	(table) => ({
 		productIdIdx: index("canonical_barcodes_product_id_idx").on(
 			table.productId,
+		),
+	}),
+);
+
+// ============================================================================
+// Cron System: cron_jobs (definitions), cron_runs (execution history)
+// Postgres-coordinated scheduling with advisory locks for distributed execution
+// ============================================================================
+
+export const cronJobs = pgTable(
+	"cron_jobs",
+	{
+		id: text("id").primaryKey(), // e.g., "daily-ingestion"
+		name: text("name").notNull(),
+		cronExpression: text("cron_expression").notNull(), // e.g., "0 6 * * *"
+		timezone: text("timezone").default("UTC"),
+		taskType: text("task_type").notNull(), // e.g., "ingestion"
+		taskPayload: jsonb("task_payload"), // optional JSON payload for the task
+		enabled: boolean("enabled").default(true),
+		nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+		lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+		lastRunStatus: text("last_run_status"), // "completed", "failed", "skipped"
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		// Index for finding due jobs efficiently
+		nextRunIdx: index("cron_jobs_next_run_idx")
+			.on(table.nextRunAt)
+			.where(sql`enabled = true`),
+		enabledIdx: index("cron_jobs_enabled_idx").on(table.enabled),
+	}),
+);
+
+export const cronRuns = pgTable(
+	"cron_runs",
+	{
+		id: bigserial({ mode: "bigint" }).primaryKey(),
+		jobId: text("job_id")
+			.notNull()
+			.references(() => cronJobs.id, { onDelete: "cascade" }),
+		idempotencyKey: text("idempotency_key").notNull(), // e.g., "cron:daily-ingestion:2024-01-15T06:00:00Z"
+		status: text("status").notNull().default("pending"), // "pending", "running", "completed", "failed", "skipped"
+		scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+		startedAt: timestamp("started_at", { withTimezone: true }),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+		errorMessage: text("error_message"),
+		errorDetails: text("error_details"), // JSON with stack trace, context
+		tasksEnqueued: integer("tasks_enqueued").default(0),
+		metadata: jsonb("metadata"), // Additional run info
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		// Critical: prevent duplicate runs for same job+schedule
+		idempotencyIdx: uniqueIndex("cron_runs_idempotency_idx").on(
+			table.idempotencyKey,
+		),
+		jobIdIdx: index("cron_runs_job_id_idx").on(table.jobId),
+		statusIdx: index("cron_runs_status_idx").on(table.status),
+		// For listing recent runs per job
+		jobCreatedIdx: index("cron_runs_job_created_idx").on(
+			table.jobId,
+			table.createdAt,
+		),
+	}),
+);
+
+// ============================================================================
+// Task Queue: Cross-service worker coordination
+// ============================================================================
+
+export const taskQueue = pgTable(
+	"task_queue",
+	{
+		id: text("id").primaryKey().default(sql`gen_random_uuid()::TEXT`),
+		taskType: text("task_type").notNull(),
+		payload: jsonb("payload").notNull(),
+		priority: integer("priority").default(0),
+		status: text("status").notNull().default("pending"),
+		scheduledFor: timestamp("scheduled_for").default(sql`NOW()`),
+		startedAt: timestamp("started_at"),
+		completedAt: timestamp("completed_at"),
+		failedAt: timestamp("failed_at"),
+		workerId: text("worker_id"),
+		retryCount: integer("retry_count").default(0),
+		maxRetries: integer("max_retries").default(3),
+		errorMessage: text("error_message"),
+		createdAt: timestamp("created_at").default(sql`NOW()`),
+		updatedAt: timestamp("updated_at").default(sql`NOW()`),
+	},
+	(table) => ({
+		statusIdx: index("idx_task_queue_status").on(table.status),
+		scheduledIdx: index("idx_task_queue_scheduled").on(table.scheduledFor),
+		workerIdx: index("idx_task_queue_worker").on(table.workerId),
+		typePriorityIdx: index("idx_task_queue_type_priority").on(
+			table.taskType,
+			table.priority,
+			table.scheduledFor,
 		),
 	}),
 );

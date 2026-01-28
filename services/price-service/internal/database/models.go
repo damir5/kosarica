@@ -90,29 +90,29 @@ type StoreItemState struct {
 
 // IngestionRun represents a single ingestion run for a chain
 type IngestionRun struct {
-	ID             int64      `json:"id"`               // CUID2
-	ChainSlug      string     `json:"chain_slug"`       // FK to chains.slug
-	Source         string     `json:"source"`           // 'cli', 'worker', 'scheduled'
-	Status         string     `json:"status"`           // 'pending', 'running', 'completed', 'failed'
-	StartedAt      *time.Time `json:"started_at"`
-	CompletedAt    *time.Time `json:"completed_at"`
-	TotalFiles     *int       `json:"total_files"`
-	ProcessedFiles *int       `json:"processed_files"`
-	TotalEntries   *int       `json:"total_entries"`
-	ProcessedEntries *int     `json:"processed_entries"`
-	ErrorCount     *int       `json:"error_count"`
-	Metadata       *string    `json:"metadata"`         // JSON for additional run info
+	ID               string     `json:"id"`               // CUID2 format: run_xxx
+	ChainSlug        string     `json:"chain_slug"`       // FK to chains.slug
+	Source           string     `json:"source"`           // 'cli', 'worker', 'scheduled'
+	Status           string     `json:"status"`           // 'pending', 'running', 'completed', 'failed'
+	StartedAt        *time.Time `json:"started_at"`
+	CompletedAt      *time.Time `json:"completed_at"`
+	TotalFiles       *int       `json:"total_files"`
+	ProcessedFiles   *int       `json:"processed_files"`
+	TotalEntries     *int       `json:"total_entries"`
+	ProcessedEntries *int       `json:"processed_entries"`
+	ErrorCount       *int       `json:"error_count"`
+	Metadata         *string    `json:"metadata"`       // JSON for additional run info
 	// Rerun support
-	ParentRunID    *int64     `json:"parent_run_id"`    // For rerun tracking
-	RerunType      *string    `json:"rerun_type"`       // 'file', 'chunk', 'entry'
-	RerunTargetID  *int64    `json:"rerun_target_id"`  // ID of file/chunk/entry being rerun
-	CreatedAt      time.Time  `json:"created_at"`
+	ParentRunID   *string `json:"parent_run_id"`   // For rerun tracking
+	RerunType     *string `json:"rerun_type"`      // 'file', 'chunk', 'entry'
+	RerunTargetID *string `json:"rerun_target_id"` // ID of file/chunk/entry being rerun
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // IngestionFile represents a file being ingested
 type IngestionFile struct {
-	ID             *int64     `json:"id"`              // CUID2
-	RunID          int64     `json:"run_id"`          // FK to ingestion_runs.id
+	ID    *int64 `json:"id"`     // bigserial
+	RunID string `json:"run_id"` // FK to ingestion_runs.id (CUID2)
 	Filename       string     `json:"filename"`        // Original filename
 	FileType       string     `json:"file_type"`       // 'csv', 'xml', 'xlsx', 'zip'
 	FileSize       *int       `json:"file_size"`       // Size in bytes
@@ -130,8 +130,8 @@ type IngestionFile struct {
 
 // IngestionError represents an error during ingestion
 type IngestionError struct {
-	ID            int64     `json:"id"`            // CUID2
-	RunID         int64     `json:"run_id"`         // FK to ingestion_runs.id
+	ID    int64  `json:"id"`     // bigserial
+	RunID string `json:"run_id"` // FK to ingestion_runs.id (CUID2)
 	FileID        *string   `json:"file_id"`       // FK to ingestion_files.id
 	ChunkID       *string   `json:"chunk_id"`       // FK to ingestion_chunks.id
 	EntryID       *string   `json:"entry_id"`      // FK to ingestion_file_entries.id

@@ -5,6 +5,7 @@ import {
 	getStoresByChain,
 	listCatalogPrices,
 } from "./catalog-prices";
+import * as cron from "./cron";
 import * as priceService from "./price-service";
 import {
 	approveMatch,
@@ -128,6 +129,15 @@ export default {
 			resolveSuspicious,
 			searchProducts,
 			getStats,
+		},
+		cron: {
+			list: cron.list,
+			get: cron.get,
+			listRuns: cron.listRuns,
+			trigger: cron.trigger,
+			toggle: cron.toggle,
+			health: cron.health,
+			getRun: cron.getRun,
 		},
 	},
 };

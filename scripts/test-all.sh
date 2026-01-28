@@ -124,7 +124,7 @@ done
 echo "Go service healthy (PID=${GO_PID})"
 
 echo "Running frontend tests..."
-pnpm test || TEST_EXIT=$?
+GO_SERVICE_FOR_TESTS=1 pnpm test || TEST_EXIT=$?
 TEST_EXIT=${TEST_EXIT:-0}
 
 if [ "$TEST_EXIT" -ne 0 ]; then

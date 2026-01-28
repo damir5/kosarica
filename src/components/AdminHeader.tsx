@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+	Clock,
 	Database,
 	DollarSign,
 	Home,
@@ -16,6 +17,7 @@ const adminNavItems = [
 	{ to: "/admin/stores", label: "Stores", icon: Store },
 	{ to: "/admin/catalog-prices", label: "Prices", icon: DollarSign },
 	{ to: "/admin/ingestion", label: "Ingestion", icon: Database },
+	{ to: "/admin/cron", label: "Cron", icon: Clock },
 	{ to: "/admin/settings", label: "Settings", icon: Settings },
 	{ to: "/admin/config", label: "Config", icon: Wrench },
 ];

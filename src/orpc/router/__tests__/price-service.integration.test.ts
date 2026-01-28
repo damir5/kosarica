@@ -24,9 +24,8 @@ describe("Price Service Proxy Integration Tests", () => {
 		if (!goServiceAvailable) {
 			console.log(
 				`\nSkipping Price Service integration tests - GO_SERVICE_FOR_TESTS not set\n` +
-					`To run these tests:\n` +
-					`  1. Start Go service: docker compose -f docker-compose-test.yml up -d\n` +
-					`  2. Set GO_SERVICE_FOR_TESTS=1 and run tests: GO_SERVICE_FOR_TESTS=1 pnpm test\n`,
+					`To run these tests, use: mise run test-all (from workspace root)\n` +
+					`This starts the Go service and sets GO_SERVICE_FOR_TESTS=1 automatically.\n`,
 			);
 			return;
 		}
@@ -53,13 +52,14 @@ describe("Price Service Proxy Integration Tests", () => {
 	describe("Health Check", () => {
 		it.skipIf(!goServiceAvailable)("should return status: ok", async () => {
 			const result = await orpc.admin.ingestion.getStats({
-				from: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-				to: new Date().toISOString(),
+				timeRange: "24h",
 			});
 
-			// This tests connectivity - stats endpoint should return buckets array
+			// This tests connectivity - stats endpoint should return IngestionStats structure
 			expect(result).toBeDefined();
-			expect(result.buckets).toBeInstanceOf(Array);
+			expect(result.timeRange).toBe("24h");
+			expect(result.runs).toBeDefined();
+			expect(typeof result.runs.total).toBe("number");
 		});
 	});
 

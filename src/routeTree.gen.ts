@@ -22,6 +22,7 @@ import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users
 import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stores'
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as AdminAdminIngestionRouteImport } from './routes/_admin.admin.ingestion'
+import { Route as AdminAdminCronRouteImport } from './routes/_admin.admin.cron'
 import { Route as AdminAdminCatalogPricesRouteImport } from './routes/_admin.admin.catalog-prices'
 import { Route as AdminAdminStoresIndexRouteImport } from './routes/_admin.admin.stores.index'
 import { Route as AdminAdminIngestionIndexRouteImport } from './routes/_admin.admin.ingestion.index'
@@ -95,6 +96,11 @@ const AdminAdminIngestionRoute = AdminAdminIngestionRouteImport.update({
   path: '/ingestion',
   getParentRoute: () => AdminAdminRoute,
 } as any)
+const AdminAdminCronRoute = AdminAdminCronRouteImport.update({
+  id: '/cron',
+  path: '/cron',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
 const AdminAdminCatalogPricesRoute = AdminAdminCatalogPricesRouteImport.update({
   id: '/catalog-prices',
   path: '/catalog-prices',
@@ -146,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminAdminRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/admin/cron': typeof AdminAdminCronRoute
   '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/api/$': typeof ApiSplatRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/admin/cron': typeof AdminAdminCronRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/_admin/admin': typeof AdminAdminRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/_admin/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/_admin/admin/cron': typeof AdminAdminCronRoute
   '/_admin/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
   '/_admin/admin/stores': typeof AdminAdminStoresRouteWithChildren
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/api/$'
     | '/admin/catalog-prices'
+    | '/admin/cron'
     | '/admin/ingestion'
     | '/admin/settings'
     | '/admin/stores'
@@ -234,6 +244,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/$'
     | '/admin/catalog-prices'
+    | '/admin/cron'
     | '/admin/settings'
     | '/admin/users'
     | '/api/auth/$'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/_admin/admin'
     | '/api/$'
     | '/_admin/admin/catalog-prices'
+    | '/_admin/admin/cron'
     | '/_admin/admin/ingestion'
     | '/_admin/admin/settings'
     | '/_admin/admin/stores'
@@ -374,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminIngestionRouteImport
       parentRoute: typeof AdminAdminRoute
     }
+    '/_admin/admin/cron': {
+      id: '/_admin/admin/cron'
+      path: '/cron'
+      fullPath: '/admin/cron'
+      preLoaderRoute: typeof AdminAdminCronRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
     '/_admin/admin/catalog-prices': {
       id: '/_admin/admin/catalog-prices'
       path: '/catalog-prices'
@@ -477,6 +496,7 @@ const AdminAdminStoresRouteWithChildren =
 
 interface AdminAdminRouteChildren {
   AdminAdminCatalogPricesRoute: typeof AdminAdminCatalogPricesRoute
+  AdminAdminCronRoute: typeof AdminAdminCronRoute
   AdminAdminIngestionRoute: typeof AdminAdminIngestionRouteWithChildren
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
   AdminAdminStoresRoute: typeof AdminAdminStoresRouteWithChildren
@@ -487,6 +507,7 @@ interface AdminAdminRouteChildren {
 
 const AdminAdminRouteChildren: AdminAdminRouteChildren = {
   AdminAdminCatalogPricesRoute: AdminAdminCatalogPricesRoute,
+  AdminAdminCronRoute: AdminAdminCronRoute,
   AdminAdminIngestionRoute: AdminAdminIngestionRouteWithChildren,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,
   AdminAdminStoresRoute: AdminAdminStoresRouteWithChildren,

@@ -18,27 +18,49 @@ description = "Run with hot reload (air) or fallback to go run when air isn't av
 run = "set -o allexport; [ -f ../../.env.development ] && . ../../.env.development || true; [ -f ./.env.development ] && . ./.env.development || true; [ -f ./.env.test ] && . ./.env.test || true; if command -v air >/dev/null 2>&1; then air; else echo 'air not found, falling back to go run'; exec go run ./cmd/server/main.go; fi"
 
 # ==============================================================================
-# TEST TASKS
+# CODE GENERATION TASKS
 # ==============================================================================
 
+[tasks.sqlc-generate]
+description = "Generate sqlc code from database schema (requires DB running)"
+run = """
+set -o allexport
+[ -f ../../.env.development ] && . ../../.env.development || true
+[ -f ./.env.development ] && . ./.env.development || true
+echo "Dumping schema from database..."
+pg_dump --schema-only "$DATABASE_URL" > schema.sql
+echo "Generating sqlc code..."
+sqlc generate
+echo "Done!"
+"""
+
+# ==============================================================================
+# TEST TASKS
+# ==============================================================================
+#
+# PRIMARY TEST COMMAND: Run from workspace root with `mise run test-all`
+# This builds the Go service, starts it, runs Node.js integration tests, then stops.
+#
+# The tasks below are for Go-only unit tests that don't need the full stack.
+
 [tasks.test]
-description = "Run Go unit tests (without testcontainers)"
+description = "Run Go unit tests (no DB needed)"
 run = "set -o allexport; [ -f ./.env.development ] && . ./.env.development || true; [ -f ./.env.test ] && . ./.env.test || true; go test ./tests/unit/... ./internal/pkg/... ./internal/pricegroups/..."
 
 [tasks.test-unit]
-description = "Run unit tests only"
+description = "Run Go unit tests only"
 run = "set -o allexport; [ -f ./.env.development ] && . ./.env.development || true; [ -f ./.env.test ] && . ./.env.test || true; go test ./tests/unit/..."
 
 [tasks.test-integration]
-description = "Run integration tests"
+description = "Run Go integration tests (requires running DB)"
 run = "set -o allexport; [ -f ./.env.development ] && . ./.env.development || true; [ -f ./.env.test ] && . ./.env.test || true; go test ./tests/integration/..."
 
 [tasks.test-e2e]
-description = "Run e2e tests (requires Docker)"
+description = "Run Go e2e tests (requires running DB)"
 run = "set -o allexport; [ -f ./.env.development ] && . ./.env.development || true; [ -f ./.env.test ] && . ./.env.test || true; go test ./tests/e2e/..."
 
 [tasks.test-short]
-description = "Run quick tests (skip e2e)"
+description = "Run quick Go tests (skip slow tests)"
 run = "set -o allexport; [ -f ./.env.development ] && . ./.env.development || true; [ -f ./.env.test ] && . ./.env.test || true; go test -short ./..."
 
 [tasks.test-verbose]
@@ -58,15 +80,19 @@ echo "Coverage report generated: coverage.html"
 """
 
 # ==============================================================================
-# E2E TEST WORKFLOW (Setup -> Test -> Teardown)
+# GO-SPECIFIC E2E TESTS (Isolated Environment)
 # ==============================================================================
+#
+# NOTE: For most testing, use `mise run test-all` from workspace root instead.
+# These tasks create an isolated PostgreSQL/Redis environment for Go-only e2e tests.
+# They are NOT the primary test workflow.
 
 [tasks.e2e]
-description = "Run complete e2e workflow: setup, test, teardown"
+description = "Run Go-specific e2e tests in isolated environment"
 depends = ["e2e-full"]
 
 [tasks.e2e-full]
-description = "Run complete e2e workflow with automated setup and teardown"
+description = "Run Go e2e tests with automated setup and teardown (isolated env)"
 run = """
 #!/usr/bin/env bash
 set -e
@@ -106,11 +132,11 @@ echo "=========================================="
 """
 
 # ==============================================================================
-# E2E SETUP
+# E2E SETUP (Isolated Environment)
 # ==============================================================================
 
 [tasks.e2e-setup]
-description = "Set up e2e test environment (start containers, run migrations)"
+description = "Start isolated PostgreSQL and Redis for Go e2e tests"
 run = """
 #!/usr/bin/env bash
 set -e
@@ -178,7 +204,6 @@ echo "PostgreSQL is ready!"
 
 # Set environment variables for tests
 export DATABASE_URL="postgres://test:test@localhost:5433/testdb?sslmode=disable"
-export TESTCONTAINERS_ENABLED="true"
 export POSTGRES_HOST="localhost"
 export POSTGRES_PORT="5433"
 export POSTGRES_USER="test"
@@ -199,7 +224,7 @@ echo "E2E setup complete!"
 """
 
 # ==============================================================================
-# E2E WAIT
+# E2E WAIT (Isolated Environment)
 # ==============================================================================
 
 [tasks.e2e-wait]
@@ -235,7 +260,7 @@ echo "All services are healthy!"
 """
 
 # ==============================================================================
-# E2E RUN TESTS
+# E2E RUN TESTS (Isolated Environment)
 # ==============================================================================
 
 [tasks.e2e-run]
@@ -248,7 +273,6 @@ echo "Running e2e tests..."
 
 # Set environment variables
 export DATABASE_URL="postgres://test:test@localhost:5433/testdb?sslmode=disable"
-export TESTCONTAINERS_ENABLED="true"
 export POSTGRES_HOST="localhost"
 export POSTGRES_PORT="5433"
 export POSTGRES_USER="test"
@@ -263,11 +287,11 @@ echo "E2E tests completed!"
 """
 
 # ==============================================================================
-# E2E TEARDOWN
+# E2E TEARDOWN (Isolated Environment)
 # ==============================================================================
 
 [tasks.e2e-teardown]
-description = "Tear down e2e test environment (stop and remove containers)"
+description = "Stop isolated PostgreSQL and Redis for Go e2e tests"
 run = """
 #!/usr/bin/env bash
 set -e
@@ -298,11 +322,11 @@ echo "E2E teardown complete!"
 """
 
 # ==============================================================================
-# E2E CLEANUP (Force clean any leftover containers)
+# E2E CLEANUP (Force clean isolated environment)
 # ==============================================================================
 
 [tasks.e2e-cleanup]
-description = "Force clean any leftover e2e containers and resources"
+description = "Force clean any leftover isolated test resources"
 run = """
 #!/usr/bin/env bash
 set -e
@@ -317,18 +341,18 @@ echo "Cleanup complete!"
 """
 
 # ==============================================================================
-# E2E INDIVIDUAL STEPS (for manual testing)
+# E2E INDIVIDUAL STEPS (for debugging Go e2e tests)
 # ==============================================================================
 
 [tasks.e2e-rebuild]
-description = "Rebuild e2e environment (teardown + setup)"
+description = "Rebuild isolated test environment (teardown + setup)"
 run = """
 mise run e2e-teardown || true
 mise run e2e-setup
 """
 
 [tasks.e2e-logs]
-description = "Show logs from e2e containers"
+description = "Show logs from isolated test environment"
 run = """
 #!/usr/bin/env bash
 echo "=== PostgreSQL Logs ==="
@@ -343,22 +367,6 @@ description = "Open shell in PostgreSQL container"
 run = """
 docker exec -it kosarica-e2e-postgres psql -U test -d testdb
 """
-
-# ==============================================================================
-# MIGRATION TASKS
-# ==============================================================================
-
-[tasks.migrate-up]
-description = "Run database migrations"
-run = "go run ./cmd/main.go migrate up"
-
-[tasks.migrate-down]
-description = "Rollback database migrations"
-run = "go run ./cmd/main.go migrate down"
-
-[tasks.migrate-reset]
-description = "Reset database (drop and recreate)"
-run = "go run ./cmd/main.go migrate reset"
 
 # ==============================================================================
 # MODULE TASKS
@@ -478,32 +486,23 @@ description = "Show available mise tasks"
 run = """
 echo "Available mise tasks for price-service:"
 echo ""
+echo "============================================"
+echo "PRIMARY TEST COMMAND (run from workspace root):"
+echo "  mise run test-all"
+echo "============================================"
+echo ""
 echo "Build & Run:"
 echo "  build         - Build the Go service"
 echo "  run           - Run the Go service directly"
 echo "  dev           - Run with hot reload (requires air)"
 echo ""
-echo "Testing:"
-echo "  test          - Run all Go tests"
+echo "Go Unit Tests (no DB needed):"
+echo "  test          - Run Go unit tests"
 echo "  test-unit     - Run unit tests only"
-echo "  test-integration - Run integration tests"
-echo "  test-e2e      - Run e2e tests (requires setup)"
 echo "  test-coverage - Run tests with coverage"
 echo ""
-echo "E2E Workflow:"
-echo "  e2e           - Run complete e2e workflow (recommended)"
-echo "  e2e-setup     - Set up e2e test environment"
-echo "  e2e-wait      - Wait for services to be ready"
-echo "  e2e-run       - Run e2e tests"
-echo "  e2e-teardown  - Tear down e2e environment"
-echo "  e2e-rebuild   - Rebuild e2e environment"
-echo "  e2e-cleanup   - Force clean any leftover resources"
-echo "  e2e-logs      - Show logs from e2e containers"
-echo "  e2e-shell     - Open shell in PostgreSQL container"
-echo ""
-echo "Migrations:"
-echo "  migrate-up    - Run database migrations"
-echo "  migrate-down  - Rollback database migrations"
+echo "Code Generation:"
+echo "  sqlc-generate - Generate sqlc code from DB schema"
 echo ""
 echo "Code Quality:"
 echo "  lint          - Run golangci-lint"
@@ -514,9 +513,4 @@ echo ""
 echo "Cleanup:"
 echo "  clean         - Clean build artifacts"
 echo "  clean-all     - Clean all artifacts and caches"
-echo ""
-echo "Docker:"
-echo "  docker-build  - Build Docker image"
-echo "  docker-run    - Run in Docker container"
-echo "  docker-stop   - Stop Docker container"
 """
