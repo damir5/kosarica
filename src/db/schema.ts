@@ -329,10 +329,9 @@ export const storeItemState = pgTable(
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},
 	(table) => ({
-		storeRetailerIdx: index("store_item_state_store_retailer_idx").on(
-			table.storeId,
-			table.retailerItemId,
-		),
+		storeRetailerUnique: uniqueIndex(
+			"store_item_state_store_retailer_unique",
+		).on(table.storeId, table.retailerItemId),
 		lastSeenIdx: index("store_item_state_last_seen_idx").on(table.lastSeenAt),
 		priceSignatureIdx: index("store_item_state_price_signature_idx").on(
 			table.priceSignature,

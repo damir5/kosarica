@@ -28,7 +28,7 @@ tasks:
     description: |
       In `src/db/schema.ts`:
       Make `store_item_state(store_id, retailer_item_id)` unique index
-    completed: false
+    completed: true
 
   - title: Generate and apply schema migration
     description: |

@@ -225,3 +225,19 @@
     - Barcode index exists
     - Archive_id index exists
   - All 14 tests pass, linting passes on changed files
+
+- [✓] 2026-01-28 - Phase 1 Task 5: Added unique index on store_item_state(store_id, retailer_item_id)
+  - Modified src/db/schema.ts: changed storeRetailerIdx from regular index to uniqueIndex
+  - Index now defined as: `storeRetailerUnique: uniqueIndex("store_item_state_store_retailer_unique").on(table.storeId, table.retailerItemId)`
+  - Renamed from store_item_state_store_retailer_idx to store_item_state_store_retailer_unique to reflect unique constraint
+  - Created src/db/schema/store-item-state.test.ts with 9 tests verifying:
+    - Table has all expected columns (id, storeId, retailerItemId, currentPrice, etc.)
+    - id is primary key
+    - storeId is not null
+    - retailerItemId is not null
+    - Unique index on store_id and retailer_item_id exists
+    - Index is marked as unique
+    - Index has correct 2 columns
+    - last_seen index exists
+    - price_signature index exists
+  - All 9 tests pass, linting passes on changed files
