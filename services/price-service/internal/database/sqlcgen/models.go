@@ -304,8 +304,8 @@ type ProductRelation struct {
 
 type RetailerItem struct {
 	ID             string           `db:"id" json:"id"`
-	RetailerItemID int32            `db:"retailer_item_id" json:"retailer_item_id"`
-	Barcode        string           `db:"barcode" json:"barcode"`
+	RetailerItemID pgtype.Int4      `db:"retailer_item_id" json:"retailer_item_id"`
+	Barcode        pgtype.Text      `db:"barcode" json:"barcode"`
 	IsPrimary      pgtype.Bool      `db:"is_primary" json:"is_primary"`
 	CreatedAt      pgtype.Timestamp `db:"created_at" json:"created_at"`
 	Name           string           `db:"name" json:"name"`
@@ -319,6 +319,14 @@ type RetailerItem struct {
 	ImageUrl       pgtype.Text      `db:"image_url" json:"image_url"`
 	ChainSlug      pgtype.Text      `db:"chain_slug" json:"chain_slug"`
 	ArchiveID      pgtype.Text      `db:"archive_id" json:"archive_id"`
+}
+
+type RetailerItemBarcode struct {
+	ID             string           `db:"id" json:"id"`
+	RetailerItemID string           `db:"retailer_item_id" json:"retailer_item_id"`
+	Barcode        string           `db:"barcode" json:"barcode"`
+	IsPrimary      pgtype.Bool      `db:"is_primary" json:"is_primary"`
+	CreatedAt      pgtype.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type RetailerItemsFailed struct {

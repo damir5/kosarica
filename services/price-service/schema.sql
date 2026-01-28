@@ -618,8 +618,8 @@ CREATE TABLE public.products (
 
 CREATE TABLE public.retailer_items (
     id text NOT NULL,
-    retailer_item_id integer NOT NULL,
-    barcode text NOT NULL,
+    retailer_item_id integer,
+    barcode text,
     is_primary boolean DEFAULT false,
     created_at timestamp without time zone DEFAULT now(),
     name text NOT NULL,
@@ -633,6 +633,15 @@ CREATE TABLE public.retailer_items (
     image_url text,
     chain_slug text,
     archive_id text
+);
+
+
+CREATE TABLE public.retailer_item_barcodes (
+    id text NOT NULL,
+    retailer_item_id text NOT NULL,
+    barcode text NOT NULL,
+    is_primary boolean DEFAULT false,
+    created_at timestamp without time zone DEFAULT now()
 );
 
 
@@ -1033,6 +1042,10 @@ ALTER TABLE ONLY public.retailer_items
     ADD CONSTRAINT retailer_items_pkey PRIMARY KEY (id);
 
 
+ALTER TABLE ONLY public.retailer_item_barcodes
+    ADD CONSTRAINT retailer_item_barcodes_pkey PRIMARY KEY (id);
+
+
 
 ALTER TABLE ONLY public.session
     ADD CONSTRAINT session_pkey PRIMARY KEY (id);
@@ -1303,7 +1316,19 @@ CREATE INDEX store_item_state_price_signature_idx ON public.store_item_state USI
 
 
 
-CREATE INDEX store_item_state_store_retailer_idx ON public.store_item_state USING btree (store_id, retailer_item_id);
+CREATE UNIQUE INDEX store_item_state_store_retailer_unique ON public.store_item_state USING btree (store_id, retailer_item_id);
+
+
+CREATE INDEX retailer_item_barcodes_retailer_item_id_idx ON public.retailer_item_barcodes USING btree (retailer_item_id);
+
+
+CREATE INDEX retailer_item_barcodes_barcode_new_idx ON public.retailer_item_barcodes USING btree (barcode);
+
+
+CREATE UNIQUE INDEX retailer_item_barcodes_item_barcode_unique ON public.retailer_item_barcodes USING btree (retailer_item_id, barcode);
+
+
+CREATE UNIQUE INDEX retailer_items_chain_slug_external_id_unique ON public.retailer_items USING btree (chain_slug, external_id);
 
 
 
@@ -1500,6 +1525,10 @@ ALTER TABLE ONLY public.product_relations
 
 ALTER TABLE ONLY public.retailer_items
     ADD CONSTRAINT retailer_items_archive_id_archives_id_fk FOREIGN KEY (archive_id) REFERENCES public.archives(id) ON DELETE SET NULL;
+
+
+ALTER TABLE ONLY public.retailer_item_barcodes
+    ADD CONSTRAINT retailer_item_barcodes_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
 
 
 

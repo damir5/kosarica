@@ -256,3 +256,26 @@
   - Migrations applied successfully during test run (pnpm db:migrate)
   - All 182 tests pass, TypeScript type checking passes
   - Phase 1 schema changes complete - all 6 tasks done
+
+- [✓] 2026-01-28 - Phase 2 Task 1: Created sqlc query files for all Go queries
+  - Created 13 new .sql files in `services/price-service/internal/database/queries/`:
+    - `stores.sql` - 3 queries (GetStoreByIdentifier, CreateStore, CreateStoreIdentifier)
+    - `retailer_items.sql` - 6 queries (GetRetailerItemByExternalId, UpdateRetailerItem, UpsertRetailerItem, UpdateRetailerItemsArchiveId, GetRetailerItemDetails, GetRetailerItemName)
+    - `retailer_item_barcodes.sql` - 1 query (InsertRetailerItemBarcode)
+    - `store_item_state.sql` - 2 queries (GetStorePreviousPrice, UpsertStoreItemState)
+    - `price_groups.sql` - 21 queries (FindPriceGroupByHash, CreatePriceGroup, UpsertGroupPrice, UpdatePriceGroupItemCount, GetCurrentStoreGroupId, CloseStoreGroupMembership, CreateStoreGroupHistory, DecrementPriceGroupStoreCount, IncrementPriceGroupStoreCount, GetStorePriceException, GetStorePriceFromGroup, GetHistoricalStorePrice, UpdatePriceGroupLastSeen, DeleteExpiredPriceExceptions, GetPriceGroupById, ListGroupPrices, ListStorePricesViaGroup, ListPriceGroupsByChain, CountPriceGroupsByChain, DeleteOrphanGroupPrices, DeleteOrphanPriceGroups)
+    - `archives.sql` - 5 queries (UpsertArchive, GetArchiveByChecksum, GetArchiveById, ListArchivesByChain, LinkArchiveToRun)
+    - `prices.sql` - 2 queries (CountStorePrices, ListStorePricesWithDetails)
+    - `runs.sql` - 9 queries (GetIngestionRunById, GetRunChainSlug, CreateRerunRun, CreateReprocessingRun, CheckRunExists, DeleteIngestionErrors, DeleteIngestionFiles, DeleteIngestionRun, GetRunStats)
+    - `files.sql` - 4 queries (CountIngestionFiles, ListIngestionFiles, CreateIngestionFile, UpdateIngestionFileCompleted)
+    - `errors.sql` - 3 queries (CountIngestionErrors, ListIngestionErrors, CountErrorsByDateRange)
+    - `failed_rows.sql` - 6 queries (CountFailedRows, ListFailedRows, UpdateFailedRowNotes, GetFailedRowsForReprocessing, MarkRowAsReprocessed, CreateFailedRow)
+    - `error_summary.sql` - 1 query (GetErrorSummaryByChain)
+    - `pipeline.sql` - 8 queries (UpdateRunStartedAt, UpdateRunTotalFiles, UpdateRunCompleted, UpdateRunInterrupted, UpdateRunFailed, IncrementRunProcessedFiles, IncrementRunProcessedEntries, GetRunProgressInfo)
+  - Updated schema.sql with Phase 1 changes (retailer_item_barcodes table, unique indexes)
+  - Total ~65+ queries converted to sqlc-managed .sql files
+  - Generated sqlc types with `sqlc generate`
+  - Created 2 test files:
+    - `internal/database/queries/queries_test.go` - 14 tests verifying query file contents
+    - `internal/database/sqlcgen/sqlcgen_test.go` - 18 tests verifying generated method existence
+  - All 32 new tests pass, Go build passes, go vet passes

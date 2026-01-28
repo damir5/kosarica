@@ -63,7 +63,7 @@ tasks:
       | `workers.sql` | workers/worker.go |
       | `jobs.sql` | jobs/cleanup_database.go |
       | `sweepers.sql` | sweepers/taskqueue.go |
-    completed: false
+    completed: true
 
   - title: Generate and verify sqlc types
     description: |
