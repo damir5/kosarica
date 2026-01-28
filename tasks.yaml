@@ -181,7 +181,7 @@ tasks:
       - Errors only appear at runtime
       - sqlc catches ALL mismatches at compile time
       ```
-    completed: false
+    completed: true
 
   - title: Verify no raw SQL remains
     description: |

@@ -69,6 +69,43 @@ sqlc generate
 mise run swag
 ```
 
+## Database Access Rules
+
+### REQUIRED: Use sqlc for ALL queries
+
+All database queries MUST use sqlc-generated code for type safety and compile-time validation.
+
+```go
+// CORRECT - type-safe, compile-time validated
+store, err := queries.CreateStore(ctx, sqlcgen.CreateStoreParams{...})
+```
+
+```go
+// FORBIDDEN - compiles with wrong columns, fails at runtime
+pool.Exec(ctx, `INSERT INTO stores ...`)
+```
+
+### Adding New Queries
+
+1. Add SQL to `internal/database/queries/*.sql`
+2. Run `mise run sqlc-generate`
+3. Use generated functions from `internal/database/sqlcgen/`
+
+### Why?
+
+- Raw SQL compiles even with wrong column names
+- Errors only appear at runtime
+- sqlc catches ALL mismatches at compile time
+
+### Exceptions
+
+Stored procedures that return TABLE or record types cannot use sqlc (sqlc cannot infer return types from PL/pgSQL functions). These are documented in the code:
+- `claim_tasks()` - taskqueue/queue.go
+- `complete_task()` - taskqueue/queue.go
+- `fail_task()` - taskqueue/queue.go
+- `cleanup_old_tasks()` - taskqueue/queue.go
+- `recover_orphaned_tasks()` - sweepers/taskqueue.go
+
 ## Environment Variables
 
 | Variable | Description | Default |

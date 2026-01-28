@@ -459,3 +459,28 @@
   - go vet linting passes: `go vet ./...`
   - go build passes: `go build ./...`
   - Phase 4 complete: 14/14 files converted to sqlc (with documented exceptions for stored procedures)
+
+- [✓] 2026-01-28 - Phase 5 Task 1: Updated AGENTS.md with sqlc-only rule
+  - Added "## Database Access Rules" section to services/price-service/AGENTS.md
+  - Section includes:
+    - "### REQUIRED: Use sqlc for ALL queries" with correct usage example
+    - Forbidden raw SQL example marked as "// FORBIDDEN"
+    - "### Adding New Queries" steps (1. add .sql, 2. run sqlc-generate, 3. use sqlcgen)
+    - "### Why?" explaining compile-time vs runtime validation benefits
+    - "### Exceptions" documenting stored procedures that cannot use sqlc:
+      - claim_tasks(), complete_task(), fail_task(), cleanup_old_tasks(), recover_orphaned_tasks()
+  - Created internal/database/agents_md_test.go with 13 tests verifying:
+    - Database access rules section exists
+    - Required sqlc rule is documented
+    - Correct sqlc usage example is shown
+    - Forbidden raw SQL example is shown
+    - Adding new queries section exists
+    - Query file location documented (internal/database/queries/*.sql)
+    - sqlc generate command documented (mise run sqlc-generate)
+    - Generated code location documented (internal/database/sqlcgen/)
+    - Why section explaining benefits exists
+    - Compile-time validation benefit explained
+    - Runtime error problem explained
+    - Exceptions section for stored procedures exists
+    - All 5 stored procedure exceptions documented
+  - All 13 tests pass, go vet linting passes
