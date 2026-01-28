@@ -16,7 +16,7 @@ tasks:
     description: |
       In `src/db/schema.ts`:
       Add `retailer_item_barcodes` table definition
-    completed: false
+    completed: true
 
   - title: Add unique index on retailer_items(chain_slug, external_id)
     description: |

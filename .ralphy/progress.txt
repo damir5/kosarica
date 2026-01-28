@@ -200,3 +200,17 @@
     - retailerItemId column is nullable (notNull === false)
     - retailerItemId is integer type (dataType === "number")
   - All 9 tests pass, linting passes on changed files
+
+- [✓] 2026-01-28 - Phase 1 Task 3: Verified retailer_item_barcodes table definition
+  - Table already exists in src/db/schema.ts (lines 208-231) with correct structure:
+    - id: cuid2("rib") primary key
+    - retailerItemId: text, not null, references retailerItems.id with cascade delete
+    - barcode: text, not null (for EAN-13, EAN-8, GTIN codes)
+    - isPrimary: boolean, default false
+    - createdAt: timestamp, default now
+  - Indexes defined:
+    - retailer_item_barcodes_retailer_item_id_idx on retailerItemId
+    - retailer_item_barcodes_barcode_new_idx on barcode
+    - retailer_item_barcodes_item_barcode_unique unique index on (retailerItemId, barcode)
+  - Tests exist in src/db/schema/retailer-item-barcodes.test.ts (16 tests covering all columns and constraints)
+  - All 16 tests pass, TypeScript type checking passes
