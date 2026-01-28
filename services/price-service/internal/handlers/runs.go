@@ -7,8 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 )
 
 // ListRunsRequest represents query parameters for listing ingestion runs
@@ -176,25 +178,10 @@ func GetRun(c *gin.Context) {
 		return
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
-	query := `
-		SELECT id, chain_slug, source, status, started_at, completed_at,
-		       total_files, processed_files, total_entries, processed_entries,
-		       error_count, metadata, created_at
-		FROM ingestion_runs
-		WHERE id = $1
-	`
-
-	var run IngestionRun
-	err := pool.QueryRow(ctx, query, runID).Scan(
-		&run.ID, &run.ChainSlug, &run.Source, &run.Status,
-		&run.StartedAt, &run.CompletedAt, &run.TotalFiles, &run.ProcessedFiles,
-		&run.TotalEntries, &run.ProcessedEntries, &run.ErrorCount,
-		&run.Metadata, &run.CreatedAt,
-	)
-
+	row, err := queries.GetIngestionRunById(ctx, runID)
 	if err == pgx.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Run not found"})
 		return
@@ -202,6 +189,50 @@ func GetRun(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch run"})
 		return
+	}
+
+	// Convert sqlcgen row to IngestionRun
+	run := IngestionRun{
+		ID:        row.ID,
+		ChainSlug: row.ChainSlug,
+		Source:    row.Source,
+		Status:    row.Status,
+	}
+
+	// Convert pgtype fields
+	if row.StartedAt.Valid {
+		t := row.StartedAt.Time
+		run.StartedAt = &t
+	}
+	if row.CompletedAt.Valid {
+		t := row.CompletedAt.Time
+		run.CompletedAt = &t
+	}
+	if row.TotalFiles.Valid {
+		v := int(row.TotalFiles.Int32)
+		run.TotalFiles = &v
+	}
+	if row.ProcessedFiles.Valid {
+		v := int(row.ProcessedFiles.Int32)
+		run.ProcessedFiles = &v
+	}
+	if row.TotalEntries.Valid {
+		v := int(row.TotalEntries.Int32)
+		run.TotalEntries = &v
+	}
+	if row.ProcessedEntries.Valid {
+		v := int(row.ProcessedEntries.Int32)
+		run.ProcessedEntries = &v
+	}
+	if row.ErrorCount.Valid {
+		v := int(row.ErrorCount.Int32)
+		run.ErrorCount = &v
+	}
+	if row.Metadata.Valid {
+		run.Metadata = &row.Metadata.String
+	}
+	if row.CreatedAt.Valid {
+		run.CreatedAt = row.CreatedAt.Time
 	}
 
 	c.JSON(http.StatusOK, run)
@@ -268,59 +299,82 @@ func ListFiles(c *gin.Context) {
 		req.Limit = 50
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
-	// Get total count
-	var total int
-	err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM ingestion_files WHERE run_id = $1", runID).Scan(&total)
+	// Get total count using sqlc
+	total, err := queries.CountIngestionFiles(ctx, runID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count files"})
 		return
 	}
 
-	// Get files with pagination
-	query := `
-		SELECT id, run_id, filename, file_type, file_size, file_hash, status,
-		       entry_count, processed_at, metadata, total_chunks, processed_chunks,
-		       chunk_size, created_at
-		FROM ingestion_files
-		WHERE run_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3
-	`
-
-	rows, err := pool.Query(ctx, query, runID, req.Limit, req.Offset)
+	// Get files with pagination using sqlc
+	fileRows, err := queries.ListIngestionFiles(ctx, sqlcgen.ListIngestionFilesParams{
+		RunID:  runID,
+		Limit:  int32(req.Limit),
+		Offset: int32(req.Offset),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch files"})
 		return
 	}
-	defer rows.Close()
 
-	files := []IngestionFile{}
-	for rows.Next() {
-		var file IngestionFile
-		err := rows.Scan(
-			&file.ID, &file.RunID, &file.Filename, &file.FileType, &file.FileSize,
-			&file.FileHash, &file.Status, &file.EntryCount, &file.ProcessedAt,
-			&file.Metadata, &file.TotalChunks, &file.ProcessedChunks,
-			&file.ChunkSize, &file.CreatedAt,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan file"})
-			return
+	// Convert sqlcgen rows to IngestionFile
+	files := make([]IngestionFile, 0, len(fileRows))
+	for _, row := range fileRows {
+		file := IngestionFile{
+			RunID:    row.RunID,
+			Filename: row.Filename,
+			FileType: row.FileType,
+			Status:   row.Status,
 		}
-		files = append(files, file)
-	}
 
-	if rows.Err() != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iterating files"})
-		return
+		// Convert ID (int64 to *string)
+		idStr := fmt.Sprintf("%d", row.ID)
+		file.ID = &idStr
+
+		// Convert pgtype fields
+		if row.FileSize.Valid {
+			v := int(row.FileSize.Int32)
+			file.FileSize = &v
+		}
+		if row.FileHash.Valid {
+			file.FileHash = &row.FileHash.String
+		}
+		if row.EntryCount.Valid {
+			v := int(row.EntryCount.Int32)
+			file.EntryCount = &v
+		}
+		if row.ProcessedAt.Valid {
+			t := row.ProcessedAt.Time
+			file.ProcessedAt = &t
+		}
+		if row.Metadata.Valid {
+			file.Metadata = &row.Metadata.String
+		}
+		if row.TotalChunks.Valid {
+			v := int(row.TotalChunks.Int32)
+			file.TotalChunks = &v
+		}
+		if row.ProcessedChunks.Valid {
+			v := int(row.ProcessedChunks.Int32)
+			file.ProcessedChunks = &v
+		}
+		if row.ChunkSize.Valid {
+			v := int(row.ChunkSize.Int32)
+			file.ChunkSize = &v
+		}
+		if row.CreatedAt.Valid {
+			file.CreatedAt = row.CreatedAt.Time
+		}
+
+		files = append(files, file)
 	}
 
 	c.JSON(http.StatusOK, ListFilesResponse{
 		Files: files,
-		Total: total,
+		Total: int(total),
 	})
 }
 
@@ -381,57 +435,62 @@ func ListErrors(c *gin.Context) {
 		req.Limit = 50
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
-	// Get total count
-	var total int
-	err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM ingestion_errors WHERE run_id = $1", runID).Scan(&total)
+	// Get total count using sqlc
+	total, err := queries.CountIngestionErrors(ctx, runID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count errors"})
 		return
 	}
 
-	// Get errors with pagination
-	query := `
-		SELECT id, run_id, file_id, chunk_id, entry_id, error_type, error_message,
-		       error_details, severity, created_at
-		FROM ingestion_errors
-		WHERE run_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3
-	`
-
-	rows, err := pool.Query(ctx, query, runID, req.Limit, req.Offset)
+	// Get errors with pagination using sqlc
+	errorRows, err := queries.ListIngestionErrors(ctx, sqlcgen.ListIngestionErrorsParams{
+		RunID:  runID,
+		Limit:  int32(req.Limit),
+		Offset: int32(req.Offset),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch errors"})
 		return
 	}
-	defer rows.Close()
 
-	errors := []IngestionError{}
-	for rows.Next() {
-		var ingestionErr IngestionError
-		err := rows.Scan(
-			&ingestionErr.ID, &ingestionErr.RunID, &ingestionErr.FileID, &ingestionErr.ChunkID,
-			&ingestionErr.EntryID, &ingestionErr.ErrorType, &ingestionErr.ErrorMessage,
-			&ingestionErr.ErrorDetails, &ingestionErr.Severity, &ingestionErr.CreatedAt,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan error"})
-			return
+	// Convert sqlcgen rows to IngestionError
+	errors := make([]IngestionError, 0, len(errorRows))
+	for _, row := range errorRows {
+		ingestionErr := IngestionError{
+			ID:           fmt.Sprintf("%d", row.ID),
+			RunID:        row.RunID,
+			ErrorType:    row.ErrorType,
+			ErrorMessage: row.ErrorMessage,
+			Severity:     row.Severity,
 		}
-		errors = append(errors, ingestionErr)
-	}
 
-	if rows.Err() != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iterating errors"})
-		return
+		// Convert pgtype fields
+		if row.FileID.Valid {
+			s := fmt.Sprintf("%d", row.FileID.Int64)
+			ingestionErr.FileID = &s
+		}
+		if row.ChunkID.Valid {
+			ingestionErr.ChunkID = &row.ChunkID.String
+		}
+		if row.EntryID.Valid {
+			ingestionErr.EntryID = &row.EntryID.String
+		}
+		if row.ErrorDetails.Valid {
+			ingestionErr.ErrorDetails = &row.ErrorDetails.String
+		}
+		if row.CreatedAt.Valid {
+			ingestionErr.CreatedAt = row.CreatedAt.Time
+		}
+
+		errors = append(errors, ingestionErr)
 	}
 
 	c.JSON(http.StatusOK, ListErrorsResponse{
 		Errors: errors,
-		Total:  total,
+		Total:  int(total),
 	})
 }
 
@@ -490,7 +549,7 @@ func GetStats(c *gin.Context) {
 		return
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
 	// Calculate 24h, 7d, 30d bucket boundaries from the "to" date
@@ -516,38 +575,36 @@ func GetStats(c *gin.Context) {
 			bucketFrom = from
 		}
 
-		// Get run counts by status
-		query := `
-			SELECT
-				COUNT(*) as total_runs,
-				COUNT(*) FILTER (WHERE status = 'completed') as completed,
-				COUNT(*) FILTER (WHERE status = 'failed') as failed,
-				COUNT(*) FILTER (WHERE status = 'running') as running,
-				COUNT(*) FILTER (WHERE status = 'pending') as pending,
-				COALESCE(SUM(total_files), 0) as total_files
-			FROM ingestion_runs
-			WHERE created_at >= $1 AND created_at <= $2
-		`
-
-		err := pool.QueryRow(ctx, query, bucketFrom, to).Scan(
-			&buckets[i].TotalRuns, &buckets[i].Completed, &buckets[i].Failed,
-			&buckets[i].Running, &buckets[i].Pending, &buckets[i].TotalFiles,
-		)
+		// Get run counts by status using sqlc
+		stats, err := queries.GetRunStats(ctx, sqlcgen.GetRunStatsParams{
+			CreatedAt:   pgtype.Timestamp{Time: bucketFrom, Valid: true},
+			CreatedAt_2: pgtype.Timestamp{Time: to, Valid: true},
+		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats"})
 			return
 		}
 
-		// Get error count
-		err = pool.QueryRow(ctx, `
-			SELECT COUNT(*)
-			FROM ingestion_errors
-			WHERE created_at >= $1 AND created_at <= $2
-		`, bucketFrom, to).Scan(&buckets[i].TotalErrors)
+		buckets[i].TotalRuns = int(stats.TotalRuns)
+		buckets[i].Completed = int(stats.Completed)
+		buckets[i].Failed = int(stats.Failed)
+		buckets[i].Running = int(stats.Running)
+		buckets[i].Pending = int(stats.Pending)
+		// TotalFiles comes as interface{} from COALESCE, handle it
+		if v, ok := stats.TotalFiles.(int64); ok {
+			buckets[i].TotalFiles = int(v)
+		}
+
+		// Get error count using sqlc
+		errorCount, err := queries.CountErrorsByDateRange(ctx, sqlcgen.CountErrorsByDateRangeParams{
+			CreatedAt:   pgtype.Timestamp{Time: bucketFrom, Valid: true},
+			CreatedAt_2: pgtype.Timestamp{Time: to, Valid: true},
+		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch error stats"})
 			return
 		}
+		buckets[i].TotalErrors = int(errorCount)
 	}
 
 	c.JSON(http.StatusOK, GetStatsResponse{
@@ -594,12 +651,11 @@ func RerunRun(c *gin.Context) {
 		return
 	}
 
-	// Get original run
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
-	var chainSlug string
-	err := pool.QueryRow(ctx, "SELECT chain_slug FROM ingestion_runs WHERE id = $1", runID).Scan(&chainSlug)
+	// Get original run's chain slug using sqlc
+	chainSlug, err := queries.GetRunChainSlug(ctx, runID)
 	if err == pgx.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Original run not found"})
 		return
@@ -609,18 +665,15 @@ func RerunRun(c *gin.Context) {
 		return
 	}
 
-	// Create new run
+	// Create new run using sqlc
 	newRunID := fmt.Sprintf("rerun-%d", time.Now().UnixNano())
-	_, err = pool.Exec(ctx, `
-		INSERT INTO ingestion_runs (
-			id, chain_slug, source, status, started_at, created_at,
-			parent_run_id, rerun_type, rerun_target_id
-		) VALUES (
-			$1, $2, 'rerun', 'pending', NOW(), NOW(),
-			$3, $4, $5
-		)
-	`, newRunID, chainSlug, runID, req.RerunType, req.TargetID)
-
+	err = queries.CreateRerunRun(ctx, sqlcgen.CreateRerunRunParams{
+		ID:            newRunID,
+		ChainSlug:     chainSlug,
+		ParentRunID:   pgtype.Text{String: runID, Valid: true},
+		RerunType:     pgtype.Text{String: req.RerunType, Valid: true},
+		RerunTargetID: pgtype.Text{String: req.TargetID, Valid: true},
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create rerun"})
 		return
@@ -630,8 +683,8 @@ func RerunRun(c *gin.Context) {
 	// For now, just return the created run ID
 
 	c.JSON(http.StatusCreated, gin.H{
-		"runId":  newRunID,
-		"status": "pending",
+		"runId":   newRunID,
+		"status":  "pending",
 		"message": fmt.Sprintf("Rerun created for %s: %s", req.RerunType, req.TargetID),
 	})
 }
@@ -666,9 +719,11 @@ func DeleteRun(c *gin.Context) {
 	}
 	defer tx.Rollback(ctx)
 
-	// Check if run exists (within transaction)
-	var exists bool
-	err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ingestion_runs WHERE id = $1)", runID).Scan(&exists)
+	// Use sqlc queries with transaction
+	txQueries := sqlcgen.New(tx)
+
+	// Check if run exists using sqlc
+	exists, err := txQueries.CheckRunExists(ctx, runID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check run existence"})
 		return
@@ -678,20 +733,22 @@ func DeleteRun(c *gin.Context) {
 		return
 	}
 
-	// Delete associated errors, files, then run (in transaction)
-	_, err = tx.Exec(ctx, "DELETE FROM ingestion_errors WHERE run_id = $1", runID)
+	// Delete associated errors using sqlc
+	err = txQueries.DeleteIngestionErrors(ctx, runID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete errors"})
 		return
 	}
 
-	_, err = tx.Exec(ctx, "DELETE FROM ingestion_files WHERE run_id = $1", runID)
+	// Delete associated files using sqlc
+	err = txQueries.DeleteIngestionFiles(ctx, runID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete files"})
 		return
 	}
 
-	_, err = tx.Exec(ctx, "DELETE FROM ingestion_runs WHERE id = $1", runID)
+	// Delete run using sqlc
+	err = txQueries.DeleteIngestionRun(ctx, runID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete run"})
 		return

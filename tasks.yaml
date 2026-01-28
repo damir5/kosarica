@@ -115,20 +115,22 @@ tasks:
       Goal: Convert remaining 70+ raw queries
 
       Files to update:
-      - `internal/database/price_groups.go` → use queries from price_groups.sql
-      - `internal/database/archive.go` → use queries from archives.sql
-      - `internal/handlers/prices.go` → use queries from prices.sql
-      - `internal/handlers/runs.go` → use queries from runs.sql
-      - `internal/handlers/ingest.go` → use queries from ingestion.sql
-      - `internal/handlers/failed_rows.go` → use queries from failed_rows.sql
-      - `internal/handlers/error_summary.go` → use queries from errors.sql
-      - `internal/pipeline/parse.go` → use queries from ingestion.sql
-      - `internal/pipeline/discover.go` → use queries from ingestion.sql
-      - `internal/pipeline/pipeline.go` → use queries from ingestion.sql
+      - `internal/database/price_groups.go` → use queries from price_groups.sql ✅
+      - `internal/database/archive.go` → use queries from archives.sql ✅
+      - `internal/handlers/prices.go` → use queries from prices.sql ✅
+      - `internal/handlers/runs.go` → use queries from runs.sql ✅
+      - `internal/handlers/ingest.go` → use queries from ingestion.sql ✅
+      - `internal/handlers/failed_rows.go` → use queries from failed_rows.sql ✅
+      - `internal/handlers/error_summary.go` → use queries from errors.sql ✅
+      - `internal/pipeline/parse.go` → use queries from ingestion.sql ✅
+      - `internal/pipeline/discover.go` → use queries from ingestion.sql ✅
+      - `internal/pipeline/pipeline.go` → use queries from ingestion.sql ✅
       - `internal/workers/worker.go` → use queries from workers.sql
       - `internal/jobs/cleanup_database.go` → use queries from jobs.sql
       - `internal/sweepers/taskqueue.go` → use queries from sweepers.sql
       - `internal/taskqueue/queue.go` → use queries from taskqueue.sql
+
+      Progress: 10/14 files converted (handlers, pipeline, database modules done)
     completed: false
 
   - title: Build and test all Go code

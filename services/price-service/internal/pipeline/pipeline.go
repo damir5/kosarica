@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/kosarica/price-service/internal/storage"
 	"github.com/rs/zerolog/log"
@@ -153,20 +155,21 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 	return result, nil
 }
 
-// createIngestionRun creates an ingestion run record in the database
+// createIngestionRun creates an ingestion run record in the database using sqlc
 func createIngestionRun(ctx context.Context, chainID string) string {
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 
 	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	now := time.Now()
 
-	_, err := pool.Exec(ctx, `
-		INSERT INTO ingestion_runs (
-			id, chain_slug, source, status, started_at, created_at
-		) VALUES (
-			$1, $2, 'worker', 'running', $3, $4
-		)
-	`, runID, chainID, now, now)
+	_, err := queries.CreateIngestionRun(ctx, sqlcgen.CreateIngestionRunParams{
+		ID:        runID,
+		ChainSlug: chainID,
+		Source:    "worker",
+		Status:    "running",
+		StartedAt: pgtype.Timestamp{Time: now, Valid: true},
+		CreatedAt: pgtype.Timestamp{Time: now, Valid: true},
+	})
 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create ingestion run")

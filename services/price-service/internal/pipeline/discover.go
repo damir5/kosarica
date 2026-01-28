@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/types"
 	"github.com/rs/zerolog/log"
 )
@@ -66,114 +68,72 @@ func DiscoverPhase(ctx context.Context, chainID string, runID string, targetDate
 	return files, nil
 }
 
-// initializeRunStats initializes the ingestion run statistics
+// initializeRunStats initializes the ingestion run statistics using sqlc
 func initializeRunStats(ctx context.Context, runID string) error {
-	pool := database.Pool()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET started_at = NOW()
-		WHERE id = $1
-	`, runID)
-	return err
+	queries := sqlcgen.New(database.Pool())
+	return queries.UpdateRunStartedAt(ctx, runID)
 }
 
-// recordTotalFiles records the total number of files to process
+// recordTotalFiles records the total number of files to process using sqlc
 func recordTotalFiles(ctx context.Context, runID string, totalFiles int) error {
-	pool := database.Pool()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET total_files = $1
-		WHERE id = $2
-	`, totalFiles, runID)
-	return err
+	queries := sqlcgen.New(database.Pool())
+	return queries.UpdateRunTotalFiles(ctx, sqlcgen.UpdateRunTotalFilesParams{
+		TotalFiles: pgtype.Int4{Int32: int32(totalFiles), Valid: true},
+		ID:         runID,
+	})
 }
 
-// markRunCompleted marks an ingestion run as completed
+// markRunCompleted marks an ingestion run as completed using sqlc
 func markRunCompleted(ctx context.Context, runID string, processedFiles int, processedEntries int) error {
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	now := time.Now()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET status = 'completed',
-		    completed_at = $1,
-		    processed_files = COALESCE($2, processed_files),
-		    processed_entries = COALESCE($3, processed_entries)
-		WHERE id = $4
-	`, now, processedFiles, processedEntries, runID)
-	return err
+	return queries.UpdateRunCompleted(ctx, sqlcgen.UpdateRunCompletedParams{
+		CompletedAt:      pgtype.Timestamp{Time: now, Valid: true},
+		ProcessedFiles:   pgtype.Int4{Int32: int32(processedFiles), Valid: true},
+		ProcessedEntries: pgtype.Int4{Int32: int32(processedEntries), Valid: true},
+		ID:               runID,
+	})
 }
 
 // MarkRunInterrupted marks an ingestion run as interrupted (e.g., service restart)
 func MarkRunInterrupted(ctx context.Context, runID string) error {
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	now := time.Now()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET status = 'interrupted',
-		    completed_at = $1,
-		    metadata = jsonb_set(
-		        COALESCE(metadata, '{}'::jsonb),
-		        '{interrupted_reason}',
-		        to_jsonb('Service restarted during processing')
-		    )
-		WHERE id = $2
-	`, now, runID)
-	if err != nil {
-		return fmt.Errorf("failed to mark run as interrupted: %w", err)
-	}
-	return nil
+	return queries.UpdateRunInterrupted(ctx, sqlcgen.UpdateRunInterruptedParams{
+		CompletedAt: pgtype.Timestamp{Time: now, Valid: true},
+		ID:          runID,
+	})
 }
 
-// markRunFailed marks an ingestion run as failed
+// markRunFailed marks an ingestion run as failed using sqlc
 func markRunFailed(ctx context.Context, runID string, errorMsg string) error {
-	pool := database.Pool()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET status = 'failed',
-		    completed_at = NOW(),
-		    metadata = jsonb_set(
-		        COALESCE(metadata, '{}'::jsonb),
-		        '{error}',
-		        to_jsonb($1)
-		    )
-		WHERE id = $2
-	`, errorMsg, runID)
-	return err
+	queries := sqlcgen.New(database.Pool())
+	return queries.UpdateRunFailed(ctx, sqlcgen.UpdateRunFailedParams{
+		Column1: errorMsg,
+		ID:      runID,
+	})
 }
 
-// incrementProcessedFiles increments the processed files count
+// incrementProcessedFiles increments the processed files count using sqlc
 func incrementProcessedFiles(ctx context.Context, runID string) error {
-	pool := database.Pool()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET processed_files = COALESCE(processed_files, 0) + 1
-		WHERE id = $1
-	`, runID)
-	return err
+	queries := sqlcgen.New(database.Pool())
+	return queries.IncrementRunProcessedFiles(ctx, runID)
 }
 
-// incrementProcessedEntries increments the processed entries count
+// incrementProcessedEntries increments the processed entries count using sqlc
 func incrementProcessedEntries(ctx context.Context, runID string, count int) error {
-	pool := database.Pool()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET processed_entries = COALESCE(processed_entries, 0) + $1
-		WHERE id = $2
-	`, count, runID)
-	return err
+	queries := sqlcgen.New(database.Pool())
+	return queries.IncrementRunProcessedEntries(ctx, sqlcgen.IncrementRunProcessedEntriesParams{
+		ProcessedEntries: pgtype.Int4{Int32: int32(count), Valid: true},
+		ID:               runID,
+	})
 }
 
 // checkAndUpdateRunCompletion checks if run is complete and updates status
 func checkAndUpdateRunCompletion(ctx context.Context, runID string) (bool, error) {
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 
-	var runStatus string
-	var totalFiles, processedFiles int
-	err := pool.QueryRow(ctx, `
-		SELECT status, COALESCE(total_files, 0), COALESCE(processed_files, 0)
-		FROM ingestion_runs
-		WHERE id = $1
-	`, runID).Scan(&runStatus, &totalFiles, &processedFiles)
+	info, err := queries.GetRunProgressInfo(ctx, runID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return false, nil
@@ -181,9 +141,12 @@ func checkAndUpdateRunCompletion(ctx context.Context, runID string) (bool, error
 		return false, err
 	}
 
-	if runStatus == "completed" || runStatus == "failed" {
+	if info.Status == "completed" || info.Status == "failed" {
 		return true, nil
 	}
+
+	totalFiles := int(info.TotalFiles)
+	processedFiles := int(info.ProcessedFiles)
 
 	// Check if all files processed
 	if totalFiles > 0 && processedFiles >= totalFiles {

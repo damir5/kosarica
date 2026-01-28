@@ -390,3 +390,43 @@
     - pipeline/parse.go, pipeline/discover.go, pipeline/pipeline.go
     - workers/worker.go, jobs/cleanup_database.go
     - sweepers/taskqueue.go, taskqueue/queue.go
+
+- [✓] 2026-01-28 - Phase 4 (Extended): Convert handlers and pipeline files to sqlc
+  - Migrated all 5 handler files to use sqlc:
+    - `handlers/prices.go` - 4 queries converted:
+      - CountStorePrices, ListStorePricesWithDetails, GetRetailerItemDetails, GetRetailerItemName, CountPriceGroupsByChain
+    - `handlers/runs.go` - 9 queries converted:
+      - GetIngestionRunById, CountIngestionFiles, ListIngestionFiles
+      - CountIngestionErrors, ListIngestionErrors, GetRunStats, CountErrorsByDateRange
+      - GetRunChainSlug, CreateRerunRun, CheckRunExists, DeleteIngestionErrors/Files/Run
+    - `handlers/ingest.go` - 5 queries converted:
+      - CreateIngestionRun, GetIngestionRun, UpdateIngestionRunStatus
+      - UpdateIngestionRunFailed, ListIngestionRunsByChain
+    - `handlers/failed_rows.go` - 5 queries converted:
+      - CountFailedRows, ListFailedRows, UpdateFailedRowNotes
+      - GetFailedRowsForReprocessing, MarkRowAsReprocessed, CreateReprocessingRun
+    - `handlers/error_summary.go` - 1 query converted:
+      - GetErrorSummaryByChain
+  - Migrated all 3 pipeline files to use sqlc:
+    - `pipeline/parse.go` - 2 queries converted:
+      - CreateIngestionFile, UpdateIngestionFileCompleted
+    - `pipeline/discover.go` - 8 queries converted:
+      - UpdateRunStartedAt, UpdateRunTotalFiles, UpdateRunCompleted
+      - UpdateRunInterrupted, UpdateRunFailed
+      - IncrementRunProcessedFiles, IncrementRunProcessedEntries, GetRunProgressInfo
+    - `pipeline/pipeline.go` - 1 query converted:
+      - CreateIngestionRun (for worker source)
+  - Created `handlers/handlers_sqlc_test.go` with 8 tests:
+    - TestSqlcImportsAvailable, TestPricesHandlerUsesSqlc, TestRunsHandlerUsesSqlc
+    - TestIngestHandlerUsesSqlc, TestFailedRowsHandlerUsesSqlc, TestErrorSummaryHandlerUsesSqlc
+    - TestSqlcMethodsExist (30+ methods verified), TestHandlerResponseTypes, TestGetChainNameFunction
+    - TestSqlcMigrationComplete
+  - All tests pass: `go test -short ./...`
+  - go vet linting passes: `go vet ./...`
+  - go build passes: `go build ./...`
+  - NOTE: Phase 4 progress updated (10 of 14 files now converted)
+  - Remaining files for future sessions:
+    - workers/worker.go (1 query - uses taskqueue.GetPool())
+    - jobs/cleanup_database.go
+    - sweepers/taskqueue.go
+    - taskqueue/queue.go

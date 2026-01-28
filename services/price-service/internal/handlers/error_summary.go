@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 )
 
 type ErrorSummary struct {
@@ -64,45 +65,25 @@ func GetErrorSummary(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-time.Duration(hours) * time.Hour)
-	pool := database.Pool()
-	ctx := context.Background()
+	queries := sqlcgen.New(database.Pool())
+	ctx := c.Request.Context()
 
-	const query = `
-		SELECT
-			chain_slug,
-			COUNT(*) as total_rows,
-			COUNT(*) as failed_rows,
-			MIN(failed_at) as first_failed,
-			MAX(failed_at) as last_failed
-		FROM retailer_items_failed
-		WHERE failed_at >= $1
-		GROUP BY chain_slug
-	`
-
-	rows, err := pool.Query(ctx, query, since)
+	// Query error summary using sqlc
+	rows, err := queries.GetErrorSummaryByChain(ctx, pgtype.Timestamp{Time: since, Valid: true})
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to query error statistics"})
 		return
 	}
-	defer rows.Close()
 
-	chains := make([]ChainError, 0)
+	chains := make([]ChainError, 0, len(rows))
 	var overallTotalRows int
 	var overallFailedRows int
 
-	for rows.Next() {
-		var chainSlug string
-		var totalRows int
-		var failedRows int
-		var firstFailed, lastFailed *time.Time
+	for _, row := range rows {
+		totalRows := int(row.TotalRows)
+		failedRows := int(row.FailedRows)
 
-		err := rows.Scan(&chainSlug, &totalRows, &failedRows, &firstFailed, &lastFailed)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "Failed to scan row"})
-			return
-		}
-
-		chainName := getChainName(chainSlug)
+		chainName := getChainName(row.ChainSlug)
 		errorRate := 0.0
 		if totalRows > 0 {
 			errorRate = float64(failedRows) / float64(totalRows)
@@ -116,7 +97,7 @@ func GetErrorSummary(c *gin.Context) {
 		}
 
 		chains = append(chains, ChainError{
-			ChainSlug:  chainSlug,
+			ChainSlug:  row.ChainSlug,
 			ChainName:  chainName,
 			TotalRows:  totalRows,
 			FailedRows: failedRows,

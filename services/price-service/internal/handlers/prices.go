@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 )
 
 // GetStorePricesRequest represents query parameters for getting store prices
@@ -82,88 +83,102 @@ func GetStorePrices(c *gin.Context) {
 		req.Limit = 100
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
-	// Get total count
-	var total int
-	err := pool.QueryRow(ctx, `
-		SELECT COUNT(*)
-		FROM store_item_state sis
-		JOIN retailer_items ri ON sis.retailer_item_id = ri.id
-		JOIN stores s ON sis.store_id = s.id
-		WHERE s.id = $1 AND s.chain_slug = $2
-	`, storeID, chainSlug).Scan(&total)
-
+	// Get total count using sqlc
+	total, err := queries.CountStorePrices(ctx, sqlcgen.CountStorePricesParams{
+		ID:        storeID,
+		ChainSlug: chainSlug,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count prices"})
 		return
 	}
 
-	// Get prices with pagination
-	query := `
-		SELECT
-			ri.id as retailer_item_id,
-			ri.name as item_name,
-			ri.external_id as item_external_id,
-			ri.brand,
-			ri.unit,
-			ri.unit_quantity,
-			sis.current_price,
-			sis.previous_price,
-			sis.discount_price,
-			TO_CHAR(sis.discount_start, 'YYYY-MM-DD HH24:MI:SS') as discount_start,
-			TO_CHAR(sis.discount_end, 'YYYY-MM-DD HH24:MI:SS') as discount_end,
-			sis.in_stock,
-			sis.unit_price,
-			sis.unit_price_base_quantity,
-			sis.unit_price_base_unit,
-			sis.lowest_price_30d,
-			sis.anchor_price,
-			sis.price_signature,
-			TO_CHAR(sis.last_seen_at, 'YYYY-MM-DD HH24:MI:SS') as last_seen_at
-		FROM store_item_state sis
-		JOIN retailer_items ri ON sis.retailer_item_id = ri.id
-		JOIN stores s ON sis.store_id = s.id
-		WHERE s.id = $1 AND s.chain_slug = $2
-		ORDER BY ri.name
-		LIMIT $3 OFFSET $4
-	`
-
-	rows, err := pool.Query(ctx, query, storeID, chainSlug, req.Limit, req.Offset)
+	// Get prices with pagination using sqlc
+	priceRows, err := queries.ListStorePricesWithDetails(ctx, sqlcgen.ListStorePricesWithDetailsParams{
+		ID:        storeID,
+		ChainSlug: chainSlug,
+		Limit:     int32(req.Limit),
+		Offset:    int32(req.Offset),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch prices"})
 		return
 	}
-	defer rows.Close()
 
-	prices := []StorePrice{}
-	for rows.Next() {
-		var price StorePrice
-		err := rows.Scan(
-			&price.RetailerItemID, &price.ItemName, &price.ItemExternalID,
-			&price.Brand, &price.Unit, &price.UnitQuantity,
-			&price.CurrentPrice, &price.PreviousPrice, &price.DiscountPrice,
-			&price.DiscountStart, &price.DiscountEnd, &price.InStock,
-			&price.UnitPrice, &price.UnitPriceBaseQty, &price.UnitPriceBaseUnit,
-			&price.LowestPrice30d, &price.AnchorPrice, &price.PriceSignature,
-			&price.LastSeenAt,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan price"})
-			return
+	// Convert sqlc rows to response type
+	prices := make([]StorePrice, 0, len(priceRows))
+	for _, row := range priceRows {
+		price := StorePrice{
+			RetailerItemID: row.RetailerItemID,
+			ItemName:       row.ItemName,
+			LastSeenAt:     row.LastSeenAt,
 		}
-		prices = append(prices, price)
-	}
 
-	if rows.Err() != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iterating prices"})
-		return
+		// Convert pgtype fields to *string/*int
+		if row.ItemExternalID.Valid {
+			price.ItemExternalID = &row.ItemExternalID.String
+		}
+		if row.Brand.Valid {
+			price.Brand = &row.Brand.String
+		}
+		if row.Unit.Valid {
+			price.Unit = &row.Unit.String
+		}
+		if row.UnitQuantity.Valid {
+			price.UnitQuantity = &row.UnitQuantity.String
+		}
+		if row.CurrentPrice.Valid {
+			v := int(row.CurrentPrice.Int32)
+			price.CurrentPrice = &v
+		}
+		if row.PreviousPrice.Valid {
+			v := int(row.PreviousPrice.Int32)
+			price.PreviousPrice = &v
+		}
+		if row.DiscountPrice.Valid {
+			v := int(row.DiscountPrice.Int32)
+			price.DiscountPrice = &v
+		}
+		if row.DiscountStart != "" {
+			price.DiscountStart = &row.DiscountStart
+		}
+		if row.DiscountEnd != "" {
+			price.DiscountEnd = &row.DiscountEnd
+		}
+		if row.InStock.Valid {
+			price.InStock = row.InStock.Bool
+		}
+		if row.UnitPrice.Valid {
+			v := int(row.UnitPrice.Int32)
+			price.UnitPrice = &v
+		}
+		if row.UnitPriceBaseQuantity.Valid {
+			price.UnitPriceBaseQty = &row.UnitPriceBaseQuantity.String
+		}
+		if row.UnitPriceBaseUnit.Valid {
+			price.UnitPriceBaseUnit = &row.UnitPriceBaseUnit.String
+		}
+		if row.LowestPrice30d.Valid {
+			v := int(row.LowestPrice30d.Int32)
+			price.LowestPrice30d = &v
+		}
+		if row.AnchorPrice.Valid {
+			v := int(row.AnchorPrice.Int32)
+			price.AnchorPrice = &v
+		}
+		if row.PriceSignature.Valid {
+			price.PriceSignature = &row.PriceSignature.String
+		}
+
+		prices = append(prices, price)
 	}
 
 	c.JSON(http.StatusOK, GetStorePricesResponse{
 		Prices: prices,
-		Total:  total,
+		Total:  int(total),
 	})
 }
 
@@ -339,7 +354,7 @@ func GetStorePricesViaGroup(c *gin.Context) {
 		return
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
 	// Get prices via price group
@@ -349,24 +364,32 @@ func GetStorePricesViaGroup(c *gin.Context) {
 		return
 	}
 
-	// Enrich with retailer item details
+	// Enrich with retailer item details using sqlc
 	enrichedPrices := []StorePrice{}
 	for _, price := range prices {
-		var itemName string
+		itemName := "Unknown Item"
 		var itemExternalID, brand, unit, unitQuantity *string
 
-		err := pool.QueryRow(ctx, `
-			SELECT name, external_id, brand, unit, unit_quantity
-			FROM retailer_items
-			WHERE id = $1
-		`, price.RetailerItemID).Scan(&itemName, &itemExternalID, &brand, &unit, &unitQuantity)
-
+		details, err := queries.GetRetailerItemDetails(ctx, price.RetailerItemID)
 		if err != nil {
 			if err != pgx.ErrNoRows {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch item details"})
 				return
 			}
-			itemName = "Unknown Item"
+		} else {
+			itemName = details.Name
+			if details.ExternalID.Valid {
+				itemExternalID = &details.ExternalID.String
+			}
+			if details.Brand.Valid {
+				brand = &details.Brand.String
+			}
+			if details.Unit.Valid {
+				unit = &details.Unit.String
+			}
+			if details.UnitQuantity.Valid {
+				unitQuantity = &details.UnitQuantity.String
+			}
 		}
 
 		enrichedPrices = append(enrichedPrices, StorePrice{
@@ -405,7 +428,7 @@ func GetHistoricalPrice(c *gin.Context) {
 		return
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
 	// Parse asOf timestamp, default to now if not provided
@@ -426,14 +449,11 @@ func GetHistoricalPrice(c *gin.Context) {
 		return
 	}
 
-	// Get item details
-	var itemName string
-	err = pool.QueryRow(ctx, `
-		SELECT name FROM retailer_items WHERE id = $1
-	`, req.ItemID).Scan(&itemName)
-
-	if err != nil {
-		itemName = "Unknown Item"
+	// Get item name using sqlc
+	itemName := "Unknown Item"
+	name, err := queries.GetRetailerItemName(ctx, req.ItemID)
+	if err == nil {
+		itemName = name
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -483,21 +503,17 @@ func ListPriceGroups(c *gin.Context) {
 		req.Limit = 50
 	}
 
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
-	// Get total count
-	var total int
-	err := pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM price_groups WHERE chain_slug = $1
-	`, chainSlug).Scan(&total)
-
+	// Get total count using sqlc
+	total, err := queries.CountPriceGroupsByChain(ctx, chainSlug)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count price groups"})
 		return
 	}
 
-	// List price groups
+	// List price groups (database package already uses sqlc internally)
 	groups, err := database.ListPriceGroups(ctx, chainSlug, req.Limit, req.Offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch price groups"})
@@ -519,7 +535,7 @@ func ListPriceGroups(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"groups": summaries,
-		"total":  total,
+		"total":  int(total),
 		"limit":  req.Limit,
 		"offset": req.Offset,
 	})

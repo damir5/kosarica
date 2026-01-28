@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/types"
 	"github.com/rs/zerolog/log"
 )
@@ -99,41 +102,51 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 	}, nil
 }
 
-// createIngestionFile creates an ingestion file record in the database
+// createIngestionFile creates an ingestion file record in the database using sqlc
 func createIngestionFile(ctx context.Context, fileID string, runID string, file types.DiscoveredFile, fetchResult *FetchResult, parseResult *types.ParseResult, storeIdentifier string) error {
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 
 	metadataJSON, _ := json.Marshal(map[string]interface{}{
 		"storeIdentifier": storeIdentifier,
 		"url":             file.URL,
 	})
 
-	_, err := pool.Exec(ctx, `
-		INSERT INTO ingestion_files (
-			id, run_id, filename, file_type, file_size, file_hash,
-			status, entry_count, total_chunks, chunk_size, metadata, created_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, 'processing', $7, 1, $7, $8, NOW()
-		)
-	`, fileID, runID, file.Filename, string(file.Type), len(fetchResult.Content), fetchResult.Hash,
-		parseResult.ValidRows, metadataJSON)
+	// Parse fileID to int64 (strip prefix if present)
+	var fileIDInt int64
+	if len(fileID) > 4 && fileID[:4] == "igf_" {
+		fileIDInt, _ = strconv.ParseInt(fileID[4:], 10, 64)
+	} else {
+		fileIDInt, _ = strconv.ParseInt(fileID, 10, 64)
+	}
 
-	return err
+	return queries.CreateIngestionFile(ctx, sqlcgen.CreateIngestionFileParams{
+		ID:         fileIDInt,
+		RunID:      runID,
+		Filename:   file.Filename,
+		FileType:   string(file.Type),
+		FileSize:   pgtype.Int4{Int32: int32(len(fetchResult.Content)), Valid: true},
+		FileHash:   pgtype.Text{String: fetchResult.Hash, Valid: fetchResult.Hash != ""},
+		EntryCount: pgtype.Int4{Int32: int32(parseResult.ValidRows), Valid: true},
+		Metadata:   pgtype.Text{String: string(metadataJSON), Valid: true},
+	})
 }
 
-// markFileCompleted marks an ingestion file as completed
+// markFileCompleted marks an ingestion file as completed using sqlc
 func markFileCompleted(ctx context.Context, fileID string, processedChunks int) error {
-	pool := database.Pool()
+	queries := sqlcgen.New(database.Pool())
 
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_files
-		SET status = 'completed',
-		    processed_chunks = $1,
-		    processed_at = NOW()
-		WHERE id = $2
-	`, processedChunks, fileID)
+	// Parse fileID to int64 (strip prefix if present)
+	var fileIDInt int64
+	if len(fileID) > 4 && fileID[:4] == "igf_" {
+		fileIDInt, _ = strconv.ParseInt(fileID[4:], 10, 64)
+	} else {
+		fileIDInt, _ = strconv.ParseInt(fileID, 10, 64)
+	}
 
-	return err
+	return queries.UpdateIngestionFileCompleted(ctx, sqlcgen.UpdateIngestionFileCompletedParams{
+		ProcessedChunks: pgtype.Int4{Int32: int32(processedChunks), Valid: true},
+		ID:              fileIDInt,
+	})
 }
 
 // groupRowsByStore groups normalized rows by store identifier

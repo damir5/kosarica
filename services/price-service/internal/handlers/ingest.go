@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/rs/zerolog/log"
@@ -58,20 +60,21 @@ func IngestChain(c *gin.Context) {
 		return
 	}
 
-	// Create run record in database
-	pool := database.Pool()
+	// Create run record in database using sqlc
+	queries := sqlcgen.New(database.Pool())
 	ctx := c.Request.Context()
 
 	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	now := time.Now()
 
-	_, err := pool.Exec(ctx, `
-		INSERT INTO ingestion_runs (
-			id, chain_slug, source, status, started_at, created_at
-		) VALUES (
-			$1, $2, 'api', 'running', $3, $4
-		)
-	`, runID, chainID, now, now)
+	_, err := queries.CreateIngestionRun(ctx, sqlcgen.CreateIngestionRunParams{
+		ID:        runID,
+		ChainSlug: chainID,
+		Source:    "api",
+		Status:    "running",
+		StartedAt: pgtype.Timestamp{Time: now, Valid: true},
+		CreatedAt: pgtype.Timestamp{Time: now, Valid: true},
+	})
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -120,10 +123,9 @@ func GetIngestionStatus(c *gin.Context) {
 		return
 	}
 
-	// Look up status from database
-	pool := database.Pool()
-	var status string
-	err := pool.QueryRow(c.Request.Context(), "SELECT status FROM ingestion_runs WHERE id = $1", runID).Scan(&status)
+	// Look up status from database using sqlc
+	queries := sqlcgen.New(database.Pool())
+	run, err := queries.GetIngestionRun(c.Request.Context(), runID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to lookup status"})
 		return
@@ -131,7 +133,7 @@ func GetIngestionStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"runId":  runID,
-		"status": status,
+		"status": run.Status,
 	})
 }
 
@@ -147,41 +149,45 @@ func ListIngestionRuns(c *gin.Context) {
 		return
 	}
 
-	// Look up runs from database
-	pool := database.Pool()
-	rows, err := pool.Query(c.Request.Context(), `
-		SELECT id, status, started_at, completed_at, files_processed, entries_persisted
-		FROM ingestion_runs
-		WHERE chain_slug = $1 AND source = 'api'
-		ORDER BY started_at DESC
-		LIMIT 20
-	`, chainID)
+	// Look up runs from database using sqlc
+	queries := sqlcgen.New(database.Pool())
+	rows, err := queries.ListIngestionRunsByChain(c.Request.Context(), sqlcgen.ListIngestionRunsByChainParams{
+		ChainSlug: chainID,
+		Limit:     20,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to lookup runs"})
 		return
 	}
-	defer rows.Close()
 
+	// Convert to response format
 	var runs []interface{}
-	for rows.Next() {
-		var run struct {
+	for _, row := range rows {
+		run := struct {
 			ID               string  `json:"id"`
 			Status           string  `json:"status"`
 			StartedAt        string  `json:"startedAt"`
 			CompletedAt      *string `json:"completedAt,omitempty"`
 			FilesProcessed   int     `json:"filesProcessed"`
 			EntriesPersisted int     `json:"entriesPersisted"`
+		}{
+			ID:     row.ID,
+			Status: row.Status,
 		}
-		err := rows.Scan(
-			&run.ID,
-			&run.Status,
-			&run.StartedAt,
-			&run.CompletedAt,
-			&run.FilesProcessed,
-			&run.EntriesPersisted,
-		)
-		if err != nil {
-			continue
+
+		if row.StartedAt.Valid {
+			s := row.StartedAt.Time.Format(time.RFC3339)
+			run.StartedAt = s
+		}
+		if row.CompletedAt.Valid {
+			s := row.CompletedAt.Time.Format(time.RFC3339)
+			run.CompletedAt = &s
+		}
+		if row.ProcessedFiles.Valid {
+			run.FilesProcessed = int(row.ProcessedFiles.Int32)
+		}
+		if row.ProcessedEntries.Valid {
+			run.EntriesPersisted = int(row.ProcessedEntries.Int32)
 		}
 		runs = append(runs, run)
 	}
@@ -192,32 +198,28 @@ func ListIngestionRuns(c *gin.Context) {
 	})
 }
 
-// markRunFailed marks an ingestion run as failed
+// markRunFailed marks an ingestion run as failed using sqlc
 func markRunFailed(ctx context.Context, runID string, errorMsg string) {
-	pool := database.Pool()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET status = 'failed',
-		    completed_at = NOW(),
-		    metadata = $2
-		WHERE id = $1
-	`, runID, fmt.Sprintf(`{"error": "%s"}`, errorMsg))
+	queries := sqlcgen.New(database.Pool())
+	err := queries.UpdateIngestionRunFailed(ctx, sqlcgen.UpdateIngestionRunFailedParams{
+		ID:       runID,
+		Metadata: pgtype.Text{String: fmt.Sprintf(`{"error": "%s"}`, errorMsg), Valid: true},
+	})
 	if err != nil {
 		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as failed")
 	}
 }
 
-// markRunCompleted marks an ingestion run as completed
+// markRunCompleted marks an ingestion run as completed using sqlc
 func markRunCompleted(ctx context.Context, runID string, filesProcessed int, entriesPersisted int) {
-	pool := database.Pool()
-	_, err := pool.Exec(ctx, `
-		UPDATE ingestion_runs
-		SET status = 'completed',
-		    completed_at = NOW(),
-		    processed_files = $2,
-		    processed_entries = $3
-		WHERE id = $1
-	`, runID, filesProcessed, entriesPersisted)
+	queries := sqlcgen.New(database.Pool())
+	err := queries.UpdateIngestionRunStatus(ctx, sqlcgen.UpdateIngestionRunStatusParams{
+		ID:               runID,
+		Status:           "completed",
+		CompletedAt:      pgtype.Timestamp{Time: time.Now(), Valid: true},
+		ProcessedFiles:   pgtype.Int4{Int32: int32(filesProcessed), Valid: true},
+		ProcessedEntries: pgtype.Int4{Int32: int32(entriesPersisted), Valid: true},
+	})
 	if err != nil {
 		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as completed")
 	}
