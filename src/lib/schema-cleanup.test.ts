@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { describe, expect, it } from "vitest";
 
 /**
  * Tests verifying that redundant schema generation files have been cleaned up.

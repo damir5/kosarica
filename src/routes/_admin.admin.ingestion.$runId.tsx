@@ -118,7 +118,10 @@ function RunDetailPage() {
 		return new Date(date).toLocaleString();
 	};
 
-	const formatDuration = (start: string | Date | null | undefined, end: string | Date | null | undefined) => {
+	const formatDuration = (
+		start: string | Date | null | undefined,
+		end: string | Date | null | undefined,
+	) => {
 		if (!start) return "N/A";
 		const startTime = new Date(start).getTime();
 		const endTime = end ? new Date(end).getTime() : Date.now();
@@ -313,7 +316,7 @@ function RunDetailPage() {
 								</div>
 								<p className="mt-1">{formatDate(run.completedAt)}</p>
 							</div>
-								{/* Note: parentRunId and rerunType fields are not returned by the SDK */}
+							{/* Note: parentRunId and rerunType fields are not returned by the SDK */}
 						</div>
 					</CardContent>
 				</Card>
@@ -449,13 +452,16 @@ function RunDetailPage() {
 										Previous
 									</Button>
 									<span className="text-sm">
-										Page {page} of {Math.ceil((filesData.total ?? 0) / pageSize)}
+										Page {page} of{" "}
+										{Math.ceil((filesData.total ?? 0) / pageSize)}
 									</span>
 									<Button
 										variant="outline"
 										size="sm"
 										onClick={() => setPage((p) => p + 1)}
-										disabled={page >= Math.ceil((filesData.total ?? 0) / pageSize)}
+										disabled={
+											page >= Math.ceil((filesData.total ?? 0) / pageSize)
+										}
 									>
 										Next
 										<ChevronRight className="h-4 w-4" />

@@ -257,11 +257,7 @@ async function tick(): Promise<void> {
 		try {
 			await executeJob(claimed);
 		} catch (err) {
-			log.error(
-				"Job execution failed",
-				{ jobId: claimed.job.id },
-				err,
-			);
+			log.error("Job execution failed", { jobId: claimed.job.id }, err);
 		}
 	}
 }

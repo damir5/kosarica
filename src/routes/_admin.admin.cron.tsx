@@ -75,7 +75,10 @@ function CronDashboard() {
 		mutationFn: async ({
 			jobId,
 			enabled,
-		}: { jobId: string; enabled: boolean }) => {
+		}: {
+			jobId: string;
+			enabled: boolean;
+		}) => {
 			return orpc.admin.cron.toggle.call({ jobId, enabled });
 		},
 		onSuccess: () => {
@@ -242,9 +245,7 @@ function CronDashboard() {
 							<Clock className="h-5 w-5" />
 							Scheduled Jobs
 						</CardTitle>
-						<CardDescription>
-							Configure and trigger cron jobs
-						</CardDescription>
+						<CardDescription>Configure and trigger cron jobs</CardDescription>
 					</CardHeader>
 					<CardContent>
 						{jobsLoading ? (
@@ -272,16 +273,14 @@ function CronDashboard() {
 												<span>TZ: {job.timezone ?? "UTC"}</span>
 												{job.nextRunAt && (
 													<span>
-														Next:{" "}
-														{new Date(job.nextRunAt).toLocaleString()}
+														Next: {new Date(job.nextRunAt).toLocaleString()}
 													</span>
 												)}
 											</div>
 											{job.lastRunAt && (
 												<div className="flex items-center gap-2 mt-1 text-sm">
 													<span className="text-muted-foreground">
-														Last run:{" "}
-														{new Date(job.lastRunAt).toLocaleString()}
+														Last run: {new Date(job.lastRunAt).toLocaleString()}
 													</span>
 													{job.lastRunStatus && (
 														<StatusBadge status={job.lastRunStatus} />
@@ -309,9 +308,7 @@ function CronDashboard() {
 												variant="outline"
 												size="sm"
 												onClick={() => triggerMutation.mutate(job.id)}
-												disabled={
-													triggerMutation.isPending || !job.hasHandler
-												}
+												disabled={triggerMutation.isPending || !job.hasHandler}
 											>
 												{triggerMutation.isPending &&
 												triggerMutation.variables === job.id ? (

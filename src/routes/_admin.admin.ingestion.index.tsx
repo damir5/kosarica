@@ -41,9 +41,9 @@ export const Route = createFileRoute("/_admin/admin/ingestion/" as any)({
 type TimeRange = "24h" | "7d" | "30d";
 type RunStatus = "pending" | "running" | "completed" | "failed";
 
+import type { IngestionRun } from "@/components/admin/ingestion";
 // Import types from Go service SDK
 import type { HandlersIngestionRun } from "@/lib/go-api";
-import type { IngestionRun } from "@/components/admin/ingestion";
 
 interface TriggerResponse {
 	runId: string;
@@ -143,10 +143,10 @@ function IngestionDashboard() {
 	const triggerMutation = useMutation({
 		mutationFn: async (chainSlug: string) => {
 			// triggerChain uses goFetchWithRetry which returns {success, data, error}
-			const response = await orpc.admin.ingestion.triggerChain.call({
+			const response = (await orpc.admin.ingestion.triggerChain.call({
 				chain: chainSlug,
 				targetDate: selectedDate,
-			}) as { success: boolean; data?: TriggerResponse; error?: string };
+			})) as { success: boolean; data?: TriggerResponse; error?: string };
 			if (!response.success) {
 				throw new Error(response.error || "Failed to trigger ingestion");
 			}
@@ -316,7 +316,9 @@ function IngestionDashboard() {
 										variant="outline"
 										size="sm"
 										onClick={() => setPage((p) => p + 1)}
-										disabled={page >= Math.ceil((runsData.total ?? 0) / pageSize)}
+										disabled={
+											page >= Math.ceil((runsData.total ?? 0) / pageSize)
+										}
 									>
 										Next
 										<ChevronRight className="h-4 w-4" />

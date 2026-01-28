@@ -2,6 +2,7 @@
 -- PostgreSQL database dump
 --
 
+\restrict UYMQnfzcnRuPPNcCFDr666libZkVNAZ7AphrvrQpM2Tsd5X9Az31NfjgwFxMl2X
 
 -- Dumped from database version 14.20 (Homebrew)
 -- Dumped by pg_dump version 15.15 (Debian 15.15-0+deb12u1)
@@ -2450,4 +2451,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE damir IN SCHEMA public GRANT ALL ON TABLES  TO
 -- PostgreSQL database dump complete
 --
 
+\unrestrict UYMQnfzcnRuPPNcCFDr666libZkVNAZ7AphrvrQpM2Tsd5X9Az31NfjgwFxMl2X
 

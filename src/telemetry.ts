@@ -183,7 +183,12 @@ export async function initTelemetry(
  * @param sdk - The NodeSDK instance returned from initTelemetry
  */
 export async function shutdownTelemetry(sdk: unknown): Promise<void> {
-	if (sdk && typeof sdk === "object" && "shutdown" in sdk && typeof (sdk as { shutdown: () => Promise<void> }).shutdown === "function") {
+	if (
+		sdk &&
+		typeof sdk === "object" &&
+		"shutdown" in sdk &&
+		typeof (sdk as { shutdown: () => Promise<void> }).shutdown === "function"
+	) {
 		try {
 			await (sdk as { shutdown: () => Promise<void> }).shutdown();
 			console.log("[Telemetry] OpenTelemetry shut down successfully");

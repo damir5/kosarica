@@ -4,7 +4,7 @@
  * Helper functions for cron expression parsing and idempotency key generation.
  */
 
-import { CronExpressionParser, type CronExpression } from "cron-parser";
+import { type CronExpression, CronExpressionParser } from "cron-parser";
 
 /**
  * Parse a cron expression and validate it
@@ -69,7 +69,10 @@ export function getPreviousRun(
  * @param scheduledFor - The scheduled execution time
  * @returns Unique idempotency key
  */
-export function generateIdempotencyKey(jobId: string, scheduledFor: Date): string {
+export function generateIdempotencyKey(
+	jobId: string,
+	scheduledFor: Date,
+): string {
 	return `cron:${jobId}:${scheduledFor.toISOString()}`;
 }
 

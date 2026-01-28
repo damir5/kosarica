@@ -158,7 +158,8 @@ export const getPendingMatches = superadminProcedure
 			`,
 		);
 
-		const rows = ((result as { rows?: unknown[] }).rows ?? []) as QueueItemData[];
+		const rows = ((result as { rows?: unknown[] }).rows ??
+			[]) as QueueItemData[];
 
 		// Check if there are more results
 		const hasMore = rows.length > input.limit;

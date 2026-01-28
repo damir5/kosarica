@@ -28,10 +28,37 @@ set -o allexport
 [ -f ../../.env.development ] && . ../../.env.development || true
 [ -f ./.env.development ] && . ./.env.development || true
 echo "Dumping schema from database..."
-pg_dump --schema-only "$DATABASE_URL" > schema.sql
+pg_dump --schema-only "$DATABASE_URL" | grep -v '^\\\\' > schema.sql
 echo "Generating sqlc code..."
 sqlc generate
 echo "Done!"
+"""
+
+[tasks.db-sync]
+description = "Sync schema from DB, regenerate sqlc, and verify Go compiles"
+run = """
+#!/usr/bin/env bash
+set -e
+
+echo "=== Step 1: Extract schema from database ==="
+set -o allexport
+[ -f ../../.env.development ] && . ../../.env.development || true
+[ -f ./.env.development ] && . ./.env.development || true
+pg_dump --schema-only "$DATABASE_URL" | grep -v '^\\\\' > schema.sql
+echo "Schema extracted to schema.sql"
+
+echo ""
+echo "=== Step 2: Generate sqlc code ==="
+sqlc generate
+echo "sqlc code generated successfully"
+
+echo ""
+echo "=== Step 3: Verify Go compilation ==="
+go build ./...
+echo "Go code compiles successfully"
+
+echo ""
+echo "=== All checks passed ==="
 """
 
 # ==============================================================================

@@ -91,7 +91,9 @@ export const dailyIngestionHandler: CronJobHandler = {
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				log.error(`Failed to trigger ingestion for ${chain}`, { error: message });
+				log.error(`Failed to trigger ingestion for ${chain}`, {
+					error: message,
+				});
 				failed++;
 			}
 		}

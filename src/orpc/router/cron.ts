@@ -9,9 +9,9 @@ import { z } from "zod";
 import { cronJobs, cronRuns } from "@/db/schema";
 import {
 	executeJobManually,
+	getNextRun,
 	getRegisteredJobs,
 	getSchedulerHealth,
-	getNextRun,
 } from "@/jobs/cron";
 import { getDb } from "@/utils/bindings";
 import { superadminProcedure } from "../base";
@@ -22,10 +22,7 @@ import { superadminProcedure } from "../base";
 export const list = superadminProcedure.handler(async () => {
 	const db = getDb();
 
-	const jobs = await db
-		.select()
-		.from(cronJobs)
-		.orderBy(cronJobs.name);
+	const jobs = await db.select().from(cronJobs).orderBy(cronJobs.name);
 
 	// Get registered jobs to check for handlers
 	const registeredJobs = getRegisteredJobs();
@@ -79,7 +76,9 @@ export const listRuns = superadminProcedure
 	.input(
 		z.object({
 			jobId: z.string().optional(),
-			status: z.enum(["pending", "running", "completed", "failed", "skipped"]).optional(),
+			status: z
+				.enum(["pending", "running", "completed", "failed", "skipped"])
+				.optional(),
 			limit: z.number().default(50),
 			offset: z.number().default(0),
 		}),

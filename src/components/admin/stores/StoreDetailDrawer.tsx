@@ -42,7 +42,6 @@ import { StoreLocationMap } from "./StoreLocationMap";
 import { StoreStatusBadge } from "./StoreStatusBadge";
 import { VerifyLocationModal } from "./VerifyLocationModal";
 
-
 interface StoreDetailDrawerProps {
 	storeId: string | null;
 	open: boolean;

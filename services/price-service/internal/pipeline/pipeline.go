@@ -25,8 +25,9 @@ type IngestionResult struct {
 }
 
 // Run executes the full ingestion pipeline for a chain
+// If runID is provided, uses that run; otherwise creates a new one
 // Returns the ingestion result with success status, run ID, and statistics
-func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResult, error) {
+func Run(ctx context.Context, chainID string, targetDate string, runID string) (*IngestionResult, error) {
 	// Validate chain ID
 	if !config.IsValidChainID(chainID) {
 		return nil, fmt.Errorf("invalid chain ID: %s", chainID)
@@ -43,10 +44,12 @@ func Run(ctx context.Context, chainID string, targetDate string) (*IngestionResu
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
 
-	// Create ingestion run
-	runID := createIngestionRun(ctx, chainID)
+	// Use provided runID or create new one
 	if runID == "" {
-		return nil, fmt.Errorf("failed to create ingestion run")
+		runID = createIngestionRun(ctx, chainID)
+		if runID == "" {
+			return nil, fmt.Errorf("failed to create ingestion run")
+		}
 	}
 
 	log.Info().Str("runId", runID).Str("chain", chainID).Msg("Starting ingestion run")

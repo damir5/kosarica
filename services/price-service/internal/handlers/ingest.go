@@ -85,20 +85,33 @@ func IngestChain(c *gin.Context) {
 
 	// Spawn goroutine for actual processing
 	go func() {
+		// Use a background context for the goroutine
+		bgCtx := context.Background()
+
+		// Add panic recovery to prevent silent crashes
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Str("runID", runID).Str("chain", chainID).Msg("Ingestion goroutine panicked")
+				markRunFailed(bgCtx, runID, fmt.Sprintf("panic: %v", r))
+			}
+		}()
+
 		// Acquire semaphore slot (blocks if max concurrent reached)
 		ingestionSem <- struct{}{}
 		defer func() { <-ingestionSem }() // Release semaphore slot when done
 
-		// Use a background context for the goroutine
-		bgCtx := context.Background()
-		result, runErr := pipeline.Run(bgCtx, chainID, req.TargetDate)
+		// Pass the handler's runID to the pipeline to avoid duplicate run creation
+		result, runErr := pipeline.Run(bgCtx, chainID, req.TargetDate, runID)
 
-		// Update run status based on result
+		// Update run status based on result with proper logging
 		if runErr != nil {
+			log.Error().Err(runErr).Str("runID", runID).Str("chain", chainID).Msg("Ingestion failed")
 			markRunFailed(bgCtx, runID, runErr.Error())
 		} else if !result.Success {
+			log.Warn().Str("runID", runID).Int("errors", len(result.Errors)).Msg("Ingestion completed with errors")
 			markRunFailed(bgCtx, runID, fmt.Sprintf("Ingestion completed with %d errors", len(result.Errors)))
 		} else {
+			log.Info().Str("runID", runID).Int("files", result.FilesProcessed).Int("entries", result.EntriesPersisted).Msg("Ingestion completed successfully")
 			markRunCompleted(bgCtx, runID, result.FilesProcessed, result.EntriesPersisted)
 		}
 	}()

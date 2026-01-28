@@ -5,17 +5,17 @@
  * Uses row-level locking (FOR UPDATE SKIP LOCKED) to prevent race conditions.
  */
 
-import { and, eq, sql, lt } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import { cronJobs, cronRuns } from "@/db/schema";
 import { getDb } from "@/utils/bindings";
 import { createLogger, errorToObject } from "@/utils/logger";
+import { getRegisteredJob } from "./registry";
 import type {
 	ClaimedJob,
 	CronExecutionContext,
 	CronJobRow,
 	CronRunStatus,
 } from "./types";
-import { getRegisteredJob } from "./registry";
 import { generateIdempotencyKey, getNextRun } from "./utils";
 
 const log = createLogger("scheduler");
@@ -70,7 +70,10 @@ export async function claimDueJobs(): Promise<ClaimedJob[]> {
 	`);
 
 	const claimedJobs: ClaimedJob[] = [];
-	const rows = ((result as { rows?: unknown[] }).rows ?? []) as Record<string, unknown>[];
+	const rows = ((result as { rows?: unknown[] }).rows ?? []) as Record<
+		string,
+		unknown
+	>[];
 
 	for (const row of rows) {
 		// The scheduledFor is captured from before we nulled next_run_at
@@ -266,10 +269,7 @@ export async function recoverStuckRuns(): Promise<number> {
 			errorMessage: "Run exceeded timeout (stuck recovery)",
 		})
 		.where(
-			and(
-				eq(cronRuns.status, "running"),
-				lt(cronRuns.startedAt, cutoffTime),
-			),
+			and(eq(cronRuns.status, "running"), lt(cronRuns.startedAt, cutoffTime)),
 		)
 		.returning({ id: cronRuns.id, jobId: cronRuns.jobId });
 
@@ -321,10 +321,7 @@ export async function executeJobManually(
 	const db = getDb();
 
 	// Get the job
-	const [job] = await db
-		.select()
-		.from(cronJobs)
-		.where(eq(cronJobs.id, jobId));
+	const [job] = await db.select().from(cronJobs).where(eq(cronJobs.id, jobId));
 
 	if (!job) {
 		throw new Error(`Job not found: ${jobId}`);
@@ -356,7 +353,10 @@ export async function executeJobManually(
 		runId,
 		scheduledFor: now,
 		isManual: true,
-		payload: payloadOverride ?? (job.taskPayload as Record<string, unknown> | null) ?? undefined,
+		payload:
+			payloadOverride ??
+			(job.taskPayload as Record<string, unknown> | null) ??
+			undefined,
 	};
 
 	let status: CronRunStatus = "completed";

@@ -14,6 +14,7 @@
     "generate": "pnpm db:generate",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:sync": "drizzle-kit migrate && cd services/price-service && mise run db-sync",
     "db:studio": "drizzle-kit studio",
     "analyze:price-variation": "node scripts/analyze-price-variation.mjs",
     "test:integration": "vitest run --run",

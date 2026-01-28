@@ -3,7 +3,6 @@ package matching
 import (
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -164,15 +163,6 @@ func TestAutoMatchByBarcodeIntegration(t *testing.T) {
 	upca := "123456789012"
 	ean13 := NormalizeBarcode(upca)
 	assert.Equal(t, "0123456789012", ean13, "UPC-A should be converted to EAN-13")
-}
-
-// mockDBConnection is a placeholder for actual DB testing setup
-// In a real scenario, this would set up a test database with testcontainers
-func setupTestDB(t *testing.T) *pgxpool.Pool {
-	t.Helper()
-	// TODO: Set up test database with testcontainers
-	// For now, this is a placeholder
-	return nil
 }
 
 func TestQueueForReview(t *testing.T) {

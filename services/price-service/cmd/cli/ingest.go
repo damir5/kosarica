@@ -72,7 +72,7 @@ func runIngest(cmd *cobra.Command, args []string) error {
 	// Process each chain
 	for _, chainID := range chains {
 		logger.Info().Str("chain", string(chainID)).Msg("Starting ingestion")
-		result, err := pipeline.Run(ctx, string(chainID), ingestDate)
+		result, err := pipeline.Run(ctx, string(chainID), ingestDate, "")
 		if err != nil {
 			logger.Error().Str("chain", string(chainID)).Err(err).Msg("Ingestion failed")
 			results = append(results, ingestResult{

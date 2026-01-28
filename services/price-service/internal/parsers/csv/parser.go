@@ -310,7 +310,6 @@ func (p *Parser) mapRowToNormalized(rawRow []string, rowNumber int, indices map[
 	// Parse price
 	price := 0
 	if priceStr := getValue("price"); priceStr != nil {
-		log.Debug().Int("row", rowNumber).Str("value", *priceStr).Interface("indices", indices).Msg("Price column FOUND")
 		parsed, err := ParsePrice(*priceStr)
 		if err != nil {
 			log.Debug().Int("row", rowNumber).Str("value", *priceStr).Err(err).Msg("Price parse ERROR")
@@ -321,11 +320,18 @@ func (p *Parser) mapRowToNormalized(rawRow []string, rowNumber int, indices map[
 				OriginalValue: priceStr,
 			})
 		} else {
-			log.Debug().Int("row", rowNumber).Str("value", *priceStr).Int("cents", parsed).Msg("Price parse OK")
 			price = parsed
 		}
-	} else {
-		log.Debug().Int("row", rowNumber).Interface("indices", indices).Msg("Price column NOT FOUND")
+	}
+
+	// Fallback: if main price is 0 or empty, use discount price
+	if price == 0 {
+		if discountPriceStr := getValue("discountPrice"); discountPriceStr != nil {
+			parsed, err := ParsePrice(*discountPriceStr)
+			if err == nil && parsed > 0 {
+				price = parsed
+			}
+		}
 	}
 
 	// Parse discount price

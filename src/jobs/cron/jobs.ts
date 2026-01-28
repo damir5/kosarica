@@ -6,8 +6,8 @@
  * when the instance becomes the leader.
  */
 
-import { registerCronJob } from "./registry";
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
+import { registerCronJob } from "./registry";
 
 /**
  * Register all cron jobs

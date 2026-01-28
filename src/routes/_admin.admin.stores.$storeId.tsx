@@ -21,7 +21,11 @@ export const Route = createFileRoute("/_admin/admin/stores/$storeId")({
 function StoreDetailPage() {
 	const { storeId } = Route.useParams();
 
-	const { data: store, isLoading, error } = useQuery(
+	const {
+		data: store,
+		isLoading,
+		error,
+	} = useQuery(
 		orpc.admin.stores.get.queryOptions({
 			input: { storeId },
 		}),

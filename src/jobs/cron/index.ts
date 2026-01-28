@@ -15,27 +15,6 @@
  * 3. The leader instance will sync jobs to DB and execute them
  */
 
-// Types
-export type {
-	CronJobConfig,
-	CronJobHandler,
-	CronExecutionContext,
-	CronRunStatus,
-	TaskToEnqueue,
-	RegisteredJob,
-	ClaimedJob,
-	SchedulerHealth,
-} from "./types";
-
-// Registry
-export {
-	registerCronJob,
-	getRegisteredJobs,
-	getRegisteredJob,
-	syncJobsToDatabase,
-	clearRegistry,
-} from "./registry";
-
 // Executor
 export {
 	claimDueJobs,
@@ -43,24 +22,42 @@ export {
 	executeJobManually,
 	recoverStuckRuns,
 } from "./executor";
+// Job Registration
+export { registerAllCronJobs } from "./jobs";
+// Registry
+export {
+	clearRegistry,
+	getRegisteredJob,
+	getRegisteredJobs,
+	registerCronJob,
+	syncJobsToDatabase,
+} from "./registry";
 
 // Tick Loop
 export {
-	startTickLoop,
-	stopTickLoop,
 	getSchedulerHealth,
 	isSchedulerLeader,
 	releaseLeadership,
+	startTickLoop,
+	stopTickLoop,
 } from "./tick";
-
-// Job Registration
-export { registerAllCronJobs } from "./jobs";
+// Types
+export type {
+	ClaimedJob,
+	CronExecutionContext,
+	CronJobConfig,
+	CronJobHandler,
+	CronRunStatus,
+	RegisteredJob,
+	SchedulerHealth,
+	TaskToEnqueue,
+} from "./types";
 
 // Utilities
 export {
-	getNextRun,
-	getPreviousRun,
 	generateIdempotencyKey,
 	generateManualIdempotencyKey,
+	getNextRun,
+	getPreviousRun,
 	parseCronExpression,
 } from "./utils";

@@ -43,7 +43,7 @@ func NewIngestionHandler() func(context.Context, []byte) error {
 			return fmt.Errorf("failed to unmarshal ingestion payload: %w", err)
 		}
 
-		result, err := pipeline.Run(ctx, "konzum", "")
+		result, err := pipeline.Run(ctx, "konzum", "", "")
 		if err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func NewRerunHandler() func(context.Context, []byte) error {
 			return fmt.Errorf("failed to unmarshal rerun payload: %w", err)
 		}
 
-		result, err := pipeline.Run(ctx, "konzum", "")
+		result, err := pipeline.Run(ctx, "konzum", "", "")
 		if err != nil {
 			return err
 		}

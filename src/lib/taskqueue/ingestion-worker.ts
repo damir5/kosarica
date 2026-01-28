@@ -1,11 +1,11 @@
 import { rerunIngestion, scheduleIngestion } from "@/lib/go-service-client";
 import {
 	type ClaimedTask,
-	type TaskType,
 	claimTasks,
 	completeTask,
 	failTask,
 	startProcessing,
+	type TaskType,
 } from "./index";
 
 type TaskHandler = (task: ClaimedTask) => Promise<void>;
