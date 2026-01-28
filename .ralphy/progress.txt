@@ -241,3 +241,18 @@
     - last_seen index exists
     - price_signature index exists
   - All 9 tests pass, linting passes on changed files
+
+- [✓] 2026-01-28 - Phase 1 Task 6: Generated and verified schema migration
+  - Ran `pnpm db:generate` to create migration file drizzle/0005_lethal_wolfpack.sql
+  - Migration includes all Phase 1 schema changes:
+    - Creates retailer_item_barcodes table with proper columns and constraints
+    - Drops old store_item_state_store_retailer_idx index
+    - Makes retailer_items.retailer_item_id nullable
+    - Makes retailer_items.barcode nullable
+    - Adds foreign key constraint on retailer_item_barcodes
+    - Creates indexes on retailer_item_barcodes (retailer_item_id, barcode, unique compound)
+    - Creates unique index on retailer_items(chain_slug, external_id)
+    - Creates unique index on store_item_state(store_id, retailer_item_id)
+  - Migrations applied successfully during test run (pnpm db:migrate)
+  - All 182 tests pass, TypeScript type checking passes
+  - Phase 1 schema changes complete - all 6 tasks done

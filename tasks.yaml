@@ -37,7 +37,7 @@ tasks:
       pnpm db:generate  # creates migration
       pnpm db:migrate   # applies to DB
       ```
-    completed: false
+    completed: true
 
   # Phase 2: sqlc Query Files
   - title: Create sqlc query files for all Go queries

@@ -35,6 +35,13 @@
       "when": 1769600466028,
       "tag": "0004_open_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769612815785,
+      "tag": "0005_lethal_wolfpack",
+      "breakpoints": true
     }
   ]
 }
