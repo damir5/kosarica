@@ -66,7 +66,7 @@ func TestRetailerItemsQueryFileContents(t *testing.T) {
 	requiredQueries := []string{
 		"-- name: GetRetailerItemByExternalId :one",
 		"-- name: UpdateRetailerItem :exec",
-		"-- name: UpsertRetailerItem :exec",
+		"-- name: UpsertRetailerItem :one", // Changed to :one to return ID on upsert (Phase 3)
 		"-- name: UpdateRetailerItemsArchiveId :exec",
 		"-- name: GetRetailerItemDetails :one",
 		"-- name: GetRetailerItemName :one",

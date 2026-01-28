@@ -117,7 +117,7 @@ func (q *Queries) UpdateRetailerItemsArchiveId(ctx context.Context, arg UpdateRe
 	return err
 }
 
-const upsertRetailerItem = `-- name: UpsertRetailerItem :exec
+const upsertRetailerItem = `-- name: UpsertRetailerItem :one
 INSERT INTO retailer_items (
     id, chain_slug, external_id, name, description, category, subcategory,
     brand, unit, unit_quantity, image_url, archive_id, created_at, updated_at
@@ -135,6 +135,7 @@ ON CONFLICT (chain_slug, external_id) DO UPDATE SET
     image_url = EXCLUDED.image_url,
     archive_id = EXCLUDED.archive_id,
     updated_at = NOW()
+RETURNING id
 `
 
 type UpsertRetailerItemParams struct {
@@ -152,8 +153,8 @@ type UpsertRetailerItemParams struct {
 	ArchiveID    pgtype.Text `db:"archive_id" json:"archive_id"`
 }
 
-func (q *Queries) UpsertRetailerItem(ctx context.Context, arg UpsertRetailerItemParams) error {
-	_, err := q.db.Exec(ctx, upsertRetailerItem,
+func (q *Queries) UpsertRetailerItem(ctx context.Context, arg UpsertRetailerItemParams) (string, error) {
+	row := q.db.QueryRow(ctx, upsertRetailerItem,
 		arg.ID,
 		arg.ChainSlug,
 		arg.ExternalID,
@@ -167,5 +168,7 @@ func (q *Queries) UpsertRetailerItem(ctx context.Context, arg UpsertRetailerItem
 		arg.ImageUrl,
 		arg.ArchiveID,
 	)
-	return err
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }

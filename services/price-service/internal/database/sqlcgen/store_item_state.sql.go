@@ -31,14 +31,14 @@ func (q *Queries) GetStorePreviousPrice(ctx context.Context, arg GetStorePreviou
 
 const upsertStoreItemState = `-- name: UpsertStoreItemState :exec
 INSERT INTO store_item_state (
-    id, store_id, retailer_item_id, current_price, previous_price,
+    store_id, retailer_item_id, current_price, previous_price,
     discount_price, discount_start, discount_end, in_stock,
     unit_price, unit_price_base_quantity, unit_price_base_unit,
     lowest_price_30d, anchor_price, anchor_price_as_of,
     price_signature, last_seen_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, true,
-    $9, $10, $11, $12, $13, $14, $15, NOW(), NOW()
+    $1, $2, $3, $4, $5, $6, $7, true,
+    $8, $9, $10, $11, $12, $13, $14, NOW(), NOW()
 )
 ON CONFLICT (store_id, retailer_item_id) DO UPDATE SET
     previous_price = store_item_state.current_price,
@@ -58,7 +58,6 @@ ON CONFLICT (store_id, retailer_item_id) DO UPDATE SET
 `
 
 type UpsertStoreItemStateParams struct {
-	ID                    int64            `db:"id" json:"id"`
 	StoreID               string           `db:"store_id" json:"store_id"`
 	RetailerItemID        string           `db:"retailer_item_id" json:"retailer_item_id"`
 	CurrentPrice          pgtype.Int4      `db:"current_price" json:"current_price"`
@@ -77,7 +76,6 @@ type UpsertStoreItemStateParams struct {
 
 func (q *Queries) UpsertStoreItemState(ctx context.Context, arg UpsertStoreItemStateParams) error {
 	_, err := q.db.Exec(ctx, upsertStoreItemState,
-		arg.ID,
 		arg.StoreID,
 		arg.RetailerItemID,
 		arg.CurrentPrice,

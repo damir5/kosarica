@@ -98,7 +98,7 @@ tasks:
           })
       }
       ```
-    completed: false
+    completed: true
 
   - title: Test barcode ingestion
     description: |

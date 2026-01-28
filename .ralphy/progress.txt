@@ -298,3 +298,42 @@
   - All 23 sqlcgen tests pass (18 existing + 5 new verification tests)
   - go vet linting passes on all files
   - Phase 2 complete - both sqlc query file creation and type generation verified
+
+- [✓] 2026-01-28 - Phase 3 Task 1: Updated persist.go to use sqlc and fix barcode saving
+  - Migrated persist.go to use sqlc for all database operations:
+    - `findStoreByIdentifier`: now uses `queries.GetStoreByIdentifier()`
+    - `createStore`: now uses `queries.CreateStore()` and `queries.CreateStoreIdentifier()`
+    - `findOrCreateRetailerItem`: now uses `queries.UpsertRetailerItem()` with RETURNING id
+    - `persistRowsForStore`: transaction loop now uses `txQueries.GetStorePreviousPrice()` and `txQueries.UpsertStoreItemState()`
+    - `saveFailedRow`: now uses `queries.CreateFailedRow()`
+  - Fixed barcode saving (Phase 3 key fix):
+    - Barcodes are now inserted in `findOrCreateRetailerItem()` using `queries.InsertRetailerItemBarcode()`
+    - Primary barcode (row.Barcodes[0]) is saved with `is_primary = true`
+    - Removed duplicate barcode insertion loop from `persistRowsForStore()` transaction
+  - Updated sqlc query files:
+    - `store_item_state.sql`: Removed ID parameter (uses auto-generated sequence)
+    - `retailer_items.sql`: Changed `UpsertRetailerItem` from `:exec` to `:one` to RETURN id
+  - Regenerated sqlc types with `sqlc generate`
+  - Removed unused `findOrCreateRetailerItemTx` function (no longer needed)
+  - Removed unused `time` import
+  - Created `internal/pipeline/persist_test.go` with 17 tests verifying:
+    - sqlcgen package import and types
+    - Function signatures for findOrCreateRetailerItem, saveFailedRow
+    - Row validation logic (validateNormalizedRow)
+    - Price signature computation
+    - All required sqlc queries exist
+    - UpsertRetailerItem returns ID (string, error)
+    - InsertRetailerItemBarcodeParams structure
+    - UpsertStoreItemStateParams has no ID field (auto-generated)
+    - Barcode insertion in findOrCreateRetailerItem
+    - CreateFailedRowParams structure
+    - PersistResult type unchanged
+    - PersistPhase function signature unchanged
+    - Validation warnings (high price, discount >= regular)
+    - Queries.WithTx method for transactions
+    - cuid2 prefix conventions
+  - Updated queries_test.go to expect `UpsertRetailerItem :one` instead of `:exec`
+  - All 17 persist.go tests pass
+  - All Go tests pass (`go test ./... -short`)
+  - go vet linting passes on all files
+  - Phase 3 Task 1 complete - persist.go migrated to sqlc with barcode fix

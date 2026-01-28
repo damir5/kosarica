@@ -9,7 +9,7 @@ SET name = $1, description = $2, category = $3, subcategory = $4,
     brand = $5, unit = $6, unit_quantity = $7, image_url = $8, updated_at = NOW()
 WHERE id = $9;
 
--- name: UpsertRetailerItem :exec
+-- name: UpsertRetailerItem :one
 INSERT INTO retailer_items (
     id, chain_slug, external_id, name, description, category, subcategory,
     brand, unit, unit_quantity, image_url, archive_id, created_at, updated_at
@@ -26,7 +26,8 @@ ON CONFLICT (chain_slug, external_id) DO UPDATE SET
     unit_quantity = EXCLUDED.unit_quantity,
     image_url = EXCLUDED.image_url,
     archive_id = EXCLUDED.archive_id,
-    updated_at = NOW();
+    updated_at = NOW()
+RETURNING id;
 
 -- name: UpdateRetailerItemsArchiveId :exec
 UPDATE retailer_items
