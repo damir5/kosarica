@@ -14,6 +14,9 @@ export interface IngestionRun {
 	chainSlug: string;
 	source: string;
 	status: string; // 'pending' | 'running' | 'completed' | 'failed'
+	statusReason?: string | null;
+	statusSeverity?: string | null;
+	statusType?: string | null;
 	startedAt: Date | null;
 	completedAt: Date | null;
 	totalFiles: number | null;
@@ -50,6 +53,21 @@ const STATUS_COLORS = {
 	failed: "destructive",
 } as const;
 
+const SUMMARY_LABELS: Record<string, string> = {
+	warning: "info",
+	error: "error",
+	critical: "critical",
+};
+
+const SUMMARY_VARIANTS: Record<
+	string,
+	"secondary" | "destructive" | "outline"
+> = {
+	warning: "secondary",
+	error: "destructive",
+	critical: "destructive",
+};
+
 const SOURCE_LABELS: Record<string, string> = {
 	cli: "CLI",
 	worker: "Worker",
@@ -67,6 +85,8 @@ export function IngestionRunCard({
 	const processedFiles = run.processedFiles ?? 0;
 	const progress =
 		totalFiles > 0 ? Math.round((processedFiles / totalFiles) * 100) : 0;
+	const summarySeverity = run.statusSeverity ?? "";
+	const summaryLabel = SUMMARY_LABELS[summarySeverity] || summarySeverity;
 
 	const formatDate = (date: Date | null) => {
 		if (!date) return "N/A";
@@ -78,6 +98,7 @@ export function IngestionRunCard({
 		const startTime = new Date(start).getTime();
 		const endTime = end ? new Date(end).getTime() : Date.now();
 		const duration = endTime - startTime;
+		if (duration < 0) return "N/A";
 		const seconds = Math.floor(duration / 1000);
 		const minutes = Math.floor(seconds / 60);
 		const hours = Math.floor(minutes / 60);
@@ -168,6 +189,26 @@ export function IngestionRunCard({
 							</p>
 						</div>
 					</div>
+
+					{run.statusReason && (
+						<div className="flex items-center gap-2 text-xs text-muted-foreground">
+							<Badge
+								variant={SUMMARY_VARIANTS[summarySeverity] || "outline"}
+								className="text-xs"
+							>
+								{summaryLabel || "info"}
+							</Badge>
+							<span>{run.statusReason}</span>
+						</div>
+					)}
+
+					{status === "completed" && totalFiles === 0 && (
+						<div className="rounded-md border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+							No files were discovered for the requested date. We do not
+							backfill older files; existing prices remain in place until the
+							retailer publishes an update.
+						</div>
+					)}
 
 					{/* Timestamps */}
 					<div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">

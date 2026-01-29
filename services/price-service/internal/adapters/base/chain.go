@@ -199,10 +199,10 @@ func (a *BaseChainAdapter) Discover(targetDate string) ([]types.DiscoveredFile, 
 		fileType := a.detectFileType(filename)
 
 		discoveredFiles = append(discoveredFiles, types.DiscoveredFile{
-			URL:      fileURL,
-			Filename: filename,
-			Type:     fileType,
-			Size:     nil,
+			URL:          fileURL,
+			Filename:     filename,
+			Type:         fileType,
+			Size:         nil,
 			LastModified: nil,
 			Metadata: map[string]string{
 				"source":       fmt.Sprintf("%s_portal", a.slug),

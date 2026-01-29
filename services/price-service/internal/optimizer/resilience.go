@@ -51,25 +51,25 @@ type CircuitBreakerConfig struct {
 // DefaultCircuitBreakerConfig returns the default circuit breaker configuration.
 func DefaultCircuitBreakerConfig() *CircuitBreakerConfig {
 	return &CircuitBreakerConfig{
-		MaxFailures:     5,
-		ResetTimeout:    30 * time.Second,
+		MaxFailures:      5,
+		ResetTimeout:     30 * time.Second,
 		HalfOpenMaxCalls: 3,
 	}
 }
 
 // CircuitBreaker implements the circuit breaker pattern for cache failures.
 type CircuitBreaker struct {
-	mu               sync.Mutex
-	state            CircuitBreakerState
-	failureCount     int
-	successCount     int // Used in half-open state
-	lastFailureTime  time.Time
-	lastStateChange  time.Time
-	config           *CircuitBreakerConfig
-	metrics          *MetricsRecorder
-	logger           *zerolog.Logger
-	name             string
-	requestID        string // For request tracking
+	mu              sync.Mutex
+	state           CircuitBreakerState
+	failureCount    int
+	successCount    int // Used in half-open state
+	lastFailureTime time.Time
+	lastStateChange time.Time
+	config          *CircuitBreakerConfig
+	metrics         *MetricsRecorder
+	logger          *zerolog.Logger
+	name            string
+	requestID       string // For request tracking
 }
 
 // NewCircuitBreaker creates a new circuit breaker.
@@ -262,7 +262,7 @@ func NewWarmupGate(logger *zerolog.Logger) *WarmupGate {
 
 	return &WarmupGate{
 		warmedCh: make(chan struct{}),
-		logger:    logger,
+		logger:   logger,
 	}
 }
 

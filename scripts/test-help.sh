@@ -7,7 +7,7 @@ Node.js Tests:
   test-node-unit     Unit tests only (no services needed)
 
 Go Tests:
-  test-go            Go unit tests
+  test-go            Go non-integration tests
   test-go-int        Go integration tests
   test-go-e2e        Go e2e tests (starts containers)
   test-go-coverage   Tests with coverage report

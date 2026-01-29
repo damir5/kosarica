@@ -12,18 +12,18 @@ import (
 // XmlAdapterConfig contains configuration for XML-based chain adapters
 type XmlAdapterConfig struct {
 	BaseAdapterConfig
-	FieldMapping           xml.XmlFieldMapping
+	FieldMapping            xml.XmlFieldMapping
 	AlternativeFieldMapping *xml.XmlFieldMapping
-	DefaultItemsPath       string
-	ItemPaths              []string
+	DefaultItemsPath        string
+	ItemPaths               []string
 }
 
 // BaseXmlAdapter provides common XML parsing logic
 type BaseXmlAdapter struct {
 	*BaseChainAdapter
-	fieldMapping    xml.XmlFieldMapping
-	altMapping      *xml.XmlFieldMapping
-	itemPaths       []string
+	fieldMapping xml.XmlFieldMapping
+	altMapping   *xml.XmlFieldMapping
+	itemPaths    []string
 }
 
 // NewBaseXmlAdapter creates a new base XML adapter

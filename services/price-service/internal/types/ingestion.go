@@ -32,12 +32,12 @@ type NormalizedRow struct {
 	RowNumber       int        `json:"rowNumber"`
 	RawData         string     `json:"rawData"`
 	// Croatian transparency fields
-	UnitPrice            *int       `json:"unitPrice,omitempty"`
-	UnitPriceBaseQuantity *string   `json:"unitPriceBaseQuantity,omitempty"`
-	UnitPriceBaseUnit    *string    `json:"unitPriceBaseUnit,omitempty"`
-	LowestPrice30d       *int       `json:"lowestPrice30d,omitempty"`
-	AnchorPrice          *int       `json:"anchorPrice,omitempty"`
-	AnchorPriceAsOf      *time.Time `json:"anchorPriceAsOf,omitempty"`
+	UnitPrice             *int       `json:"unitPrice,omitempty"`
+	UnitPriceBaseQuantity *string    `json:"unitPriceBaseQuantity,omitempty"`
+	UnitPriceBaseUnit     *string    `json:"unitPriceBaseUnit,omitempty"`
+	LowestPrice30d        *int       `json:"lowestPrice30d,omitempty"`
+	AnchorPrice           *int       `json:"anchorPrice,omitempty"`
+	AnchorPriceAsOf       *time.Time `json:"anchorPriceAsOf,omitempty"`
 }
 
 // NormalizedRowValidation represents validation result for a normalized row
@@ -67,18 +67,18 @@ type StoreIdentifier struct {
 
 // StoreMetadata represents metadata extracted from file for auto-registering stores
 type StoreMetadata struct {
-	Name      string `json:"name"`                // Store name
-	Address   string `json:"address,omitempty"`   // Street address
-	City      string `json:"city,omitempty"`      // City name
+	Name       string `json:"name"`                 // Store name
+	Address    string `json:"address,omitempty"`    // Street address
+	City       string `json:"city,omitempty"`       // City name
 	PostalCode string `json:"postalCode,omitempty"` // Postal/ZIP code
-	StoreType string `json:"storeType,omitempty"` // 'SUPERMARKET', 'HIPERMARKET', etc.
+	StoreType  string `json:"storeType,omitempty"`  // 'SUPERMARKET', 'HIPERMARKET', etc.
 }
 
 // StoreResolutionResult represents result of store resolution attempt
 type StoreResolutionResult struct {
-	Found               bool              `json:"found"`
-	Store               *StoreDescriptor  `json:"store,omitempty"`
-	MatchedIdentifier   *StoreIdentifier  `json:"matchedIdentifier,omitempty"`
+	Found                bool              `json:"found"`
+	Store                *StoreDescriptor  `json:"store,omitempty"`
+	MatchedIdentifier    *StoreIdentifier  `json:"matchedIdentifier,omitempty"`
 	AttemptedIdentifiers []StoreIdentifier `json:"attemptedIdentifiers,omitempty"`
 }
 
@@ -95,17 +95,17 @@ type DiscoveredFile struct {
 // FetchedFile represents a fetched file
 type FetchedFile struct {
 	Discovered DiscoveredFile `json:"discovered"`
-	Content   []byte         `json:"content"`
-	Hash      string         `json:"hash"`
+	Content    []byte         `json:"content"`
+	Hash       string         `json:"hash"`
 }
 
 // ExpandedFile represents a file expanded from a ZIP archive
 type ExpandedFile struct {
-	Parent       DiscoveredFile `json:"parent"`
+	Parent        DiscoveredFile `json:"parent"`
 	InnerFilename string         `json:"innerFilename"`
-	Type         FileType       `json:"type"`
-	Content      []byte         `json:"content"`
-	Hash         string         `json:"hash"`
+	Type          FileType       `json:"type"`
+	Content       []byte         `json:"content"`
+	Hash          string         `json:"hash"`
 }
 
 // ParseOptions represents options for parsing
@@ -116,9 +116,9 @@ type ParseOptions struct {
 
 // ParseError represents a parsing error
 type ParseError struct {
-	RowNumber   *int    `json:"rowNumber,omitempty"`
-	Field       *string `json:"field,omitempty"`
-	Message     string  `json:"message"`
+	RowNumber     *int    `json:"rowNumber,omitempty"`
+	Field         *string `json:"field,omitempty"`
+	Message       string  `json:"message"`
 	OriginalValue *string `json:"originalValue,omitempty"`
 }
 
@@ -186,7 +186,17 @@ const (
 	ErrorTypePersist         IngestionErrorType = "persist"
 	ErrorTypeFetch           IngestionErrorType = "fetch"
 	ErrorTypeExpand          IngestionErrorType = "expand"
+	ErrorTypeDuplicate       IngestionErrorType = "duplicate"
 	ErrorTypeUnknown         IngestionErrorType = "unknown"
+)
+
+// StatusType represents summarized ingestion status reasons
+type StatusType string
+
+const (
+	StatusTypeCommunicationFailure StatusType = "communication_failure"
+	StatusTypeAlreadyImported      StatusType = "already_imported"
+	StatusTypeNoFilesForDate       StatusType = "no_files_for_date"
 )
 
 // StringPtr returns a pointer to the given string

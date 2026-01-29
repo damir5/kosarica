@@ -558,7 +558,10 @@ CREATE TABLE public.ingestion_files (
     total_chunks integer DEFAULT 0,
     processed_chunks integer DEFAULT 0,
     chunk_size integer,
-    created_at timestamp without time zone DEFAULT now()
+    created_at timestamp without time zone DEFAULT now(),
+    status_reason text,
+    status_severity text,
+    status_type text
 );
 
 
@@ -607,7 +610,10 @@ CREATE TABLE public.ingestion_runs (
     rerun_target_id text,
     created_at timestamp without time zone DEFAULT now(),
     archive_id text,
-    source_url text
+    source_url text,
+    status_reason text,
+    status_severity text,
+    status_type text
 );
 
 
@@ -632,6 +638,48 @@ ALTER TABLE public.ingestion_runs_id_seq OWNER TO kosarica;
 --
 
 ALTER SEQUENCE public.ingestion_runs_id_seq OWNED BY public.ingestion_runs.id;
+
+
+--
+-- Name: ingestion_store_stats; Type: TABLE; Schema: public; Owner: kosarica
+--
+
+CREATE TABLE public.ingestion_store_stats (
+    id bigint NOT NULL,
+    run_id text NOT NULL,
+    file_id bigint NOT NULL,
+    store_id text NOT NULL,
+    store_identifier text NOT NULL,
+    row_count integer DEFAULT 0 NOT NULL,
+    persisted_count integer DEFAULT 0 NOT NULL,
+    price_changes integer DEFAULT 0 NOT NULL,
+    failed_rows integer DEFAULT 0 NOT NULL,
+    warning_rows integer DEFAULT 0 NOT NULL,
+    created_at timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.ingestion_store_stats OWNER TO kosarica;
+
+--
+-- Name: ingestion_store_stats_id_seq; Type: SEQUENCE; Schema: public; Owner: kosarica
+--
+
+CREATE SEQUENCE public.ingestion_store_stats_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.ingestion_store_stats_id_seq OWNER TO kosarica;
+
+--
+-- Name: ingestion_store_stats_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kosarica
+--
+
+ALTER SEQUENCE public.ingestion_store_stats_id_seq OWNED BY public.ingestion_store_stats.id;
 
 
 --
@@ -1236,6 +1284,13 @@ ALTER TABLE ONLY public.ingestion_runs ALTER COLUMN id SET DEFAULT nextval('publ
 
 
 --
+-- Name: ingestion_store_stats id; Type: DEFAULT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.ingestion_store_stats ALTER COLUMN id SET DEFAULT nextval('public.ingestion_store_stats_id_seq'::regclass);
+
+
+--
 -- Name: product_match_audit id; Type: DEFAULT; Schema: public; Owner: kosarica
 --
 
@@ -1365,6 +1420,14 @@ ALTER TABLE ONLY public.ingestion_files
 
 ALTER TABLE ONLY public.ingestion_runs
     ADD CONSTRAINT ingestion_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ingestion_store_stats ingestion_store_stats_pkey; Type: CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.ingestion_store_stats
+    ADD CONSTRAINT ingestion_store_stats_pkey PRIMARY KEY (id);
 
 
 --
@@ -1727,6 +1790,27 @@ CREATE INDEX ingestion_chunks_file_chunk_idx ON public.ingestion_chunks USING bt
 --
 
 CREATE INDEX ingestion_chunks_status_idx ON public.ingestion_chunks USING btree (status);
+
+
+--
+-- Name: ingestion_store_stats_file_idx; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX ingestion_store_stats_file_idx ON public.ingestion_store_stats USING btree (file_id);
+
+
+--
+-- Name: ingestion_store_stats_run_idx; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX ingestion_store_stats_run_idx ON public.ingestion_store_stats USING btree (run_id);
+
+
+--
+-- Name: ingestion_store_stats_store_idx; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX ingestion_store_stats_store_idx ON public.ingestion_store_stats USING btree (store_id);
 
 
 --
@@ -2140,6 +2224,30 @@ ALTER TABLE ONLY public.ingestion_runs
 
 ALTER TABLE ONLY public.ingestion_runs
     ADD CONSTRAINT ingestion_runs_chain_slug_chains_slug_fk FOREIGN KEY (chain_slug) REFERENCES public.chains(slug) ON DELETE CASCADE;
+
+
+--
+-- Name: ingestion_store_stats ingestion_store_stats_file_id_ingestion_files_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.ingestion_store_stats
+    ADD CONSTRAINT ingestion_store_stats_file_id_ingestion_files_id_fk FOREIGN KEY (file_id) REFERENCES public.ingestion_files(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ingestion_store_stats ingestion_store_stats_run_id_ingestion_runs_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.ingestion_store_stats
+    ADD CONSTRAINT ingestion_store_stats_run_id_ingestion_runs_id_fk FOREIGN KEY (run_id) REFERENCES public.ingestion_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ingestion_store_stats ingestion_store_stats_store_id_stores_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.ingestion_store_stats
+    ADD CONSTRAINT ingestion_store_stats_store_id_stores_id_fk FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --

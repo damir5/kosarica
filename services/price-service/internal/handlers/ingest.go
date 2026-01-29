@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ import (
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
+	"github.com/kosarica/price-service/internal/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -91,7 +93,12 @@ func IngestChain(c *gin.Context) {
 		// Add panic recovery to prevent silent crashes
 		defer func() {
 			if r := recover(); r != nil {
-				log.Error().Interface("panic", r).Str("runID", runID).Str("chain", chainID).Msg("Ingestion goroutine panicked")
+				log.Error().
+					Interface("panic", r).
+					Str("runID", runID).
+					Str("chain", chainID).
+					Str("stack", string(debug.Stack())).
+					Msg("Ingestion goroutine panicked")
 				markRunFailed(bgCtx, runID, fmt.Sprintf("panic: %v", r))
 			}
 		}()
@@ -214,6 +221,7 @@ func ListIngestionRuns(c *gin.Context) {
 // markRunFailed marks an ingestion run as failed using sqlc
 func markRunFailed(ctx context.Context, runID string, errorMsg string) {
 	queries := sqlcgen.New(database.Pool())
+	pipeline.UpdateRunStatusSummary(ctx, runID, errorMsg, types.SeverityError, "run_failed")
 	err := queries.UpdateIngestionRunFailed(ctx, sqlcgen.UpdateIngestionRunFailedParams{
 		ID:       runID,
 		Metadata: pgtype.Text{String: fmt.Sprintf(`{"error": "%s"}`, errorMsg), Valid: true},

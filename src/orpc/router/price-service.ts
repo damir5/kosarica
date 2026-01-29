@@ -8,19 +8,27 @@
 import * as z from "zod";
 import {
 	deleteInternalIngestionRunsByRunId,
+	getInternalIngestionFilesByFileId,
+	getInternalIngestionFilesByFileIdChunks,
+	getInternalIngestionFilesByFileIdErrors,
+	getInternalIngestionFilesByFileIdStores,
 	getInternalIngestionRuns,
 	getInternalIngestionRunsByRunId,
 	getInternalIngestionRunsByRunIdErrors,
 	getInternalIngestionRunsByRunIdFiles,
+	getInternalIngestionRunsByRunIdStores,
 	getInternalIngestionStats,
 	getInternalItemsSearch,
 	getInternalPricesByChainSlugByStoreId,
 	type HandlersGetStatsResponse,
 	type HandlersGetStorePricesResponse,
+	type HandlersIngestionFile,
 	type HandlersIngestionRun,
 	type HandlersListErrorsResponse,
+	type HandlersListChunksResponse,
 	type HandlersListFilesResponse,
 	type HandlersListRunsResponse,
+	type HandlersListStoreStatsResponse,
 	type HandlersSearchItemsResponse,
 	postInternalIngestionRunsByRunIdRerun,
 } from "@/lib/go-api";
@@ -130,6 +138,52 @@ export const listErrors = procedure
 			},
 		});
 		return unwrapSdkResponse<HandlersListErrorsResponse>(result);
+	});
+
+/**
+ * List store stats for a run
+ * GET /internal/ingestion/runs/:runId/stores?limit=&offset=
+ */
+export const listRunStoreStats = procedure
+	.input(
+		z.object({
+			runId: z.string(),
+			limit: z.number().int().min(1).max(100).default(50),
+			offset: z.number().int().min(0).default(0),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const result = await getInternalIngestionRunsByRunIdStores({
+			path: { runId: input.runId },
+			query: {
+				limit: input.limit,
+				offset: input.offset,
+			},
+		});
+		return unwrapSdkResponse<HandlersListStoreStatsResponse>(result);
+	});
+
+/**
+ * List store stats for a file
+ * GET /internal/ingestion/files/:fileId/stores?limit=&offset=
+ */
+export const listFileStoreStats = procedure
+	.input(
+		z.object({
+			fileId: z.string(),
+			limit: z.number().int().min(1).max(100).default(50),
+			offset: z.number().int().min(0).default(0),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const result = await getInternalIngestionFilesByFileIdStores({
+			path: { fileId: input.fileId },
+			query: {
+				limit: input.limit,
+				offset: input.offset,
+			},
+		});
+		return unwrapSdkResponse<HandlersListStoreStatsResponse>(result);
 	});
 
 // Type for transformed stats response matching frontend expectations
@@ -291,24 +345,19 @@ export const deleteRun = procedure
 /**
  * Get a single file by ID
  * GET /internal/ingestion/files/:fileId
- * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const getFile = procedure
 	.input(z.object({ fileId: z.string() }))
 	.handler(async ({ input }) => {
-		const response = await goFetchWithRetry(
-			`/internal/ingestion/files/${input.fileId}`,
-			{
-				timeout: 5000,
-			},
-		);
-		return unwrapResponse(response);
+		const result = await getInternalIngestionFilesByFileId({
+			path: { fileId: input.fileId },
+		});
+		return unwrapSdkResponse<HandlersIngestionFile>(result);
 	});
 
 /**
  * List chunks for a file with pagination
  * GET /internal/ingestion/files/:fileId/chunks?status=&page=&pageSize=
- * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const listChunks = procedure
 	.input(
@@ -322,20 +371,15 @@ export const listChunks = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const params = new URLSearchParams({
-			page: input.page.toString(),
-			pageSize: input.pageSize.toString(),
+		const result = await getInternalIngestionFilesByFileIdChunks({
+			path: { fileId: input.fileId },
+			query: {
+				status: input.status,
+				page: input.page,
+				pageSize: input.pageSize,
+			},
 		});
-
-		if (input.status) {
-			params.set("status", input.status);
-		}
-
-		const response = await goFetchWithRetry(
-			`/internal/ingestion/files/${input.fileId}/chunks?${params.toString()}`,
-			{ timeout: 5000 },
-		);
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersListChunksResponse>(result);
 	});
 
 /**
@@ -377,7 +421,6 @@ export const rerunChunk = procedure
 /**
  * List errors for a file with pagination
  * GET /internal/ingestion/files/:fileId/errors?page=&pageSize=
- * Note: Not in OpenAPI spec yet - using goFetchWithRetry
  */
 export const listFileErrors = procedure
 	.input(
@@ -388,16 +431,14 @@ export const listFileErrors = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const params = new URLSearchParams({
-			page: input.page.toString(),
-			pageSize: input.pageSize.toString(),
+		const result = await getInternalIngestionFilesByFileIdErrors({
+			path: { fileId: input.fileId },
+			query: {
+				page: input.page,
+				pageSize: input.pageSize,
+			},
 		});
-
-		const response = await goFetchWithRetry(
-			`/internal/ingestion/files/${input.fileId}/errors?${params.toString()}`,
-			{ timeout: 5000 },
-		);
-		return unwrapResponse(response);
+		return unwrapSdkResponse<HandlersListErrorsResponse>(result);
 	});
 
 // ============================================================================

@@ -1,7 +1,8 @@
 -- name: GetIngestionRunById :one
 SELECT id, chain_slug, source, status, started_at, completed_at,
        total_files, processed_files, total_entries, processed_entries,
-       error_count, metadata, created_at
+       error_count, status_reason, status_severity, status_type, metadata,
+       created_at
 FROM ingestion_runs
 WHERE id = $1;
 
@@ -57,7 +58,8 @@ WHERE (@chain_filter::text = '' OR chain_slug = @chain_filter::text)
 -- Pass empty string for chain_slug or status to not filter by that field
 SELECT id, chain_slug, source, status, started_at, completed_at,
        total_files, processed_files, total_entries, processed_entries,
-       error_count, metadata, created_at
+       error_count, status_reason, status_severity, status_type, metadata,
+       created_at
 FROM ingestion_runs
 WHERE (@chain_filter::text = '' OR chain_slug = @chain_filter::text)
   AND (@status_filter::text = '' OR status = @status_filter::text)

@@ -130,20 +130,37 @@ func (a *MetroAdapter) extractStoreCodeFromFilename(filename string) string {
 
 // Discover discovers available Metro price files from the portal
 func (a *MetroAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) {
+	filterDate := targetDate
+	if filterDate == "" {
+		filterDate = time.Now().Format("2006-01-02")
+	}
+
 	// Use base class discover method
 	files, err := a.BaseCsvAdapter.Discover(targetDate)
 	if err != nil {
 		return nil, err
 	}
 
-	// Enrich files with lastModified extracted from filename
+	filtered := make([]types.DiscoveredFile, 0, len(files))
 	for i := range files {
+		fileDate := ""
 		if date := a.extractDateFromFilename(files[i].Filename); date != nil {
 			files[i].LastModified = date
+			fileDate = date.Format("2006-01-02")
+			if files[i].Metadata == nil {
+				files[i].Metadata = map[string]string{}
+			}
+			files[i].Metadata["portalDate"] = fileDate
 		}
+
+		if filterDate != "" && fileDate != filterDate {
+			continue
+		}
+
+		filtered = append(filtered, files[i])
 	}
 
-	return files, nil
+	return filtered, nil
 }
 
 // ExtractStoreIdentifier extracts store identifier from Metro filename

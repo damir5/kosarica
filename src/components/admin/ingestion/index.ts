@@ -4,4 +4,5 @@ export { type IngestionFile, IngestionFileList } from "./IngestionFileList";
 export { type IngestionRun, IngestionRunCard } from "./IngestionRunCard";
 export { IngestionRunList } from "./IngestionRunList";
 export { IngestionStatsCards } from "./IngestionStatsCards";
+export { IngestionStoreStatsTable } from "./IngestionStoreStatsTable";
 export { RerunButton } from "./RerunButton";

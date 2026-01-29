@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	discoverDate  string
+	discoverDate   string
 	discoverOutput string
 )
 

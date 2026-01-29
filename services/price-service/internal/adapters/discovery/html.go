@@ -14,10 +14,10 @@ import (
 
 // HTMLOptions contains options for HTML discovery
 type HTMLOptions struct {
-	Extensions        []string        // File extensions to look for (e.g., ["csv", "xml"])
-	LinkPattern       *regexp.Regexp  // Custom pattern for matching links
-	MaxPages          int             // Maximum pages to crawl (for pagination)
-	PaginationPattern *regexp.Regexp  // Pattern for pagination links
+	Extensions        []string          // File extensions to look for (e.g., ["csv", "xml"])
+	LinkPattern       *regexp.Regexp    // Custom pattern for matching links
+	MaxPages          int               // Maximum pages to crawl (for pagination)
+	PaginationPattern *regexp.Regexp    // Pattern for pagination links
 	Headers           map[string]string // Custom HTTP headers
 }
 
@@ -35,9 +35,9 @@ func HTMLOptionsDefault() HTMLOptions {
 
 // HTMLDiscoverer discovers files from HTML pages
 type HTMLDiscoverer struct {
-	client   *http.Client
-	options  HTMLOptions
-	baseURL  *url.URL
+	client    *http.Client
+	options   HTMLOptions
+	baseURL   *url.URL
 	chainSlug string
 }
 
@@ -52,8 +52,8 @@ func NewHTMLDiscoverer(baseURL string, chainSlug string, options HTMLOptions) (*
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		options:  options,
-		baseURL:  parsedURL,
+		options:   options,
+		baseURL:   parsedURL,
 		chainSlug: chainSlug,
 	}, nil
 }
@@ -156,10 +156,10 @@ func (d *HTMLDiscoverer) extractLinks(html, pageURL string) []types.DiscoveredFi
 		fileType := d.detectFileType(filename)
 
 		discoveredFiles = append(discoveredFiles, types.DiscoveredFile{
-			URL:      fileURL,
-			Filename: filename,
-			Type:     fileType,
-			Size:     nil,
+			URL:          fileURL,
+			Filename:     filename,
+			Type:         fileType,
+			Size:         nil,
 			LastModified: nil,
 			Metadata: map[string]string{
 				"source":       fmt.Sprintf("%s_portal", d.chainSlug),

@@ -196,6 +196,9 @@ func (a *StudenacAdapter) Discover(targetDate string) ([]types.DiscoveredFile, e
 	if filterDate == "" && a.discoveryDate != "" {
 		filterDate = a.discoveryDate
 	}
+	if filterDate == "" {
+		filterDate = time.Now().Format("2006-01-02")
+	}
 
 	log.Debug().Str("url", a.BaseURL()).Msg("Fetching Studenac portal")
 
@@ -239,7 +242,7 @@ func (a *StudenacAdapter) Discover(targetDate string) ([]types.DiscoveredFile, e
 		fileDate := a.extractDateFromFilename(filename)
 
 		// Filter by date if filterDate is set
-		if filterDate != "" && fileDate != "" && fileDate != filterDate {
+		if filterDate != "" && fileDate != filterDate {
 			continue
 		}
 
@@ -357,8 +360,8 @@ func (a *StudenacAdapter) ExtractStoreMetadata(file types.DiscoveredFile) *types
 		}
 	}
 
-	storeType := match[1]                           // "SUPERMARKET"
-	locationRaw := match[2]                         // "Bijela_uvala_5_FUNTANA"
+	storeType := match[1]                                 // "SUPERMARKET"
+	locationRaw := match[2]                               // "Bijela_uvala_5_FUNTANA"
 	location := strings.ReplaceAll(locationRaw, "_", " ") // "Bijela uvala 5 FUNTANA"
 
 	// Try to separate address and city (city is often last word in ALL CAPS)

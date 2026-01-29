@@ -11,16 +11,16 @@ import (
 // CsvAdapterConfig contains configuration for CSV-based chain adapters
 type CsvAdapterConfig struct {
 	BaseAdapterConfig
-	ColumnMapping           csv.CsvColumnMapping
+	ColumnMapping            csv.CsvColumnMapping
 	AlternativeColumnMapping *csv.CsvColumnMapping
 }
 
 // BaseCsvAdapter provides common CSV parsing logic
 type BaseCsvAdapter struct {
 	*BaseChainAdapter
-	csvParser        *csv.Parser
-	columnMapping    csv.CsvColumnMapping
-	altMapping       *csv.CsvColumnMapping
+	csvParser     *csv.Parser
+	columnMapping csv.CsvColumnMapping
+	altMapping    *csv.CsvColumnMapping
 }
 
 // NewBaseCsvAdapter creates a new base CSV adapter

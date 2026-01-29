@@ -18,7 +18,7 @@ func randomBytes(p []byte) error {
 	if err == nil {
 		return nil
 	}
-	
+
 	// Fallback to math/rand if crypto/rand fails
 	// This is less secure but prevents service crash
 	rand.Seed(time.Now().UnixNano())
@@ -153,7 +153,7 @@ func RandomBigInt(max *big.Int) (*big.Int, error) {
 	if err == nil {
 		return n, nil
 	}
-	
+
 	// Fallback to math/rand if crypto/rand fails
 	// Convert max to int64 and use rand.Int63n
 	rand.Seed(time.Now().UnixNano())
@@ -166,6 +166,6 @@ func RandomBigInt(max *big.Int) (*big.Int, error) {
 		randomVal := rand.Int63n(int64(maxUint64))
 		return new(big.Int).SetInt64(randomVal), nil
 	}
-	
+
 	return new(big.Int), err
 }

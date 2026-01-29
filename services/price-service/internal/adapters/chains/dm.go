@@ -1,6 +1,7 @@
 package chains
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/kosarica/price-service/internal/parsers/xlsx"
 	"github.com/kosarica/price-service/internal/types"
 	"github.com/rs/zerolog/log"
+	"github.com/xuri/excelize/v2"
 )
 
 const (
@@ -51,19 +53,19 @@ const (
 // 11: Najniža cijena u posljednjih 30 dana (lowest price in 30 days)
 // 12: sidrena cijena (anchor price)
 var dmWebColumnMapping = xlsx.XlsxColumnMapping{
-	Name:          xlsx.NewNumericIndex(0),
-	ExternalID:    ptr(xlsx.NewNumericIndex(1)),
-	Brand:         ptr(xlsx.NewNumericIndex(2)),
-	Barcodes:      ptr(xlsx.NewNumericIndex(3)),
-	Category:      ptr(xlsx.NewNumericIndex(4)),
-	UnitQuantity:  ptr(xlsx.NewNumericIndex(5)),
-	Unit:          ptr(xlsx.NewNumericIndex(6)),
-	UnitPrice:     ptr(xlsx.NewNumericIndex(7)),
+	Name:         xlsx.NewNumericIndex(0),
+	ExternalID:   ptr(xlsx.NewNumericIndex(1)),
+	Brand:        ptr(xlsx.NewNumericIndex(2)),
+	Barcodes:     ptr(xlsx.NewNumericIndex(3)),
+	Category:     ptr(xlsx.NewNumericIndex(4)),
+	UnitQuantity: ptr(xlsx.NewNumericIndex(5)),
+	Unit:         ptr(xlsx.NewNumericIndex(6)),
+	UnitPrice:    ptr(xlsx.NewNumericIndex(7)),
 	// Column 8 is "dostupno samo online" - ignored
-	Price:         xlsx.NewNumericIndex(9),
-	DiscountPrice: ptr(xlsx.NewNumericIndex(10)),
+	Price:          xlsx.NewNumericIndex(9),
+	DiscountPrice:  ptr(xlsx.NewNumericIndex(10)),
 	LowestPrice30d: ptr(xlsx.NewNumericIndex(11)),
-	AnchorPrice:   ptr(xlsx.NewNumericIndex(12)),
+	AnchorPrice:    ptr(xlsx.NewNumericIndex(12)),
 }
 
 // dmLocalColumnMapping is the column mapping for local DM XLSX files (legacy/test format)
@@ -180,8 +182,20 @@ func (a *DmAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) 
 	resp, err := a.HTTPClient().Get(dmPriceListURL)
 	if err == nil && resp.StatusCode == 200 {
 		defer resp.Body.Close()
-		// Discard body since we only need headers
-		_, _ = io.Copy(io.Discard, resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to read DM price list content")
+			goto fallback
+		}
+
+		inferredDate := inferDateFromXlsxContent(bodyBytes)
+		if date != "" && (inferredDate == "" || inferredDate != date) {
+			log.Info().
+				Str("target_date", date).
+				Str("inferred_date", inferredDate).
+				Msg("DM price list date does not match target date; skipping import")
+			return discoveredFiles, nil
+		}
 
 		contentLength := resp.Header.Get("Content-Length")
 		lastModified := resp.Header.Get("Last-Modified")
@@ -200,6 +214,10 @@ func (a *DmAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) 
 			if s > 0 {
 				size = &s
 			}
+		}
+		if size == nil && len(bodyBytes) > 0 {
+			s := len(bodyBytes)
+			size = &s
 		}
 
 		var modTime *time.Time
@@ -223,7 +241,7 @@ func (a *DmAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) 
 				"source":       "dm_web",
 				"discoveredAt": time.Now().Format(time.RFC3339),
 				"portalUrl":    dmPortalURL,
-				"portalDate":   date,
+				"portalDate":   inferredDate,
 			},
 		})
 
@@ -231,6 +249,7 @@ func (a *DmAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) 
 		return discoveredFiles, nil
 	}
 
+fallback:
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to access DM web portal")
 	} else if resp != nil {
@@ -304,6 +323,65 @@ func (a *DmAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error) 
 	}
 
 	return discoveredFiles, nil
+}
+
+func inferDateFromXlsxContent(content []byte) string {
+	f, err := excelize.OpenReader(bytes.NewReader(content))
+	if err != nil {
+		return ""
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	sheets := f.GetSheetList()
+	if len(sheets) == 0 {
+		return ""
+	}
+
+	rows, err := f.GetRows(sheets[0])
+	if err != nil {
+		return ""
+	}
+
+	maxRows := len(rows)
+	if maxRows > 10 {
+		maxRows = 10
+	}
+
+	for i := 0; i < maxRows; i++ {
+		row := rows[i]
+		maxCols := len(row)
+		if maxCols > 8 {
+			maxCols = 8
+		}
+		for j := 0; j < maxCols; j++ {
+			if date := extractDateFromText(row[j]); date != "" {
+				return date
+			}
+		}
+	}
+
+	return ""
+}
+
+func extractDateFromText(text string) string {
+	value := strings.TrimSpace(text)
+	if value == "" {
+		return ""
+	}
+
+	if match := regexp.MustCompile(`\b(\d{4})-(\d{2})-(\d{2})\b`).FindStringSubmatch(value); len(match) == 4 {
+		return fmt.Sprintf("%s-%s-%s", match[1], match[2], match[3])
+	}
+	if match := regexp.MustCompile(`\b(\d{2})\.(\d{2})\.(\d{4})\b`).FindStringSubmatch(value); len(match) == 4 {
+		return fmt.Sprintf("%s-%s-%s", match[3], match[2], match[1])
+	}
+	if match := regexp.MustCompile(`\b(\d{2})/(\d{2})/(\d{4})\b`).FindStringSubmatch(value); len(match) == 4 {
+		return fmt.Sprintf("%s-%s-%s", match[3], match[2], match[1])
+	}
+
+	return ""
 }
 
 // Fetch fetches a discovered DM file

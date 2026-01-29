@@ -50,6 +50,21 @@ const SOURCE_LABELS: Record<string, string> = {
 	scheduled: "Scheduled",
 };
 
+const SUMMARY_LABELS: Record<string, string> = {
+	warning: "info",
+	error: "error",
+	critical: "critical",
+};
+
+const SUMMARY_VARIANTS: Record<
+	string,
+	"secondary" | "destructive" | "outline"
+> = {
+	warning: "secondary",
+	error: "destructive",
+	critical: "destructive",
+};
+
 export function IngestionRunList({
 	runs,
 	isLoading,
@@ -74,6 +89,7 @@ export function IngestionRunList({
 		const startTime = new Date(start).getTime();
 		const endTime = end ? new Date(end).getTime() : Date.now();
 		const duration = endTime - startTime;
+		if (duration < 0) return "-";
 		const seconds = Math.floor(duration / 1000);
 		const minutes = Math.floor(seconds / 60);
 		const hours = Math.floor(minutes / 60);
@@ -143,6 +159,11 @@ export function IngestionRunList({
 							totalFiles > 0
 								? Math.round((processedFiles / totalFiles) * 100)
 								: 0;
+						const noFilesDiscovered =
+							run.status === "completed" && totalFiles === 0;
+						const summarySeverity = run.statusSeverity ?? "";
+						const summaryLabel =
+							SUMMARY_LABELS[summarySeverity] || summarySeverity;
 
 						return (
 							<TableRow key={run.id}>
@@ -164,6 +185,12 @@ export function IngestionRunList({
 												</span>
 											)}
 										</div>
+										{noFilesDiscovered && (
+											<p className="mt-1 text-xs text-muted-foreground">
+												No files discovered; older prices retained until
+												publish.
+											</p>
+										)}
 									</div>
 								</TableCell>
 								<TableCell>
@@ -176,6 +203,19 @@ export function IngestionRunList({
 										/>
 										{status}
 									</Badge>
+									{run.statusReason && (
+										<div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+											<Badge
+												variant={
+													SUMMARY_VARIANTS[summarySeverity] || "outline"
+												}
+												className="text-xs"
+											>
+												{summaryLabel || "info"}
+											</Badge>
+											<span>{run.statusReason}</span>
+										</div>
+									)}
 								</TableCell>
 								<TableCell>
 									<div className="w-32">

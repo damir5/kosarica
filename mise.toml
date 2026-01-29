@@ -58,3 +58,7 @@ run = "go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g cmd/server/main.go
 [tasks.generate-go-api]
 description = "Generate TypeScript SDK from Go OpenAPI spec"
 run = "pnpm generate:go-api"
+
+[tasks.gofmt]
+description = "Format Go code (price-service)"
+run = "if [ -n \"{{args}}\" ]; then gofmt -w {{args}}; else find services/price-service -name '*.go' -print0 | xargs -0 gofmt -w; fi"

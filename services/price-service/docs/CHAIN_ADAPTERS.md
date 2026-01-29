@@ -11,6 +11,12 @@ The Price Service implements adapters for 11 Croatian retail chains. Each adapte
 3. **Parses** data into normalized format
 4. **Persists** to PostgreSQL database
 
+### Discovery Guardrails (Must Follow)
+
+- **Never backfill or fall back to older files** when a target date returns no matches.
+- If discovery yields zero files, ingestion must stop and **retain existing prices** until the retailer publishes a new file.
+- This behavior is required for business logic correctness and storage optimization.
+
 ## Chain Reference
 
 | Chain | Format | Encoding | Delimiter | Special |

@@ -36,23 +36,23 @@ var plodineColumnMapping = csv.CsvColumnMapping{
 
 // plodineColumnMappingAlt is the alternative column mapping for Plodine CSV files
 var plodineColumnMappingAlt = csv.CsvColumnMapping{
-	ExternalID:          types.StringPtr("Šifra"),
-	Name:                "Naziv",
-	Category:            types.StringPtr("Kategorija"),
-	Brand:               types.StringPtr("Marka"),
-	Unit:                types.StringPtr("Mjerna jedinica"),
-	UnitQuantity:        types.StringPtr("Količina"),
-	Price:               "Cijena",
-	DiscountPrice:       types.StringPtr("Akcijska cijena"),
-	DiscountStart:       types.StringPtr("Početak akcije"),
-	DiscountEnd:         types.StringPtr("Kraj akcije"),
-	Barcodes:            types.StringPtr("Barkod"),
-	UnitPrice:           types.StringPtr("Cijena za jedinicu mjere"),
-	LowestPrice30d:      types.StringPtr("Najniža cijena u zadnjih 30 dana"),
-	AnchorPrice:         types.StringPtr("Sidrena cijena"),
+	ExternalID:            types.StringPtr("Šifra"),
+	Name:                  "Naziv",
+	Category:              types.StringPtr("Kategorija"),
+	Brand:                 types.StringPtr("Marka"),
+	Unit:                  types.StringPtr("Mjerna jedinica"),
+	UnitQuantity:          types.StringPtr("Količina"),
+	Price:                 "Cijena",
+	DiscountPrice:         types.StringPtr("Akcijska cijena"),
+	DiscountStart:         types.StringPtr("Početak akcije"),
+	DiscountEnd:           types.StringPtr("Kraj akcije"),
+	Barcodes:              types.StringPtr("Barkod"),
+	UnitPrice:             types.StringPtr("Cijena za jedinicu mjere"),
+	LowestPrice30d:        types.StringPtr("Najniža cijena u zadnjih 30 dana"),
+	AnchorPrice:           types.StringPtr("Sidrena cijena"),
 	UnitPriceBaseQuantity: types.StringPtr("Količina za jedinicu mjere"),
-	UnitPriceBaseUnit:   types.StringPtr("Jedinica mjere za cijenu"),
-	AnchorPriceAsOf:     types.StringPtr("Datum sidrene cijene"),
+	UnitPriceBaseUnit:     types.StringPtr("Jedinica mjere za cijenu"),
+	AnchorPriceAsOf:       types.StringPtr("Datum sidrene cijene"),
 }
 
 // PlodineAdapter is the chain adapter for Plodine retail chain
@@ -189,9 +189,9 @@ func (a *PlodineAdapter) Discover(targetDate string) ([]types.DiscoveredFile, er
 				Size:         nil,
 				LastModified: types.TimePtr(lastModified),
 				Metadata: map[string]string{
-					"source":       "plodine_portal",
-					"discoveredAt": time.Now().Format(time.RFC3339),
-					"portalDate":   date,
+					"source":          "plodine_portal",
+					"discoveredAt":    time.Now().Format(time.RFC3339),
+					"portalDate":      date,
 					"fileDatePattern": fileDatePattern,
 				},
 			})

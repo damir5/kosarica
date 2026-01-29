@@ -12,6 +12,7 @@ import (
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/kosarica/price-service/internal/storage"
+	"github.com/kosarica/price-service/internal/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -63,7 +64,20 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 	log.Info().Msg("Phase 1: Discovery")
 	discoveredFiles, err := DiscoverPhase(ctx, chainID, runID, targetDate)
 	if err != nil {
-		result.Errors = append(result.Errors, fmt.Sprintf("Discovery failed: %v", err))
+		errMsg := fmt.Sprintf("Discovery failed: %v", err)
+		result.Errors = append(result.Errors, errMsg)
+		recordIngestionError(ctx, IngestionErrorParams{
+			RunID:        runID,
+			ErrorType:    types.ErrorTypeFetch,
+			ErrorMessage: errMsg,
+			ErrorDetails: formatErrorDetails(err.Error(), map[string]string{
+				"phase":      "discovery",
+				"chain":      chainID,
+				"targetDate": targetDate,
+			}),
+			Severity: types.SeverityError,
+		})
+		UpdateRunStatusSummary(ctx, runID, "Communication failure", types.SeverityError, string(types.StatusTypeCommunicationFailure))
 		markRunFailed(ctx, runID, err.Error())
 		result.Success = false
 		return result, nil
@@ -82,6 +96,15 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 	// Process each file through fetch, parse, persist phases
 	for _, file := range discoveredFiles {
 		log.Info().Str("filename", file.Filename).Msg("Processing file")
+		fileID := generateFileID()
+
+		if err := createIngestionFilePlaceholder(ctx, fileID, runID, file); err != nil {
+			errMsg := fmt.Sprintf("Failed to create ingestion file record for %s: %v", file.Filename, err)
+			result.Errors = append(result.Errors, errMsg)
+			log.Error().Str("error", errMsg).Msg("File record creation failed")
+			UpdateRunStatusSummary(ctx, runID, "File record creation failed", types.SeverityError, string(types.ErrorTypePersist))
+			continue
+		}
 
 		// Phase 2: Fetch (with storage backend)
 		fetchResult, err := FetchPhase(ctx, chainID, file, storageBackend)
@@ -89,11 +112,56 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 			errMsg := fmt.Sprintf("Fetch failed for %s: %v", file.Filename, err)
 			result.Errors = append(result.Errors, errMsg)
 			log.Error().Str("error", errMsg).Msg("Fetch failed")
+			recordIngestionError(ctx, IngestionErrorParams{
+				RunID:        runID,
+				FileID:       fileID,
+				ErrorType:    types.ErrorTypeFetch,
+				ErrorMessage: errMsg,
+				ErrorDetails: formatErrorDetails(err.Error(), map[string]string{
+					"phase":    "fetch",
+					"url":      file.URL,
+					"filename": file.Filename,
+				}),
+				Severity: types.SeverityError,
+			})
+			UpdateRunStatusSummary(ctx, runID, "Communication failure", types.SeverityError, string(types.StatusTypeCommunicationFailure))
+			if err := markIngestionFileFailed(ctx, fileID, "Communication failure", types.SeverityError, string(types.StatusTypeCommunicationFailure)); err != nil {
+				log.Warn().Err(err).Str("file_id", fileID).Msg("Failed to mark file as failed")
+			}
+			if err := incrementProcessedFiles(ctx, runID); err != nil {
+				log.Warn().Err(err).Msg("Failed to increment processed files")
+			}
+			result.FilesProcessed++
 			continue
 		}
 
-		if fetchResult == nil {
-			// Duplicate file, skip
+		if err := updateIngestionFileFetchInfo(ctx, fileID, fetchResult.FileSize, fetchResult.Hash); err != nil {
+			log.Warn().Err(err).Str("file_id", fileID).Msg("Failed to update file fetch info")
+		}
+
+		if fetchResult.IsDuplicate {
+			reason := "Already imported"
+			recordIngestionError(ctx, IngestionErrorParams{
+				RunID:        runID,
+				FileID:       fileID,
+				ErrorType:    types.ErrorTypeDuplicate,
+				ErrorMessage: reason,
+				ErrorDetails: formatErrorDetails("Duplicate archive", map[string]string{
+					"phase":     "fetch",
+					"url":       file.URL,
+					"filename":  file.Filename,
+					"archiveId": fetchResult.ArchiveID,
+				}),
+				Severity: types.SeverityWarning,
+			})
+			UpdateRunStatusSummary(ctx, runID, reason, types.SeverityWarning, string(types.StatusTypeAlreadyImported))
+			if err := markIngestionFileCompletedWithSummary(ctx, fileID, 0, reason, types.SeverityWarning, string(types.StatusTypeAlreadyImported)); err != nil {
+				log.Warn().Err(err).Str("file_id", fileID).Msg("Failed to mark duplicate file as completed")
+			}
+			if err := incrementProcessedFiles(ctx, runID); err != nil {
+				log.Warn().Err(err).Msg("Failed to increment processed files")
+			}
+			result.FilesProcessed++
 			continue
 		}
 
@@ -103,11 +171,34 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 		}
 
 		// Phase 3: Parse
-		parseResult, err := ParsePhase(ctx, chainID, fetchResult, file, runID)
+		parseResult, err := ParsePhase(ctx, chainID, fetchResult, file, runID, fileID)
 		if err != nil {
 			errMsg := fmt.Sprintf("Parse failed for %s: %v", file.Filename, err)
 			result.Errors = append(result.Errors, errMsg)
 			log.Error().Str("error", errMsg).Msg("Parse failed")
+			recordIngestionError(ctx, IngestionErrorParams{
+				RunID:        runID,
+				FileID:       fileID,
+				ErrorType:    types.ErrorTypeParse,
+				ErrorMessage: errMsg,
+				ErrorDetails: formatErrorDetails(err.Error(), map[string]string{
+					"phase":      "parse",
+					"url":        file.URL,
+					"filename":   file.Filename,
+					"archiveId":  fetchResult.ArchiveID,
+					"storageKey": fetchResult.StorageKey,
+					"hash":       fetchResult.Hash,
+				}),
+				Severity: types.SeverityError,
+			})
+			UpdateRunStatusSummary(ctx, runID, "Parse failed", types.SeverityError, string(types.ErrorTypeParse))
+			if err := markIngestionFileFailed(ctx, fileID, "Parse failed", types.SeverityError, string(types.ErrorTypeParse)); err != nil {
+				log.Warn().Err(err).Str("file_id", fileID).Msg("Failed to mark file as failed")
+			}
+			if err := incrementProcessedFiles(ctx, runID); err != nil {
+				log.Warn().Err(err).Msg("Failed to increment processed files")
+			}
+			result.FilesProcessed++
 			continue
 		}
 
@@ -127,6 +218,23 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 			errMsg := fmt.Sprintf("Persist failed for %s: %v", file.Filename, err)
 			result.Errors = append(result.Errors, errMsg)
 			log.Error().Str("error", errMsg).Msg("Persist failed")
+			recordIngestionError(ctx, IngestionErrorParams{
+				RunID:        runID,
+				FileID:       fileID,
+				ErrorType:    types.ErrorTypePersist,
+				ErrorMessage: errMsg,
+				ErrorDetails: formatErrorDetails(err.Error(), map[string]string{
+					"phase":     "persist",
+					"url":       file.URL,
+					"filename":  file.Filename,
+					"archiveId": fetchResult.ArchiveID,
+				}),
+				Severity: types.SeverityError,
+			})
+			UpdateRunStatusSummary(ctx, runID, "Persist failed", types.SeverityError, string(types.ErrorTypePersist))
+			if err := markIngestionFileFailed(ctx, fileID, "Persist failed", types.SeverityError, string(types.ErrorTypePersist)); err != nil {
+				log.Warn().Err(err).Str("file_id", fileID).Msg("Failed to mark file as failed")
+			}
 			continue
 		}
 

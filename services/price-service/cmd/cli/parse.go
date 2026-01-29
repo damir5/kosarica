@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	parseChain     string
-	parseOutput    string
-	parseEncoding  string
+	parseChain    string
+	parseOutput   string
+	parseEncoding string
 )
 
 // parseCmd represents the parse command

@@ -18,26 +18,26 @@ func TestHaversineEdgeCases(t *testing.T) {
 		wantDist float64
 	}{
 		{
-			name:     "same point",
-			lat1:     45.0, lon1: 16.0,
+			name: "same point",
+			lat1: 45.0, lon1: 16.0,
 			lat2: 45.0, lon2: 16.0,
 			wantDist: 0,
 		},
 		{
-			name:     "poles - north pole to south pole",
-			lat1:     90.0, lon1: 0.0,
+			name: "poles - north pole to south pole",
+			lat1: 90.0, lon1: 0.0,
 			lat2: -90.0, lon2: 0.0,
 			wantDist: 20015, // Approximately half Earth's circumference
 		},
 		{
-			name:     "date line crossing",
-			lat1:     0.0, lon1: 179.0,
+			name: "date line crossing",
+			lat1: 0.0, lon1: 179.0,
 			lat2: 0.0, lon2: -179.0,
 			wantDist: 222, // About 2 degrees of longitude at equator
 		},
 		{
-			name:     "short distance",
-			lat1:     45.0, lon1: 16.0,
+			name: "short distance",
+			lat1: 45.0, lon1: 16.0,
 			lat2: 45.1, lon2: 16.1,
 			wantDist: 15, // Approximately 15km
 		},

@@ -57,6 +57,9 @@ function mapToIngestionRun(run: HandlersIngestionRun): IngestionRun {
 		chainSlug: run.chainSlug ?? "",
 		source: run.source ?? "",
 		status: run.status ?? "pending",
+		statusReason: run.statusReason ?? null,
+		statusSeverity: run.statusSeverity ?? null,
+		statusType: run.statusType ?? null,
 		startedAt: run.startedAt ? new Date(run.startedAt) : null,
 		completedAt: run.completedAt ? new Date(run.completedAt) : null,
 		totalFiles: run.totalFiles ?? null,
@@ -142,15 +145,11 @@ function IngestionDashboard() {
 	// Trigger chain mutation
 	const triggerMutation = useMutation({
 		mutationFn: async (chainSlug: string) => {
-			// triggerChain uses goFetchWithRetry which returns {success, data, error}
 			const response = (await orpc.admin.ingestion.triggerChain.call({
 				chain: chainSlug,
 				targetDate: selectedDate,
-			})) as { success: boolean; data?: TriggerResponse; error?: string };
-			if (!response.success) {
-				throw new Error(response.error || "Failed to trigger ingestion");
-			}
-			return response.data as TriggerResponse;
+			})) as TriggerResponse;
+			return response;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });

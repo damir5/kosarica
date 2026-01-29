@@ -13,7 +13,11 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useState } from "react";
-import { IngestionChunkList, RerunButton } from "@/components/admin/ingestion";
+import {
+	IngestionChunkList,
+	IngestionStoreStatsTable,
+	RerunButton,
+} from "@/components/admin/ingestion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +35,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { orpc } from "@/orpc/client";
+import type { HandlersIngestionFile } from "@/lib/go-api";
 
 export const Route = createFileRoute("/_admin/admin/ingestion/$runId/$fileId")({
 	component: FileDetailPage,
@@ -38,22 +43,7 @@ export const Route = createFileRoute("/_admin/admin/ingestion/$runId/$fileId")({
 
 type ChunkStatus = "pending" | "processing" | "completed" | "failed";
 
-// Types for Go service responses (not in OpenAPI spec - using goFetchWithRetry)
-// All date fields are ISO strings from the API, converted to Date when needed
-interface FileData {
-	id?: string;
-	filename?: string;
-	fileType?: string;
-	fileSize?: number | null;
-	fileHash?: string | null;
-	status?: string;
-	entryCount?: number | null;
-	totalChunks?: number | null;
-	processedChunks?: number | null;
-	chunkSize?: number | null;
-	createdAt?: string | null;
-	processedAt?: string | null;
-}
+type FileData = HandlersIngestionFile;
 
 interface ChunkData {
 	id?: string;
@@ -80,6 +70,7 @@ interface ErrorData {
 	id?: string;
 	errorType?: string;
 	errorMessage?: string;
+	errorDetails?: string;
 	severity?: string;
 	chunkId?: string | null;
 	createdAt?: string | null;
@@ -112,6 +103,38 @@ const FILE_TYPE_COLORS: Record<string, string> = {
 	json: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
 };
 
+const SUMMARY_VARIANTS: Record<string, "secondary" | "destructive" | "outline"> =
+	{
+		warning: "secondary",
+		error: "destructive",
+		critical: "destructive",
+	};
+
+type ParsedErrorDetails = {
+	url?: string;
+	filename?: string;
+	phase?: string;
+	archiveId?: string;
+	storageKey?: string;
+	hash?: string;
+	details?: string;
+};
+
+function parseErrorDetails(raw?: string): ParsedErrorDetails | null {
+	if (!raw) {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(raw);
+		if (parsed && typeof parsed === "object") {
+			return parsed as ParsedErrorDetails;
+		}
+	} catch {
+		return null;
+	}
+	return null;
+}
+
 function FileDetailPage() {
 	const { runId, fileId } = Route.useParams() as {
 		runId: string;
@@ -123,6 +146,10 @@ function FileDetailPage() {
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [page, setPage] = useState(1);
 	const pageSize = 20;
+	const [errorPage, setErrorPage] = useState(1);
+	const errorPageSize = 20;
+	const [storePage, setStorePage] = useState(1);
+	const storePageSize = 25;
 
 	// File query
 	const {
@@ -153,8 +180,19 @@ function FileDetailPage() {
 		orpc.admin.ingestion.listFileErrors.queryOptions({
 			input: {
 				fileId,
-				page: 1,
-				pageSize: 10,
+				page: errorPage,
+				pageSize: errorPageSize,
+			},
+		}),
+	);
+
+	// Store stats query
+	const { data: storeStatsResponse, isLoading: storeStatsLoading } = useQuery(
+		orpc.admin.ingestion.listFileStoreStats.queryOptions({
+			input: {
+				fileId,
+				limit: storePageSize,
+				offset: (storePage - 1) * storePageSize,
 			},
 		}),
 	);
@@ -202,6 +240,11 @@ function FileDetailPage() {
 		return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 	};
 
+	const formatCount = (value?: number | null) => {
+		if (value === null || value === undefined) return "-";
+		return value.toLocaleString();
+	};
+
 	if (fileLoading) {
 		return (
 			<div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -236,6 +279,12 @@ function FileDetailPage() {
 	const processedChunks = file.processedChunks ?? 0;
 	const chunkProgress =
 		totalChunks > 0 ? Math.round((processedChunks / totalChunks) * 100) : 0;
+	const summarySeverity = file.statusSeverity ?? "";
+	const summaryLabel =
+		summarySeverity === "warning" ? "info" : summarySeverity || "info";
+	const storeStats = storeStatsResponse?.stores ?? [];
+	const storeStatsTotal = storeStatsResponse?.total ?? 0;
+	const rowCount = file.rowCount ?? file.entryCount ?? null;
 
 	return (
 		<>
@@ -282,6 +331,19 @@ function FileDetailPage() {
 								/>
 								{file.status}
 							</Badge>
+							{file.statusReason && (
+								<div className="flex items-center gap-2 text-xs text-muted-foreground">
+									<Badge
+										variant={
+											SUMMARY_VARIANTS[summarySeverity] || "outline"
+										}
+										className="text-xs"
+									>
+										{summaryLabel}
+									</Badge>
+									<span>{file.statusReason}</span>
+								</div>
+							)}
 							{(file.status === "completed" || file.status === "failed") && (
 								<RerunButton
 									onRerun={() => rerunFileMutation.mutate()}
@@ -341,13 +403,15 @@ function FileDetailPage() {
 
 					<Card>
 						<CardHeader className="pb-2">
-							<CardTitle className="text-sm font-medium">Entries</CardTitle>
+							<CardTitle className="text-sm font-medium">Rows</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<div className="text-2xl font-bold">
-								{(file.entryCount ?? 0).toLocaleString()}
+								{formatCount(rowCount)}
 							</div>
-							<p className="text-xs text-muted-foreground">rows in this file</p>
+							<p className="text-xs text-muted-foreground">
+								rows parsed from this file
+							</p>
 						</CardContent>
 					</Card>
 
@@ -377,6 +441,63 @@ function FileDetailPage() {
 						</CardContent>
 					</Card>
 				</div>
+
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-sm font-medium">
+							Processing Summary
+						</CardTitle>
+						<CardDescription>
+							Rows, stores, and changes processed for this file
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+							<div>
+								<div className="text-xs text-muted-foreground">Stores</div>
+								<div className="text-2xl font-bold">
+									{formatCount(file.storeCount)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Rows</div>
+								<div className="text-2xl font-bold">
+									{formatCount(rowCount)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Persisted</div>
+								<div className="text-2xl font-bold">
+									{formatCount(file.persistedCount)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">
+									Price Changes
+								</div>
+								<div className="text-2xl font-bold">
+									{formatCount(file.priceChanges)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Failed Rows</div>
+								<div
+									className={`text-2xl font-bold ${(file.failedRows ?? 0) > 0 ? "text-destructive" : ""}`}
+								>
+									{formatCount(file.failedRows)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Warnings</div>
+								<div
+									className={`text-2xl font-bold ${(file.warningRows ?? 0) > 0 ? "text-amber-600" : ""}`}
+								>
+									{formatCount(file.warningRows)}
+								</div>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
 
 				{/* File Details */}
 				<Card>
@@ -411,6 +532,28 @@ function FileDetailPage() {
 								</div>
 								<p className="mt-1">{formatDate(file.processedAt)}</p>
 							</div>
+							<div>
+								<div className="text-sm font-medium text-muted-foreground">
+									Status Reason
+								</div>
+								<p className="mt-1">{file.statusReason ?? "—"}</p>
+							</div>
+							<div>
+								<div className="text-sm font-medium text-muted-foreground">
+									Status Severity
+								</div>
+								<p className="mt-1">
+									{file.statusSeverity === "warning"
+										? "info"
+										: file.statusSeverity ?? "—"}
+								</p>
+							</div>
+							<div>
+								<div className="text-sm font-medium text-muted-foreground">
+									Status Type
+								</div>
+								<p className="mt-1">{file.statusType ?? "—"}</p>
+							</div>
 							{file.fileHash && (
 								<div className="sm:col-span-2">
 									<div className="text-sm font-medium text-muted-foreground">
@@ -422,6 +565,56 @@ function FileDetailPage() {
 								</div>
 							)}
 						</div>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Store Stats</CardTitle>
+						<CardDescription>Per-store totals for this file</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<IngestionStoreStatsTable
+							stores={storeStats}
+							isLoading={storeStatsLoading}
+							emptyLabel="No store stats recorded for this file"
+						/>
+
+						{storeStatsTotal > storePageSize && (
+							<div className="mt-4 flex items-center justify-between">
+								<p className="text-sm text-muted-foreground">
+									Showing {(storePage - 1) * storePageSize + 1} to{" "}
+									{Math.min(storePage * storePageSize, storeStatsTotal)} of{" "}
+									{storeStatsTotal} stores
+								</p>
+								<div className="flex items-center gap-2">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setStorePage((p) => Math.max(1, p - 1))}
+										disabled={storePage === 1}
+									>
+										<ChevronLeft className="h-4 w-4" />
+										Previous
+									</Button>
+									<span className="text-sm">
+										Page {storePage} of{" "}
+										{Math.ceil(storeStatsTotal / storePageSize)}
+									</span>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setStorePage((p) => p + 1)}
+										disabled={
+											storePage >= Math.ceil(storeStatsTotal / storePageSize)
+										}
+									>
+										Next
+										<ChevronRight className="h-4 w-4" />
+									</Button>
+								</div>
+							</div>
+						)}
 					</CardContent>
 				</Card>
 
@@ -439,44 +632,117 @@ function FileDetailPage() {
 						</CardHeader>
 						<CardContent>
 							<div className="space-y-3">
-								{(errorsData.errors ?? []).map((error) => (
-									<div
-										key={error.id}
-										className="p-3 rounded-lg border bg-destructive/5 border-destructive/20"
-									>
-										<div className="flex items-start justify-between">
-											<div className="flex-1">
-												<div className="flex items-center gap-2">
-													<Badge variant="outline" className="text-xs">
-														{error.errorType}
-													</Badge>
-													<Badge
-														variant={
-															error.severity === "critical"
-																? "destructive"
-																: "secondary"
-														}
-														className="text-xs"
-													>
-														{error.severity}
-													</Badge>
-													{error.chunkId && (
-														<span className="text-xs text-muted-foreground font-mono">
-															Chunk: {error.chunkId.slice(0, 12)}...
-														</span>
+								{(errorsData.errors ?? []).map((error) => {
+									const parsedDetails = parseErrorDetails(error.errorDetails);
+									const detailText =
+										parsedDetails?.details ?? error.errorDetails;
+									const contextParts = [
+										parsedDetails?.phase
+											? `Phase: ${parsedDetails.phase}`
+											: null,
+										parsedDetails?.filename
+											? `File: ${parsedDetails.filename}`
+											: null,
+										parsedDetails?.archiveId
+											? `Archive: ${parsedDetails.archiveId}`
+											: null,
+										parsedDetails?.storageKey
+											? `Storage: ${parsedDetails.storageKey}`
+											: null,
+									].filter(Boolean);
+
+									return (
+										<div
+											key={error.id}
+											className="p-3 rounded-lg border bg-destructive/5 border-destructive/20"
+										>
+											<div className="flex items-start justify-between">
+												<div className="flex-1">
+													<div className="flex items-center gap-2">
+														<Badge variant="outline" className="text-xs">
+															{error.errorType}
+														</Badge>
+														<Badge
+															variant={
+																error.severity === "critical"
+																	? "destructive"
+																	: "secondary"
+															}
+															className="text-xs"
+														>
+															{error.severity === "warning"
+																? "info"
+																: error.severity}
+														</Badge>
+														{error.chunkId && (
+															<span className="text-xs text-muted-foreground font-mono">
+																Chunk: {error.chunkId.slice(0, 12)}...
+															</span>
+														)}
+													</div>
+													<p className="mt-1 text-sm">{error.errorMessage}</p>
+													{parsedDetails?.url && (
+														<p className="mt-1 text-xs text-muted-foreground break-all">
+															URL: {parsedDetails.url}
+														</p>
+													)}
+													{contextParts.length > 0 && (
+														<p className="mt-1 text-xs text-muted-foreground">
+															{contextParts.join(" · ")}
+														</p>
+													)}
+													{detailText && (
+														<pre className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
+															{detailText}
+														</pre>
 													)}
 												</div>
-												<p className="mt-1 text-sm">{error.errorMessage}</p>
+												<span className="text-xs text-muted-foreground">
+													{error.createdAt
+														? new Date(error.createdAt).toLocaleTimeString()
+														: ""}
+												</span>
 											</div>
-											<span className="text-xs text-muted-foreground">
-												{error.createdAt
-													? new Date(error.createdAt).toLocaleTimeString()
-													: ""}
-											</span>
 										</div>
-									</div>
-								))}
+									);
+								})}
 							</div>
+							{errorsData.total && errorsData.total > errorPageSize && (
+								<div className="mt-4 flex items-center justify-between">
+									<p className="text-sm text-muted-foreground">
+										Showing {(errorPage - 1) * errorPageSize + 1} to{" "}
+										{Math.min(errorPage * errorPageSize, errorsData.total)} of{" "}
+										{errorsData.total} errors
+									</p>
+									<div className="flex items-center gap-2">
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setErrorPage((p) => Math.max(1, p - 1))}
+											disabled={errorPage === 1}
+										>
+											<ChevronLeft className="h-4 w-4" />
+											Previous
+										</Button>
+										<span className="text-sm">
+											Page {errorPage} of{" "}
+											{Math.ceil(errorsData.total / errorPageSize)}
+										</span>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setErrorPage((p) => p + 1)}
+											disabled={
+												errorPage >=
+												Math.ceil(errorsData.total / errorPageSize)
+											}
+										>
+											Next
+											<ChevronRight className="h-4 w-4" />
+										</Button>
+									</div>
+								</div>
+							)}
 						</CardContent>
 					</Card>
 				)}

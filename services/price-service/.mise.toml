@@ -71,8 +71,8 @@ echo "=== All checks passed ==="
 # The tasks below are for Go-only unit tests that don't need the full stack.
 
 [tasks.test]
-description = "Run Go unit tests (no DB needed)"
-run = "set -o allexport; [ -f ./.env.development ] && . ./.env.development || true; [ -f ./.env.test ] && . ./.env.test || true; go test ./tests/unit/... ./internal/pkg/... ./internal/pricegroups/..."
+description = "Run Go non-integration tests (no DB needed)"
+run = "set -o allexport; [ -f ./.env.development ] && . ./.env.development || true; [ -f ./.env.test ] && . ./.env.test || true; packages=$(go list ./... | grep -v \"/tests/integration\" | grep -v \"/tests/e2e\"); go test $packages"
 
 [tasks.test-unit]
 description = "Run Go unit tests only"

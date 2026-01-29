@@ -15,8 +15,17 @@ const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "test-key";
 
 // Assume service is unavailable unless env var explicitly set to run these tests
 const goServiceAvailable = process.env.GO_SERVICE_FOR_TESTS === "1";
+const isCi = process.env.CI === "true" || process.env.CI === "1";
 
 describe("Price Service Proxy Integration Tests", () => {
+	it("requires GO_SERVICE_FOR_TESTS in CI", () => {
+		if (isCi && !goServiceAvailable) {
+			throw new Error(
+				"GO_SERVICE_FOR_TESTS=1 is required in CI to avoid silently skipping Go service integration tests. Run `mise run test-all` or set the env var explicitly.",
+			);
+		}
+	});
+
 	// biome-ignore lint/suspicious/noExplicitAny: oRPC client types are complex
 	let orpc: any;
 

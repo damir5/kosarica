@@ -3,7 +3,7 @@ SELECT current_price
 FROM store_item_state
 WHERE store_id = $1 AND retailer_item_id = $2;
 
--- name: UpsertStoreItemState :exec
+-- name: UpsertStoreItemState :one
 INSERT INTO store_item_state (
     store_id, retailer_item_id, current_price, previous_price,
     discount_price, discount_start, discount_end, in_stock,
@@ -28,4 +28,5 @@ ON CONFLICT (store_id, retailer_item_id) DO UPDATE SET
     anchor_price_as_of = EXCLUDED.anchor_price_as_of,
     price_signature = EXCLUDED.price_signature,
     last_seen_at = NOW(),
-    updated_at = NOW();
+    updated_at = NOW()
+RETURNING previous_price, current_price;

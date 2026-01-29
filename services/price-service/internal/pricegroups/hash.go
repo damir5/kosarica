@@ -21,9 +21,9 @@ const (
 
 // ItemPrice represents a single item's price for hashing
 type ItemPrice struct {
-	ItemID        string  // UUID (will be normalized to lowercase for hashing)
-	Price         int     // cents, NOT NULL
-	DiscountPrice *int    // cents, nullable (NULL ≠ 0!)
+	ItemID        string // UUID (will be normalized to lowercase for hashing)
+	Price         int    // cents, NOT NULL
+	DiscountPrice *int   // cents, nullable (NULL ≠ 0!)
 }
 
 // ComputePriceHash computes a deterministic hash of a set of item prices
@@ -41,7 +41,7 @@ func ComputePriceHash(prices []ItemPrice) string {
 	// we must include price and discount in sort key to ensure full determinism.
 	sortedPrices := make([]ItemPrice, len(prices))
 	copy(sortedPrices, prices)
-	
+
 	sort.Slice(sortedPrices, func(i, j int) bool {
 		// Primary sort key: ItemID (case-insensitive/normalized)
 		idI := strings.ToLower(sortedPrices[i].ItemID)
@@ -49,17 +49,17 @@ func ComputePriceHash(prices []ItemPrice) string {
 		if idI != idJ {
 			return idI < idJ
 		}
-		
+
 		// Secondary sort key: Price
 		if sortedPrices[i].Price != sortedPrices[j].Price {
 			return sortedPrices[i].Price < sortedPrices[j].Price
 		}
-		
+
 		// Tertiary sort key: DiscountPrice
 		// Handle nil comparisons
 		discI := sortedPrices[i].DiscountPrice
 		discJ := sortedPrices[j].DiscountPrice
-		
+
 		if discI == nil && discJ == nil {
 			return false // equal
 		}

@@ -24,19 +24,22 @@ func DiscoverPhase(ctx context.Context, chainID string, runID string, targetDate
 		return nil, fmt.Errorf("failed to get adapter for %s: %w", chainID, err)
 	}
 
+	effectiveDate := targetDate
+	if effectiveDate == "" {
+		effectiveDate = time.Now().Format("2006-01-02")
+	}
+
 	log.Info().
 		Str("chain", chainID).
 		Str("run_id", runID).
 		Msg("Starting discovery")
 
-	if targetDate != "" {
-		log.Info().
-			Str("target_date", targetDate).
-			Msg("Discovery target date")
-	}
+	log.Info().
+		Str("target_date", effectiveDate).
+		Msg("Discovery target date")
 
 	// Discover files
-	files, err := adapter.Discover(targetDate)
+	files, err := adapter.Discover(effectiveDate)
 	if err != nil {
 		return nil, fmt.Errorf("discovery failed: %w", err)
 	}
@@ -60,6 +63,8 @@ func DiscoverPhase(ctx context.Context, chainID string, runID string, targetDate
 		log.Warn().
 			Str("chain", chainID).
 			Msg("No files discovered")
+		reason := fmt.Sprintf("No files for %s", effectiveDate)
+		UpdateRunStatusSummary(ctx, runID, reason, types.SeverityWarning, string(types.StatusTypeNoFilesForDate))
 		if err := markRunCompleted(ctx, runID, 0, 0); err != nil {
 			return nil, fmt.Errorf("failed to mark run as completed: %w", err)
 		}

@@ -2,9 +2,7 @@ package pipeline
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -12,6 +10,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
+	zipexpand "github.com/kosarica/price-service/internal/ingestion/zip"
 	"github.com/kosarica/price-service/internal/types"
 	"github.com/rs/zerolog/log"
 )
@@ -26,7 +25,7 @@ type ParseResult struct {
 
 // ParsePhase executes the parse phase of the ingestion pipeline
 // It parses file content into normalized rows
-func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, file types.DiscoveredFile, runID string) (*ParseResult, error) {
+func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, file types.DiscoveredFile, runID string, fileID string) (*ParseResult, error) {
 	// Get adapter from registry
 	adapter, err := registry.GetAdapter(config.ChainID(chainID))
 	if err != nil {
@@ -35,10 +34,50 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 
 	log.Info().Str("filename", file.Filename).Msg("Parsing file")
 
-	// Parse the content
-	parseResult, err := adapter.Parse(fetchResult.Content, file.Filename, nil)
-	if err != nil {
-		return nil, fmt.Errorf("parse failed for %s: %w", file.Filename, err)
+	var parseResult *types.ParseResult
+	var err error
+
+	if fetchResult.IsZip || file.Type == types.FileTypeZIP {
+		expanded, expandErr := expandZipFiles(ctx, adapter, fetchResult.Content, file.Filename)
+		if expandErr != nil {
+			return nil, fmt.Errorf("expand failed for %s: %w", file.Filename, expandErr)
+		}
+		if len(expanded) == 0 {
+			return nil, fmt.Errorf("no supported files extracted from %s", file.Filename)
+		}
+
+		parseResult = &types.ParseResult{
+			Rows:     make([]types.NormalizedRow, 0),
+			Errors:   make([]types.ParseError, 0),
+			Warnings: make([]types.ParseWarning, 0),
+		}
+
+		for _, inner := range expanded {
+			if inner.Type != types.FileTypeCSV {
+				continue
+			}
+
+			innerResult, parseErr := adapter.Parse(inner.Content, inner.InnerFilename, nil)
+			if parseErr != nil {
+				return nil, fmt.Errorf("parse failed for %s/%s: %w", file.Filename, inner.InnerFilename, parseErr)
+			}
+
+			parseResult.TotalRows += innerResult.TotalRows
+			parseResult.ValidRows += innerResult.ValidRows
+			parseResult.Rows = append(parseResult.Rows, innerResult.Rows...)
+			if len(innerResult.Errors) > 0 {
+				parseResult.Errors = append(parseResult.Errors, prefixParseErrors(innerResult.Errors, inner.InnerFilename)...)
+			}
+			if len(innerResult.Warnings) > 0 {
+				parseResult.Warnings = append(parseResult.Warnings, prefixParseWarnings(innerResult.Warnings, inner.InnerFilename)...)
+			}
+		}
+	} else {
+		// Parse the content directly
+		parseResult, err = adapter.Parse(fetchResult.Content, file.Filename, nil)
+		if err != nil {
+			return nil, fmt.Errorf("parse failed for %s: %w", file.Filename, err)
+		}
 	}
 
 	log.Info().
@@ -70,15 +109,15 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 		}
 	}
 
-	// Create file record in database
-	fileID := generateFileID()
 	storeIdentifier := "unknown"
-	if storeID := adapter.ExtractStoreIdentifier(file); storeID != nil {
+	if fetchResult.IsZip || file.Type == types.FileTypeZIP {
+		storeIdentifier = "multiple"
+	} else if storeID := adapter.ExtractStoreIdentifier(file); storeID != nil {
 		storeIdentifier = storeID.Value
 	}
 
-	if err := createIngestionFile(ctx, fileID, runID, file, fetchResult, parseResult, storeIdentifier); err != nil {
-		return nil, fmt.Errorf("failed to create ingestion file record: %w", err)
+	if err := updateIngestionFileAfterParse(ctx, fileID, file, parseResult, storeIdentifier); err != nil {
+		return nil, fmt.Errorf("failed to update ingestion file record: %w", err)
 	}
 
 	if parseResult.ValidRows == 0 {
@@ -102,33 +141,33 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 	}, nil
 }
 
-// createIngestionFile creates an ingestion file record in the database using sqlc
-func createIngestionFile(ctx context.Context, fileID string, runID string, file types.DiscoveredFile, fetchResult *FetchResult, parseResult *types.ParseResult, storeIdentifier string) error {
-	queries := sqlcgen.New(database.Pool())
+type zipExpander interface {
+	ExpandZIP(ctx context.Context, content []byte, filename string) ([]zipexpand.ExpandedFile, error)
+}
 
-	metadataJSON, _ := json.Marshal(map[string]interface{}{
-		"storeIdentifier": storeIdentifier,
-		"url":             file.URL,
-	})
-
-	// Parse fileID to int64 (strip prefix if present)
-	var fileIDInt int64
-	if len(fileID) > 4 && fileID[:4] == "igf_" {
-		fileIDInt, _ = strconv.ParseInt(fileID[4:], 10, 64)
-	} else {
-		fileIDInt, _ = strconv.ParseInt(fileID, 10, 64)
+func expandZipFiles(ctx context.Context, adapter interface{}, content []byte, filename string) ([]zipexpand.ExpandedFile, error) {
+	if expander, ok := adapter.(zipExpander); ok {
+		return expander.ExpandZIP(ctx, content, filename)
 	}
+	return zipexpand.ExpandInMemory(content, filename)
+}
 
-	return queries.CreateIngestionFile(ctx, sqlcgen.CreateIngestionFileParams{
-		ID:         fileIDInt,
-		RunID:      runID,
-		Filename:   file.Filename,
-		FileType:   string(file.Type),
-		FileSize:   pgtype.Int4{Int32: int32(len(fetchResult.Content)), Valid: true},
-		FileHash:   pgtype.Text{String: fetchResult.Hash, Valid: fetchResult.Hash != ""},
-		EntryCount: pgtype.Int4{Int32: int32(parseResult.ValidRows), Valid: true},
-		Metadata:   pgtype.Text{String: string(metadataJSON), Valid: true},
-	})
+func prefixParseErrors(errors []types.ParseError, filename string) []types.ParseError {
+	prefixed := make([]types.ParseError, len(errors))
+	for i, err := range errors {
+		err.Message = fmt.Sprintf("%s: %s", filename, err.Message)
+		prefixed[i] = err
+	}
+	return prefixed
+}
+
+func prefixParseWarnings(warnings []types.ParseWarning, filename string) []types.ParseWarning {
+	prefixed := make([]types.ParseWarning, len(warnings))
+	for i, warn := range warnings {
+		warn.Message = fmt.Sprintf("%s: %s", filename, warn.Message)
+		prefixed[i] = warn
+	}
+	return prefixed
 }
 
 // markFileCompleted marks an ingestion file as completed using sqlc
@@ -136,11 +175,9 @@ func markFileCompleted(ctx context.Context, fileID string, processedChunks int) 
 	queries := sqlcgen.New(database.Pool())
 
 	// Parse fileID to int64 (strip prefix if present)
-	var fileIDInt int64
-	if len(fileID) > 4 && fileID[:4] == "igf_" {
-		fileIDInt, _ = strconv.ParseInt(fileID[4:], 10, 64)
-	} else {
-		fileIDInt, _ = strconv.ParseInt(fileID, 10, 64)
+	fileIDInt, err := parseFileIDToInt64(fileID)
+	if err != nil {
+		return err
 	}
 
 	return queries.UpdateIngestionFileCompleted(ctx, sqlcgen.UpdateIngestionFileCompletedParams{

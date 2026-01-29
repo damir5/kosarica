@@ -82,6 +82,7 @@ export default {
 			getRun: priceService.getRun,
 			listFiles: priceService.listFiles,
 			listErrors: priceService.listErrors,
+			listRunStoreStats: priceService.listRunStoreStats,
 			getStats: priceService.getStats,
 			triggerChain: priceService.triggerChain,
 			rerunRun: priceService.rerunRun,
@@ -91,6 +92,7 @@ export default {
 			rerunFile: priceService.rerunFile,
 			rerunChunk: priceService.rerunChunk,
 			listFileErrors: priceService.listFileErrors,
+			listFileStoreStats: priceService.listFileStoreStats,
 		},
 		stores: {
 			list: listStores,

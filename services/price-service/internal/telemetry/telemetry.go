@@ -12,8 +12,8 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	metricnoop "go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	tracenoop "go.opentelemetry.io/otel/trace/noop"
@@ -26,11 +26,11 @@ const (
 
 // Config holds the telemetry configuration
 type Config struct {
-	Enabled         bool
-	Endpoint        string
-	ServiceName     string
-	ServiceVersion  string
-	Environment     string
+	Enabled        bool
+	Endpoint       string
+	ServiceName    string
+	ServiceVersion string
+	Environment    string
 }
 
 // Init initializes OpenTelemetry with the given configuration

@@ -384,10 +384,10 @@ func (o *MultiStoreOptimizer) evaluateStoreCombination(
 
 	// Build result
 	result := &MultiStoreResult{
-		CombinedTotal:  totalCost,
-		CoverageRatio:  coverageRatio,
+		CombinedTotal:   totalCost,
+		CoverageRatio:   coverageRatio,
 		UnassignedItems: unassigned,
-		AlgorithmUsed:  "optimal",
+		AlgorithmUsed:   "optimal",
 	}
 
 	// Convert storeItems to StoreAllocation
@@ -478,9 +478,9 @@ func (o *MultiStoreOptimizer) buildResult(
 	unassigned []*MissingItem,
 ) (*MultiStoreResult, error) {
 	result := &MultiStoreResult{
-		Stores:         make([]*StoreAllocation, 0, len(storeItems)),
+		Stores:          make([]*StoreAllocation, 0, len(storeItems)),
 		UnassignedItems: unassigned,
-		AlgorithmUsed:  "greedy",
+		AlgorithmUsed:   "greedy",
 	}
 
 	combinedTotal := int64(0)
@@ -648,13 +648,13 @@ type candidateStore struct {
 
 // storeEvaluation represents the evaluation result of a single store.
 type storeEvaluation struct {
-	storeID        string
-	totalCost      int64
-	coverageRatio  float64
-	coverageBin    int
-	itemPrices     map[string]*ItemPriceInfo
-	missingItems   map[string]*MissingItem
-	distance       float64
+	storeID       string
+	totalCost     int64
+	coverageRatio float64
+	coverageBin   int
+	itemPrices    map[string]*ItemPriceInfo
+	missingItems  map[string]*MissingItem
+	distance      float64
 }
 
 // ItemAllocation represents a basket item allocated to a store.

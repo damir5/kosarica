@@ -48,14 +48,14 @@ type PartialConfig struct {
 
 // RateLimiter provides rate limiting using a token bucket algorithm
 type RateLimiter struct {
-	config     Config
+	config      Config
 	lastRequest int64 // Unix nanoseconds of last request
 }
 
 // NewRateLimiter creates a new rate limiter with the given config
 func NewRateLimiter(config Config) *RateLimiter {
 	return &RateLimiter{
-		config:     config,
+		config:      config,
 		lastRequest: 0,
 	}
 }

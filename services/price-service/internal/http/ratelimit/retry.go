@@ -9,10 +9,10 @@ import (
 
 // FetchRetryError represents an error when all retry attempts are exhausted
 type FetchRetryError struct {
-	URL       string
-	Attempts  int
+	URL        string
+	Attempts   int
 	LastStatus int
-	LastError error
+	LastError  error
 }
 
 func (e *FetchRetryError) Error() string {

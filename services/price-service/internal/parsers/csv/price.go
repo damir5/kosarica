@@ -20,7 +20,7 @@ func ParsePrice(value string) (int, error) {
 	cleaned = strings.Map(func(r rune) rune {
 		// Remove currency symbols and thousands separators (space)
 		if r == '€' || r == '$' || r == '£' || r == '₹' ||
-		   r == '¥' || r == '¢' || r == '\u00A0' { // non-breaking space
+			r == '¥' || r == '¢' || r == '\u00A0' { // non-breaking space
 			return -1
 		}
 		// Keep other characters

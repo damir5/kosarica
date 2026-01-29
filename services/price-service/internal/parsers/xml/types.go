@@ -11,41 +11,41 @@ type BarcodeExtractor func(map[string]interface{}) []string
 // Can be a string path or an extraction function
 type XmlFieldMapping struct {
 	// String paths for simple field extraction
-	StoreIdentifier     *string            `json:"storeIdentifier,omitempty"`
-	ExternalID          *string            `json:"externalId,omitempty"`
-	Name                string             `json:"name"` // Required
-	Description         *string            `json:"description,omitempty"`
-	Category            *string            `json:"category,omitempty"`
-	Subcategory         *string            `json:"subcategory,omitempty"`
-	Brand               *string            `json:"brand,omitempty"`
-	Unit                *string            `json:"unit,omitempty"`
-	UnitQuantity        *string            `json:"unitQuantity,omitempty"`
-	Price               string             `json:"price"` // Required
-	DiscountPrice       *string            `json:"discountPrice,omitempty"`
-	DiscountStart       *string            `json:"discountStart,omitempty"`
-	DiscountEnd         *string            `json:"discountEnd,omitempty"`
-	Barcodes            *string            `json:"barcodes,omitempty"`
-	ImageURL            *string            `json:"imageUrl,omitempty"`
-	UnitPrice           *string            `json:"unitPrice,omitempty"`
-	UnitPriceBaseQuantity *string          `json:"unitPriceBaseQuantity,omitempty"`
-	UnitPriceBaseUnit   *string            `json:"unitPriceBaseUnit,omitempty"`
-	LowestPrice30d      *string            `json:"lowestPrice30d,omitempty"`
-	AnchorPrice         *string            `json:"anchorPrice,omitempty"`
-	AnchorPriceAsOf     *string            `json:"anchorPriceAsOf,omitempty"`
+	StoreIdentifier       *string `json:"storeIdentifier,omitempty"`
+	ExternalID            *string `json:"externalId,omitempty"`
+	Name                  string  `json:"name"` // Required
+	Description           *string `json:"description,omitempty"`
+	Category              *string `json:"category,omitempty"`
+	Subcategory           *string `json:"subcategory,omitempty"`
+	Brand                 *string `json:"brand,omitempty"`
+	Unit                  *string `json:"unit,omitempty"`
+	UnitQuantity          *string `json:"unitQuantity,omitempty"`
+	Price                 string  `json:"price"` // Required
+	DiscountPrice         *string `json:"discountPrice,omitempty"`
+	DiscountStart         *string `json:"discountStart,omitempty"`
+	DiscountEnd           *string `json:"discountEnd,omitempty"`
+	Barcodes              *string `json:"barcodes,omitempty"`
+	ImageURL              *string `json:"imageUrl,omitempty"`
+	UnitPrice             *string `json:"unitPrice,omitempty"`
+	UnitPriceBaseQuantity *string `json:"unitPriceBaseQuantity,omitempty"`
+	UnitPriceBaseUnit     *string `json:"unitPriceBaseUnit,omitempty"`
+	LowestPrice30d        *string `json:"lowestPrice30d,omitempty"`
+	AnchorPrice           *string `json:"anchorPrice,omitempty"`
+	AnchorPriceAsOf       *string `json:"anchorPriceAsOf,omitempty"`
 
 	// Function extractors for complex field extraction
-	NameExtractor       FieldExtractor     `json:"-"`
-	PriceExtractor      FieldExtractor     `json:"-"`
-	BarcodesExtractor   BarcodeExtractor   `json:"-"`
+	NameExtractor     FieldExtractor   `json:"-"`
+	PriceExtractor    FieldExtractor   `json:"-"`
+	BarcodesExtractor BarcodeExtractor `json:"-"`
 }
 
 // XmlParserOptions represents XML parser options
 type XmlParserOptions struct {
-	ItemsPath                string           `json:"itemsPath"` // Path to items array (e.g., "products.product")
-	FieldMapping             XmlFieldMapping  `json:"fieldMapping"`
-	DefaultStoreIdentifier   string           `json:"defaultStoreIdentifier,omitempty"`
-	Encoding                 string           `json:"encoding,omitempty"`
-	AttributePrefix          string           `json:"attributePrefix,omitempty"` // Default: "@_"
+	ItemsPath              string          `json:"itemsPath"` // Path to items array (e.g., "products.product")
+	FieldMapping           XmlFieldMapping `json:"fieldMapping"`
+	DefaultStoreIdentifier string          `json:"defaultStoreIdentifier,omitempty"`
+	Encoding               string          `json:"encoding,omitempty"`
+	AttributePrefix        string          `json:"attributePrefix,omitempty"` // Default: "@_"
 }
 
 // DefaultXmlOptions returns default XML parser options

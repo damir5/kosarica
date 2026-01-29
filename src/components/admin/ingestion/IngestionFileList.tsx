@@ -26,7 +26,16 @@ export interface IngestionFile {
 	fileSize: number | null;
 	fileHash: string | null;
 	status: string; // 'pending' | 'processing' | 'completed' | 'failed'
+	statusReason?: string | null;
+	statusSeverity?: string | null;
+	statusType?: string | null;
 	entryCount: number | null;
+	rowCount?: number | null;
+	persistedCount?: number | null;
+	priceChanges?: number | null;
+	failedRows?: number | null;
+	warningRows?: number | null;
+	storeCount?: number | null;
 	processedAt: Date | null;
 	metadata: string | null;
 	totalChunks: number | null;
@@ -71,6 +80,21 @@ const FILE_TYPE_COLORS: Record<string, string> = {
 	json: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
 };
 
+const SUMMARY_LABELS: Record<string, string> = {
+	warning: "info",
+	error: "error",
+	critical: "critical",
+};
+
+const SUMMARY_VARIANTS: Record<
+	string,
+	"secondary" | "destructive" | "outline"
+> = {
+	warning: "secondary",
+	error: "destructive",
+	critical: "destructive",
+};
+
 export function IngestionFileList({
 	files,
 	runId,
@@ -99,6 +123,11 @@ export function IngestionFileList({
 		return "Just now";
 	};
 
+	const formatCount = (value: number | null | undefined) => {
+		if (value === null || value === undefined) return "-";
+		return value.toLocaleString();
+	};
+
 	if (isLoading) {
 		return (
 			<div className="rounded-md border">
@@ -110,7 +139,7 @@ export function IngestionFileList({
 							<TableHead>Size</TableHead>
 							<TableHead>Status</TableHead>
 							<TableHead>Chunks</TableHead>
-							<TableHead>Entries</TableHead>
+							<TableHead>Stats</TableHead>
 							<TableHead>Processed</TableHead>
 							<TableHead className="w-[100px]">Actions</TableHead>
 						</TableRow>
@@ -148,7 +177,7 @@ export function IngestionFileList({
 						<TableHead>Size</TableHead>
 						<TableHead>Status</TableHead>
 						<TableHead>Chunks</TableHead>
-						<TableHead>Entries</TableHead>
+						<TableHead>Stats</TableHead>
 						<TableHead>Processed</TableHead>
 						<TableHead className="w-[100px]">Actions</TableHead>
 					</TableRow>
@@ -159,6 +188,12 @@ export function IngestionFileList({
 						const StatusIcon = STATUS_ICONS[status] || Clock;
 						const totalChunks = file.totalChunks ?? 0;
 						const processedChunks = file.processedChunks ?? 0;
+						const summarySeverity = file.statusSeverity ?? "";
+						const summaryLabel =
+							SUMMARY_LABELS[summarySeverity] || summarySeverity;
+						const rowCount = file.rowCount ?? file.entryCount;
+						const failedRows = file.failedRows ?? null;
+						const warningRows = file.warningRows ?? null;
 						const chunkProgress =
 							totalChunks > 0
 								? Math.round((processedChunks / totalChunks) * 100)
@@ -205,6 +240,19 @@ export function IngestionFileList({
 										/>
 										{status}
 									</Badge>
+									{file.statusReason && (
+										<div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+											<Badge
+												variant={
+													SUMMARY_VARIANTS[summarySeverity] || "outline"
+												}
+												className="text-xs"
+											>
+												{summaryLabel || "info"}
+											</Badge>
+											<span>{file.statusReason}</span>
+										</div>
+									)}
 								</TableCell>
 								<TableCell>
 									{totalChunks > 0 ? (
@@ -232,9 +280,42 @@ export function IngestionFileList({
 									)}
 								</TableCell>
 								<TableCell>
-									<span className="font-medium">
-										{(file.entryCount ?? 0).toLocaleString()}
-									</span>
+									<div className="space-y-1 text-xs">
+										<div className="text-muted-foreground">
+											<span className="font-medium text-foreground">
+												{formatCount(file.storeCount)}
+											</span>{" "}
+											stores ·{" "}
+											<span className="font-medium text-foreground">
+												{formatCount(rowCount)}
+											</span>{" "}
+											rows
+										</div>
+										<div className="text-muted-foreground">
+											<span className="font-medium text-foreground">
+												{formatCount(file.persistedCount)}
+											</span>{" "}
+											persisted ·{" "}
+											<span className="font-medium text-foreground">
+												{formatCount(file.priceChanges)}
+											</span>{" "}
+											changes
+										</div>
+										<div className="text-muted-foreground">
+											<span
+												className={`font-medium ${failedRows && failedRows > 0 ? "text-destructive" : "text-foreground"}`}
+											>
+												{formatCount(failedRows)}
+											</span>{" "}
+											failed ·{" "}
+											<span
+												className={`font-medium ${warningRows && warningRows > 0 ? "text-amber-600" : "text-foreground"}`}
+											>
+												{formatCount(warningRows)}
+											</span>{" "}
+											warn
+										</div>
+									</div>
 								</TableCell>
 								<TableCell>
 									<span className="text-sm text-muted-foreground">

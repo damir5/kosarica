@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/csv"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // ktcColumnMapping is the primary column mapping for KTC CSV files
@@ -103,6 +103,14 @@ func (a *KtcAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error)
 	discoveredFiles := make([]types.DiscoveredFile, 0)
 	seenURLs := make(map[string]bool)
 
+	filterDate := targetDate
+	if filterDate == "" {
+		filterDate = a.discoveryDate
+	}
+	if filterDate == "" {
+		filterDate = time.Now().Format("2006-01-02")
+	}
+
 	log.Debug().Str("chain", a.Name()).Str("portal", a.BaseURL()).Msg("Fetching portal")
 
 	// Fetch main page to get list of stores
@@ -190,8 +198,8 @@ func (a *KtcAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error)
 			filename := a.extractFilenameFromURL(fileURL)
 			fileDate := a.extractDateFromFilename(filename)
 
-			// Filter by date if discoveryDate is set
-			if a.discoveryDate != "" && fileDate != "" && fileDate != a.discoveryDate {
+			// Filter by date if filterDate is set
+			if filterDate != "" && fileDate != filterDate {
 				continue
 			}
 
@@ -287,8 +295,8 @@ func (a *KtcAdapter) ExtractStoreMetadata(file types.DiscoveredFile) *types.Stor
 	}
 
 	return &types.StoreMetadata{
-		Name:   fmt.Sprintf("KTC %s", titleCase(city)),
+		Name:    fmt.Sprintf("KTC %s", titleCase(city)),
 		Address: titleCase(address),
-		City:   titleCase(city),
+		City:    titleCase(city),
 	}
 }

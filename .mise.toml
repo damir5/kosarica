@@ -18,7 +18,7 @@ description = "Run Node.js unit tests (no services needed)"
 run = "./scripts/test-node.sh unit"
 
 [tasks.test-go]
-description = "Run Go unit tests"
+description = "Run Go non-integration tests"
 run = "./scripts/test-go.sh unit"
 
 [tasks.test-go-int]

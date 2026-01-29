@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	zipexpand "github.com/kosarica/price-service/internal/ingestion/zip"
 	"github.com/kosarica/price-service/internal/parsers/csv"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // lidlColumnMapping is the primary column mapping for Lidl CSV files (2026 format)
@@ -103,6 +103,11 @@ func (a *LidlAdapter) Discover(targetDate string) ([]types.DiscoveredFile, error
 	if filterDate == "" {
 		filterDate = a.discoveryDate
 	}
+	if filterDate == "" {
+		filterDate = time.Now().Format("2006-01-02")
+	}
+	// Important: never fall back to older files when a date has no matches.
+	// We keep existing prices until the retailer publishes a new file.
 
 	log.Debug().Str("url", a.BaseURL()).Msg("Fetching Lidl portal")
 

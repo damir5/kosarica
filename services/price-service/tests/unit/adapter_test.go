@@ -21,40 +21,40 @@ import (
 // custom regex extraction logic using capture groups.
 func TestStoreIDExtraction(t *testing.T) {
 	tests := []struct {
-		name         string
-		filename     string
-		patterns     []string
-		expectedID   string
-		shouldError  bool
+		name        string
+		filename    string
+		patterns    []string
+		expectedID  string
+		shouldError bool
 	}{
 		{
-			name:     "Prefix pattern strips 'SUPERMARKET,' from filename",
-			filename: "SUPERMARKET,Zagreb+100002024-01-19,10-00-00.csv",
-			patterns: []string{`^SUPERMARKET,`},
+			name:       "Prefix pattern strips 'SUPERMARKET,' from filename",
+			filename:   "SUPERMARKET,Zagreb+100002024-01-19,10-00-00.csv",
+			patterns:   []string{`^SUPERMARKET,`},
 			expectedID: "Zagreb+100002024-01-19,10-00-00",
 		},
 		{
-			name:     "Prefix pattern strips 'Lidl_' from filename",
-			filename: "Lidl_2024-01-19_265.csv",
-			patterns: []string{`^Lidl_`},
+			name:       "Prefix pattern strips 'Lidl_' from filename",
+			filename:   "Lidl_2024-01-19_265.csv",
+			patterns:   []string{`^Lidl_`},
 			expectedID: "2024-01-19_265",
 		},
 		{
-			name:     "Multiple prefix patterns applied sequentially",
-			filename: "TestChain_Zagreb_Main_123.csv",
-			patterns: []string{`^TestChain_`, `^Zagreb_`},
+			name:       "Multiple prefix patterns applied sequentially",
+			filename:   "TestChain_Zagreb_Main_123.csv",
+			patterns:   []string{`^TestChain_`, `^Zagreb_`},
 			expectedID: "Main_123",
 		},
 		{
-			name:     "No prefix pattern returns entire filename minus extension",
-			filename: "random_file.csv",
-			patterns: []string{},
+			name:       "No prefix pattern returns entire filename minus extension",
+			filename:   "random_file.csv",
+			patterns:   []string{},
 			expectedID: "random_file",
 		},
 		{
-			name:     "Non-matching prefix returns entire filename minus extension",
-			filename: "store_data.csv",
-			patterns: []string{`^Prefix_`},
+			name:       "Non-matching prefix returns entire filename minus extension",
+			filename:   "store_data.csv",
+			patterns:   []string{`^Prefix_`},
 			expectedID: "store_data",
 		},
 	}

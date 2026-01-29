@@ -1,11 +1,5 @@
-composed-percolating-blum.md - golang
 sequential-noodling-oasis.md - error handling
-convert logging to pino/winston 
-
-
-
-- move injest to golang
-  - hot reload, api for testing,
+convert logging to pino
 
 - front ux
   - ux skill
@@ -32,4 +26,6 @@ https://www.reddit.com/r/ClaudeAI/comments/1qgdg6v/finally_get_1500_users_on_my_
   - mail/whatsapp/telegram/firebase push/...
 - slikaj kosaricu - ocr - cijena kosarice/split u drugima
 - slikaj barcode
-
+- report item in store as unavailable - stats
+- send suggestions UI
+- take into account gas price for between store travel in basket optimization

@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/base"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/parsers/csv"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // intersparJsonFile represents a file entry from Interspar's JSON API
@@ -45,23 +45,23 @@ var intersparColumnMapping = csv.CsvColumnMapping{
 
 // intersparColumnMappingAlt is the alternative column mapping for Interspar CSV files
 var intersparColumnMappingAlt = csv.CsvColumnMapping{
-	ExternalID:          types.StringPtr("Šifra"),
-	Name:                "Naziv",
-	Category:            types.StringPtr("Kategorija"),
-	Brand:               types.StringPtr("Marka"),
-	Unit:                types.StringPtr("Mjerna jedinica"),
-	UnitQuantity:        types.StringPtr("Količina"),
-	Price:               "Cijena",
-	DiscountPrice:       types.StringPtr("Akcijska cijena"),
-	DiscountStart:       types.StringPtr("Početak akcije"),
-	DiscountEnd:         types.StringPtr("Kraj akcije"),
-	Barcodes:            types.StringPtr("Barkod"),
-	UnitPrice:           types.StringPtr("Cijena za jedinicu mjere"),
-	LowestPrice30d:      types.StringPtr("Najniža cijena u zadnjih 30 dana"),
-	AnchorPrice:         types.StringPtr("Sidrena cijena"),
+	ExternalID:            types.StringPtr("Šifra"),
+	Name:                  "Naziv",
+	Category:              types.StringPtr("Kategorija"),
+	Brand:                 types.StringPtr("Marka"),
+	Unit:                  types.StringPtr("Mjerna jedinica"),
+	UnitQuantity:          types.StringPtr("Količina"),
+	Price:                 "Cijena",
+	DiscountPrice:         types.StringPtr("Akcijska cijena"),
+	DiscountStart:         types.StringPtr("Početak akcije"),
+	DiscountEnd:           types.StringPtr("Kraj akcije"),
+	Barcodes:              types.StringPtr("Barkod"),
+	UnitPrice:             types.StringPtr("Cijena za jedinicu mjere"),
+	LowestPrice30d:        types.StringPtr("Najniža cijena u zadnjih 30 dana"),
+	AnchorPrice:           types.StringPtr("Sidrena cijena"),
 	UnitPriceBaseQuantity: types.StringPtr("Količina za jedinicu mjere"),
-	UnitPriceBaseUnit:   types.StringPtr("Jedinica mjere za cijenu"),
-	AnchorPriceAsOf:     types.StringPtr("Datum sidrene cijene"),
+	UnitPriceBaseUnit:     types.StringPtr("Jedinica mjere za cijenu"),
+	AnchorPriceAsOf:       types.StringPtr("Datum sidrene cijene"),
 }
 
 // IntersparAdapter is the chain adapter for Interspar retail chain

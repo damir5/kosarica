@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
@@ -35,6 +36,8 @@ func main() {
 		os.Exit(1)
 	}
 	logger := initLogger(cfg.Logging)
+	// Ensure global logger uses the same output/level as the service logger.
+	log.Logger = *logger
 
 	logger.Info().Msg("Starting price service")
 
@@ -99,6 +102,11 @@ func main() {
 			ingestion.GET("/runs/:runId", handlers.GetRun)
 			ingestion.GET("/runs/:runId/files", handlers.ListFiles)
 			ingestion.GET("/runs/:runId/errors", handlers.ListErrors)
+			ingestion.GET("/runs/:runId/stores", handlers.ListRunStoreStats)
+			ingestion.GET("/files/:fileId", handlers.GetFile)
+			ingestion.GET("/files/:fileId/chunks", handlers.ListChunks)
+			ingestion.GET("/files/:fileId/errors", handlers.ListFileErrors)
+			ingestion.GET("/files/:fileId/stores", handlers.ListFileStoreStats)
 			ingestion.GET("/stats", handlers.GetStats)
 			ingestion.POST("/runs/:runId/rerun", handlers.RerunRun)
 			ingestion.DELETE("/runs/:runId", handlers.DeleteRun)

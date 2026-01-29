@@ -19,44 +19,44 @@ import (
 
 // eurospinColumnMapping is the primary column mapping for Eurospin CSV files
 var eurospinColumnMapping = csv.CsvColumnMapping{
-	ExternalID:          types.StringPtr("ŠIFRA_PROIZVODA"),
-	Name:                "NAZIV_PROIZVODA",
-	Category:            types.StringPtr("KATEGORIJA_PROIZVODA"),
-	Brand:               types.StringPtr("MARKA_PROIZVODA"),
-	Unit:                types.StringPtr("JEDINICA_MJERE"),
-	UnitQuantity:        types.StringPtr("NETO_KOLIČINA"),
-	Price:               "MALOPROD.CIJENA(EUR)",
-	DiscountPrice:       types.StringPtr("MPC_POSEB.OBLIK_PROD"),
-	DiscountStart:       types.StringPtr("POČETAK_AKCIJE"),
-	DiscountEnd:         types.StringPtr("KRAJ_AKCIJE"),
-	Barcodes:            types.StringPtr("BARKOD"),
-	UnitPrice:           types.StringPtr("CIJENA_ZA_JEDINICU_MJERE"),
-	LowestPrice30d:      types.StringPtr("NAJNIŽA_MPC_U_30DANA"),
-	AnchorPrice:         types.StringPtr("SIDRENA_CIJENA"),
+	ExternalID:            types.StringPtr("ŠIFRA_PROIZVODA"),
+	Name:                  "NAZIV_PROIZVODA",
+	Category:              types.StringPtr("KATEGORIJA_PROIZVODA"),
+	Brand:                 types.StringPtr("MARKA_PROIZVODA"),
+	Unit:                  types.StringPtr("JEDINICA_MJERE"),
+	UnitQuantity:          types.StringPtr("NETO_KOLIČINA"),
+	Price:                 "MALOPROD.CIJENA(EUR)",
+	DiscountPrice:         types.StringPtr("MPC_POSEB.OBLIK_PROD"),
+	DiscountStart:         types.StringPtr("POČETAK_AKCIJE"),
+	DiscountEnd:           types.StringPtr("KRAJ_AKCIJE"),
+	Barcodes:              types.StringPtr("BARKOD"),
+	UnitPrice:             types.StringPtr("CIJENA_ZA_JEDINICU_MJERE"),
+	LowestPrice30d:        types.StringPtr("NAJNIŽA_MPC_U_30DANA"),
+	AnchorPrice:           types.StringPtr("SIDRENA_CIJENA"),
 	UnitPriceBaseQuantity: types.StringPtr("KOLIČINA_ZA_JEDINICU_MJERE"),
-	UnitPriceBaseUnit:   types.StringPtr("JEDINICA_MJERE_ZA_CIJENU"),
-	AnchorPriceAsOf:     types.StringPtr("DATUM_SIDRENE_CIJENE"),
+	UnitPriceBaseUnit:     types.StringPtr("JEDINICA_MJERE_ZA_CIJENU"),
+	AnchorPriceAsOf:       types.StringPtr("DATUM_SIDRENE_CIJENE"),
 }
 
 // eurospinColumnMappingAlt is the alternative column mapping for Eurospin CSV files
 var eurospinColumnMappingAlt = csv.CsvColumnMapping{
-	ExternalID:          types.StringPtr("SIFRA_PROIZVODA"),
-	Name:                "NAZIV_PROIZVODA",
-	Category:            types.StringPtr("KATEGORIJA"),
-	Brand:               types.StringPtr("MARKA"),
-	Unit:                types.StringPtr("JM"),
-	UnitQuantity:        types.StringPtr("NETO_KOLICINA"),
-	Price:               "MALOPROD_CIJENA",
-	DiscountPrice:       types.StringPtr("MPC_POSEB_OBLIK_PROD"),
-	DiscountStart:       types.StringPtr("Pocetak_akcije"),
-	DiscountEnd:         types.StringPtr("Kraj_akcije"),
-	Barcodes:            types.StringPtr("BARKOD"),
-	UnitPrice:           types.StringPtr("CIJENA_ZA_JEDINICU_MJERE"),
-	LowestPrice30d:      types.StringPtr("NAJNIZA_MPC_U_30DANA"),
-	AnchorPrice:         types.StringPtr("SIDRENA_CIJENA"),
+	ExternalID:            types.StringPtr("SIFRA_PROIZVODA"),
+	Name:                  "NAZIV_PROIZVODA",
+	Category:              types.StringPtr("KATEGORIJA"),
+	Brand:                 types.StringPtr("MARKA"),
+	Unit:                  types.StringPtr("JM"),
+	UnitQuantity:          types.StringPtr("NETO_KOLICINA"),
+	Price:                 "MALOPROD_CIJENA",
+	DiscountPrice:         types.StringPtr("MPC_POSEB_OBLIK_PROD"),
+	DiscountStart:         types.StringPtr("Pocetak_akcije"),
+	DiscountEnd:           types.StringPtr("Kraj_akcije"),
+	Barcodes:              types.StringPtr("BARKOD"),
+	UnitPrice:             types.StringPtr("CIJENA_ZA_JEDINICU_MJERE"),
+	LowestPrice30d:        types.StringPtr("NAJNIZA_MPC_U_30DANA"),
+	AnchorPrice:           types.StringPtr("SIDRENA_CIJENA"),
 	UnitPriceBaseQuantity: types.StringPtr("KOLICINA_ZA_JM"),
-	UnitPriceBaseUnit:   types.StringPtr("JM_ZA_CIJENU"),
-	AnchorPriceAsOf:     types.StringPtr("DATUM_SIDRENE_CIJENE"),
+	UnitPriceBaseUnit:     types.StringPtr("JM_ZA_CIJENU"),
+	AnchorPriceAsOf:       types.StringPtr("DATUM_SIDRENE_CIJENE"),
 }
 
 // EurospinAdapter is the chain adapter for Eurospin retail chain
@@ -168,7 +168,7 @@ func (a *EurospinAdapter) Discover(targetDate string) ([]types.DiscoveredFile, e
 		fileDate := a.extractDateFromFilename(filename)
 
 		// Filter by discovery date if set
-		if date != "" && fileDate != "" && fileDate != date {
+		if date != "" && fileDate != date {
 			continue
 		}
 

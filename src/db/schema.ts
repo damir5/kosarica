@@ -414,6 +414,9 @@ export const ingestionRuns = pgTable(
 			.references(() => chains.slug, { onDelete: "cascade" }),
 		source: text("source").notNull(), // 'cli', 'worker', 'scheduled'
 		status: text("status").notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
+		statusReason: text("status_reason"),
+		statusSeverity: text("status_severity"), // 'warning', 'error', 'critical'
+		statusType: text("status_type"),
 		startedAt: timestamp("started_at"),
 		completedAt: timestamp("completed_at"),
 		totalFiles: integer("total_files").default(0),
@@ -448,6 +451,9 @@ export const ingestionFiles = pgTable("ingestion_files", {
 	fileSize: integer("file_size"),
 	fileHash: text("file_hash"), // for deduplication
 	status: text("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+	statusReason: text("status_reason"),
+	statusSeverity: text("status_severity"), // 'warning', 'error', 'critical'
+	statusType: text("status_type"),
 	entryCount: integer("entry_count").default(0),
 	processedAt: timestamp("processed_at"),
 	metadata: text("metadata"), // JSON for file-specific info
@@ -525,6 +531,34 @@ export const ingestionErrors = pgTable("ingestion_errors", {
 	severity: text("severity").notNull().default("error"), // 'warning', 'error', 'critical'
 	createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const ingestionStoreStats = pgTable(
+	"ingestion_store_stats",
+	{
+		id: bigserial({ mode: "bigint" }).primaryKey(),
+		runId: text("run_id")
+			.notNull()
+			.references(() => ingestionRuns.id, { onDelete: "cascade" }),
+		fileId: bigint("file_id", { mode: "bigint" })
+			.notNull()
+			.references(() => ingestionFiles.id, { onDelete: "cascade" }),
+		storeId: text("store_id")
+			.notNull()
+			.references(() => stores.id, { onDelete: "cascade" }),
+		storeIdentifier: text("store_identifier").notNull(),
+		rowCount: integer("row_count").notNull().default(0),
+		persistedCount: integer("persisted_count").notNull().default(0),
+		priceChanges: integer("price_changes").notNull().default(0),
+		failedRows: integer("failed_rows").notNull().default(0),
+		warningRows: integer("warning_rows").notNull().default(0),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => ({
+		runIdx: index("ingestion_store_stats_run_idx").on(table.runId),
+		fileIdx: index("ingestion_store_stats_file_idx").on(table.fileId),
+		storeIdx: index("ingestion_store_stats_store_idx").on(table.storeId),
+	}),
+);
 
 // Failed rows archive for analysis and re-processing
 export const retailerItemsFailed = pgTable("retailer_items_failed", {

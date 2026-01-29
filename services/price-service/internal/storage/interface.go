@@ -18,12 +18,12 @@ type Metadata struct {
 
 // FileInfo contains information about a stored file
 type FileInfo struct {
-	Key          string    `json:"key"`
-	Size         int64     `json:"size"`
-	Checksum     string    `json:"checksum"`
-	ContentType  string    `json:"contentType,omitempty"`
-	ModifiedAt   time.Time `json:"modifiedAt"`
-	Metadata     *Metadata `json:"metadata,omitempty"`
+	Key         string    `json:"key"`
+	Size        int64     `json:"size"`
+	Checksum    string    `json:"checksum"`
+	ContentType string    `json:"contentType,omitempty"`
+	ModifiedAt  time.Time `json:"modifiedAt"`
+	Metadata    *Metadata `json:"metadata,omitempty"`
 }
 
 // Storage defines the interface for file storage operations

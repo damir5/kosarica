@@ -24,14 +24,14 @@ type TrgocentarAdapter struct {
 
 // trgocentarFieldMapping is the field mapping for Trgocentar XML files
 var trgocentarFieldMapping = xml.XmlFieldMapping{
-	ExternalID: types.StringPtr("sif_art"),
-	Name:       "naziv_art",
-	Category:   types.StringPtr("naz_kat"),
-	Brand:      types.StringPtr("marka"),
-	Unit:       types.StringPtr("jmj"),
-	UnitQuantity: types.StringPtr("net_kol"),
-	Barcodes:   types.StringPtr("ean_kod"),
-	UnitPrice:  types.StringPtr("c_jmj"),
+	ExternalID:     types.StringPtr("sif_art"),
+	Name:           "naziv_art",
+	Category:       types.StringPtr("naz_kat"),
+	Brand:          types.StringPtr("marka"),
+	Unit:           types.StringPtr("jmj"),
+	UnitQuantity:   types.StringPtr("net_kol"),
+	Barcodes:       types.StringPtr("ean_kod"),
+	UnitPrice:      types.StringPtr("c_jmj"),
 	LowestPrice30d: types.StringPtr("c_najniza_30"),
 	// Use PriceExtractor for complex price logic
 	PriceExtractor: xml.FieldExtractor(func(item map[string]interface{}) string {
@@ -116,6 +116,14 @@ func (a *TrgocentarAdapter) Discover(targetDate string) ([]types.DiscoveredFile,
 	discoveredFiles := make([]types.DiscoveredFile, 0)
 	seenURLs := make(map[string]bool)
 
+	filterDate := targetDate
+	if filterDate == "" {
+		filterDate = a.discoveryDate
+	}
+	if filterDate == "" {
+		filterDate = time.Now().Format("2006-01-02")
+	}
+
 	log.Debug().Str("url", a.BaseURL()).Msg("Fetching Trgocentar portal")
 
 	resp, err := a.HTTPClient().Get(a.BaseURL())
@@ -162,8 +170,8 @@ func (a *TrgocentarAdapter) Discover(targetDate string) ([]types.DiscoveredFile,
 		filename := a.extractFilenameFromURL(fileURL)
 		fileDate := a.extractDateFromFilename(filename)
 
-		// Filter by date if discoveryDate is set
-		if a.discoveryDate != "" && fileDate != "" && fileDate != a.discoveryDate {
+		// Filter by date if filterDate is set
+		if filterDate != "" && fileDate != filterDate {
 			continue
 		}
 

@@ -275,6 +275,278 @@
                 }
             }
         },
+        "/internal/ingestion/files/{fileId}": {
+            "get": {
+                "description": "Returns a single ingestion file by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingestion"
+                ],
+                "summary": "Get ingestion file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.IngestionFile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "File not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/ingestion/files/{fileId}/chunks": {
+            "get": {
+                "description": "Returns a paginated list of chunks for a specific ingestion file",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingestion"
+                ],
+                "summary": "List ingestion chunks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "pending",
+                            "processing",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "Chunk status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ListChunksResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/ingestion/files/{fileId}/errors": {
+            "get": {
+                "description": "Returns a paginated list of errors for a specific ingestion file",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingestion"
+                ],
+                "summary": "List ingestion errors for file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ListErrorsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/ingestion/files/{fileId}/stores": {
+            "get": {
+                "description": "Returns store stats for a specific ingestion file",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingestion"
+                ],
+                "summary": "List ingestion store stats (file)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Number of items to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Number of items to skip",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ListStoreStatsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/internal/ingestion/runs": {
             "get": {
                 "description": "Returns a paginated list of ingestion runs with optional chain and status filters",
@@ -673,6 +945,73 @@
                 }
             }
         },
+        "/internal/ingestion/runs/{runId}/stores": {
+            "get": {
+                "description": "Returns aggregated store stats for a specific ingestion run",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingestion"
+                ],
+                "summary": "List ingestion store stats (run)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Run ID",
+                        "name": "runId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Number of items to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Number of items to skip",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ListStoreStatsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/internal/ingestion/stats": {
             "get": {
                 "description": "Returns aggregated statistics for ingestion runs within a time range (24h/7d/30d buckets)",
@@ -917,6 +1256,47 @@
                 }
             }
         },
+        "handlers.IngestionChunk": {
+            "type": "object",
+            "properties": {
+                "chunkIndex": {
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "endRow": {
+                    "type": "integer"
+                },
+                "errorCount": {
+                    "type": "integer"
+                },
+                "fileId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "persistedCount": {
+                    "type": "integer"
+                },
+                "processedAt": {
+                    "type": "string"
+                },
+                "r2Key": {
+                    "type": "string"
+                },
+                "rowCount": {
+                    "type": "integer"
+                },
+                "startRow": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.IngestionError": {
             "type": "object",
             "properties": {
@@ -964,6 +1344,9 @@
                 "entryCount": {
                     "type": "integer"
                 },
+                "failedRows": {
+                    "type": "integer"
+                },
                 "fileHash": {
                     "type": "string"
                 },
@@ -982,10 +1365,19 @@
                 "metadata": {
                     "type": "string"
                 },
+                "persistedCount": {
+                    "type": "integer"
+                },
+                "priceChanges": {
+                    "type": "integer"
+                },
                 "processedAt": {
                     "type": "string"
                 },
                 "processedChunks": {
+                    "type": "integer"
+                },
+                "rowCount": {
                     "type": "integer"
                 },
                 "runId": {
@@ -994,7 +1386,22 @@
                 "status": {
                     "type": "string"
                 },
+                "statusReason": {
+                    "type": "string"
+                },
+                "statusSeverity": {
+                    "type": "string"
+                },
+                "statusType": {
+                    "type": "string"
+                },
+                "storeCount": {
+                    "type": "integer"
+                },
                 "totalChunks": {
+                    "type": "integer"
+                },
+                "warningRows": {
                     "type": "integer"
                 }
             }
@@ -1014,16 +1421,28 @@
                 "errorCount": {
                     "type": "integer"
                 },
+                "failedRows": {
+                    "type": "integer"
+                },
                 "id": {
                     "type": "string"
                 },
                 "metadata": {
                     "type": "string"
                 },
+                "persistedCount": {
+                    "type": "integer"
+                },
+                "priceChanges": {
+                    "type": "integer"
+                },
                 "processedEntries": {
                     "type": "integer"
                 },
                 "processedFiles": {
+                    "type": "integer"
+                },
+                "rowCount": {
                     "type": "integer"
                 },
                 "source": {
@@ -1035,10 +1454,60 @@
                 "status": {
                     "type": "string"
                 },
+                "statusReason": {
+                    "type": "string"
+                },
+                "statusSeverity": {
+                    "type": "string"
+                },
+                "statusType": {
+                    "type": "string"
+                },
+                "storeCount": {
+                    "type": "integer"
+                },
                 "totalEntries": {
                     "type": "integer"
                 },
                 "totalFiles": {
+                    "type": "integer"
+                },
+                "warningRows": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.IngestionStoreStats": {
+            "type": "object",
+            "properties": {
+                "failedRows": {
+                    "type": "integer"
+                },
+                "fileCount": {
+                    "type": "integer"
+                },
+                "persistedCount": {
+                    "type": "integer"
+                },
+                "priceChanges": {
+                    "type": "integer"
+                },
+                "rowCount": {
+                    "type": "integer"
+                },
+                "storeCity": {
+                    "type": "string"
+                },
+                "storeId": {
+                    "type": "string"
+                },
+                "storeIdentifier": {
+                    "type": "string"
+                },
+                "storeName": {
+                    "type": "string"
+                },
+                "warningRows": {
                     "type": "integer"
                 }
             }
@@ -1068,6 +1537,23 @@
                     "type": "integer"
                 },
                 "quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.ListChunksResponse": {
+            "type": "object",
+            "properties": {
+                "chunks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.IngestionChunk"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPages": {
                     "type": "integer"
                 }
             }
@@ -1107,6 +1593,20 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.IngestionRun"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.ListStoreStatsResponse": {
+            "type": "object",
+            "properties": {
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.IngestionStoreStats"
                     }
                 },
                 "total": {

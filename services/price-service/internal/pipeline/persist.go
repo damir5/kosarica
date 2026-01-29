@@ -10,7 +10,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
@@ -18,6 +17,7 @@ import (
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/kosarica/price-service/internal/pricegroups"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // PersistResult represents the result of persisting parsed data
@@ -29,6 +29,11 @@ type PersistResult struct {
 // PersistPhase executes the persist phase of the ingestion pipeline
 // It persists normalized rows to the database and links them to the archive
 func PersistPhase(ctx context.Context, chainID string, parseResult *ParseResult, file types.DiscoveredFile, runID string, archiveID string) (*PersistResult, error) {
+	log.Info().
+		Str("filename", file.Filename).
+		Int("valid_rows", parseResult.ValidRows).
+		Msg("Persist phase start")
+
 	// Get adapter from registry
 	adapter, err := registry.GetAdapter(config.ChainID(chainID))
 	if err != nil {
@@ -190,18 +195,41 @@ func createStore(ctx context.Context, chainID string, storeIdentifier string, me
 
 // persistRowsForStore persists normalized rows for a specific store using price groups
 func persistRowsForStore(ctx context.Context, chainID string, storeID string, storeIdentifier string, rows []types.NormalizedRow, archiveID string, runID string, fileID string) (int, int, []string, error) {
+	log.Info().
+		Str("store_identifier", storeIdentifier).
+		Int("rows", len(rows)).
+		Msg("Persisting store rows")
+
 	// Step 1: Collect all validated items with prices
 	itemPrices := make([]pricegroups.ItemPrice, 0, len(rows))
 	itemData := make(map[string]types.NormalizedRow) // Map itemID -> row data
 	persisted := 0
 	priceChanges := 0
+	failedRows := 0
+	warningRows := 0
 	itemIDs := make([]string, 0, len(rows))
 
+	conn, err := database.Pool().Acquire(ctx)
+	if err != nil {
+		return 0, 0, nil, fmt.Errorf("failed to acquire database connection: %w", err)
+	}
+	defer conn.Release()
+	queries := sqlcgen.New(conn)
+
 	// First pass: validate and find/create retailer items, build price hash input
-	for _, row := range rows {
+	for i, row := range rows {
+		if i > 0 && i%1000 == 0 {
+			log.Info().
+				Str("store_identifier", storeIdentifier).
+				Int("processed_rows", i).
+				Int("total_rows", len(rows)).
+				Msg("Persist progress")
+		}
+
 		// Validate row
 		validation := validateNormalizedRow(row)
 		if !validation.IsValid {
+			failedRows++
 			fmt.Printf("[DEBUG] VALIDATION FAILED - Row %d\n", row.RowNumber)
 			fmt.Printf("  Name: %q\n", row.Name)
 			fmt.Printf("  Price: %d\n", row.Price)
@@ -210,17 +238,21 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 			fmt.Printf("  Raw Data: %s\n", row.RawData)
 
 			// Save failed row for later analysis and re-processing
-			if err := saveFailedRow(ctx, chainID, runID, fileID, row, validation); err != nil {
+			if err := saveFailedRowWithQueries(ctx, queries, chainID, runID, fileID, row, validation); err != nil {
 				log.Error().Err(err).Int("row_number", row.RowNumber).Msg("Failed to save failed row")
 			}
 
 			continue
 		}
+		if len(validation.Warnings) > 0 {
+			warningRows++
+		}
 
 		// Find or create retailer item
-		retailerItemID, err := findOrCreateRetailerItem(ctx, chainID, row, archiveID)
+		retailerItemID, err := findOrCreateRetailerItemWithQueries(ctx, queries, chainID, row, archiveID)
 		if err != nil {
 			log.Warn().Err(err).Int("row_number", row.RowNumber).Msg("Failed to find/create retailer item")
+			failedRows++
 			continue
 		}
 
@@ -236,6 +268,17 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 	}
 
 	if len(itemPrices) == 0 {
+		recordIngestionStoreStats(ctx, IngestionStoreStatsParams{
+			RunID:           runID,
+			FileID:          fileID,
+			StoreID:         storeID,
+			StoreIdentifier: storeIdentifier,
+			RowCount:        len(rows),
+			PersistedCount:  0,
+			PriceChanges:    0,
+			FailedRows:      failedRows,
+			WarningRows:     warningRows,
+		})
 		return 0, 0, nil, nil // No valid items
 	}
 
@@ -288,55 +331,30 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 	}
 
 	// Step 6: Update store_item_state for price change tracking
-	// We still maintain store_item_state for historical price tracking
-	pool := database.Pool()
-
-	// Begin transaction for store item state updates
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return 0, 0, nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-
-	// Track commit state to prevent rollback after commit
-	txCommitted := false
-
-	// Defer rollback with SEPARATE context
-	defer func() {
-		if txCommitted {
-			return // Already committed, don't rollback
-		}
-
-		// Create a new context with timeout for rollback
-		// This ensures rollback can complete even if original ctx is canceled
-		rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := tx.Rollback(rollbackCtx); err != nil {
-			log.Error().Err(err).Msg("Failed to rollback transaction (connection may be closed)")
-		}
-	}()
-
-	log.Debug().Str("operation", "persistRowsForStore").Msg("Transaction began")
-
-	// Use sqlc queries with transaction
-	txQueries := sqlcgen.New(tx)
+	// Use a single acquired connection to avoid pool contention in tight loops.
 
 	for _, itemID := range itemIDs {
 		row := itemData[itemID]
 
-		// Check for price change (from previous state)
-		priceChanged := false
-		var previousPrice pgtype.Int4
-
-		prevPriceResult, err := txQueries.GetStorePreviousPrice(ctx, sqlcgen.GetStorePreviousPriceParams{
+		previousPrice, err := queries.GetStorePreviousPrice(ctx, sqlcgen.GetStorePreviousPriceParams{
 			StoreID:        storeID,
 			RetailerItemID: itemID,
 		})
-		if err == nil && prevPriceResult.Valid {
-			previousPrice = prevPriceResult
-			if prevPriceResult.Int32 != int32(row.Price) {
-				priceChanged = true
+		if err != nil && err != pgx.ErrNoRows {
+			log.Warn().Err(err).Str("retailer_item_id", itemID).Msg("Failed to fetch previous price")
+		}
+		if err == nil && previousPrice.Valid && priceChangeRequiresReview(previousPrice.Int32, int32(row.Price)) {
+			validation := types.NormalizedRowValidation{
+				IsValid: false,
+				Errors: []string{
+					fmt.Sprintf("Price change exceeds %d%% threshold", priceChangeReviewThresholdPercent),
+				},
 			}
+			if err := saveFailedRowWithQueries(ctx, queries, chainID, runID, fileID, row, validation); err != nil {
+				log.Error().Err(err).Int("row_number", row.RowNumber).Msg("Failed to save review-required row")
+			}
+			failedRows++
+			continue
 		}
 
 		// Upsert store item state (for tracking price history)
@@ -347,7 +365,7 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 			StoreID:        storeID,
 			RetailerItemID: itemID,
 			CurrentPrice:   pgtype.Int4{Int32: int32(row.Price), Valid: true},
-			PreviousPrice:  previousPrice,
+			PreviousPrice:  pgtype.Int4{Valid: false},
 			PriceSignature: pgtype.Text{String: priceSignature, Valid: true},
 		}
 
@@ -380,11 +398,16 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 			upsertParams.AnchorPriceAsOf = pgtype.Timestamp{Time: *row.AnchorPriceAsOf, Valid: true}
 		}
 
-		err = txQueries.UpsertStoreItemState(ctx, upsertParams)
+		upsertResult, err := queries.UpsertStoreItemState(ctx, upsertParams)
 		if err != nil {
 			log.Warn().Err(err).Str("retailer_item_id", itemID).Msg("Failed to upsert store item state for item")
+			failedRows++
 			continue
 		}
+
+		priceChanged := upsertResult.PreviousPrice.Valid &&
+			upsertResult.CurrentPrice.Valid &&
+			upsertResult.PreviousPrice.Int32 != upsertResult.CurrentPrice.Int32
 
 		// Note: Barcodes are now inserted in findOrCreateRetailerItem (Phase 3 fix)
 		// No duplicate barcode insertion loop needed here
@@ -395,22 +418,29 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		}
 	}
 
-	// Commit transaction
-	if err := tx.Commit(ctx); err != nil {
-		return 0, 0, nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-	txCommitted = true
-
-	log.Debug().Str("operation", "persistRowsForStore").Msg("Transaction committed")
-
 	log.Info().Str("store_id", storeID).Str("price_group_id", group.ID).Int("item_count", len(itemPrices)).Msg("Assigned store to price group")
+
+	recordIngestionStoreStats(ctx, IngestionStoreStatsParams{
+		RunID:           runID,
+		FileID:          fileID,
+		StoreID:         storeID,
+		StoreIdentifier: storeIdentifier,
+		RowCount:        len(rows),
+		PersistedCount:  persisted,
+		PriceChanges:    priceChanges,
+		FailedRows:      failedRows,
+		WarningRows:     warningRows,
+	})
 
 	return persisted, priceChanges, itemIDs, nil
 }
 
 // findOrCreateRetailerItem finds or creates a retailer item and inserts the first barcode
 func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.NormalizedRow, archiveID string) (string, error) {
-	queries := sqlcgen.New(database.Pool())
+	return findOrCreateRetailerItemWithQueries(ctx, sqlcgen.New(database.Pool()), chainID, row, archiveID)
+}
+
+func findOrCreateRetailerItemWithQueries(ctx context.Context, queries *sqlcgen.Queries, chainID string, row types.NormalizedRow, archiveID string) (string, error) {
 
 	// Build parameters for upsert
 	var externalID, chainSlug, description, category, subcategory, brand, unit, unitQuantity, imageURL, archiveIDVal pgtype.Text
@@ -449,6 +479,7 @@ func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.Nor
 	newItemID := cuid2.GeneratePrefixedId("itm", cuid2.PrefixedIdOptions{})
 
 	// Upsert the retailer item and get the actual ID (new or existing)
+	upsertStart := time.Now()
 	itemID, err := queries.UpsertRetailerItem(ctx, sqlcgen.UpsertRetailerItemParams{
 		ID:           newItemID,
 		ChainSlug:    chainSlug,
@@ -463,6 +494,13 @@ func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.Nor
 		ImageUrl:     imageURL,
 		ArchiveID:    archiveIDVal,
 	})
+	if time.Since(upsertStart) > 2*time.Second {
+		log.Warn().
+			Dur("duration", time.Since(upsertStart)).
+			Str("external_id", externalID.String).
+			Str("item_name", row.Name).
+			Msg("UpsertRetailerItem slow")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to upsert retailer item: %w", err)
 	}
@@ -487,7 +525,10 @@ func findOrCreateRetailerItem(ctx context.Context, chainID string, row types.Nor
 
 // saveFailedRow saves a failed row for later analysis and re-processing
 func saveFailedRow(ctx context.Context, chainID string, runID string, fileID string, row types.NormalizedRow, validation types.NormalizedRowValidation) error {
-	queries := sqlcgen.New(database.Pool())
+	return saveFailedRowWithQueries(ctx, sqlcgen.New(database.Pool()), chainID, runID, fileID, row, validation)
+}
+
+func saveFailedRowWithQueries(ctx context.Context, queries *sqlcgen.Queries, chainID string, runID string, fileID string, row types.NormalizedRow, validation types.NormalizedRowValidation) error {
 
 	// Marshal validation errors to JSON
 	errorsJSON, _ := json.Marshal(validation.Errors)
@@ -545,6 +586,19 @@ func validateNormalizedRow(row types.NormalizedRow) types.NormalizedRowValidatio
 		Errors:   errors,
 		Warnings: warnings,
 	}
+}
+
+const priceChangeReviewThresholdPercent = 50
+
+func priceChangeRequiresReview(previousPrice int32, currentPrice int32) bool {
+	if previousPrice <= 0 {
+		return false
+	}
+	diff := previousPrice - currentPrice
+	if diff < 0 {
+		diff = -diff
+	}
+	return int64(diff)*100 > int64(previousPrice)*priceChangeReviewThresholdPercent
 }
 
 // computePriceSignature computes a signature for price deduplication

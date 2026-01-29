@@ -170,9 +170,6 @@ export async function getStoreWithPriceSource(
 
 	// If price source store not found, fall back to the original store
 	if (!priceStore) {
-		console.warn(
-			`[stores] Price source store ${store.priceSourceStoreId} not found for store ${storeId}`,
-		);
 		return {
 			store: store as Store,
 			priceStore: store as Store,

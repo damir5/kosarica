@@ -35,6 +35,9 @@ type IngestionRun struct {
 	ChainSlug        string     `json:"chainSlug" jsonschema:"required"`
 	Source           string     `json:"source" jsonschema:"required"`
 	Status           string     `json:"status" jsonschema:"required,enum=pending,enum=running,enum=completed,enum=failed"`
+	StatusReason     *string    `json:"statusReason"`
+	StatusSeverity   *string    `json:"statusSeverity" jsonschema:"enum=warning,enum=error,enum=critical"`
+	StatusType       *string    `json:"statusType"`
 	StartedAt        *time.Time `json:"startedAt"`
 	CompletedAt      *time.Time `json:"completedAt"`
 	TotalFiles       *int       `json:"totalFiles"`
@@ -42,6 +45,12 @@ type IngestionRun struct {
 	TotalEntries     *int       `json:"totalEntries"`
 	ProcessedEntries *int       `json:"processedEntries"`
 	ErrorCount       *int       `json:"errorCount"`
+	StoreCount       *int       `json:"storeCount"`
+	RowCount         *int       `json:"rowCount"`
+	PersistedCount   *int       `json:"persistedCount"`
+	PriceChanges     *int       `json:"priceChanges"`
+	FailedRows       *int       `json:"failedRows"`
+	WarningRows      *int       `json:"warningRows"`
 	Metadata         *string    `json:"metadata"`
 	CreatedAt        time.Time  `json:"createdAt" jsonschema:"required"`
 }
@@ -115,6 +124,15 @@ func ListRuns(c *gin.Context) {
 		if row.CompletedAt.Valid {
 			t := row.CompletedAt.Time
 			run.CompletedAt = &t
+		}
+		if row.StatusReason.Valid {
+			run.StatusReason = &row.StatusReason.String
+		}
+		if row.StatusSeverity.Valid {
+			run.StatusSeverity = &row.StatusSeverity.String
+		}
+		if row.StatusType.Valid {
+			run.StatusType = &row.StatusType.String
 		}
 		if row.TotalFiles.Valid {
 			v := int(row.TotalFiles.Int32)
@@ -201,6 +219,15 @@ func GetRun(c *gin.Context) {
 		t := row.CompletedAt.Time
 		run.CompletedAt = &t
 	}
+	if row.StatusReason.Valid {
+		run.StatusReason = &row.StatusReason.String
+	}
+	if row.StatusSeverity.Valid {
+		run.StatusSeverity = &row.StatusSeverity.String
+	}
+	if row.StatusType.Valid {
+		run.StatusType = &row.StatusType.String
+	}
 	if row.TotalFiles.Valid {
 		v := int(row.TotalFiles.Int32)
 		run.TotalFiles = &v
@@ -228,6 +255,33 @@ func GetRun(c *gin.Context) {
 		run.CreatedAt = row.CreatedAt.Time
 	}
 
+	if summary, err := queries.GetIngestionRunStatsSummary(ctx, runID); err == nil {
+		if summary.StoreCount > 0 {
+			v := int(summary.StoreCount)
+			run.StoreCount = &v
+		}
+		if summary.RowCount > 0 {
+			v := int(summary.RowCount)
+			run.RowCount = &v
+		}
+		if summary.PersistedCount > 0 {
+			v := int(summary.PersistedCount)
+			run.PersistedCount = &v
+		}
+		if summary.PriceChanges > 0 {
+			v := int(summary.PriceChanges)
+			run.PriceChanges = &v
+		}
+		if summary.FailedRows > 0 {
+			v := int(summary.FailedRows)
+			run.FailedRows = &v
+		}
+		if summary.WarningRows > 0 {
+			v := int(summary.WarningRows)
+			run.WarningRows = &v
+		}
+	}
+
 	c.JSON(http.StatusOK, run)
 }
 
@@ -252,7 +306,16 @@ type IngestionFile struct {
 	FileSize        *int       `json:"fileSize"`
 	FileHash        *string    `json:"fileHash"`
 	Status          string     `json:"status" jsonschema:"required,enum=pending,enum=processing,enum=completed,enum=failed"`
+	StatusReason    *string    `json:"statusReason"`
+	StatusSeverity  *string    `json:"statusSeverity" jsonschema:"enum=warning,enum=error,enum=critical"`
+	StatusType      *string    `json:"statusType"`
 	EntryCount      *int       `json:"entryCount"`
+	RowCount        *int       `json:"rowCount"`
+	PersistedCount  *int       `json:"persistedCount"`
+	PriceChanges    *int       `json:"priceChanges"`
+	FailedRows      *int       `json:"failedRows"`
+	WarningRows     *int       `json:"warningRows"`
+	StoreCount      *int       `json:"storeCount"`
 	ProcessedAt     *time.Time `json:"processedAt"`
 	Metadata        *string    `json:"metadata"`
 	TotalChunks     *int       `json:"totalChunks"`
@@ -338,6 +401,39 @@ func ListFiles(c *gin.Context) {
 		if row.EntryCount.Valid {
 			v := int(row.EntryCount.Int32)
 			file.EntryCount = &v
+		}
+		if row.RowCount.Valid {
+			v := int(row.RowCount.Int64)
+			file.RowCount = &v
+		}
+		if row.PersistedCount.Valid {
+			v := int(row.PersistedCount.Int64)
+			file.PersistedCount = &v
+		}
+		if row.PriceChanges.Valid {
+			v := int(row.PriceChanges.Int64)
+			file.PriceChanges = &v
+		}
+		if row.FailedRows.Valid {
+			v := int(row.FailedRows.Int64)
+			file.FailedRows = &v
+		}
+		if row.WarningRows.Valid {
+			v := int(row.WarningRows.Int64)
+			file.WarningRows = &v
+		}
+		if row.StoreCount.Valid {
+			v := int(row.StoreCount.Int64)
+			file.StoreCount = &v
+		}
+		if row.StatusReason.Valid {
+			file.StatusReason = &row.StatusReason.String
+		}
+		if row.StatusSeverity.Valid {
+			file.StatusSeverity = &row.StatusSeverity.String
+		}
+		if row.StatusType.Valid {
+			file.StatusType = &row.StatusType.String
 		}
 		if row.ProcessedAt.Valid {
 			t := row.ProcessedAt.Time

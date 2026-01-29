@@ -9,16 +9,16 @@ import (
 type ChainID string
 
 const (
-	ChainKonzum    ChainID = "konzum"
-	ChainLidl      ChainID = "lidl"
-	ChainPlodine   ChainID = "plodine"
-	ChainInterspar ChainID = "interspar"
-	ChainStudenac  ChainID = "studenac"
-	ChainKaufland  ChainID = "kaufland"
-	ChainEurospin  ChainID = "eurospin"
-	ChainDm        ChainID = "dm"
-	ChainKtc       ChainID = "ktc"
-	ChainMetro     ChainID = "metro"
+	ChainKonzum     ChainID = "konzum"
+	ChainLidl       ChainID = "lidl"
+	ChainPlodine    ChainID = "plodine"
+	ChainInterspar  ChainID = "interspar"
+	ChainStudenac   ChainID = "studenac"
+	ChainKaufland   ChainID = "kaufland"
+	ChainEurospin   ChainID = "eurospin"
+	ChainDm         ChainID = "dm"
+	ChainKtc        ChainID = "ktc"
+	ChainMetro      ChainID = "metro"
 	ChainTrgocentar ChainID = "trgocentar"
 )
 
@@ -46,15 +46,15 @@ type CSVConfig struct {
 
 // ChainConfig contains configuration for a retail chain's data source
 type ChainConfig struct {
-	ID               ChainID            `json:"id"`
-	Name             string             `json:"name"`
-	BaseURL          string             `json:"baseUrl"`
-	PrimaryFileType  types.FileType     `json:"primaryFileType"`
-	SupportedTypes   []types.FileType   `json:"supportedFileTypes"`
-	CSV              *CSVConfig         `json:"csv,omitempty"`
-	UsesZIP          bool               `json:"usesZip"`
-	StoreResolution  string             `json:"storeResolution"` // "filename", "portal_id", "national"
-	Metadata         map[string]string  `json:"metadata,omitempty"`
+	ID              ChainID           `json:"id"`
+	Name            string            `json:"name"`
+	BaseURL         string            `json:"baseUrl"`
+	PrimaryFileType types.FileType    `json:"primaryFileType"`
+	SupportedTypes  []types.FileType  `json:"supportedFileTypes"`
+	CSV             *CSVConfig        `json:"csv,omitempty"`
+	UsesZIP         bool              `json:"usesZip"`
+	StoreResolution string            `json:"storeResolution"` // "filename", "portal_id", "national"
+	Metadata        map[string]string `json:"metadata,omitempty"`
 }
 
 // ChainConfigs contains all chain configurations

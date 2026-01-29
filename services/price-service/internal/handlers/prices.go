@@ -201,7 +201,7 @@ type SearchItem struct {
 	Unit         *string `json:"unit"`
 	UnitQuantity *string `json:"unitQuantity"`
 	ImageURL     *string `json:"imageUrl"`
-	AvgPrice     *int    `json:"avgPrice"`                     // Average price across stores
+	AvgPrice     *int    `json:"avgPrice"`                         // Average price across stores
 	StoreCount   int     `json:"storeCount" jsonschema:"required"` // Number of stores with this item
 }
 

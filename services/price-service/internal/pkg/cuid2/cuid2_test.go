@@ -40,7 +40,7 @@ func TestEncodeTimestampBase64(t *testing.T) {
 		60:         "00000y",
 		3600:       "0000w4",
 		86400:      "000MTY",
-		1704067200:  "1rK5iq",
+		1704067200: "1rK5iq",
 	}
 
 	for seconds, expected := range testEncodings {

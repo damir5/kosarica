@@ -13,7 +13,10 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useState } from "react";
-import { IngestionFileList } from "@/components/admin/ingestion";
+import {
+	IngestionFileList,
+	IngestionStoreStatsTable,
+} from "@/components/admin/ingestion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +53,38 @@ const STATUS_COLORS = {
 	failed: "destructive",
 } as const;
 
+const SUMMARY_VARIANTS: Record<string, "secondary" | "destructive" | "outline"> =
+	{
+		warning: "secondary",
+		error: "destructive",
+		critical: "destructive",
+	};
+
+type ParsedErrorDetails = {
+	url?: string;
+	filename?: string;
+	phase?: string;
+	archiveId?: string;
+	storageKey?: string;
+	hash?: string;
+	details?: string;
+};
+
+function parseErrorDetails(raw?: string): ParsedErrorDetails | null {
+	if (!raw) {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(raw);
+		if (parsed && typeof parsed === "object") {
+			return parsed as ParsedErrorDetails;
+		}
+	} catch {
+		return null;
+	}
+	return null;
+}
+
 function RunDetailPage() {
 	const { runId } = Route.useParams() as { runId: string };
 	const queryClient = useQueryClient();
@@ -58,6 +93,8 @@ function RunDetailPage() {
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [page, setPage] = useState(1);
 	const pageSize = 20;
+	const [storePage, setStorePage] = useState(1);
+	const storePageSize = 25;
 
 	// Run query
 	const {
@@ -88,6 +125,17 @@ function RunDetailPage() {
 				runId,
 				limit: 10,
 				offset: 0,
+			},
+		}),
+	);
+
+	// Store stats query
+	const { data: storeStatsResponse, isLoading: storeStatsLoading } = useQuery(
+		orpc.admin.ingestion.listRunStoreStats.queryOptions({
+			input: {
+				runId,
+				limit: storePageSize,
+				offset: (storePage - 1) * storePageSize,
 			},
 		}),
 	);
@@ -126,12 +174,18 @@ function RunDetailPage() {
 		const startTime = new Date(start).getTime();
 		const endTime = end ? new Date(end).getTime() : Date.now();
 		const duration = endTime - startTime;
+		if (duration < 0) return "N/A";
 		const seconds = Math.floor(duration / 1000);
 		const minutes = Math.floor(seconds / 60);
 		const hours = Math.floor(minutes / 60);
 		if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
 		if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
 		return `${seconds}s`;
+	};
+
+	const formatCount = (value?: number | null) => {
+		if (value === null || value === undefined) return "-";
+		return value.toLocaleString();
 	};
 
 	if (runLoading) {
@@ -168,6 +222,12 @@ function RunDetailPage() {
 	const processedFiles = run.processedFiles ?? 0;
 	const progress =
 		totalFiles > 0 ? Math.round((processedFiles / totalFiles) * 100) : 0;
+	const noFilesDiscovered = run.status === "completed" && totalFiles === 0;
+	const summarySeverity = run.statusSeverity ?? "";
+	const summaryLabel =
+		summarySeverity === "warning" ? "info" : summarySeverity || "info";
+	const storeStats = storeStatsResponse?.stores ?? [];
+	const storeStatsTotal = storeStatsResponse?.total ?? 0;
 
 	return (
 		<>
@@ -206,6 +266,19 @@ function RunDetailPage() {
 								/>
 								{run.status}
 							</Badge>
+							{run.statusReason && (
+								<div className="flex items-center gap-2 text-xs text-muted-foreground">
+									<Badge
+										variant={
+											SUMMARY_VARIANTS[summarySeverity] || "outline"
+										}
+										className="text-xs"
+									>
+										{summaryLabel}
+									</Badge>
+									<span>{run.statusReason}</span>
+								</div>
+							)}
 							{/* Note: Run-level rerun removed - API requires specific file/chunk/entry to rerun */}
 						</div>
 					</div>
@@ -285,6 +358,71 @@ function RunDetailPage() {
 					</Card>
 				</div>
 
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-sm font-medium">Data Summary</CardTitle>
+						<CardDescription>
+							Rows, stores, and changes processed in this run
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+							<div>
+								<div className="text-xs text-muted-foreground">Stores</div>
+								<div className="text-2xl font-bold">
+									{formatCount(run.storeCount)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Rows</div>
+								<div className="text-2xl font-bold">
+									{formatCount(run.rowCount)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Persisted</div>
+								<div className="text-2xl font-bold">
+									{formatCount(run.persistedCount)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">
+									Price Changes
+								</div>
+								<div className="text-2xl font-bold">
+									{formatCount(run.priceChanges)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Failed Rows</div>
+								<div
+									className={`text-2xl font-bold ${(run.failedRows ?? 0) > 0 ? "text-destructive" : ""}`}
+								>
+									{formatCount(run.failedRows)}
+								</div>
+							</div>
+							<div>
+								<div className="text-xs text-muted-foreground">Warnings</div>
+								<div
+									className={`text-2xl font-bold ${(run.warningRows ?? 0) > 0 ? "text-amber-600" : ""}`}
+								>
+									{formatCount(run.warningRows)}
+								</div>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				{noFilesDiscovered && (
+					<Card>
+						<CardContent className="py-4 text-sm text-muted-foreground">
+							No files were discovered for the requested date. We do not
+							backfill older files; existing prices remain in place until the
+							retailer publishes an update.
+						</CardContent>
+					</Card>
+				)}
+
 				{/* Run Details */}
 				<Card>
 					<CardHeader>
@@ -316,6 +454,28 @@ function RunDetailPage() {
 								</div>
 								<p className="mt-1">{formatDate(run.completedAt)}</p>
 							</div>
+							<div>
+								<div className="text-sm font-medium text-muted-foreground">
+									Status Reason
+								</div>
+								<p className="mt-1">{run.statusReason ?? "—"}</p>
+							</div>
+							<div>
+								<div className="text-sm font-medium text-muted-foreground">
+									Status Severity
+								</div>
+								<p className="mt-1">
+									{run.statusSeverity === "warning"
+										? "info"
+										: run.statusSeverity ?? "—"}
+								</p>
+							</div>
+							<div>
+								<div className="text-sm font-medium text-muted-foreground">
+									Status Type
+								</div>
+								<p className="mt-1">{run.statusType ?? "—"}</p>
+							</div>
 							{/* Note: parentRunId and rerunType fields are not returned by the SDK */}
 						</div>
 					</CardContent>
@@ -335,47 +495,132 @@ function RunDetailPage() {
 						</CardHeader>
 						<CardContent>
 							<div className="space-y-3">
-								{(errorsData.errors ?? []).slice(0, 5).map((error) => (
-									<div
-										key={error.id}
-										className="p-3 rounded-lg border bg-destructive/5 border-destructive/20"
-									>
-										<div className="flex items-start justify-between">
-											<div className="flex-1">
-												<div className="flex items-center gap-2">
-													<Badge variant="outline" className="text-xs">
-														{error.errorType}
-													</Badge>
-													<Badge
-														variant={
-															error.severity === "critical"
-																? "destructive"
-																: "secondary"
-														}
-														className="text-xs"
-													>
-														{error.severity}
-													</Badge>
+								{(errorsData.errors ?? []).slice(0, 5).map((error) => {
+									const parsedDetails = parseErrorDetails(error.errorDetails);
+									const detailText =
+										parsedDetails?.details ?? error.errorDetails;
+									const contextParts = [
+										parsedDetails?.phase
+											? `Phase: ${parsedDetails.phase}`
+											: null,
+										parsedDetails?.filename
+											? `File: ${parsedDetails.filename}`
+											: null,
+										parsedDetails?.archiveId
+											? `Archive: ${parsedDetails.archiveId}`
+											: null,
+									].filter(Boolean);
+
+									return (
+										<div
+											key={error.id}
+											className="p-3 rounded-lg border bg-destructive/5 border-destructive/20"
+										>
+											<div className="flex items-start justify-between">
+												<div className="flex-1">
+													<div className="flex items-center gap-2">
+														<Badge variant="outline" className="text-xs">
+															{error.errorType}
+														</Badge>
+														<Badge
+															variant={
+																error.severity === "critical"
+																	? "destructive"
+																	: "secondary"
+															}
+															className="text-xs"
+														>
+															{error.severity === "warning"
+																? "info"
+																: error.severity}
+														</Badge>
+													</div>
+													<p className="mt-1 text-sm">{error.errorMessage}</p>
+													{parsedDetails?.url && (
+														<p className="mt-1 text-xs text-muted-foreground break-all">
+															URL: {parsedDetails.url}
+														</p>
+													)}
+													{contextParts.length > 0 && (
+														<p className="mt-1 text-xs text-muted-foreground">
+															{contextParts.join(" · ")}
+														</p>
+													)}
+													{error.fileId && (
+														<p className="mt-1 text-xs text-muted-foreground font-mono">
+															File: {error.fileId}
+														</p>
+													)}
+													{detailText && (
+														<pre className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
+															{detailText}
+														</pre>
+													)}
 												</div>
-												<p className="mt-1 text-sm">{error.errorMessage}</p>
-												{error.fileId && (
-													<p className="mt-1 text-xs text-muted-foreground font-mono">
-														File: {error.fileId}
-													</p>
-												)}
+												<span className="text-xs text-muted-foreground">
+													{error.createdAt
+														? new Date(error.createdAt).toLocaleTimeString()
+														: ""}
+												</span>
 											</div>
-											<span className="text-xs text-muted-foreground">
-												{error.createdAt
-													? new Date(error.createdAt).toLocaleTimeString()
-													: ""}
-											</span>
 										</div>
-									</div>
-								))}
+									);
+								})}
 							</div>
 						</CardContent>
 					</Card>
 				)}
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Store Stats</CardTitle>
+						<CardDescription>Per-store totals for this run</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<IngestionStoreStatsTable
+							stores={storeStats}
+							isLoading={storeStatsLoading}
+							showFileCount
+							emptyLabel="No store stats recorded for this run"
+						/>
+
+						{storeStatsTotal > storePageSize && (
+							<div className="mt-4 flex items-center justify-between">
+								<p className="text-sm text-muted-foreground">
+									Showing {(storePage - 1) * storePageSize + 1} to{" "}
+									{Math.min(storePage * storePageSize, storeStatsTotal)} of{" "}
+									{storeStatsTotal} stores
+								</p>
+								<div className="flex items-center gap-2">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setStorePage((p) => Math.max(1, p - 1))}
+										disabled={storePage === 1}
+									>
+										<ChevronLeft className="h-4 w-4" />
+										Previous
+									</Button>
+									<span className="text-sm">
+										Page {storePage} of{" "}
+										{Math.ceil(storeStatsTotal / storePageSize)}
+									</span>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setStorePage((p) => p + 1)}
+										disabled={
+											storePage >= Math.ceil(storeStatsTotal / storePageSize)
+										}
+									>
+										Next
+										<ChevronRight className="h-4 w-4" />
+									</Button>
+								</div>
+							</div>
+						)}
+					</CardContent>
+				</Card>
 
 				{/* Files List */}
 				<Card>
@@ -418,7 +663,16 @@ function RunDetailPage() {
 								fileSize: f.fileSize ?? null,
 								fileHash: f.fileHash ?? null,
 								status: f.status ?? "pending",
+								statusReason: f.statusReason ?? null,
+								statusSeverity: f.statusSeverity ?? null,
+								statusType: f.statusType ?? null,
 								entryCount: f.entryCount ?? null,
+								rowCount: f.rowCount ?? null,
+								persistedCount: f.persistedCount ?? null,
+								priceChanges: f.priceChanges ?? null,
+								failedRows: f.failedRows ?? null,
+								warningRows: f.warningRows ?? null,
+								storeCount: f.storeCount ?? null,
 								processedAt: f.processedAt ? new Date(f.processedAt) : null,
 								metadata: f.metadata ?? null,
 								totalChunks: f.totalChunks ?? null,

@@ -18,18 +18,18 @@ import (
 
 // konzumColumnMapping is the primary column mapping for Konzum CSV files (Croatian headers)
 var konzumColumnMapping = csv.CsvColumnMapping{
-	ExternalID:          types.StringPtr("ŠIFRA PROIZVODA"),
-	Name:                "NAZIV PROIZVODA",
-	Category:            types.StringPtr("KATEGORIJA PROIZVODA"),
-	Brand:               types.StringPtr("MARKA PROIZVODA"),
-	Unit:                types.StringPtr("JEDINICA MJERE"),
-	UnitQuantity:        types.StringPtr("NETO KOLIČINA"),
-	Price:               "MALOPRODAJNA CIJENA",
-	DiscountPrice:       types.StringPtr("MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE"),
-	Barcodes:            types.StringPtr("BARKOD"),
-	UnitPrice:           types.StringPtr("CIJENA ZA JEDINICU MJERE"),
-	LowestPrice30d:      types.StringPtr("NAJNIŽA CIJENA U ZADNJIH 30 DANA"),
-	AnchorPrice:         types.StringPtr("SIDRENA CIJENA"),
+	ExternalID:     types.StringPtr("ŠIFRA PROIZVODA"),
+	Name:           "NAZIV PROIZVODA",
+	Category:       types.StringPtr("KATEGORIJA PROIZVODA"),
+	Brand:          types.StringPtr("MARKA PROIZVODA"),
+	Unit:           types.StringPtr("JEDINICA MJERE"),
+	UnitQuantity:   types.StringPtr("NETO KOLIČINA"),
+	Price:          "MALOPRODAJNA CIJENA",
+	DiscountPrice:  types.StringPtr("MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE"),
+	Barcodes:       types.StringPtr("BARKOD"),
+	UnitPrice:      types.StringPtr("CIJENA ZA JEDINICU MJERE"),
+	LowestPrice30d: types.StringPtr("NAJNIŽA CIJENA U ZADNJIH 30 DANA"),
+	AnchorPrice:    types.StringPtr("SIDRENA CIJENA"),
 }
 
 // konzumColumnMappingEN is the alternative column mapping for Konzum CSV files (English headers)
@@ -67,7 +67,7 @@ func NewKonzumAdapter() (*KonzumAdapter, error) {
 				`(?i)^cjenik[_-]?`,
 			},
 		},
-		ColumnMapping:           konzumColumnMapping,
+		ColumnMapping:            konzumColumnMapping,
 		AlternativeColumnMapping: &konzumColumnMappingEN,
 	}
 
@@ -168,16 +168,21 @@ func (a *KonzumAdapter) discoverPage(pageURL string, seenURLs map[string]bool, d
 			filename = filename + ".csv"
 		}
 
+		fileDate := a.extractDateFromFilename(filename)
+		if date != "" && fileDate != date {
+			continue
+		}
+
 		files = append(files, types.DiscoveredFile{
-			URL:      fileURL,
-			Filename: filename,
-			Type:     types.FileTypeCSV,
-			Size:     nil,
+			URL:          fileURL,
+			Filename:     filename,
+			Type:         types.FileTypeCSV,
+			Size:         nil,
 			LastModified: types.TimePtr(time.Now()), // Use current time as approximation
 			Metadata: map[string]string{
 				"source":       "konzum_portal",
 				"discoveredAt": time.Now().Format(time.RFC3339),
-				"portalDate":   date,
+				"portalDate":   fileDate,
 				"page":         fmt.Sprintf("%d", page),
 			},
 		})
@@ -241,6 +246,19 @@ func (a *KonzumAdapter) ExtractStoreIdentifierFromFilename(filename string) stri
 	return ""
 }
 
+func (a *KonzumAdapter) extractDateFromFilename(filename string) string {
+	if match := regexp.MustCompile(`\d{4}-\d{2}-\d{2}`).FindString(filename); match != "" {
+		return match
+	}
+
+	// Konzum filenames use Croatian date format: DD.MM.YYYY
+	if match := regexp.MustCompile(`\b(\d{2})\.(\d{2})\.(\d{4})\b`).FindStringSubmatch(filename); len(match) == 4 {
+		return fmt.Sprintf("%s-%s-%s", match[3], match[2], match[1])
+	}
+
+	return ""
+}
+
 // ExtractStoreMetadata extracts store metadata from Konzum filename for auto-registration
 // Parses: STORETYPE,ADDRESS+POSTAL+CITY,STORE_ID,DATE,TIME.CSV
 func (a *KonzumAdapter) ExtractStoreMetadata(file types.DiscoveredFile) *types.StoreMetadata {
@@ -253,8 +271,8 @@ func (a *KonzumAdapter) ExtractStoreMetadata(file types.DiscoveredFile) *types.S
 		}
 	}
 
-	storeType := parts[0]      // SUPERMARKET, HIPERMARKET, etc.
-	addressPart := parts[1]    // e.g., ŽITNA+1A+10310+IVANIĆ+GRAD
+	storeType := parts[0]   // SUPERMARKET, HIPERMARKET, etc.
+	addressPart := parts[1] // e.g., ŽITNA+1A+10310+IVANIĆ+GRAD
 
 	// Decode URL-encoded parts
 	decodedAddress := strings.ReplaceAll(addressPart, "+", " ")
@@ -289,10 +307,10 @@ func (a *KonzumAdapter) ExtractStoreMetadata(file types.DiscoveredFile) *types.S
 	}
 
 	return &types.StoreMetadata{
-		Name:      strings.Join(nameParts, " "),
-		Address:   address,
-		City:      city,
+		Name:       strings.Join(nameParts, " "),
+		Address:    address,
+		City:       city,
 		PostalCode: postalCode,
-		StoreType: storeType,
+		StoreType:  storeType,
 	}
 }

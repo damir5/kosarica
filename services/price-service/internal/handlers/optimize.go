@@ -363,7 +363,7 @@ func CacheWarmup(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "ok",
+		"status":  "ok",
 		"message": "Cache warmed up successfully",
 	})
 }
@@ -399,8 +399,8 @@ func CacheRefresh(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "ok",
-		"message": "Chain cache refreshed successfully",
+		"status":    "ok",
+		"message":   "Chain cache refreshed successfully",
 		"chainSlug": chainSlug,
 	})
 }
@@ -417,7 +417,7 @@ func CacheRefresh(c *gin.Context) {
 func CacheHealth(c *gin.Context) {
 	if priceCache == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "Cache not initialized",
 		})
 		return
@@ -428,9 +428,9 @@ func CacheHealth(c *gin.Context) {
 	chains := make([]gin.H, 0, len(freshness))
 	for chain, info := range freshness {
 		chains = append(chains, gin.H{
-			"chainSlug": chain,
-			"loadedAt":  info.LoadedAt,
-			"isStale":   info.IsStale,
+			"chainSlug":   chain,
+			"loadedAt":    info.LoadedAt,
+			"isStale":     info.IsStale,
 			"estimatedMB": info.EstimatedMB,
 		})
 	}

@@ -2,13 +2,18 @@ package http
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/kosarica/price-service/internal/http/ratelimit"
+	"github.com/rs/zerolog/log"
 )
 
 // Client is an HTTP client with rate limiting and retry logic
@@ -20,9 +25,13 @@ type Client struct {
 
 // NewClient creates a new HTTP client with rate limiting
 func NewClient(config ratelimit.Config) *Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = extraTLSConfig()
+
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   30 * time.Second,
+			Transport: transport,
 		},
 		rateLimiter: ratelimit.NewRateLimiter(config),
 		config:      config,
@@ -32,6 +41,65 @@ func NewClient(config ratelimit.Config) *Client {
 // NewClientDefault creates a new HTTP client with default rate limiting
 func NewClientDefault() *Client {
 	return NewClient(ratelimit.DefaultConfig())
+}
+
+func extraTLSConfig() *tls.Config {
+	paths := extraCACertPaths()
+	if len(paths) == 0 {
+		return nil
+	}
+
+	pool, err := x509.SystemCertPool()
+	if err != nil || pool == nil {
+		pool = x509.NewCertPool()
+	}
+
+	added := false
+	for _, path := range paths {
+		pemBytes, readErr := os.ReadFile(path)
+		if readErr != nil {
+			log.Warn().Err(readErr).Str("path", path).Msg("Failed to read extra CA certs file")
+			continue
+		}
+		if ok := pool.AppendCertsFromPEM(pemBytes); !ok {
+			log.Warn().Str("path", path).Msg("No certificates appended from extra CA certs file")
+			continue
+		}
+		added = true
+	}
+
+	if !added {
+		return nil
+	}
+
+	return &tls.Config{
+		RootCAs: pool,
+	}
+}
+
+func extraCACertPaths() []string {
+	env := strings.TrimSpace(os.Getenv("EXTRA_CA_CERTS_FILE"))
+	if env == "" {
+		env = strings.TrimSpace(os.Getenv("PRICE_SERVICE_EXTRA_CA_CERTS_FILE"))
+	}
+	if env == "" {
+		return nil
+	}
+
+	parts := strings.FieldsFunc(env, func(r rune) bool {
+		return r == ',' || r == ';'
+	})
+
+	paths := make([]string, 0, len(parts))
+	for _, part := range parts {
+		path := strings.TrimSpace(part)
+		if path == "" {
+			continue
+		}
+		paths = append(paths, path)
+	}
+
+	return paths
 }
 
 // Get performs a GET request with rate limiting and retry logic
@@ -59,10 +127,10 @@ func (c *Client) Do(method, url string, body io.Reader) (*http.Response, error) 
 				continue
 			}
 			return nil, &ratelimit.FetchRetryError{
-				URL:       url,
-				Attempts:  attempt + 1,
+				URL:        url,
+				Attempts:   attempt + 1,
 				LastStatus: lastStatus,
-				LastError: lastErr,
+				LastError:  lastErr,
 			}
 		}
 
@@ -79,10 +147,10 @@ func (c *Client) Do(method, url string, body io.Reader) (*http.Response, error) 
 				continue
 			}
 			return nil, &ratelimit.FetchRetryError{
-				URL:       url,
-				Attempts:  attempt + 1,
+				URL:        url,
+				Attempts:   attempt + 1,
 				LastStatus: lastStatus,
-				LastError: lastErr,
+				LastError:  lastErr,
 			}
 		}
 
@@ -98,10 +166,10 @@ func (c *Client) Do(method, url string, body io.Reader) (*http.Response, error) 
 		if !ratelimit.IsRetryableStatus(resp.StatusCode) {
 			resp.Body.Close()
 			return nil, &ratelimit.FetchRetryError{
-				URL:       url,
-				Attempts:  attempt + 1,
+				URL:        url,
+				Attempts:   attempt + 1,
 				LastStatus: resp.StatusCode,
-				LastError: nil,
+				LastError:  nil,
 			}
 		}
 
@@ -109,10 +177,10 @@ func (c *Client) Do(method, url string, body io.Reader) (*http.Response, error) 
 		if attempt == c.config.MaxRetries {
 			resp.Body.Close()
 			return nil, &ratelimit.FetchRetryError{
-				URL:       url,
-				Attempts:  attempt + 1,
+				URL:        url,
+				Attempts:   attempt + 1,
 				LastStatus: resp.StatusCode,
-				LastError: nil,
+				LastError:  nil,
 			}
 		}
 
@@ -137,10 +205,10 @@ func (c *Client) Do(method, url string, body io.Reader) (*http.Response, error) 
 
 	// Should not reach here, but needed for return
 	return nil, &ratelimit.FetchRetryError{
-		URL:       url,
-		Attempts:  c.config.MaxRetries + 1,
+		URL:        url,
+		Attempts:   c.config.MaxRetries + 1,
 		LastStatus: lastStatus,
-		LastError: lastErr,
+		LastError:  lastErr,
 	}
 }
 

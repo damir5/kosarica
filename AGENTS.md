@@ -5,6 +5,8 @@
 Go is the source of truth for shared API types (basket, prices, ingestion).
 Types are exposed via OpenAPI spec and consumed via generated TypeScript SDK.
 
+- Note: Run all Go tools via `mise run -- <command>` (e.g., `mise run -- gofmt -w <paths>`, `mise run -- go test ./...`) to ensure the pinned toolchain is used.
+
 - Regenerate OpenAPI spec: `mise run swag` (from Go swag annotations)
 - Regenerate TypeScript SDK: `mise run generate-go-api` (or `pnpm generate:go-api`)
 - After changing Go handlers in `services/price-service/internal/handlers/`, run both commands

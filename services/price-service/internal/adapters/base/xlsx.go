@@ -23,12 +23,12 @@ type XlsxAdapterConfig struct {
 // BaseXlsxAdapter provides common XLSX parsing logic
 type BaseXlsxAdapter struct {
 	*BaseChainAdapter
-	xlsxParser               *xlsx.Parser
-	columnMapping            xlsx.XlsxColumnMapping
-	altMapping               *xlsx.XlsxColumnMapping
-	hasHeader                bool
-	headerRowCount           int
-	defaultStoreIdentifier   string
+	xlsxParser             *xlsx.Parser
+	columnMapping          xlsx.XlsxColumnMapping
+	altMapping             *xlsx.XlsxColumnMapping
+	hasHeader              bool
+	headerRowCount         int
+	defaultStoreIdentifier string
 }
 
 // NewBaseXlsxAdapter creates a new base XLSX adapter

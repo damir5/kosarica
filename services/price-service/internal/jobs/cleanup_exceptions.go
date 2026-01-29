@@ -31,7 +31,7 @@ type CleanupManager struct {
 	cancel context.CancelFunc
 
 	exceptionCleanupDone chan struct{}
-	orphanGroupDone       chan struct{}
+	orphanGroupDone      chan struct{}
 }
 
 // NewCleanupManager creates a new cleanup manager
@@ -39,12 +39,12 @@ func NewCleanupManager(config ExceptionCleanupConfig, logger *zerolog.Logger) *C
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &CleanupManager{
-		config:                config,
-		logger:                logger,
-		ctx:                   ctx,
-		cancel:                cancel,
-		exceptionCleanupDone:  make(chan struct{}),
-		orphanGroupDone:       make(chan struct{}),
+		config:               config,
+		logger:               logger,
+		ctx:                  ctx,
+		cancel:               cancel,
+		exceptionCleanupDone: make(chan struct{}),
+		orphanGroupDone:      make(chan struct{}),
 	}
 }
 

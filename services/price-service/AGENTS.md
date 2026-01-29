@@ -5,6 +5,8 @@
 Go service handling price ingestion, basket optimization, and price queries.
 This service exposes an OpenAPI spec for TypeScript SDK generation.
 
+Note: Run all Go tools via `mise run -- <command>` (e.g., `mise run -- go test ./...`, `mise run -- gofmt -w <paths>`) to ensure the pinned toolchain is used.
+
 ## OpenAPI Generation
 
 Handlers with swag annotations generate OpenAPI spec for Node.js SDK:

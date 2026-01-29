@@ -42,6 +42,20 @@
       "when": 1769612815785,
       "tag": "0005_lethal_wolfpack",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769664238391,
+      "tag": "0006_flawless_randall_flagg",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1769669535803,
+      "tag": "0007_foamy_doorman",
+      "breakpoints": true
     }
   ]
 }

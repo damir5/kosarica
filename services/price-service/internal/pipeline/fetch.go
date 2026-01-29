@@ -8,21 +8,23 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/rs/zerolog/log"
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/storage"
 	"github.com/kosarica/price-service/internal/types"
+	"github.com/rs/zerolog/log"
 )
 
 // FetchResult represents the result of fetching a file
 type FetchResult struct {
-	StorageKey string
-	Hash       string
-	Content    []byte
-	IsZip      bool
-	ArchiveID  string // ID of the archive record
+	StorageKey  string
+	Hash        string
+	Content     []byte
+	IsZip       bool
+	ArchiveID   string // ID of the archive record
+	FileSize    int
+	IsDuplicate bool
 }
 
 // FetchPhase executes the fetch phase of the ingestion pipeline
@@ -42,8 +44,9 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 		return nil, fmt.Errorf("fetch failed for %s: %w", file.Filename, err)
 	}
 
-	// Compute hash
+	// Compute hash and file size
 	hash := computeSha256(fetched.Content)
+	fileSize := len(fetched.Content)
 
 	// Check for duplicate by checksum in archives table
 	existingArchive, err := database.GetArchiveByChecksum(ctx, hash)
@@ -53,9 +56,12 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 	if existingArchive != nil {
 		log.Info().Str("filename", file.Filename).Str("existing_archive", existingArchive.ID).Msg("Skipping duplicate file")
 		return &FetchResult{
-			ArchiveID: existingArchive.ID,
-			Content:   fetched.Content,
-			IsZip:     file.Type == types.FileTypeZIP,
+			ArchiveID:   existingArchive.ID,
+			Content:     fetched.Content,
+			IsZip:       file.Type == types.FileTypeZIP,
+			Hash:        hash,
+			FileSize:    fileSize,
+			IsDuplicate: true,
 		}, nil
 	}
 
@@ -67,10 +73,10 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 
 	// Store file in archive storage
 	metadata := &storage.Metadata{
-		OriginalName:  file.Filename,
-		ChainSlug:     chainID,
-		SourceURL:     file.URL,
-		DownloadedAt:  time.Now(),
+		OriginalName: file.Filename,
+		ChainSlug:    chainID,
+		SourceURL:    file.URL,
+		DownloadedAt: time.Now(),
 	}
 
 	if err := storageBackend.Put(ctx, storageKey, fetched.Content, metadata); err != nil {
@@ -78,7 +84,7 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 	}
 
 	// Create archive record in database
-	fileSize := int64(len(fetched.Content))
+	fileSize64 := int64(fileSize)
 	archive := &database.Archive{
 		ID:             archiveID,
 		ChainSlug:      chainID,
@@ -87,7 +93,7 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 		OriginalFormat: string(file.Type),
 		ArchivePath:    storageKey,
 		ArchiveType:    "local",
-		FileSize:       &fileSize,
+		FileSize:       &fileSize64,
 		Checksum:       hash,
 		DownloadedAt:   time.Now(),
 	}
@@ -97,14 +103,16 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 		// Continue anyway - file is stored
 	}
 
-	log.Info().Str("filename", file.Filename).Int64("file_size", fileSize).Str("hash", hash).Str("storage_key", storageKey).Msg("Archived file")
+	log.Info().Str("filename", file.Filename).Int("file_size", fileSize).Str("hash", hash).Str("storage_key", storageKey).Msg("Archived file")
 
 	return &FetchResult{
-		StorageKey: storageKey,
-		Hash:       hash,
-		Content:    fetched.Content,
-		IsZip:      file.Type == types.FileTypeZIP,
-		ArchiveID:  archiveID,
+		StorageKey:  storageKey,
+		Hash:        hash,
+		Content:     fetched.Content,
+		IsZip:       file.Type == types.FileTypeZIP,
+		ArchiveID:   archiveID,
+		FileSize:    fileSize,
+		IsDuplicate: false,
 	}, nil
 }
 
@@ -119,4 +127,3 @@ func buildArchiveKey(chainSlug, filename string, downloadedAt time.Time) string 
 	datePrefix := downloadedAt.Format("2006/01/02")
 	return fmt.Sprintf("archives/%s/%s/%s", chainSlug, datePrefix, filename)
 }
-

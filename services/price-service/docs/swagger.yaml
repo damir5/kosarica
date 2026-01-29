@@ -30,6 +30,33 @@ definitions:
       total:
         type: integer
     type: object
+  handlers.IngestionChunk:
+    properties:
+      chunkIndex:
+        type: integer
+      createdAt:
+        type: string
+      endRow:
+        type: integer
+      errorCount:
+        type: integer
+      fileId:
+        type: string
+      id:
+        type: string
+      persistedCount:
+        type: integer
+      processedAt:
+        type: string
+      r2Key:
+        type: string
+      rowCount:
+        type: integer
+      startRow:
+        type: integer
+      status:
+        type: string
+    type: object
   handlers.IngestionError:
     properties:
       chunkId:
@@ -61,6 +88,8 @@ definitions:
         type: string
       entryCount:
         type: integer
+      failedRows:
+        type: integer
       fileHash:
         type: string
       fileSize:
@@ -73,15 +102,31 @@ definitions:
         type: string
       metadata:
         type: string
+      persistedCount:
+        type: integer
+      priceChanges:
+        type: integer
       processedAt:
         type: string
       processedChunks:
+        type: integer
+      rowCount:
         type: integer
       runId:
         type: string
       status:
         type: string
+      statusReason:
+        type: string
+      statusSeverity:
+        type: string
+      statusType:
+        type: string
+      storeCount:
+        type: integer
       totalChunks:
+        type: integer
+      warningRows:
         type: integer
     type: object
   handlers.IngestionRun:
@@ -94,13 +139,21 @@ definitions:
         type: string
       errorCount:
         type: integer
+      failedRows:
+        type: integer
       id:
         type: string
       metadata:
         type: string
+      persistedCount:
+        type: integer
+      priceChanges:
+        type: integer
       processedEntries:
         type: integer
       processedFiles:
+        type: integer
+      rowCount:
         type: integer
       source:
         type: string
@@ -108,9 +161,42 @@ definitions:
         type: string
       status:
         type: string
+      statusReason:
+        type: string
+      statusSeverity:
+        type: string
+      statusType:
+        type: string
+      storeCount:
+        type: integer
       totalEntries:
         type: integer
       totalFiles:
+        type: integer
+      warningRows:
+        type: integer
+    type: object
+  handlers.IngestionStoreStats:
+    properties:
+      failedRows:
+        type: integer
+      fileCount:
+        type: integer
+      persistedCount:
+        type: integer
+      priceChanges:
+        type: integer
+      rowCount:
+        type: integer
+      storeCity:
+        type: string
+      storeId:
+        type: string
+      storeIdentifier:
+        type: string
+      storeName:
+        type: string
+      warningRows:
         type: integer
     type: object
   handlers.ItemPriceInfo:
@@ -130,6 +216,17 @@ definitions:
       lineTotal:
         type: integer
       quantity:
+        type: integer
+    type: object
+  handlers.ListChunksResponse:
+    properties:
+      chunks:
+        items:
+          $ref: '#/definitions/handlers.IngestionChunk'
+        type: array
+      total:
+        type: integer
+      totalPages:
         type: integer
     type: object
   handlers.ListErrorsResponse:
@@ -155,6 +252,15 @@ definitions:
       runs:
         items:
           $ref: '#/definitions/handlers.IngestionRun'
+        type: array
+      total:
+        type: integer
+    type: object
+  handlers.ListStoreStatsResponse:
+    properties:
+      stores:
+        items:
+          $ref: '#/definitions/handlers.IngestionStoreStats'
         type: array
       total:
         type: integer
@@ -538,6 +644,192 @@ paths:
       summary: Optimize basket for single store
       tags:
       - basket
+  /internal/ingestion/files/{fileId}:
+    get:
+      consumes:
+      - application/json
+      description: Returns a single ingestion file by its ID
+      parameters:
+      - description: File ID
+        in: path
+        name: fileId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.IngestionFile'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get ingestion file
+      tags:
+      - ingestion
+  /internal/ingestion/files/{fileId}/chunks:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of chunks for a specific ingestion file
+      parameters:
+      - description: File ID
+        in: path
+        name: fileId
+        required: true
+        type: string
+      - description: Chunk status
+        enum:
+        - pending
+        - processing
+        - completed
+        - failed
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ListChunksResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ingestion chunks
+      tags:
+      - ingestion
+  /internal/ingestion/files/{fileId}/errors:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of errors for a specific ingestion file
+      parameters:
+      - description: File ID
+        in: path
+        name: fileId
+        required: true
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ListErrorsResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ingestion errors for file
+      tags:
+      - ingestion
+  /internal/ingestion/files/{fileId}/stores:
+    get:
+      consumes:
+      - application/json
+      description: Returns store stats for a specific ingestion file
+      parameters:
+      - description: File ID
+        in: path
+        name: fileId
+        required: true
+        type: string
+      - default: 50
+        description: Number of items to return
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ListStoreStatsResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ingestion store stats (file)
+      tags:
+      - ingestion
   /internal/ingestion/runs:
     get:
       consumes:
@@ -808,6 +1100,52 @@ paths:
               type: string
             type: object
       summary: Rerun ingestion
+      tags:
+      - ingestion
+  /internal/ingestion/runs/{runId}/stores:
+    get:
+      consumes:
+      - application/json
+      description: Returns aggregated store stats for a specific ingestion run
+      parameters:
+      - description: Run ID
+        in: path
+        name: runId
+        required: true
+        type: string
+      - default: 50
+        description: Number of items to return
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ListStoreStatsResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ingestion store stats (run)
       tags:
       - ingestion
   /internal/ingestion/stats:

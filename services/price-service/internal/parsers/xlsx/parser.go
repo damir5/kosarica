@@ -17,7 +17,7 @@ import (
 
 // Parser is an XLSX parser implementation
 type Parser struct {
-	options XlsxParserOptions
+	options    XlsxParserOptions
 	altMapping *XlsxColumnMapping
 }
 

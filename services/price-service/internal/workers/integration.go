@@ -19,7 +19,7 @@ func StartIngestionWorker(ctx context.Context) error {
 	config := WorkerConfig{
 		WorkerID:  "ingestion-worker-1",
 		TaskTypes: []string{"ingestion", "rerun"},
-		MaxTasks: 5,
+		MaxTasks:  5,
 		PollDelay: 5 * time.Second,
 	}
 
@@ -81,7 +81,7 @@ func NewRerunHandler() func(context.Context, []byte) error {
 
 func CleanupOldRuns(ctx context.Context) error {
 	queue := taskqueue.New(nil)
-	count, err := 	queue.CleanupOldTasks(ctx, 7) // Keep 7 days
+	count, err := queue.CleanupOldTasks(ctx, 7) // Keep 7 days
 	if err != nil {
 		return fmt.Errorf("failed to cleanup old tasks: %w", err)
 	}

@@ -55,8 +55,8 @@ func TestPhase3PersistFunctionSignatures(t *testing.T) {
 // TestPhase3ValidateNormalizedRow verifies row validation still works
 func TestPhase3ValidateNormalizedRow(t *testing.T) {
 	tests := []struct {
-		name     string
-		row      types.NormalizedRow
+		name      string
+		row       types.NormalizedRow
 		wantValid bool
 	}{
 		{
@@ -99,6 +99,55 @@ func TestPhase3ValidateNormalizedRow(t *testing.T) {
 			if result.IsValid != tt.wantValid {
 				t.Errorf("validateNormalizedRow() IsValid = %v, want %v; errors: %v",
 					result.IsValid, tt.wantValid, result.Errors)
+			}
+		})
+	}
+}
+
+func TestPriceChangeRequiresReview(t *testing.T) {
+	tests := []struct {
+		name          string
+		previousPrice int32
+		currentPrice  int32
+		expected      bool
+	}{
+		{
+			name:          "increase greater than 50 percent",
+			previousPrice: 100,
+			currentPrice:  151,
+			expected:      true,
+		},
+		{
+			name:          "increase exactly 50 percent",
+			previousPrice: 100,
+			currentPrice:  150,
+			expected:      false,
+		},
+		{
+			name:          "decrease greater than 50 percent",
+			previousPrice: 200,
+			currentPrice:  90,
+			expected:      true,
+		},
+		{
+			name:          "decrease exactly 50 percent",
+			previousPrice: 200,
+			currentPrice:  100,
+			expected:      false,
+		},
+		{
+			name:          "no previous price",
+			previousPrice: 0,
+			currentPrice:  100,
+			expected:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := priceChangeRequiresReview(tt.previousPrice, tt.currentPrice)
+			if result != tt.expected {
+				t.Errorf("priceChangeRequiresReview(%d, %d) = %v, want %v", tt.previousPrice, tt.currentPrice, result, tt.expected)
 			}
 		})
 	}

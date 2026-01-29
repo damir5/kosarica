@@ -15,7 +15,8 @@ source_env
 
 case "${1:-unit}" in
   unit)
-    go test ./tests/unit/... ./internal/pkg/... ./internal/pricegroups/...
+    packages=$(go list ./... | grep -v "/tests/integration" | grep -v "/tests/e2e")
+    go test $packages
     ;;
   integration|int)
     go test ./tests/integration/...

@@ -82,6 +82,11 @@ func TestSwaggerInfoHasEndpoints(t *testing.T) {
 		"/internal/prices/{chainSlug}/{storeId}",
 		"/internal/items/search",
 		"/internal/ingestion/runs",
+		"/internal/ingestion/runs/{runId}/stores",
+		"/internal/ingestion/files/{fileId}",
+		"/internal/ingestion/files/{fileId}/chunks",
+		"/internal/ingestion/files/{fileId}/errors",
+		"/internal/ingestion/files/{fileId}/stores",
 		"/internal/ingestion/stats",
 		"/internal/basket/optimize/single",
 		"/internal/basket/optimize/multi",
@@ -110,6 +115,8 @@ func TestSwaggerInfoHasDefinitions(t *testing.T) {
 		"handlers.GetStorePricesResponse",
 		"handlers.SearchItemsResponse",
 		"handlers.ListRunsResponse",
+		"handlers.ListChunksResponse",
+		"handlers.ListStoreStatsResponse",
 		"handlers.OptimizeRequest",
 	}
 

@@ -38,6 +38,58 @@ SET status = 'failed',
     )::text
 WHERE id = $2;
 
+-- name: UpdateRunStatusSummary :exec
+UPDATE ingestion_runs
+SET status_reason = CASE
+        WHEN status_severity IS NULL THEN $1
+        WHEN CASE status_severity
+                WHEN 'critical' THEN 3
+                WHEN 'error' THEN 2
+                WHEN 'warning' THEN 1
+                ELSE 0
+             END
+             >= CASE $2
+                WHEN 'critical' THEN 3
+                WHEN 'error' THEN 2
+                WHEN 'warning' THEN 1
+                ELSE 0
+             END THEN status_reason
+        ELSE $1
+    END,
+    status_severity = CASE
+        WHEN status_severity IS NULL THEN $2
+        WHEN CASE status_severity
+                WHEN 'critical' THEN 3
+                WHEN 'error' THEN 2
+                WHEN 'warning' THEN 1
+                ELSE 0
+             END
+             >= CASE $2
+                WHEN 'critical' THEN 3
+                WHEN 'error' THEN 2
+                WHEN 'warning' THEN 1
+                ELSE 0
+             END THEN status_severity
+        ELSE $2
+    END,
+    status_type = CASE
+        WHEN status_severity IS NULL THEN $3
+        WHEN CASE status_severity
+                WHEN 'critical' THEN 3
+                WHEN 'error' THEN 2
+                WHEN 'warning' THEN 1
+                ELSE 0
+             END
+             >= CASE $2
+                WHEN 'critical' THEN 3
+                WHEN 'error' THEN 2
+                WHEN 'warning' THEN 1
+                ELSE 0
+             END THEN status_type
+        ELSE $3
+    END
+WHERE id = $4;
+
 -- name: IncrementRunProcessedFiles :exec
 UPDATE ingestion_runs
 SET processed_files = COALESCE(processed_files, 0) + 1
@@ -46,6 +98,11 @@ WHERE id = $1;
 -- name: IncrementRunProcessedEntries :exec
 UPDATE ingestion_runs
 SET processed_entries = COALESCE(processed_entries, 0) + $1
+WHERE id = $2;
+
+-- name: IncrementRunErrorCount :exec
+UPDATE ingestion_runs
+SET error_count = COALESCE(error_count, 0) + $1
 WHERE id = $2;
 
 -- name: GetRunProgressInfo :one
