@@ -63,3 +63,9 @@ go.work.sum
 # Sisyphus work session tracking
 .sisyphus/
 log/
+
+# Backup files (editors, git merge conflicts, etc.)
+*.bak
+*.bak2
+*.orig
+*~
