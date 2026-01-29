@@ -330,91 +330,173 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		return 0, 0, nil, fmt.Errorf("failed to assign store to group: %w", err)
 	}
 
-	// Step 6: Update store_item_state for price change tracking
-	// Use a single acquired connection to avoid pool contention in tight loops.
+	// Step 6: Batch update store_item_state for price change tracking
+	// Use batch operations to reduce database round trips from N to 2.
 
+	// Batch fetch previous prices for all items in this store
+	previousPrices, err := queries.GetStorePreviousPricesBatch(ctx, sqlcgen.GetStorePreviousPricesBatchParams{
+		StoreID: storeID,
+		Column2: itemIDs,
+	})
+	if err != nil && err != pgx.ErrNoRows {
+		log.Warn().Err(err).Msg("Failed to fetch previous prices batch")
+	}
+
+	// Build map for quick lookup
+	previousPriceMap := make(map[string]int32)
+	for _, pp := range previousPrices {
+		if pp.CurrentPrice.Valid {
+			previousPriceMap[pp.RetailerItemID] = pp.CurrentPrice.Int32
+		}
+	}
+
+	// Prepare batch upsert arrays
+	batchStoreIDs := make([]string, 0, len(itemIDs))
+	batchRetailerItemIDs := make([]string, 0, len(itemIDs))
+	batchCurrentPrices := make([]int32, 0, len(itemIDs))
+	batchPreviousPrices := make([]int32, 0, len(itemIDs))
+	batchDiscountPrices := make([]int32, 0, len(itemIDs))
+	batchDiscountStarts := make([]pgtype.Timestamptz, 0, len(itemIDs))
+	batchDiscountEnds := make([]pgtype.Timestamptz, 0, len(itemIDs))
+	batchUnitPrices := make([]int32, 0, len(itemIDs))
+	batchUnitPriceBaseQuantities := make([]string, 0, len(itemIDs))
+	batchUnitPriceBaseUnits := make([]string, 0, len(itemIDs))
+	batchLowestPrice30s := make([]int32, 0, len(itemIDs))
+	batchAnchorPrices := make([]int32, 0, len(itemIDs))
+	batchAnchorPriceAsOfs := make([]pgtype.Timestamptz, 0, len(itemIDs))
+	batchPriceSignatures := make([]string, 0, len(itemIDs))
+
+	// Items to skip due to price change review
+	itemsToSkip := make(map[string]bool)
+
+	// First pass: validate price changes and build arrays for batch upsert
 	for _, itemID := range itemIDs {
 		row := itemData[itemID]
 
-		previousPrice, err := queries.GetStorePreviousPrice(ctx, sqlcgen.GetStorePreviousPriceParams{
-			StoreID:        storeID,
-			RetailerItemID: itemID,
-		})
-		if err != nil && err != pgx.ErrNoRows {
-			log.Warn().Err(err).Str("retailer_item_id", itemID).Msg("Failed to fetch previous price")
-		}
-		if err == nil && previousPrice.Valid && priceChangeRequiresReview(previousPrice.Int32, int32(row.Price)) {
-			validation := types.NormalizedRowValidation{
-				IsValid: false,
-				Errors: []string{
-					fmt.Sprintf("Price change exceeds %d%% threshold", priceChangeReviewThresholdPercent),
-				},
+		// Check for price changes requiring review
+		if previousPrice, ok := previousPriceMap[itemID]; ok {
+			if priceChangeRequiresReview(previousPrice, int32(row.Price)) {
+				validation := types.NormalizedRowValidation{
+					IsValid: false,
+					Errors: []string{
+						fmt.Sprintf("Price change exceeds %d%% threshold", priceChangeReviewThresholdPercent),
+					},
+				}
+				if err := saveFailedRowWithQueries(ctx, queries, chainID, runID, fileID, row, validation); err != nil {
+					log.Error().Err(err).Int("row_number", row.RowNumber).Msg("Failed to save review-required row")
+				}
+				failedRows++
+				itemsToSkip[itemID] = true
+				continue
 			}
-			if err := saveFailedRowWithQueries(ctx, queries, chainID, runID, fileID, row, validation); err != nil {
-				log.Error().Err(err).Int("row_number", row.RowNumber).Msg("Failed to save review-required row")
-			}
-			failedRows++
-			continue
 		}
 
-		// Upsert store item state (for tracking price history)
+		// Compute price signature
 		priceSignature := computePriceSignature(row)
 
-		// Build params for UpsertStoreItemState
-		upsertParams := sqlcgen.UpsertStoreItemStateParams{
-			StoreID:        storeID,
-			RetailerItemID: itemID,
-			CurrentPrice:   pgtype.Int4{Int32: int32(row.Price), Valid: true},
-			PreviousPrice:  pgtype.Int4{Valid: false},
-			PriceSignature: pgtype.Text{String: priceSignature, Valid: true},
-		}
+		// Build arrays for batch upsert
+		batchStoreIDs = append(batchStoreIDs, storeID)
+		batchRetailerItemIDs = append(batchRetailerItemIDs, itemID)
+		batchCurrentPrices = append(batchCurrentPrices, int32(row.Price))
 
-		// Set optional fields
+		// Previous price is not set on insert (will be set by ON CONFLICT)
+		batchPreviousPrices = append(batchPreviousPrices, 0)
+
+		// Optional fields
 		if row.DiscountPrice != nil {
-			upsertParams.DiscountPrice = pgtype.Int4{Int32: int32(*row.DiscountPrice), Valid: true}
-		}
-		if row.DiscountStart != nil {
-			upsertParams.DiscountStart = pgtype.Timestamp{Time: *row.DiscountStart, Valid: true}
-		}
-		if row.DiscountEnd != nil {
-			upsertParams.DiscountEnd = pgtype.Timestamp{Time: *row.DiscountEnd, Valid: true}
-		}
-		if row.UnitPrice != nil {
-			upsertParams.UnitPrice = pgtype.Int4{Int32: int32(*row.UnitPrice), Valid: true}
-		}
-		if row.UnitPriceBaseQuantity != nil {
-			upsertParams.UnitPriceBaseQuantity = pgtype.Text{String: *row.UnitPriceBaseQuantity, Valid: true}
-		}
-		if row.UnitPriceBaseUnit != nil {
-			upsertParams.UnitPriceBaseUnit = pgtype.Text{String: *row.UnitPriceBaseUnit, Valid: true}
-		}
-		if row.LowestPrice30d != nil {
-			upsertParams.LowestPrice30d = pgtype.Int4{Int32: int32(*row.LowestPrice30d), Valid: true}
-		}
-		if row.AnchorPrice != nil {
-			upsertParams.AnchorPrice = pgtype.Int4{Int32: int32(*row.AnchorPrice), Valid: true}
-		}
-		if row.AnchorPriceAsOf != nil {
-			upsertParams.AnchorPriceAsOf = pgtype.Timestamp{Time: *row.AnchorPriceAsOf, Valid: true}
+			batchDiscountPrices = append(batchDiscountPrices, int32(*row.DiscountPrice))
+		} else {
+			batchDiscountPrices = append(batchDiscountPrices, 0)
 		}
 
-		upsertResult, err := queries.UpsertStoreItemState(ctx, upsertParams)
+		if row.DiscountStart != nil {
+			batchDiscountStarts = append(batchDiscountStarts, pgtype.Timestamptz{Time: *row.DiscountStart, Valid: true})
+		} else {
+			batchDiscountStarts = append(batchDiscountStarts, pgtype.Timestamptz{Valid: false})
+		}
+
+		if row.DiscountEnd != nil {
+			batchDiscountEnds = append(batchDiscountEnds, pgtype.Timestamptz{Time: *row.DiscountEnd, Valid: true})
+		} else {
+			batchDiscountEnds = append(batchDiscountEnds, pgtype.Timestamptz{Valid: false})
+		}
+
+		if row.UnitPrice != nil {
+			batchUnitPrices = append(batchUnitPrices, int32(*row.UnitPrice))
+		} else {
+			batchUnitPrices = append(batchUnitPrices, 0)
+		}
+
+		if row.UnitPriceBaseQuantity != nil {
+			batchUnitPriceBaseQuantities = append(batchUnitPriceBaseQuantities, *row.UnitPriceBaseQuantity)
+		} else {
+			batchUnitPriceBaseQuantities = append(batchUnitPriceBaseQuantities, "")
+		}
+
+		if row.UnitPriceBaseUnit != nil {
+			batchUnitPriceBaseUnits = append(batchUnitPriceBaseUnits, *row.UnitPriceBaseUnit)
+		} else {
+			batchUnitPriceBaseUnits = append(batchUnitPriceBaseUnits, "")
+		}
+
+		if row.LowestPrice30d != nil {
+			batchLowestPrice30s = append(batchLowestPrice30s, int32(*row.LowestPrice30d))
+		} else {
+			batchLowestPrice30s = append(batchLowestPrice30s, 0)
+		}
+
+		if row.AnchorPrice != nil {
+			batchAnchorPrices = append(batchAnchorPrices, int32(*row.AnchorPrice))
+		} else {
+			batchAnchorPrices = append(batchAnchorPrices, 0)
+		}
+
+		if row.AnchorPriceAsOf != nil {
+			batchAnchorPriceAsOfs = append(batchAnchorPriceAsOfs, pgtype.Timestamptz{Time: *row.AnchorPriceAsOf, Valid: true})
+		} else {
+			batchAnchorPriceAsOfs = append(batchAnchorPriceAsOfs, pgtype.Timestamptz{Valid: false})
+		}
+
+		batchPriceSignatures = append(batchPriceSignatures, priceSignature)
+	}
+
+	// Execute batch upsert
+	if len(batchStoreIDs) > 0 {
+		err = queries.BatchUpsertStoreItemState(ctx, sqlcgen.BatchUpsertStoreItemStateParams{
+			Column1:  batchStoreIDs,
+			Column2:  batchRetailerItemIDs,
+			Column3:  batchCurrentPrices,
+			Column4:  batchPreviousPrices,
+			Column5:  batchDiscountPrices,
+			Column6:  batchDiscountStarts,
+			Column7:  batchDiscountEnds,
+			Column8:  true, // in_stock
+			Column9:  batchUnitPrices,
+			Column10: batchUnitPriceBaseQuantities,
+			Column11: batchUnitPriceBaseUnits,
+			Column12: batchLowestPrice30s,
+			Column13: batchAnchorPrices,
+			Column14: batchAnchorPriceAsOfs,
+			Column15: batchPriceSignatures,
+		})
 		if err != nil {
-			log.Warn().Err(err).Str("retailer_item_id", itemID).Msg("Failed to upsert store item state for item")
-			failedRows++
+			log.Warn().Err(err).Msg("Failed to batch upsert store item state")
+		}
+	}
+
+	// Count persisted items and price changes
+	for _, itemID := range itemIDs {
+		if itemsToSkip[itemID] {
 			continue
 		}
-
-		priceChanged := upsertResult.PreviousPrice.Valid &&
-			upsertResult.CurrentPrice.Valid &&
-			upsertResult.PreviousPrice.Int32 != upsertResult.CurrentPrice.Int32
-
-		// Note: Barcodes are now inserted in findOrCreateRetailerItem (Phase 3 fix)
-		// No duplicate barcode insertion loop needed here
-
+		row := itemData[itemID]
 		persisted++
-		if priceChanged {
-			priceChanges++
+
+		// Check if price changed
+		if previousPrice, ok := previousPriceMap[itemID]; ok {
+			if previousPrice != int32(row.Price) {
+				priceChanges++
+			}
 		}
 	}
 

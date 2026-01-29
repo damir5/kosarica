@@ -35,7 +35,6 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 	log.Info().Str("filename", file.Filename).Msg("Parsing file")
 
 	var parseResult *types.ParseResult
-	var err error
 
 	if fetchResult.IsZip || file.Type == types.FileTypeZIP {
 		expanded, expandErr := expandZipFiles(ctx, adapter, fetchResult.Content, file.Filename)
