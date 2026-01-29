@@ -84,11 +84,6 @@ export const dailyIngestionHandler: CronJobHandler = {
 				});
 
 				successful++;
-
-				// Add 1 second delay between chains to avoid overwhelming the service
-				if (chain !== chains[chains.length - 1]) {
-					await new Promise((resolve) => setTimeout(resolve, 1000));
-				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				log.error(`Failed to trigger ingestion for ${chain}`, {
