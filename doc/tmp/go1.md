@@ -672,7 +672,6 @@ Complete documentation and deployment configuration.
 | `docs/ARCHITECTURE.md` | Architecture decisions |
 | `docs/CHAIN_ADAPTERS.md` | Chain adapter guide |
 | `deployment/Dockerfile` | Multi-stage build |
-| `deployment/docker-compose.yml` | Docker service definition |
 | `config.example.yaml` | Example configuration |
 
 ### Verification Steps
@@ -680,10 +679,8 @@ Complete documentation and deployment configuration.
 # Build Docker image
 docker build -t price-service:latest -f deployment/Dockerfile .
 
-# Test with docker-compose
-docker-compose -f deployment/docker-compose.yml up -d
-
 # Verify service
+docker run -p 3003:3003 price-service:latest
 curl http://localhost:3003/health
 ```
 

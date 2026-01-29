@@ -61,10 +61,20 @@ The Go price-service reads the database schema but NEVER manages migrations. All
 3. Review generated SQL in `drizzle/`
 4. Apply migration: `pnpm db:migrate`
 
+### Common command sequence (schema + Go/API updates)
+
+When a change touches DB schema, Go sqlc, Swagger, and the TS SDK, run these in order:
+
+- `mise exec node@24 -- pnpm db:generate`
+- `mise exec node@24 -- pnpm db:migrate`
+- `mise run sqlc-generate`
+- `mise run swag`
+- `mise exec node@24 -- pnpm generate:go-api`
+- `mise exec go@latest -- gofmt -w <paths>`
+
 ### Rules
 
 - Never create migrations in Go services or other locations
-- Never use Docker init scripts (`/docker-entrypoint-initdb.d`) for schema
 - Seed data (like chains) should be included in migrations with `ON CONFLICT DO NOTHING`
 - Schema source of truth: `src/db/schema.ts`
 - Migrations output: `drizzle/`

@@ -14,7 +14,7 @@ Kosarica is deployed to a single Hetzner VPS using **Docker-first deployment** w
 | Component | Tool | Purpose |
 |-----------|------|---------|
 | **Deployment** | Kamal | Zero-downtime deployments via Docker |
-| **Orchestration** | Docker Compose | Local development and testing |
+| **Development** | Native Go/mise | Local development and testing |
 | **Observability** | OpenObserve | Single UI for logs, metrics, traces |
 | **Telemetry** | OpenTelemetry Collector | Unified telemetry collection |
 | **Containers** | Ubuntu 24.04 | Base image for all services |
@@ -72,9 +72,6 @@ sudo apt update && sudo apt upgrade -y
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 sudo usermod -aG docker $USER
-
-# Install Docker Compose
-sudo apt install docker-compose-plugin -y
 
 # Install Kamal
 npm install -g kamal
@@ -156,20 +153,7 @@ LOG_LEVEL=info
 
 ## Deployment (Code Updates)
 
-### Option A: Docker Compose (for initial setup/testing)
-
-```bash
-# Build and start all services
-docker compose -f docker-compose.production.yml up -d
-
-# View logs
-docker compose -f docker-compose.production.yml logs -f
-
-# Stop services
-docker compose -f docker-compose.production.yml down
-```
-
-### Option B: Kamal (for production deployments)
+### Kamal (for production deployments)
 
 ```bash
 # Initial setup
@@ -225,12 +209,12 @@ Default credentials:
 ### Viewing Logs
 
 ```bash
-# Via Docker Compose
-docker compose -f docker-compose.production.yml logs -f nodejs
-docker compose -f docker-compose.production.yml logs -f price-service
-
 # Via Kamal
 kamal app logs
+
+# Via Docker (for direct container access)
+docker logs -f kosarica-nodejs
+docker logs -f kosarica-price-service
 
 # Via OpenObserve UI
 # Stream: kosarica-logs
@@ -360,8 +344,13 @@ docker exec -it kosarica-postgres psql -U kosarica kosarica
 # Pull new image
 docker pull ghcr.io/<username>/kosarica/nodejs:latest
 
-# Recreate container with new image
-docker compose -f docker-compose.production.yml up -d --force-recreate nodejs
+# Recreate container with new image (via Kamal)
+kamal deploy
+
+# Or manually restart the container
+docker stop kosarica-nodejs
+docker rm kosarica-nodejs
+# Kamal will recreate with new image
 ```
 
 ## Scaling Considerations

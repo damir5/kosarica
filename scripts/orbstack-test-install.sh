@@ -60,7 +60,7 @@ if ! command -v docker &> /dev/null; then
 
     # Install Docker
     sudo apt-get update -y
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 
     # Enable and start Docker
     sudo systemctl enable docker
@@ -137,11 +137,6 @@ if [ ! -f "$REPO_PATH/package.json" ]; then
     exit 1
 fi
 
-if [ ! -f "$REPO_PATH/docker-compose.yml" ]; then
-    log_error "docker-compose.yml not found in $REPO_PATH"
-    exit 1
-fi
-
 log_info "Repository verified"
 
 #############################################
@@ -201,15 +196,18 @@ log_warn "  INTERNAL_API_KEY: ${INTERNAL_API_KEY:0:8}..."
 log_warn "  DB_PASSWORD: ${DB_PASSWORD:0:8}..."
 
 #############################################
-# 7. Start Docker Services
+# 7. Start PostgreSQL Service
 #############################################
-log_step "Step 7/10: Starting Docker services..."
+log_step "Step 7/10: Starting PostgreSQL service..."
 
-# Stop any existing containers
-$DOCKER_CMD compose down -v 2>/dev/null || true
-
-# Start services
-$DOCKER_CMD compose up -d
+# Start PostgreSQL container
+$DOCKER_CMD run -d \
+    --name kosarica-postgres-dev \
+    -e POSTGRES_USER=kosarica \
+    -e POSTGRES_PASSWORD=${DB_PASSWORD} \
+    -e POSTGRES_DB=kosarica \
+    -p 5432:5432 \
+    postgres:16
 
 log_info "Waiting for PostgreSQL to be healthy..."
 
@@ -232,9 +230,9 @@ if [ $WAIT_TIME -ge $MAX_WAIT ]; then
     exit 1
 fi
 
-# Check containers are running
+# Check container is running
 log_info "Checking container status..."
-$DOCKER_CMD compose ps
+$DOCKER_CMD ps | grep kosarica-postgres-dev
 
 #############################################
 # 8. Install Dependencies
@@ -286,15 +284,16 @@ log_info "Installation completed successfully!"
 log_info "============================================"
 echo ""
 log_info "Access URLs:"
-echo "  - Go Price Service:  http://localhost:8080"
-echo "  - Node.js App:       http://localhost:3000 (requires 'pnpm dev')"
 echo "  - PostgreSQL:        localhost:5432"
+echo "  - Node.js App:       http://localhost:3000 (requires 'pnpm dev')"
+echo ""
+log_info "Go Price Service (run natively for development):"
+echo "  cd services/price-service && go run ./cmd/server/main.go"
 echo ""
 log_info "Useful commands:"
-echo "  - View logs:         docker compose logs -f"
-echo "  - Stop services:     docker compose down"
-echo "  - Restart services:  docker compose restart"
-echo "  - Start dev server:  pnpm dev"
+echo "  - View PostgreSQL logs: docker logs -f kosarica-postgres-dev"
+echo "  - Stop PostgreSQL:       docker stop kosarica-postgres-dev"
+echo "  - Start dev server:      pnpm dev"
 echo ""
 log_info "To start the Node.js development server:"
 echo "  pnpm dev"

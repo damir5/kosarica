@@ -43,19 +43,7 @@ pnpm test:unit
 
 #### Full Suite with Go Service
 
-**Option A: Using Docker Compose (Recommended)**
-```bash
-# Start all services
-docker compose -f docker-compose-test.yml up -d
-
-# Run full test suite
-pnpm test
-
-# Stop services when done
-docker compose -f docker-compose-test.yml down
-```
-
-**Option B: Using Native Development**
+**Using Native Development**
 ```bash
 # Start Go service
 cd services/price-service
@@ -72,8 +60,8 @@ kill $(pgrep -f price-service)
 ### Stopping Services
 
 ```bash
-# Stop Go service if running
-pnpm dev:stop
+# Stop Go service (running natively)
+kill $(pgrep -f price-service)
 ```
 
 ### Checking Service Status
@@ -89,7 +77,7 @@ curl http://localhost:8080/internal/health
 docker ps | grep postgres
 
 # See logs
-docker compose logs price-service
+docker logs kosarica-postgres-dev
 ```
 
 ## Environment Variables
@@ -106,10 +94,6 @@ docker compose logs price-service
 | `pnpm test` | Run all backend tests (63 tests) |
 | `pnpm test:unit` | Run only unit tests (40 tests) |
 | `pnpm test:integration` | Run full suite with Go service (63 tests) |
-| `pnpm dev:start` | Start all services (postgres + Go) |
-| `pnpm dev:stop` | Stop all services |
-| `pnpm dev:start-services` | Start services with test profile |
-| `pnpm dev:stop-services` | Stop services with test profile |
 
 ## Test Results
 
@@ -137,17 +121,15 @@ docker compose logs price-service
 
 **Solutions:**
 
-1. **Check Docker Compose profile:**
+1. **Check if Go service is running:**
    ```bash
-   docker compose ls
+   ps aux | grep price-service
    ```
-   Verify price-service is in the profile
 
-2. **Check Go service logs:**
+2. **Check Go service logs:** (if running via mise)
    ```bash
-   docker compose logs price-service
+   # Check the terminal where the service is running for any errors
    ```
-   Look for startup errors
 
 3. **Verify health endpoint:**
    ```bash
@@ -156,17 +138,11 @@ docker compose logs price-service
    ```
    Both should return 200 OK
 
-4. **Check internal API key:**
+4. **Start Go service natively:**
    ```bash
-   docker compose exec price-service env | grep INTERNAL_API_KEY
+   cd services/price-service
+   go run ./cmd/server/main.go
    ```
-   Must match between Go service and test setup
-
-5. **Network connectivity:**
-   ```bash
-   docker network inspect kosarica-dev
-   ```
-   Verify Node app can reach Go service container
 
 ### Tests Failing with Database Errors
 
@@ -196,26 +172,15 @@ docker compose logs price-service
 - Development database: `kosarica` on port 5432
 - Never mix them!
 
-### Running Tests in Docker Compose
-
-For a self-contained test environment:
-
-```bash
-# Use test-specific compose file
-docker compose -f docker-compose-test.yml up -d
-
-# Run tests
-docker exec -it kosarica-test pnpm test
-```
-
 ## Best Practices
 
 ### 1. Development Workflow
 ```bash
-# 1. Start Go service (if needed)
-pnpm dev:start-services
+# 1. Start Go service (in separate terminal, if needed)
+cd services/price-service
+go run ./cmd/server/main.go
 
-# 2. Run full test suite
+# 2. Run full test suite (in another terminal)
 pnpm test
 
 # 3. Make changes
@@ -223,9 +188,6 @@ pnpm test
 
 # 4. Re-run tests (fast!)
 pnpm test:unit
-
-# 5. Stop services when done
-pnpm dev:stop-services
 ```
 
 ### 2. CI/CD Workflow
