@@ -48,7 +48,8 @@ run = "pg_dump --schema-only --no-owner --no-privileges $DATABASE_URL > src/db/t
 
 [tasks.sqlc-generate]
 description = "Generate sqlc Go code from queries"
-run = "cd services/price-service && sqlc generate"
+dir = "services/price-service"
+run = "go run github.com/sqlc-dev/sqlc/cmd/sqlc@latest generate"
 
 [tasks.swag]
 description = "Generate OpenAPI spec from Go annotations"
@@ -62,3 +63,12 @@ run = "pnpm generate:go-api"
 [tasks.gofmt]
 description = "Format Go code (price-service)"
 run = "if [ -n \"{{args}}\" ]; then gofmt -w {{args}}; else find services/price-service -name '*.go' -print0 | xargs -0 gofmt -w; fi"
+
+[tasks.generate-all]
+description = "Regenerate all codegen: JSONB types, sqlc, OpenAPI, and TypeScript SDK"
+depends = ["generate-jsonb", "sqlc-generate", "swag", "generate-go-api"]
+run = "echo '==> All codegen complete!'"
+
+[tasks.generate-jsonb]
+description = "Generate JSONB types (Zod -> JSON Schema -> Go)"
+run = "pnpm generate:jsonb"
