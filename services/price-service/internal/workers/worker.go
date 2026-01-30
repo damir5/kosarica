@@ -2,12 +2,12 @@ package workers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
+	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/taskqueue"
 )
 
@@ -22,7 +22,7 @@ type WorkerConfig struct {
 type Worker struct {
 	queue    *taskqueue.TaskQueue
 	config   WorkerConfig
-	handlers map[string]func(context.Context, []byte) error
+	handlers map[string]func(context.Context, jsonb.TaskQueuePayload) error
 	stopChan chan struct{}
 	running  chan struct{}
 	wg       sync.WaitGroup
@@ -32,13 +32,13 @@ func New(queue *taskqueue.TaskQueue, config WorkerConfig) *Worker {
 	return &Worker{
 		queue:    queue,
 		config:   config,
-		handlers: make(map[string]func(context.Context, []byte) error),
+		handlers: make(map[string]func(context.Context, jsonb.TaskQueuePayload) error),
 		stopChan: make(chan struct{}),
 		running:  make(chan struct{}),
 	}
 }
 
-func (w *Worker) RegisterHandler(taskType string, handler func(context.Context, []byte) error) {
+func (w *Worker) RegisterHandler(taskType string, handler func(context.Context, jsonb.TaskQueuePayload) error) {
 	w.handlers[taskType] = handler
 }
 
@@ -156,13 +156,6 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 		return
 	}
 
-	var payloadJSON interface{}
-	if err := json.Unmarshal(task.Payload, &payloadJSON); err != nil {
-		log.Error().Err(err).Msg("Failed to unmarshal payload")
-		w.queue.FailTask(ctx, task.ID, fmt.Sprintf("Payload parse error: %v", err), false)
-		return
-	}
-
 	handlerErr := handler(ctx, task.Payload)
 	if handlerErr != nil {
 		w.queue.FailTask(ctx, task.ID, handlerErr.Error(), true)
@@ -173,7 +166,7 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 		return
 	}
 
-	completeErr := w.queue.CompleteTask(ctx, task.ID, payloadJSON)
+	completeErr := w.queue.CompleteTask(ctx, task.ID, task.Payload)
 	if completeErr != nil {
 		log.Error().Err(completeErr).Msg("Failed to mark task as completed")
 		return

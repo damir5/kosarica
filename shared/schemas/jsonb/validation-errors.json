@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "field": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "value": {}
+    },
+    "required": [
+      "message"
+    ],
+    "additionalProperties": false
+  },
+  "title": "ValidationErrors"
+}

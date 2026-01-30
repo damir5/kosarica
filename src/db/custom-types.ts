@@ -1,5 +1,30 @@
-import { text } from "drizzle-orm/pg-core";
+import { customType, text } from "drizzle-orm/pg-core";
 import { generatePrefixedId } from "@/utils/id";
+import type { z } from "zod";
+
+/**
+ * Creates a typed JSONB column with runtime validation.
+ * The Zod schema serves as the single source of truth for the type.
+ *
+ * @param schema - Zod schema for validation
+ * @param name - Column name in the database
+ * @returns A Drizzle custom type with typed input/output
+ */
+export function typedJsonb<T extends z.ZodType>(schema: T, name: string) {
+	type Data = z.infer<T>;
+	return customType<{ data: Data; driverData: string }>({
+		dataType() {
+			return "jsonb";
+		},
+		toDriver(value: Data): string {
+			return JSON.stringify(value);
+		},
+		fromDriver(value: unknown): Data {
+			const parsed = typeof value === "string" ? JSON.parse(value) : value;
+			return schema.parse(parsed);
+		},
+	})(name);
+}
 
 /**
  * Options for cuid2 column type.

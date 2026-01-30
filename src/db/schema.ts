@@ -6,7 +6,6 @@ import {
 	boolean,
 	index,
 	integer,
-	jsonb,
 	pgTable,
 	serial,
 	smallint,
@@ -14,7 +13,14 @@ import {
 	timestamp,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { cuid2 } from "./custom-types";
+import { cuid2, typedJsonb } from "./custom-types";
+import {
+	archiveMetadata,
+	cronJobPayload,
+	cronRunMetadata,
+	taskQueuePayload,
+	validationErrors,
+} from "./jsonb-schemas";
 
 export const todos = pgTable("todos", {
 	id: serial().primaryKey(),
@@ -383,7 +389,7 @@ export const archives = pgTable(
 		isCompressed: boolean("is_compressed").default(false),
 		checksum: text("checksum").notNull(),
 		downloadedAt: timestamp("downloaded_at", { withTimezone: true }).notNull(),
-		metadata: jsonb("metadata").default({}),
+		metadata: typedJsonb(archiveMetadata, "metadata").default({}),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
@@ -577,7 +583,7 @@ export const retailerItemsFailed = pgTable("retailer_items_failed", {
 	storeIdentifier: text("store_identifier"),
 	rowNumber: integer("row_number"),
 	rawData: text("raw_data").notNull(), // Full CSV row data for analysis
-	validationErrors: jsonb("validation_errors").notNull(), // JSON array of error messages
+	validationErrors: typedJsonb(validationErrors, "validation_errors").notNull(),
 	failedAt: timestamp("failed_at").defaultNow(),
 	reviewed: boolean("reviewed").default(false),
 	reviewedBy: text("reviewed_by"),
@@ -891,7 +897,7 @@ export const cronJobs = pgTable(
 		cronExpression: text("cron_expression").notNull(), // e.g., "0 6 * * *"
 		timezone: text("timezone").default("UTC"),
 		taskType: text("task_type").notNull(), // e.g., "ingestion"
-		taskPayload: jsonb("task_payload"), // optional JSON payload for the task
+		taskPayload: typedJsonb(cronJobPayload, "task_payload"), // optional JSON payload for the task
 		enabled: boolean("enabled").default(true),
 		nextRunAt: timestamp("next_run_at", { withTimezone: true }),
 		lastRunAt: timestamp("last_run_at", { withTimezone: true }),
@@ -923,7 +929,7 @@ export const cronRuns = pgTable(
 		errorMessage: text("error_message"),
 		errorDetails: text("error_details"), // JSON with stack trace, context
 		tasksEnqueued: integer("tasks_enqueued").default(0),
-		metadata: jsonb("metadata"), // Additional run info
+		metadata: typedJsonb(cronRunMetadata, "metadata"), // Additional run info
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 	},
 	(table) => ({
@@ -950,7 +956,7 @@ export const taskQueue = pgTable(
 	{
 		id: text("id").primaryKey().default(sql`gen_random_uuid()::TEXT`),
 		taskType: text("task_type").notNull(),
-		payload: jsonb("payload").notNull(),
+		payload: typedJsonb(taskQueuePayload, "payload").notNull(),
 		priority: integer("priority").default(0),
 		status: text("status").notNull().default("pending"),
 		scheduledFor: timestamp("scheduled_for").default(sql`NOW()`),

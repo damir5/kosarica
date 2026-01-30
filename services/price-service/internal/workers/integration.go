@@ -2,11 +2,11 @@ package workers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/taskqueue"
 	"github.com/rs/zerolog"
@@ -33,17 +33,13 @@ func StartIngestionWorker(ctx context.Context) error {
 	return nil
 }
 
-func NewIngestionHandler() func(context.Context, []byte) error {
-	return func(ctx context.Context, payload []byte) error {
-		var req struct {
-			RunID string `json:"runId"`
+func NewIngestionHandler() func(context.Context, jsonb.TaskQueuePayload) error {
+	return func(ctx context.Context, payload jsonb.TaskQueuePayload) error {
+		if !payload.IsIngestion() {
+			return fmt.Errorf("expected ingestion payload, got type: %s", payload.Type)
 		}
 
-		if err := json.Unmarshal(payload, &req); err != nil {
-			return fmt.Errorf("failed to unmarshal ingestion payload: %w", err)
-		}
-
-		result, err := pipeline.Run(ctx, "konzum", "", "")
+		result, err := pipeline.Run(ctx, payload.ChainSlug, "", "")
 		if err != nil {
 			return err
 		}
@@ -56,17 +52,19 @@ func NewIngestionHandler() func(context.Context, []byte) error {
 	}
 }
 
-func NewRerunHandler() func(context.Context, []byte) error {
-	return func(ctx context.Context, payload []byte) error {
-		var req struct {
-			RunID string `json:"runId"`
+func NewRerunHandler() func(context.Context, jsonb.TaskQueuePayload) error {
+	return func(ctx context.Context, payload jsonb.TaskQueuePayload) error {
+		if !payload.IsRerun() {
+			return fmt.Errorf("expected rerun payload, got type: %s", payload.Type)
 		}
 
-		if err := json.Unmarshal(payload, &req); err != nil {
-			return fmt.Errorf("failed to unmarshal rerun payload: %w", err)
+		// Use the typed fields directly
+		originalRunID := ""
+		if payload.OriginalRunID != nil {
+			originalRunID = *payload.OriginalRunID
 		}
 
-		result, err := pipeline.Run(ctx, "konzum", "", "")
+		result, err := pipeline.Run(ctx, "konzum", originalRunID, "")
 		if err != nil {
 			return err
 		}

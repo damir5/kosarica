@@ -20,7 +20,11 @@
     "test:integration": "vitest run --run",
     "test:unit": "vitest run --run src/orpc/router/__tests__/stores*.test.ts src/db/queries/*.test.ts",
     "test:price-service": "vitest run --run src/orpc/router/__tests__/price-service.integration.test.ts",
-    "generate:go-api": "openapi-ts"
+    "generate:go-api": "openapi-ts",
+    "generate:json-schemas": "tsx scripts/generate-jsonb-types.ts",
+    "generate:go-jsonb": "cd services/price-service && go-jsonschema -p jsonb ../../shared/schemas/jsonb/*.json -o internal/jsonb/types.generated.go",
+    "generate:jsonb": "pnpm generate:json-schemas && pnpm generate:go-jsonb",
+    "validate:schema": "tsx scripts/validate-schema.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.4.13",

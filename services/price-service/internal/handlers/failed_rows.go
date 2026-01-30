@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -119,10 +118,10 @@ func GetFailedRows(c *gin.Context) {
 			row.ReprocessedAt = &s
 		}
 
-		// Parse validation errors from JSON
-		var validationErrors []string
-		if len(data.ValidationErrors) > 0 {
-			_ = json.Unmarshal(data.ValidationErrors, &validationErrors)
+		// Extract error messages from typed validation errors
+		validationErrors := make([]string, len(data.ValidationErrors))
+		for i, ve := range data.ValidationErrors {
+			validationErrors[i] = ve.Message
 		}
 		row.ValidationErrors = validationErrors
 

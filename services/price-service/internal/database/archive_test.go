@@ -144,38 +144,6 @@ func TestArchiveUseSqlc(t *testing.T) {
 		}
 	})
 
-	t.Run("stringPtrToBytes handles nil", func(t *testing.T) {
-		result := stringPtrToBytes(nil)
-		if result != nil {
-			t.Errorf("Expected nil, got %v", result)
-		}
-	})
-
-	t.Run("stringPtrToBytes handles value", func(t *testing.T) {
-		val := "test data"
-		result := stringPtrToBytes(&val)
-		if string(result) != "test data" {
-			t.Errorf("Expected 'test data', got '%s'", string(result))
-		}
-	})
-
-	t.Run("bytesToStringPtr handles nil", func(t *testing.T) {
-		result := bytesToStringPtr(nil)
-		if result != nil {
-			t.Errorf("Expected nil, got %v", result)
-		}
-	})
-
-	t.Run("bytesToStringPtr handles value", func(t *testing.T) {
-		result := bytesToStringPtr([]byte("hello bytes"))
-		if result == nil {
-			t.Error("Expected non-nil")
-		}
-		if *result != "hello bytes" {
-			t.Errorf("Expected 'hello bytes', got '%s'", *result)
-		}
-	})
-
 	t.Run("Archive type has expected fields", func(t *testing.T) {
 		a := Archive{}
 		aType := reflect.TypeOf(a)

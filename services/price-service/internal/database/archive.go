@@ -9,27 +9,28 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
+	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 )
 
 // Archive represents a stored archive file
 type Archive struct {
-	ID             string    `json:"id"`              // arc_{uuid}
-	ChainSlug      string    `json:"chain_slug"`      // e.g., 'konzum', 'lidl'
-	SourceURL      string    `json:"source_url"`      // Original download URL
-	Filename       string    `json:"filename"`        // Original filename
-	OriginalFormat string    `json:"original_format"` // 'csv', 'xml', 'xlsx', 'zip'
-	ArchivePath    string    `json:"archive_path"`    // Storage key/path
-	ArchiveType    string    `json:"archive_type"`    // 'local', 's3'
-	ContentType    *string   `json:"content_type"`    // MIME type
-	FileSize       *int64    `json:"file_size"`       // Size in bytes
-	CompressedSize *int64    `json:"compressed_size"` // Compressed size if applicable
-	IsCompressed   bool      `json:"is_compressed"`   // Whether stored data is compressed
-	Checksum       string    `json:"checksum"`        // SHA-256 checksum
-	DownloadedAt   time.Time `json:"downloaded_at"`   // When file was downloaded
-	Metadata       *string   `json:"metadata"`        // JSON metadata
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             string                `json:"id"`              // arc_{uuid}
+	ChainSlug      string                `json:"chain_slug"`      // e.g., 'konzum', 'lidl'
+	SourceURL      string                `json:"source_url"`      // Original download URL
+	Filename       string                `json:"filename"`        // Original filename
+	OriginalFormat string                `json:"original_format"` // 'csv', 'xml', 'xlsx', 'zip'
+	ArchivePath    string                `json:"archive_path"`    // Storage key/path
+	ArchiveType    string                `json:"archive_type"`    // 'local', 's3'
+	ContentType    *string               `json:"content_type"`    // MIME type
+	FileSize       *int64                `json:"file_size"`       // Size in bytes
+	CompressedSize *int64                `json:"compressed_size"` // Compressed size if applicable
+	IsCompressed   bool                  `json:"is_compressed"`   // Whether stored data is compressed
+	Checksum       string                `json:"checksum"`        // SHA-256 checksum
+	DownloadedAt   time.Time             `json:"downloaded_at"`   // When file was downloaded
+	Metadata       jsonb.ArchiveMetadata `json:"metadata"`        // Typed archive metadata
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
 }
 
 // ArchiveFilterOptions contains options for filtering archives
@@ -66,7 +67,7 @@ func CreateArchive(ctx context.Context, archive *Archive) error {
 			Time:  archive.DownloadedAt,
 			Valid: true,
 		},
-		Metadata: stringPtrToBytes(archive.Metadata),
+		Metadata: archive.Metadata,
 		CreatedAt: pgtype.Timestamptz{
 			Time:  archive.CreatedAt,
 			Valid: true,
@@ -182,7 +183,7 @@ func convertSqlcArchive(a sqlcgen.Archive) *Archive {
 		IsCompressed:   a.IsCompressed.Bool,
 		Checksum:       a.Checksum,
 		DownloadedAt:   a.DownloadedAt.Time,
-		Metadata:       bytesToStringPtr(a.Metadata),
+		Metadata:       a.Metadata,
 		CreatedAt:      a.CreatedAt.Time,
 		UpdatedAt:      a.UpdatedAt.Time,
 	}
@@ -216,17 +217,3 @@ func pgInt8ToInt64Ptr(p pgtype.Int8) *int64 {
 	return &p.Int64
 }
 
-func stringPtrToBytes(s *string) []byte {
-	if s == nil {
-		return nil
-	}
-	return []byte(*s)
-}
-
-func bytesToStringPtr(b []byte) *string {
-	if b == nil {
-		return nil
-	}
-	s := string(b)
-	return &s
-}

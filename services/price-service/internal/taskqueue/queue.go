@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
+	"github.com/kosarica/price-service/internal/jsonb"
 )
 
 // Note: Some methods in this file use raw SQL for stored procedure calls
@@ -28,7 +29,7 @@ func (q *TaskQueue) GetPool() *pgxpool.Pool {
 
 type ScheduleTaskInput struct {
 	TaskType    string
-	Payload     interface{}
+	Payload     jsonb.TaskQueuePayload
 	Priority    int
 	ScheduledAt interface{}
 	MaxRetries  int
@@ -40,11 +41,6 @@ type ScheduleTaskResult struct {
 }
 
 func (q *TaskQueue) ScheduleTask(ctx context.Context, input ScheduleTaskInput) ScheduleTaskResult {
-	payload, err := json.Marshal(input.Payload)
-	if err != nil {
-		return ScheduleTaskResult{Err: err}
-	}
-
 	maxRetries := 3
 	if input.MaxRetries > 0 {
 		maxRetries = input.MaxRetries
@@ -58,7 +54,7 @@ func (q *TaskQueue) ScheduleTask(ctx context.Context, input ScheduleTaskInput) S
 	queries := sqlcgen.New(q.pool)
 	id, err := queries.ScheduleTask(ctx, sqlcgen.ScheduleTaskParams{
 		TaskType:   input.TaskType,
-		Payload:    payload,
+		Payload:    input.Payload,
 		Priority:   pgtype.Int4{Int32: int32(priority), Valid: true},
 		Column4:    input.ScheduledAt, // nil means NOW() via COALESCE
 		MaxRetries: pgtype.Int4{Int32: int32(maxRetries), Valid: true},

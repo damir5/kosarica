@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
+	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/kosarica/price-service/internal/pricegroups"
 	"github.com/kosarica/price-service/internal/types"
@@ -612,8 +612,13 @@ func saveFailedRow(ctx context.Context, chainID string, runID string, fileID str
 
 func saveFailedRowWithQueries(ctx context.Context, queries *sqlcgen.Queries, chainID string, runID string, fileID string, row types.NormalizedRow, validation types.NormalizedRowValidation) error {
 
-	// Marshal validation errors to JSON
-	errorsJSON, _ := json.Marshal(validation.Errors)
+	// Convert validation errors to typed jsonb.ValidationErrors
+	validationErrors := make(jsonb.ValidationErrors, len(validation.Errors))
+	for i, errMsg := range validation.Errors {
+		validationErrors[i] = jsonb.ValidationError{
+			Message: errMsg,
+		}
+	}
 
 	// Generate unique ID using cuid2
 	itemID := cuid2.GeneratePrefixedId("failed", cuid2.PrefixedIdOptions{})
@@ -632,7 +637,7 @@ func saveFailedRowWithQueries(ctx context.Context, queries *sqlcgen.Queries, cha
 		StoreIdentifier:  pgtype.Text{String: row.StoreIdentifier, Valid: row.StoreIdentifier != ""},
 		RowNumber:        pgtype.Int4{Int32: int32(row.RowNumber), Valid: true},
 		RawData:          row.RawData,
-		ValidationErrors: errorsJSON,
+		ValidationErrors: validationErrors,
 	})
 
 	if err != nil {

@@ -23,9 +23,10 @@ describe("Schema Cleanup Verification", () => {
 			expect(fs.existsSync(goSchemasDir)).toBe(false);
 		});
 
-		it("should not have shared/schemas/ directory", () => {
-			const sharedSchemasDir = path.join(projectRoot, "shared/schemas");
-			expect(fs.existsSync(sharedSchemasDir)).toBe(false);
+		it("should not have shared/schemas/go-rpc/ directory (old schema system)", () => {
+			// Note: shared/schemas/jsonb/ is now used for JSONB type generation (Zod -> JSON Schema -> Go)
+			const goRpcSchemasDir = path.join(projectRoot, "shared/schemas/go-rpc");
+			expect(fs.existsSync(goRpcSchemasDir)).toBe(false);
 		});
 	});
 
