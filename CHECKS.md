@@ -1,87 +1,55 @@
 # Code Review Checks
 
-## Database Schema Sync (TypeScript ↔ Go)
+## Quick Reference
 
-When adding or modifying database fields, the schema must stay in sync across both services.
-
-### Workflow
-
-1. **Modify Drizzle schema** in `src/db/schema.ts` (source of truth)
-2. **Generate migration**: `pnpm db:generate`
-3. **Apply migration**: `pnpm db:migrate`
-4. **Regenerate Go types**: `mise run sqlc-generate`
-5. **Update OpenAPI if needed**: `mise run swag`
-6. **Regenerate TS SDK**: `pnpm generate:go-api`
-
-### Full command sequence
-
+**Regenerate everything after schema changes:**
 ```bash
-pnpm db:generate
-pnpm db:migrate
-mise run sqlc-generate
-mise run swag
-pnpm generate:go-api
+mise run generate-all
 ```
 
-### What to verify during code review
-
-- [ ] New DB fields in `src/db/schema.ts` have corresponding sqlc queries updated
-- [ ] Drizzle migration exists in `drizzle/` for schema changes
-- [ ] Go types in `services/price-service/internal/database/sqlcgen/` match the schema
-- [ ] If field is exposed via API, OpenAPI spec (`docs/swagger.json`) is updated
-- [ ] TypeScript SDK in `src/lib/go-api/` reflects any API changes
-- [ ] No raw SQL queries bypass sqlc (except documented exceptions)
-
-### Common mistakes
-
-- Adding field to Drizzle but forgetting `mise run sqlc-generate`
-- Adding field to Go queries but not running `mise run swag` for API changes
-- Modifying handler responses without regenerating the TS SDK
+**Validate schema consistency:**
+```bash
+pnpm validate:schema
+```
 
 ---
 
-## JSONB Type Safety (TypeScript ↔ Go)
+## Schema Sync Checklist
 
-JSONB columns have typed schemas shared between TypeScript (Drizzle/Zod) and Go (sqlc).
+When modifying database fields or JSONB types:
 
-### Source of truth
+- [ ] Drizzle schema updated (`src/db/schema.ts`)
+- [ ] Migration generated and applied (`pnpm db:generate && pnpm db:migrate`)
+- [ ] Codegen run (`mise run generate-all`)
+- [ ] Validation passes (`pnpm validate:schema`)
 
-Zod schemas in `src/db/jsonb-schemas.ts` define JSONB types:
-- `TaskQueuePayload` - discriminated union for task types
-- `ValidationErrors` - array of validation error objects
-- `CronJobPayload` - cron job configuration
-- `CronRunMetadata` - cron run metadata
-- `ArchiveMetadata` - archive file metadata
+---
 
-### Workflow for JSONB changes
+## Details
 
-1. **Modify Zod schema** in `src/db/jsonb-schemas.ts`
-2. **Generate JSON schemas and Go types**: `pnpm generate:jsonb`
-3. **Regenerate sqlc**: `mise run sqlc-generate`
-4. **Validate consistency**: `pnpm validate:schema`
+### Database Schema (TypeScript ↔ Go)
 
-### Generated files
+Source of truth: `src/db/schema.ts`
 
-| Source | Generated |
-|--------|-----------|
-| `src/db/jsonb-schemas.ts` | `shared/schemas/jsonb/*.json` |
-| `shared/schemas/jsonb/*.json` | `services/price-service/internal/jsonb/types.generated.go` |
+| Change | Regenerate |
+|--------|------------|
+| New/modified DB fields | `mise run sqlc-generate` |
+| API response changes | `mise run swag && pnpm generate:go-api` |
 
-### What to verify during code review
+### JSONB Types (TypeScript ↔ Go)
 
-- [ ] Zod schema changes have corresponding JSON schemas regenerated
-- [ ] Go types in `internal/jsonb/types.generated.go` match the Zod schemas
-- [ ] sqlc type overrides in `services/price-service/sqlc.yaml` reference correct types
-- [ ] `pnpm validate:schema` passes
+Source of truth: `src/db/jsonb-schemas.ts`
 
-### Full command sequence (schema + JSONB changes)
+Types: `TaskQueuePayload`, `ValidationErrors`, `CronJobPayload`, `CronRunMetadata`, `ArchiveMetadata`
 
-```bash
-pnpm db:generate
-pnpm db:migrate
-pnpm generate:jsonb
-mise run sqlc-generate
-pnpm validate:schema
-mise run swag
-pnpm generate:go-api
+| Change | Regenerate |
+|--------|------------|
+| Zod schema changes | `pnpm generate:jsonb` |
+
+### Generated Files
+
+```
+src/db/jsonb-schemas.ts          → shared/schemas/jsonb/*.json
+shared/schemas/jsonb/*.json      → services/price-service/internal/jsonb/types.generated.go
+services/price-service/sqlc.yaml → services/price-service/internal/database/sqlcgen/
 ```
