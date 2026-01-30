@@ -1,5 +1,7 @@
 # Price Service Agent Instructions
 
+**Code Review**: See [../../CHECKS.md](../../CHECKS.md) for required verification steps.
+
 ## Overview
 
 Go service handling price ingestion, basket optimization, and price queries.

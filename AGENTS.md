@@ -1,5 +1,7 @@
 # Agent Instructions
 
+**Code Review**: See [CHECKS.md](./CHECKS.md) for required verification steps.
+
 ## API Client Generation (Go → Node)
 
 Go is the source of truth for shared API types (basket, prices, ingestion).
