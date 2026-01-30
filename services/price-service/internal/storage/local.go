@@ -30,6 +30,8 @@ func NewLocalStorage(basePath string) (*LocalStorage, error) {
 	}, nil
 }
 
+const MinCompressionSize = 1024 // 1KB minimum
+
 // Put stores content at the given key with optional metadata
 func (s *LocalStorage) Put(ctx context.Context, key string, content []byte, metadata *Metadata) error {
 	fullPath := s.keyToPath(key)
@@ -40,21 +42,58 @@ func (s *LocalStorage) Put(ctx context.Context, key string, content []byte, meta
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	// Write content
-	if err := os.WriteFile(fullPath, content, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
+	var dataToStore []byte
+	var compressed bool
+
+	// Determine if we should compress
+	if metadata != nil && len(content) >= MinCompressionSize {
+		fileType := ""
+		if metadata.Custom != nil {
+			fileType = metadata.Custom["file_type"]
+		}
+		if ShouldCompress(fileType) {
+			compressedData, err := CompressWithZstd(content)
+			if err == nil && len(compressedData) < len(content) {
+				dataToStore = compressedData
+				compressed = true
+			}
+		}
 	}
 
-	// Write metadata if provided
+	if !compressed {
+		dataToStore = content
+	}
+
+	// Write metadata to a temporary file first (for atomic rename)
 	if metadata != nil {
+		if metadata.Custom == nil {
+			metadata.Custom = make(map[string]string)
+		}
+		if compressed {
+			metadata.Custom["compressed"] = "true"
+			metadata.Custom["original_size"] = fmt.Sprintf("%d", len(content))
+			metadata.CompressedSize = int64(len(dataToStore))
+		}
 		metaPath := fullPath + ".meta"
+		metaTmpPath := fullPath + ".meta.tmp"
 		metaBytes, err := json.Marshal(metadata)
 		if err != nil {
 			return fmt.Errorf("failed to marshal metadata: %w", err)
 		}
-		if err := os.WriteFile(metaPath, metaBytes, 0644); err != nil {
-			return fmt.Errorf("failed to write metadata %s: %w", metaPath, err)
+		// Write to temporary file first
+		if err := os.WriteFile(metaTmpPath, metaBytes, 0644); err != nil {
+			return fmt.Errorf("failed to write temporary metadata %s: %w", metaTmpPath, err)
 		}
+		// Atomically rename to final metadata path
+		if err := os.Rename(metaTmpPath, metaPath); err != nil {
+			os.Remove(metaTmpPath) // Clean up temp file
+			return fmt.Errorf("failed to finalize metadata %s: %w", metaPath, err)
+		}
+	}
+
+	// Write content file (after metadata to ensure consistency on read)
+	if err := os.WriteFile(fullPath, dataToStore, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
 	}
 
 	return nil
@@ -70,6 +109,29 @@ func (s *LocalStorage) Get(ctx context.Context, key string) ([]byte, error) {
 			return nil, fmt.Errorf("file not found: %s", key)
 		}
 		return nil, fmt.Errorf("failed to read file %s: %w", fullPath, err)
+	}
+
+	// Check if compressed (handle missing .meta gracefully)
+	metaPath := fullPath + ".meta"
+	isCompressed := false
+
+	if metaBytes, err := os.ReadFile(metaPath); err == nil {
+		var metadata Metadata
+		if err := json.Unmarshal(metaBytes, &metadata); err == nil {
+			if metadata.Custom != nil && metadata.Custom["compressed"] == "true" {
+				isCompressed = true
+			}
+		}
+	}
+
+	if isCompressed {
+		decompressed, err := DecompressZstd(content)
+		if err != nil {
+			// Decompression failed - file may be corrupted
+			// Return error without deleting files - let caller decide how to handle
+			return nil, fmt.Errorf("decompression failed for %s (file may be corrupted): %w", key, err)
+		}
+		return decompressed, nil
 	}
 
 	return content, nil

@@ -2,10 +2,10 @@
 INSERT INTO archives (
     id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
-    compressed_size, checksum, downloaded_at, metadata,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
     created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 )
 ON CONFLICT (id) DO UPDATE SET
     source_url = EXCLUDED.source_url,
@@ -16,6 +16,7 @@ ON CONFLICT (id) DO UPDATE SET
     content_type = EXCLUDED.content_type,
     file_size = EXCLUDED.file_size,
     compressed_size = EXCLUDED.compressed_size,
+    is_compressed = EXCLUDED.is_compressed,
     checksum = EXCLUDED.checksum,
     downloaded_at = EXCLUDED.downloaded_at,
     metadata = EXCLUDED.metadata,
@@ -24,7 +25,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- name: GetArchiveByChecksum :one
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
-    compressed_size, checksum, downloaded_at, metadata,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
     created_at, updated_at
 FROM archives
 WHERE checksum = $1
@@ -33,7 +34,7 @@ LIMIT 1;
 -- name: GetArchiveById :one
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
-    compressed_size, checksum, downloaded_at, metadata,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
     created_at, updated_at
 FROM archives
 WHERE id = $1;
@@ -41,7 +42,7 @@ WHERE id = $1;
 -- name: ListArchivesByChain :many
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
-    compressed_size, checksum, downloaded_at, metadata,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
     created_at, updated_at
 FROM archives
 WHERE chain_slug = $1

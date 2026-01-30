@@ -386,3 +386,50 @@ func (q *Queries) UpdateIngestionFileFetchInfo(ctx context.Context, arg UpdateIn
 	_, err := q.db.Exec(ctx, updateIngestionFileFetchInfo, arg.FileSize, arg.FileHash, arg.ID)
 	return err
 }
+
+const listPendingFilesForResume = `-- name: ListPendingFilesForResume :many
+SELECT id, filename, file_type, file_hash
+FROM ingestion_files
+WHERE run_id = $1
+  AND status IN ('pending', 'processing')
+ORDER BY created_at ASC
+`
+
+type ListPendingFilesForResumeRow struct {
+	ID       int64       `db:"id" json:"id"`
+	Filename string      `db:"filename" json:"filename"`
+	FileType string      `db:"file_type" json:"file_type"`
+	FileHash pgtype.Text `db:"file_hash" json:"file_hash"`
+}
+
+func (q *Queries) ListPendingFilesForResume(ctx context.Context, runID string) ([]ListPendingFilesForResumeRow, error) {
+	rows, err := q.db.Query(ctx, listPendingFilesForResume, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingFilesForResumeRow{}
+	for rows.Next() {
+		var i ListPendingFilesForResumeRow
+		if err := rows.Scan(&i.ID, &i.Filename, &i.FileType, &i.FileHash); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resetProcessingFilesToPending = `-- name: ResetProcessingFilesToPending :exec
+UPDATE ingestion_files
+SET status = 'pending'
+WHERE run_id = $1
+  AND status = 'processing'
+`
+
+func (q *Queries) ResetProcessingFilesToPending(ctx context.Context, runID string) error {
+	_, err := q.db.Exec(ctx, resetProcessingFilesToPending, runID)
+	return err
+}

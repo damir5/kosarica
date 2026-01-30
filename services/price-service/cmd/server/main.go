@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
@@ -24,8 +25,10 @@ import (
 	"github.com/kosarica/price-service/config"
 	_ "github.com/kosarica/price-service/docs" // Swagger generated docs
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/handlers"
 	"github.com/kosarica/price-service/internal/middleware"
+	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/sweepers"
 )
 
@@ -61,8 +64,8 @@ func main() {
 
 	logger.Info().Msg("Database connected")
 
-	if err := handleInterruptedRuns(ctx, logger); err != nil {
-		logger.Warn().Err(err).Msg("Failed to handle interrupted runs")
+	if err := resumeInterruptedRuns(ctx, logger); err != nil {
+		logger.Warn().Err(err).Msg("Failed to resume interrupted runs")
 	}
 
 	sweeperInterval := 5 * time.Minute
@@ -155,11 +158,11 @@ func main() {
 	logger.Info().Msg("Server exited")
 }
 
-func handleInterruptedRuns(ctx context.Context, logger *zerolog.Logger) error {
+func resumeInterruptedRuns(ctx context.Context, logger *zerolog.Logger) error {
 	pool := database.Pool()
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, chain_slug, started_at, processed_files, total_files
+		SELECT id, chain_slug
 		FROM ingestion_runs
 		WHERE status = 'running'
 		ORDER BY started_at DESC
@@ -170,26 +173,25 @@ func handleInterruptedRuns(ctx context.Context, logger *zerolog.Logger) error {
 	defer rows.Close()
 
 	var runs []struct {
-		ID             string
-		Chain          string
-		Started        time.Time
-		ProcessedFiles int
-		TotalFiles     int
+		ID    string
+		Chain string
 	}
 
 	for rows.Next() {
 		var run struct {
-			ID             string
-			Chain          string
-			Started        time.Time
-			ProcessedFiles int
-			TotalFiles     int
+			ID    string
+			Chain string
 		}
-		if err := rows.Scan(&run.ID, &run.Chain, &run.Started, &run.ProcessedFiles, &run.TotalFiles); err != nil {
+		if err := rows.Scan(&run.ID, &run.Chain); err != nil {
 			logger.Error().Err(err).Msg("Failed to scan run")
 			continue
 		}
 		runs = append(runs, run)
+	}
+
+	// Check for iteration errors
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating rows: %w", err)
 	}
 
 	if len(runs) == 0 {
@@ -198,29 +200,37 @@ func handleInterruptedRuns(ctx context.Context, logger *zerolog.Logger) error {
 	}
 
 	for _, run := range runs {
-		_, err := pool.Exec(ctx, `
-			UPDATE ingestion_runs
-			SET status = 'interrupted',
-			    completed_at = NOW(),
-			    metadata = jsonb_build_object(
-				    'interrupted_reason', 'Service restarted during processing')
-			WHERE id = $1
-		`, run.ID)
+		// Attempt to resume the run
+		resumed, err := pipeline.ResumeRun(ctx, run.ID, run.Chain)
 
 		if err != nil {
-			logger.Error().Err(err).Str("id", run.ID).Msg("Failed to mark run as interrupted")
+			logger.Error().Err(err).Str("run_id", run.ID).Msg("Failed to resume run")
+			// Mark as interrupted (fallback)
+			markRunInterrupted(ctx, run.ID)
 			continue
 		}
-		logger.Info().
-			Str("id", run.ID).
-			Str("chain", run.Chain).
-			Int("processed", run.ProcessedFiles).
-			Int("total", run.TotalFiles).
-			Msg("Marked interrupted run")
+
+		if !resumed {
+			// No files to process, mark as interrupted
+			logger.Info().Str("run_id", run.ID).Msg("No files to resume, marking as interrupted")
+			markRunInterrupted(ctx, run.ID)
+		} else {
+			logger.Info().Str("run_id", run.ID).Msg("Resumed interrupted run")
+		}
 	}
 
 	logger.Info().Int("count", len(runs)).Msg("Handled interrupted runs")
 	return nil
+}
+
+// markRunInterrupted marks a run as interrupted when resumption is not possible
+func markRunInterrupted(ctx context.Context, runID string) {
+	queries := sqlcgen.New(database.Pool())
+	now := time.Now()
+	_ = queries.UpdateRunInterrupted(ctx, sqlcgen.UpdateRunInterruptedParams{
+		CompletedAt: pgtype.Timestamp{Time: now, Valid: true},
+		ID:          runID,
+	})
 }
 
 func initLogger(cfg config.LoggingConfig) *zerolog.Logger {

@@ -45,6 +45,7 @@ type Archive struct {
 	ContentType    pgtype.Text        `db:"content_type" json:"content_type"`
 	FileSize       pgtype.Int8        `db:"file_size" json:"file_size"`
 	CompressedSize pgtype.Int8        `db:"compressed_size" json:"compressed_size"`
+	IsCompressed   pgtype.Bool        `db:"is_compressed" json:"is_compressed"`
 	Checksum       string             `db:"checksum" json:"checksum"`
 	DownloadedAt   pgtype.Timestamptz `db:"downloaded_at" json:"downloaded_at"`
 	Metadata       []byte             `db:"metadata" json:"metadata"`

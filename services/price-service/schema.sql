@@ -335,6 +335,7 @@ CREATE TABLE public.archives (
     content_type text,
     file_size bigint,
     compressed_size bigint,
+    is_compressed boolean DEFAULT false,
     checksum text NOT NULL,
     downloaded_at timestamp with time zone NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb,

@@ -24,6 +24,7 @@ type Archive struct {
 	ContentType    *string   `json:"content_type"`    // MIME type
 	FileSize       *int64    `json:"file_size"`       // Size in bytes
 	CompressedSize *int64    `json:"compressed_size"` // Compressed size if applicable
+	IsCompressed   bool      `json:"is_compressed"`   // Whether stored data is compressed
 	Checksum       string    `json:"checksum"`        // SHA-256 checksum
 	DownloadedAt   time.Time `json:"downloaded_at"`   // When file was downloaded
 	Metadata       *string   `json:"metadata"`        // JSON metadata
@@ -59,6 +60,7 @@ func CreateArchive(ctx context.Context, archive *Archive) error {
 		ContentType:    stringPtrToPgText(archive.ContentType),
 		FileSize:       int64PtrToPgInt8(archive.FileSize),
 		CompressedSize: int64PtrToPgInt8(archive.CompressedSize),
+		IsCompressed:   pgtype.Bool{Bool: archive.IsCompressed, Valid: true},
 		Checksum:       archive.Checksum,
 		DownloadedAt: pgtype.Timestamptz{
 			Time:  archive.DownloadedAt,
@@ -177,6 +179,7 @@ func convertSqlcArchive(a sqlcgen.Archive) *Archive {
 		ContentType:    pgTextToStringPtr(a.ContentType),
 		FileSize:       pgInt8ToInt64Ptr(a.FileSize),
 		CompressedSize: pgInt8ToInt64Ptr(a.CompressedSize),
+		IsCompressed:   a.IsCompressed.Bool,
 		Checksum:       a.Checksum,
 		DownloadedAt:   a.DownloadedAt.Time,
 		Metadata:       bytesToStringPtr(a.Metadata),

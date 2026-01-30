@@ -1,0 +1,1 @@
+ALTER TABLE "archives" ADD COLUMN "is_compressed" boolean DEFAULT false;

@@ -56,6 +56,13 @@
       "when": 1769669535803,
       "tag": "0007_foamy_doorman",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1769752445112,
+      "tag": "0008_overconfident_boom_boom",
+      "breakpoints": true
     }
   ]
 }

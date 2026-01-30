@@ -380,6 +380,7 @@ export const archives = pgTable(
 		contentType: text("content_type"),
 		fileSize: bigint("file_size", { mode: "number" }),
 		compressedSize: bigint("compressed_size", { mode: "number" }),
+		isCompressed: boolean("is_compressed").default(false),
 		checksum: text("checksum").notNull(),
 		downloadedAt: timestamp("downloaded_at", { withTimezone: true }).notNull(),
 		metadata: jsonb("metadata").default({}),

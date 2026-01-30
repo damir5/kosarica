@@ -103,3 +103,16 @@ SET status = 'failed',
     status_severity = $2,
     status_type = $3
 WHERE id = $4;
+
+-- name: ListPendingFilesForResume :many
+SELECT id, filename, file_type, file_hash
+FROM ingestion_files
+WHERE run_id = $1
+  AND status IN ('pending', 'processing')
+ORDER BY created_at ASC;
+
+-- name: ResetProcessingFilesToPending :exec
+UPDATE ingestion_files
+SET status = 'pending'
+WHERE run_id = $1
+  AND status = 'processing';

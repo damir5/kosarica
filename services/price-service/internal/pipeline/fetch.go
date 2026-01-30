@@ -71,20 +71,31 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 	// Build storage key
 	storageKey := buildArchiveKey(chainID, file.Filename, time.Now())
 
-	// Store file in archive storage
+	// Store file in archive storage with metadata including file type
 	metadata := &storage.Metadata{
 		OriginalName: file.Filename,
 		ChainSlug:    chainID,
 		SourceURL:    file.URL,
 		DownloadedAt: time.Now(),
+		Custom:       map[string]string{"file_type": string(file.Type)},
 	}
 
 	if err := storageBackend.Put(ctx, storageKey, fetched.Content, metadata); err != nil {
 		return nil, fmt.Errorf("failed to store file: %w", err)
 	}
 
-	// Create archive record in database
+	// Create archive record in database with compression info
 	fileSize64 := int64(fileSize)
+	var compressedSize64 *int64
+	var isCompressed bool
+
+	// Check if file was compressed by storage layer
+	if metadata.CompressedSize > 0 {
+		cs := metadata.CompressedSize
+		compressedSize64 = &cs
+		isCompressed = true
+	}
+
 	archive := &database.Archive{
 		ID:             archiveID,
 		ChainSlug:      chainID,
@@ -94,6 +105,8 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 		ArchivePath:    storageKey,
 		ArchiveType:    "local",
 		FileSize:       &fileSize64,
+		CompressedSize: compressedSize64,
+		IsCompressed:   isCompressed,
 		Checksum:       hash,
 		DownloadedAt:   time.Now(),
 	}

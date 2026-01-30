@@ -14,7 +14,7 @@ import (
 const getArchiveByChecksum = `-- name: GetArchiveByChecksum :one
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
-    compressed_size, checksum, downloaded_at, metadata,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
     created_at, updated_at
 FROM archives
 WHERE checksum = $1
@@ -35,6 +35,7 @@ func (q *Queries) GetArchiveByChecksum(ctx context.Context, checksum string) (Ar
 		&i.ContentType,
 		&i.FileSize,
 		&i.CompressedSize,
+		&i.IsCompressed,
 		&i.Checksum,
 		&i.DownloadedAt,
 		&i.Metadata,
@@ -47,7 +48,7 @@ func (q *Queries) GetArchiveByChecksum(ctx context.Context, checksum string) (Ar
 const getArchiveById = `-- name: GetArchiveById :one
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
-    compressed_size, checksum, downloaded_at, metadata,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
     created_at, updated_at
 FROM archives
 WHERE id = $1
@@ -67,6 +68,7 @@ func (q *Queries) GetArchiveById(ctx context.Context, id string) (Archive, error
 		&i.ContentType,
 		&i.FileSize,
 		&i.CompressedSize,
+		&i.IsCompressed,
 		&i.Checksum,
 		&i.DownloadedAt,
 		&i.Metadata,
@@ -98,7 +100,7 @@ func (q *Queries) LinkArchiveToRun(ctx context.Context, arg LinkArchiveToRunPara
 const listArchivesByChain = `-- name: ListArchivesByChain :many
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
-    compressed_size, checksum, downloaded_at, metadata,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
     created_at, updated_at
 FROM archives
 WHERE chain_slug = $1
@@ -132,6 +134,7 @@ func (q *Queries) ListArchivesByChain(ctx context.Context, arg ListArchivesByCha
 			&i.ContentType,
 			&i.FileSize,
 			&i.CompressedSize,
+			&i.IsCompressed,
 			&i.Checksum,
 			&i.DownloadedAt,
 			&i.Metadata,
@@ -152,10 +155,10 @@ const upsertArchive = `-- name: UpsertArchive :exec
 INSERT INTO archives (
     id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
-    compressed_size, checksum, downloaded_at, metadata,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
     created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 )
 ON CONFLICT (id) DO UPDATE SET
     source_url = EXCLUDED.source_url,
@@ -166,6 +169,7 @@ ON CONFLICT (id) DO UPDATE SET
     content_type = EXCLUDED.content_type,
     file_size = EXCLUDED.file_size,
     compressed_size = EXCLUDED.compressed_size,
+    is_compressed = EXCLUDED.is_compressed,
     checksum = EXCLUDED.checksum,
     downloaded_at = EXCLUDED.downloaded_at,
     metadata = EXCLUDED.metadata,
@@ -183,6 +187,7 @@ type UpsertArchiveParams struct {
 	ContentType    pgtype.Text        `db:"content_type" json:"content_type"`
 	FileSize       pgtype.Int8        `db:"file_size" json:"file_size"`
 	CompressedSize pgtype.Int8        `db:"compressed_size" json:"compressed_size"`
+	IsCompressed   pgtype.Bool        `db:"is_compressed" json:"is_compressed"`
 	Checksum       string             `db:"checksum" json:"checksum"`
 	DownloadedAt   pgtype.Timestamptz `db:"downloaded_at" json:"downloaded_at"`
 	Metadata       []byte             `db:"metadata" json:"metadata"`
@@ -202,6 +207,7 @@ func (q *Queries) UpsertArchive(ctx context.Context, arg UpsertArchiveParams) er
 		arg.ContentType,
 		arg.FileSize,
 		arg.CompressedSize,
+		arg.IsCompressed,
 		arg.Checksum,
 		arg.DownloadedAt,
 		arg.Metadata,

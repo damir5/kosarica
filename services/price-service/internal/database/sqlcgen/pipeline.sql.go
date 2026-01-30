@@ -239,3 +239,20 @@ func (q *Queries) UpdateRunTotalFiles(ctx context.Context, arg UpdateRunTotalFil
 	_, err := q.db.Exec(ctx, updateRunTotalFiles, arg.TotalFiles, arg.ID)
 	return err
 }
+
+const updateRunResumed = `-- name: UpdateRunResumed :exec
+UPDATE ingestion_runs
+SET status = 'running',
+    started_at = $1
+WHERE id = $2
+`
+
+type UpdateRunResumedParams struct {
+	StartedAt pgtype.Timestamp `db:"started_at" json:"started_at"`
+	ID        string           `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateRunResumed(ctx context.Context, arg UpdateRunResumedParams) error {
+	_, err := q.db.Exec(ctx, updateRunResumed, arg.StartedAt, arg.ID)
+	return err
+}

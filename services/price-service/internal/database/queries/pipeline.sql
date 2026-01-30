@@ -109,3 +109,9 @@ WHERE id = $2;
 SELECT status, COALESCE(total_files, 0) as total_files, COALESCE(processed_files, 0) as processed_files
 FROM ingestion_runs
 WHERE id = $1;
+
+-- name: UpdateRunResumed :exec
+UPDATE ingestion_runs
+SET status = 'running',
+    started_at = $1
+WHERE id = $2;
