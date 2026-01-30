@@ -37,3 +37,51 @@ pnpm generate:go-api
 - Adding field to Drizzle but forgetting `mise run sqlc-generate`
 - Adding field to Go queries but not running `mise run swag` for API changes
 - Modifying handler responses without regenerating the TS SDK
+
+---
+
+## JSONB Type Safety (TypeScript ↔ Go)
+
+JSONB columns have typed schemas shared between TypeScript (Drizzle/Zod) and Go (sqlc).
+
+### Source of truth
+
+Zod schemas in `src/db/jsonb-schemas.ts` define JSONB types:
+- `TaskQueuePayload` - discriminated union for task types
+- `ValidationErrors` - array of validation error objects
+- `CronJobPayload` - cron job configuration
+- `CronRunMetadata` - cron run metadata
+- `ArchiveMetadata` - archive file metadata
+
+### Workflow for JSONB changes
+
+1. **Modify Zod schema** in `src/db/jsonb-schemas.ts`
+2. **Generate JSON schemas and Go types**: `pnpm generate:jsonb`
+3. **Regenerate sqlc**: `mise run sqlc-generate`
+4. **Validate consistency**: `pnpm validate:schema`
+
+### Generated files
+
+| Source | Generated |
+|--------|-----------|
+| `src/db/jsonb-schemas.ts` | `shared/schemas/jsonb/*.json` |
+| `shared/schemas/jsonb/*.json` | `services/price-service/internal/jsonb/types.generated.go` |
+
+### What to verify during code review
+
+- [ ] Zod schema changes have corresponding JSON schemas regenerated
+- [ ] Go types in `internal/jsonb/types.generated.go` match the Zod schemas
+- [ ] sqlc type overrides in `services/price-service/sqlc.yaml` reference correct types
+- [ ] `pnpm validate:schema` passes
+
+### Full command sequence (schema + JSONB changes)
+
+```bash
+pnpm db:generate
+pnpm db:migrate
+pnpm generate:jsonb
+mise run sqlc-generate
+pnpm validate:schema
+mise run swag
+pnpm generate:go-api
+```
