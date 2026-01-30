@@ -66,3 +66,16 @@ GROUP BY ri.id, ri.chain_slug, ri.external_id, ri.name, ri.description,
          ri.brand, ri.category, ri.subcategory, ri.unit, ri.unit_quantity, ri.image_url
 ORDER BY ri.name
 LIMIT @result_limit::int;
+
+-- name: GetRetailerItemDetailsBatch :many
+-- Batch fetch retailer item details for multiple IDs
+-- Used to avoid N+1 queries when enriching price data
+SELECT
+    ri.id,
+    ri.name,
+    ri.external_id,
+    ri.brand,
+    ri.unit,
+    ri.unit_quantity
+FROM retailer_items ri
+WHERE ri.id = ANY(@item_ids::text[]);

@@ -1,26 +1,32 @@
 package storage
 
 import (
-	"github.com/klauspost/compress/zstd"
+	"bytes"
+	"compress/gzip"
+	"io"
 )
 
-// CompressWithZstd compresses data using zstd
-func CompressWithZstd(data []byte) ([]byte, error) {
-	// Use default compression level
-	encoder, err := zstd.NewWriter(nil)
-	if err != nil {
+// CompressWithGzip compresses data using gzip
+func CompressWithGzip(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	if _, err := w.Write(data); err != nil {
 		return nil, err
 	}
-	return encoder.EncodeAll(data, nil), nil
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
-// DecompressZstd decompresses zstd data
-func DecompressZstd(data []byte) ([]byte, error) {
-	decoder, err := zstd.NewReader(nil)
+// DecompressGzip decompresses gzip data
+func DecompressGzip(data []byte) ([]byte, error) {
+	r, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
-	return decoder.DecodeAll(data, nil)
+	defer r.Close()
+	return io.ReadAll(r)
 }
 
 // ShouldCompress returns true if file type should be compressed

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 type RateLimiterConfig struct {
 	RequestsPerSecond float64
 	BurstSize         int
+	// TrustedProxies is a list of trusted proxy IP addresses or CIDR ranges
+	// If empty, X-Forwarded-For header is ignored
+	TrustedProxies []string
 }
 
 // DefaultRateLimiterConfig returns default rate limiting settings
@@ -85,10 +89,24 @@ func RateLimitMiddleware(config ...RateLimiterConfig) gin.HandlerFunc {
 	}()
 
 	return func(c *gin.Context) {
-		// Get client IP from X-Forwarded-For header if present, otherwise from RemoteAddr
-		ip := c.GetHeader("X-Forwarded-For")
-		if ip == "" {
-			ip = c.ClientIP()
+		// Get client IP, validating X-Forwarded-For only from trusted proxies
+		ip := c.ClientIP()
+
+		// Only use X-Forwarded-For if we have trusted proxies configured
+		// and the request comes from one of them
+		if len(cfg.TrustedProxies) > 0 {
+			clientIP := c.RemoteIP()
+			if isTrustedProxy(clientIP, cfg.TrustedProxies) {
+				// Use X-Forwarded-For from trusted proxy
+				forwardedFor := c.GetHeader("X-Forwarded-For")
+				if forwardedFor != "" {
+					// X-Forwarded-For can contain multiple IPs, use the first one (client)
+					ips := strings.Split(forwardedFor, ",")
+					if len(ips) > 0 {
+						ip = strings.TrimSpace(ips[0])
+					}
+				}
+			}
 		}
 
 		// Get or create limiter for this IP
@@ -104,6 +122,17 @@ func RateLimitMiddleware(config ...RateLimiterConfig) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// isTrustedProxy checks if the given IP is in the list of trusted proxies
+func isTrustedProxy(ip string, trustedProxies []string) bool {
+	for _, trusted := range trustedProxies {
+		// Simple string match for now - could be enhanced to support CIDR ranges
+		if ip == trusted {
+			return true
+		}
+	}
+	return false
 }
 
 // ServiceRateLimitMiddleware applies rate limiting for service-to-service calls

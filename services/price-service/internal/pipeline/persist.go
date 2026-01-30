@@ -460,27 +460,35 @@ func persistRowsForStore(ctx context.Context, chainID string, storeID string, st
 		batchPriceSignatures = append(batchPriceSignatures, priceSignature)
 	}
 
-	// Execute batch upsert
+	// Execute batch upsert in chunks to avoid PostgreSQL parameter limits
+	const batchSize = 1000
 	if len(batchStoreIDs) > 0 {
-		err = queries.BatchUpsertStoreItemState(ctx, sqlcgen.BatchUpsertStoreItemStateParams{
-			Column1:  batchStoreIDs,
-			Column2:  batchRetailerItemIDs,
-			Column3:  batchCurrentPrices,
-			Column4:  batchPreviousPrices,
-			Column5:  batchDiscountPrices,
-			Column6:  batchDiscountStarts,
-			Column7:  batchDiscountEnds,
-			Column8:  true, // in_stock
-			Column9:  batchUnitPrices,
-			Column10: batchUnitPriceBaseQuantities,
-			Column11: batchUnitPriceBaseUnits,
-			Column12: batchLowestPrice30s,
-			Column13: batchAnchorPrices,
-			Column14: batchAnchorPriceAsOfs,
-			Column15: batchPriceSignatures,
-		})
-		if err != nil {
-			log.Warn().Err(err).Msg("Failed to batch upsert store item state")
+		for i := 0; i < len(batchStoreIDs); i += batchSize {
+			end := i + batchSize
+			if end > len(batchStoreIDs) {
+				end = len(batchStoreIDs)
+			}
+
+			err = queries.BatchUpsertStoreItemState(ctx, sqlcgen.BatchUpsertStoreItemStateParams{
+				Column1:  batchStoreIDs[i:end],
+				Column2:  batchRetailerItemIDs[i:end],
+				Column3:  batchCurrentPrices[i:end],
+				Column4:  batchPreviousPrices[i:end],
+				Column5:  batchDiscountPrices[i:end],
+				Column6:  batchDiscountStarts[i:end],
+				Column7:  batchDiscountEnds[i:end],
+				Column8:  true, // in_stock
+				Column9:  batchUnitPrices[i:end],
+				Column10: batchUnitPriceBaseQuantities[i:end],
+				Column11: batchUnitPriceBaseUnits[i:end],
+				Column12: batchLowestPrice30s[i:end],
+				Column13: batchAnchorPrices[i:end],
+				Column14: batchAnchorPriceAsOfs[i:end],
+				Column15: batchPriceSignatures[i:end],
+			})
+			if err != nil {
+				log.Warn().Err(err).Int("batch_start", i).Int("batch_end", end).Msg("Failed to batch upsert store item state")
+			}
 		}
 	}
 

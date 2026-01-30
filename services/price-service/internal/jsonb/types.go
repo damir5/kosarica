@@ -74,6 +74,8 @@ type ArchiveMetadata struct {
 	OriginalFilename *string  `json:"originalFilename,omitempty"`
 	Encoding         *string  `json:"encoding,omitempty"`
 	ExtractedFiles   []string `json:"extractedFiles,omitempty"`
+	ContentType      *string  `json:"contentType,omitempty"`
+	FileType         *string  `json:"fileType,omitempty"` // csv, xml, json, xlsx, zip
 
 	// Extra allows additional properties
 	Extra map[string]interface{} `json:"-"`

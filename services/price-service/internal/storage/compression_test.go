@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// TestCompressionDecompression tests zstd compression roundtrip
+// TestCompressionDecompression tests gzip compression roundtrip
 func TestCompressionDecompression(t *testing.T) {
 	tests := []struct {
 		name string
@@ -29,13 +29,13 @@ func TestCompressionDecompression(t *testing.T) {
 			testData := []byte(tt.data)
 
 			// Test compression
-			compressed, err := CompressWithZstd(testData)
+			compressed, err := CompressWithGzip(testData)
 			if err != nil {
 				t.Fatalf("Compress failed: %v", err)
 			}
 
 			// Test decompression
-			decompressed, err := DecompressZstd(compressed)
+			decompressed, err := DecompressGzip(compressed)
 			if err != nil {
 				t.Fatalf("Decompress failed: %v", err)
 			}
@@ -89,9 +89,9 @@ func TestShouldCompress(t *testing.T) {
 
 // TestDecompressWithInvalidData tests error handling for corrupted data
 func TestDecompressWithInvalidData(t *testing.T) {
-	invalidData := []byte("this is not zstd compressed data")
+	invalidData := []byte("this is not gzip compressed data")
 
-	_, err := DecompressZstd(invalidData)
+	_, err := DecompressGzip(invalidData)
 	if err == nil {
 		t.Error("Expected error when decompressing invalid data, got nil")
 	}

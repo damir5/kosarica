@@ -25,7 +25,6 @@ export default defineConfig({
     },
     // Set environment variables for tests
     env: {
-      STORAGE_PATH: "./test-data/storage",
       SAMPLE_DATA_DIR: path.join(process.cwd(), "sample-data"),
     },
     // Coverage configuration

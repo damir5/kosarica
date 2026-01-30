@@ -72,3 +72,7 @@ run = "echo '==> All codegen complete!'"
 [tasks.generate-jsonb]
 description = "Generate JSONB types (Zod -> JSON Schema -> Go)"
 run = "pnpm generate:jsonb"
+
+[tasks.reset-data]
+description = "Reset database and storage (preserves admin users). Add --yes or --dry-run flags as needed"
+run = "bash -c 'set -a; source .env.development; set +a; exec ./scripts/reset-data.sh \"$@\"' bash"

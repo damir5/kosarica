@@ -21,7 +21,6 @@ export default defineConfig({
       },
     },
     env: {
-      STORAGE_PATH: "./test-data/storage",
       SAMPLE_DATA_DIR: path.join(process.cwd(), "sample-data"),
       TEST_MOCK_GO_SERVICE: process.env.TEST_MOCK_GO_SERVICE || "0",
       PORT: process.env.PORT || "3002",

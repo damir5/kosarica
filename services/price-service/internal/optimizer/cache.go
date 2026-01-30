@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/semaphore"
+	"golang.org/x/sync/singleflight"
 )
 
 // PriceCache implements the group-aware price cache with per-chain sharding.
@@ -20,7 +21,7 @@ import (
 type PriceCache struct {
 	chainsMu sync.RWMutex
 	chains   map[string]*ChainCache
-	sf       singleFlightGroup
+	sf       singleflight.Group
 
 	db     *pgxpool.Pool
 	config *OptimizerConfig
@@ -44,20 +45,6 @@ type PriceCache struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
-}
-
-// singleFlightGroup prevents thundering herd on cache loads.
-// We use a custom type instead of golang.org/x/sync/singleflight to allow
-// dedicated load context (not request ctx) for better cancellation handling.
-type singleFlightGroup struct {
-	mu    sync.Mutex
-	calls map[string]*singleFlightCall
-}
-
-type singleFlightCall struct {
-	wg  sync.WaitGroup
-	val *ChainCacheSnapshot
-	err error
 }
 
 // ChainCache holds the price data for a single chain with atomic snapshot swaps.
@@ -647,36 +634,6 @@ func (c *PriceCache) getActiveChains(ctx context.Context) ([]string, error) {
 	}
 
 	return chains, rows.Err()
-}
-
-// Do executes a single-flight call.
-func (g *singleFlightGroup) Do(key string, fn func() (interface{}, error)) (interface{}, error, bool) {
-	g.mu.Lock()
-	if g.calls == nil {
-		g.calls = make(map[string]*singleFlightCall)
-	}
-
-	if call, ok := g.calls[key]; ok {
-		g.mu.Unlock()
-		call.wg.Wait()
-		return call.val, call.err, false // shared result
-	}
-
-	call := &singleFlightCall{}
-	call.wg.Add(1)
-	g.calls[key] = call
-	g.mu.Unlock()
-
-	// Execute function
-	result, err := fn()
-	call.val, call.err = result.(*ChainCacheSnapshot), err
-	call.wg.Done()
-
-	g.mu.Lock()
-	delete(g.calls, key)
-	g.mu.Unlock()
-
-	return call.val, call.err, true // new result
 }
 
 // Close gracefully shuts down the cache.

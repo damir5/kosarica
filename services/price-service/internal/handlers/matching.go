@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/jobs"
 	"github.com/kosarica/price-service/internal/matching"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
@@ -175,60 +176,34 @@ func (h *MatchingHandler) WarmupProductEmbeddings(c *gin.Context) {
 // GET /internal/matching/status
 func (h *MatchingHandler) GetMatchingStatus(c *gin.Context) {
 	ctx := c.Request.Context()
+	queries := sqlcgen.New(h.db)
 
-	// Get queue statistics
-	var pendingCount, approvedCount, rejectedCount int
-	_ = h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_match_queue WHERE status = 'pending'
-	`).Scan(&pendingCount)
-
-	_ = h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_match_queue WHERE status = 'approved'
-	`).Scan(&approvedCount)
-
-	_ = h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_match_queue WHERE status = 'rejected'
-	`).Scan(&rejectedCount)
-
-	// Get candidate statistics
-	var candidateCount int
-	_ = h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_match_candidates
-	`).Scan(&candidateCount)
-
-	// Get link statistics
-	var totalLinks int
-	_ = h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_links
-	`).Scan(&totalLinks)
-
-	var barcodeLinks int
-	_ = h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_links WHERE match_type = 'barcode'
-	`).Scan(&barcodeLinks)
-
-	var aiLinks int
-	_ = h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_links WHERE match_type = 'ai'
-	`).Scan(&aiLinks)
+	// Get all matching status in a single query
+	status, err := queries.GetMatchingStatus(ctx)
+	if err != nil {
+		slog.Error("failed to get matching status", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get matching status"})
+		return
+	}
 
 	// Get cleanup stats
 	cfg := jobs.DefaultCleanupConfig()
-	cleanupStats, _ := jobs.GetCleanupStats(ctx, h.db, cfg)
+	cleanupStats, err := jobs.GetCleanupStats(ctx, h.db, cfg)
+	if err != nil {
+		slog.Error("failed to get cleanup stats", "error", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"queue": gin.H{
-			"pending":  pendingCount,
-			"approved": approvedCount,
-			"rejected": rejectedCount,
+			"pending":  int(status.PendingCount),
+			"approved": int(status.ApprovedCount),
+			"rejected": int(status.RejectedCount),
 		},
 		"candidates": gin.H{
-			"total": candidateCount,
+			"total": int(status.CandidateCount),
 		},
 		"links": gin.H{
-			"total":   totalLinks,
-			"barcode": barcodeLinks,
-			"ai":      aiLinks,
+			"total": int(status.TotalLinks),
 		},
 		"cleanup": cleanupStats,
 	})
@@ -310,23 +285,19 @@ func RunAIMatching(cfg matching.AIMatcherConfig, runID string) (*matching.AIMatc
 func GetMatchingStatsJSON() (string, error) {
 	db := database.Pool()
 	ctx := context.Background()
+	queries := sqlcgen.New(db)
 
 	stats := make(map[string]interface{})
 
-	// Queue stats
-	var pendingCount int
-	_ = db.QueryRow(ctx, `SELECT COUNT(*) FROM product_match_queue WHERE status = 'pending'`).Scan(&pendingCount)
-	stats["pendingQueue"] = pendingCount
-
-	// Candidate stats
-	var candidateCount int
-	_ = db.QueryRow(ctx, `SELECT COUNT(*) FROM product_match_candidates`).Scan(&candidateCount)
-	stats["candidates"] = candidateCount
-
-	// Link stats
-	var linkCount int
-	_ = db.QueryRow(ctx, `SELECT COUNT(*) FROM product_links`).Scan(&linkCount)
-	stats["totalLinks"] = linkCount
+	// Get all stats using sqlc queries
+	status, err := queries.GetMatchingStatus(ctx)
+	if err != nil {
+		slog.Error("failed to get matching status", "error", err)
+	} else {
+		stats["pendingQueue"] = int(status.PendingCount)
+		stats["candidates"] = int(status.CandidateCount)
+		stats["totalLinks"] = int(status.TotalLinks)
+	}
 
 	bytes, err := json.Marshal(stats)
 	if err != nil {

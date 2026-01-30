@@ -3,11 +3,17 @@
 package jsonb
 
 type ArchiveMetadataJson struct {
+	// ContentType corresponds to the JSON schema field "contentType".
+	ContentType *string `json:"contentType,omitempty" yaml:"contentType,omitempty" mapstructure:"contentType,omitempty"`
+
 	// Encoding corresponds to the JSON schema field "encoding".
 	Encoding *string `json:"encoding,omitempty" yaml:"encoding,omitempty" mapstructure:"encoding,omitempty"`
 
 	// ExtractedFiles corresponds to the JSON schema field "extractedFiles".
 	ExtractedFiles []string `json:"extractedFiles,omitempty" yaml:"extractedFiles,omitempty" mapstructure:"extractedFiles,omitempty"`
+
+	// FileType corresponds to the JSON schema field "fileType".
+	FileType *string `json:"fileType,omitempty" yaml:"fileType,omitempty" mapstructure:"fileType,omitempty"`
 
 	// OriginalFilename corresponds to the JSON schema field "originalFilename".
 	OriginalFilename *string `json:"originalFilename,omitempty" yaml:"originalFilename,omitempty" mapstructure:"originalFilename,omitempty"`

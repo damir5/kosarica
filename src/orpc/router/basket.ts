@@ -14,7 +14,7 @@ import {
 	postInternalBasketOptimizeMulti,
 	postInternalBasketOptimizeSingle,
 } from "@/lib/go-api";
-import { unwrapSdkResponse } from "@/lib/go-api/client-config";
+import { unwrapSdkResponse } from "@/lib/go-api/utils";
 import { procedure } from "../base";
 
 // ============================================================================

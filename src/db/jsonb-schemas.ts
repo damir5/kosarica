@@ -69,6 +69,8 @@ export const archiveMetadata = z.looseObject({
 	originalFilename: z.string().optional(),
 	encoding: z.string().optional(),
 	extractedFiles: z.array(z.string()).optional(),
+	contentType: z.string().optional(),
+	fileType: z.string().optional(), // csv, xml, json, xlsx, zip
 });
 
 // ============================================================================

@@ -83,26 +83,27 @@ type MultiStoreResult struct {
 	AlgorithmUsed   string             `json:"algorithmUsed" jsonschema:"required"`
 }
 
-// Global optimizer instances (initialized by the application)
-var (
+// OptimizerHandler handles basket optimization HTTP endpoints
+type OptimizerHandler struct {
 	singleStoreOptimizer *optimizer.SingleStoreOptimizer
 	multiStoreOptimizer  *optimizer.MultiStoreOptimizer
 	priceCache           *optimizer.PriceCache
 	optimizerConfig      *optimizer.OptimizerConfig
-)
+}
 
-// InitOptimizers initializes the optimizer instances
-// This should be called during application startup
-func InitOptimizers(cache *optimizer.PriceCache, config *optimizer.OptimizerConfig, metrics *optimizer.MetricsRecorder) {
-	priceCache = cache
-	optimizerConfig = config
-	singleStoreOptimizer = optimizer.NewSingleStoreOptimizer(cache, config)
-	multiStoreOptimizer = optimizer.NewMultiStoreOptimizer(cache, config, metrics)
+// NewOptimizerHandler creates a new optimizer handler with injected dependencies
+func NewOptimizerHandler(cache *optimizer.PriceCache, config *optimizer.OptimizerConfig, metrics *optimizer.MetricsRecorder) *OptimizerHandler {
+	return &OptimizerHandler{
+		priceCache:           cache,
+		optimizerConfig:      config,
+		singleStoreOptimizer: optimizer.NewSingleStoreOptimizer(cache, config),
+		multiStoreOptimizer:  optimizer.NewMultiStoreOptimizer(cache, config, metrics),
+	}
 }
 
 // GetPriceCache returns the price cache instance
-func GetPriceCache() *optimizer.PriceCache {
-	return priceCache
+func (h *OptimizerHandler) GetPriceCache() *optimizer.PriceCache {
+	return h.priceCache
 }
 
 // OptimizeSingle handles single-store basket optimization
@@ -117,7 +118,7 @@ func GetPriceCache() *optimizer.PriceCache {
 // @Failure 500 {object} map[string]string "Internal server error"
 // @Failure 503 {object} map[string]string "Cache unavailable"
 // @Router /internal/basket/optimize/single [post]
-func OptimizeSingle(c *gin.Context) {
+func (h *OptimizerHandler) OptimizeSingle(c *gin.Context) {
 	var req OptimizeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -150,18 +151,18 @@ func OptimizeSingle(c *gin.Context) {
 	}
 
 	// Check if cache is healthy
-	if priceCache == nil {
+	if h.priceCache == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Cache not initialized"})
 		return
 	}
 
-	if !priceCache.IsHealthy(c.Request.Context()) {
+	if !h.priceCache.IsHealthy(c.Request.Context()) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Cache unavailable or stale"})
 		return
 	}
 
 	// Run optimization
-	results, err := singleStoreOptimizer.Optimize(c.Request.Context(), optimizeReq)
+	results, err := h.singleStoreOptimizer.Optimize(c.Request.Context(), optimizeReq)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -227,7 +228,7 @@ func OptimizeSingle(c *gin.Context) {
 // @Failure 503 {object} map[string]string "Cache unavailable"
 // @Failure 504 {object} map[string]string "Optimization timed out"
 // @Router /internal/basket/optimize/multi [post]
-func OptimizeMulti(c *gin.Context) {
+func (h *OptimizerHandler) OptimizeMulti(c *gin.Context) {
 	var req OptimizeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -269,18 +270,18 @@ func OptimizeMulti(c *gin.Context) {
 	}
 
 	// Check if cache is healthy
-	if priceCache == nil {
+	if h.priceCache == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Cache not initialized"})
 		return
 	}
 
-	if !priceCache.IsHealthy(c.Request.Context()) {
+	if !h.priceCache.IsHealthy(c.Request.Context()) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Cache unavailable or stale"})
 		return
 	}
 
 	// Run optimization
-	result, err := multiStoreOptimizer.Optimize(c.Request.Context(), optimizeReq)
+	result, err := h.multiStoreOptimizer.Optimize(c.Request.Context(), optimizeReq)
 	if err != nil {
 		// Check for timeout
 		if err.Error() == "context deadline exceeded" {
@@ -350,13 +351,13 @@ func OptimizeMulti(c *gin.Context) {
 // @Failure 500 {object} map[string]string "Internal server error"
 // @Failure 503 {object} map[string]string "Cache not initialized"
 // @Router /internal/basket/cache/warmup [post]
-func CacheWarmup(c *gin.Context) {
-	if priceCache == nil {
+func (h *OptimizerHandler) CacheWarmup(c *gin.Context) {
+	if h.priceCache == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Cache not initialized"})
 		return
 	}
 
-	err := priceCache.Warmup(c.Request.Context())
+	err := h.priceCache.Warmup(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to warm up cache: " + err.Error()})
 		return
@@ -380,19 +381,19 @@ func CacheWarmup(c *gin.Context) {
 // @Failure 500 {object} map[string]string "Internal server error"
 // @Failure 503 {object} map[string]string "Cache not initialized"
 // @Router /internal/basket/cache/refresh/{chainSlug} [post]
-func CacheRefresh(c *gin.Context) {
+func (h *OptimizerHandler) CacheRefresh(c *gin.Context) {
 	chainSlug := c.Param("chainSlug")
 	if chainSlug == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "chainSlug is required"})
 		return
 	}
 
-	if priceCache == nil {
+	if h.priceCache == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Cache not initialized"})
 		return
 	}
 
-	err := priceCache.RefreshChain(c.Request.Context(), chainSlug)
+	err := h.priceCache.RefreshChain(c.Request.Context(), chainSlug)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refresh cache: " + err.Error()})
 		return
@@ -414,8 +415,8 @@ func CacheRefresh(c *gin.Context) {
 // @Success 200 {object} map[string]interface{} "Cache health status"
 // @Failure 503 {object} map[string]string "Cache not initialized"
 // @Router /internal/basket/cache/health [get]
-func CacheHealth(c *gin.Context) {
-	if priceCache == nil {
+func (h *OptimizerHandler) CacheHealth(c *gin.Context) {
+	if h.priceCache == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status":  "error",
 			"message": "Cache not initialized",
@@ -423,7 +424,7 @@ func CacheHealth(c *gin.Context) {
 		return
 	}
 
-	freshness := priceCache.GetFreshness(c.Request.Context())
+	freshness := h.priceCache.GetFreshness(c.Request.Context())
 
 	chains := make([]gin.H, 0, len(freshness))
 	for chain, info := range freshness {
@@ -435,7 +436,7 @@ func CacheHealth(c *gin.Context) {
 		})
 	}
 
-	isHealthy := priceCache.IsHealthy(c.Request.Context())
+	isHealthy := h.priceCache.IsHealthy(c.Request.Context())
 	status := "ok"
 	if !isHealthy {
 		status = "degraded"
@@ -445,4 +446,16 @@ func CacheHealth(c *gin.Context) {
 		"status": status,
 		"chains": chains,
 	})
+}
+
+// RegisterOptimizerRoutes registers optimizer routes with the Gin router
+func RegisterOptimizerRoutes(r *gin.RouterGroup, handler *OptimizerHandler) {
+	basket := r.Group("/basket")
+	{
+		basket.POST("/optimize/single", handler.OptimizeSingle)
+		basket.POST("/optimize/multi", handler.OptimizeMulti)
+		basket.POST("/cache/warmup", handler.CacheWarmup)
+		basket.POST("/cache/refresh/:chainSlug", handler.CacheRefresh)
+		basket.GET("/cache/health", handler.CacheHealth)
+	}
 }

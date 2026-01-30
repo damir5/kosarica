@@ -91,7 +91,12 @@ func ParsePhase(ctx context.Context, chainID string, fetchResult *FetchResult, f
 			Int("error_count", len(parseResult.Errors)).
 			Str("filename", file.Filename).
 			Msg("Parse errors found")
-		for _, e := range parseResult.Errors[:5] { // Log first 5 errors
+		// Log first 5 errors (or all if fewer than 5)
+		errorsToLog := parseResult.Errors
+		if len(errorsToLog) > 5 {
+			errorsToLog = errorsToLog[:5]
+		}
+		for _, e := range errorsToLog {
 			event := log.Warn().
 				Str("error", e.Message).
 				Str("filename", file.Filename)

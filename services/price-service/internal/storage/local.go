@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -44,6 +43,7 @@ func (s *LocalStorage) Put(ctx context.Context, key string, content []byte, meta
 
 	var dataToStore []byte
 	var compressed bool
+	storePath := fullPath
 
 	// Determine if we should compress
 	if metadata != nil && len(content) >= MinCompressionSize {
@@ -52,10 +52,11 @@ func (s *LocalStorage) Put(ctx context.Context, key string, content []byte, meta
 			fileType = metadata.Custom["file_type"]
 		}
 		if ShouldCompress(fileType) {
-			compressedData, err := CompressWithZstd(content)
+			compressedData, err := CompressWithGzip(content)
 			if err == nil && len(compressedData) < len(content) {
 				dataToStore = compressedData
 				compressed = true
+				storePath = fullPath + ".gz"
 			}
 		}
 	}
@@ -64,7 +65,7 @@ func (s *LocalStorage) Put(ctx context.Context, key string, content []byte, meta
 		dataToStore = content
 	}
 
-	// Write metadata to a temporary file first (for atomic rename)
+	// Update metadata with compression info
 	if metadata != nil {
 		if metadata.Custom == nil {
 			metadata.Custom = make(map[string]string)
@@ -74,26 +75,11 @@ func (s *LocalStorage) Put(ctx context.Context, key string, content []byte, meta
 			metadata.Custom["original_size"] = fmt.Sprintf("%d", len(content))
 			metadata.CompressedSize = int64(len(dataToStore))
 		}
-		metaPath := fullPath + ".meta"
-		metaTmpPath := fullPath + ".meta.tmp"
-		metaBytes, err := json.Marshal(metadata)
-		if err != nil {
-			return fmt.Errorf("failed to marshal metadata: %w", err)
-		}
-		// Write to temporary file first
-		if err := os.WriteFile(metaTmpPath, metaBytes, 0644); err != nil {
-			return fmt.Errorf("failed to write temporary metadata %s: %w", metaTmpPath, err)
-		}
-		// Atomically rename to final metadata path
-		if err := os.Rename(metaTmpPath, metaPath); err != nil {
-			os.Remove(metaTmpPath) // Clean up temp file
-			return fmt.Errorf("failed to finalize metadata %s: %w", metaPath, err)
-		}
 	}
 
-	// Write content file (after metadata to ensure consistency on read)
-	if err := os.WriteFile(fullPath, dataToStore, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
+	// Write content file
+	if err := os.WriteFile(storePath, dataToStore, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", storePath, err)
 	}
 
 	return nil
@@ -103,35 +89,27 @@ func (s *LocalStorage) Put(ctx context.Context, key string, content []byte, meta
 func (s *LocalStorage) Get(ctx context.Context, key string) ([]byte, error) {
 	fullPath := s.keyToPath(key)
 
+	// Check if .gz version exists (compressed file)
+	gzPath := fullPath + ".gz"
+	if _, err := os.Stat(gzPath); err == nil {
+		content, err := os.ReadFile(gzPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read compressed file %s: %w", gzPath, err)
+		}
+		decompressed, err := DecompressGzip(content)
+		if err != nil {
+			return nil, fmt.Errorf("decompression failed for %s (file may be corrupted): %w", key, err)
+		}
+		return decompressed, nil
+	}
+
+	// Fall back to uncompressed file
 	content, err := os.ReadFile(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("file not found: %s", key)
 		}
 		return nil, fmt.Errorf("failed to read file %s: %w", fullPath, err)
-	}
-
-	// Check if compressed (handle missing .meta gracefully)
-	metaPath := fullPath + ".meta"
-	isCompressed := false
-
-	if metaBytes, err := os.ReadFile(metaPath); err == nil {
-		var metadata Metadata
-		if err := json.Unmarshal(metaBytes, &metadata); err == nil {
-			if metadata.Custom != nil && metadata.Custom["compressed"] == "true" {
-				isCompressed = true
-			}
-		}
-	}
-
-	if isCompressed {
-		decompressed, err := DecompressZstd(content)
-		if err != nil {
-			// Decompression failed - file may be corrupted
-			// Return error without deleting files - let caller decide how to handle
-			return nil, fmt.Errorf("decompression failed for %s (file may be corrupted): %w", key, err)
-		}
-		return decompressed, nil
 	}
 
 	return content, nil
@@ -141,16 +119,25 @@ func (s *LocalStorage) Get(ctx context.Context, key string) ([]byte, error) {
 func (s *LocalStorage) GetInfo(ctx context.Context, key string) (*FileInfo, error) {
 	fullPath := s.keyToPath(key)
 
-	stat, err := os.Stat(fullPath)
+	// Check for compressed version first
+	actualPath := fullPath
+	isCompressed := false
+	gzPath := fullPath + ".gz"
+	if _, err := os.Stat(gzPath); err == nil {
+		actualPath = gzPath
+		isCompressed = true
+	}
+
+	stat, err := os.Stat(actualPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("file not found: %s", key)
 		}
-		return nil, fmt.Errorf("failed to stat file %s: %w", fullPath, err)
+		return nil, fmt.Errorf("failed to stat file %s: %w", actualPath, err)
 	}
 
 	// Compute checksum
-	checksum, err := s.computeFileChecksum(fullPath)
+	checksum, err := s.computeFileChecksum(actualPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute checksum: %w", err)
 	}
@@ -162,13 +149,10 @@ func (s *LocalStorage) GetInfo(ctx context.Context, key string) (*FileInfo, erro
 		ModifiedAt: stat.ModTime(),
 	}
 
-	// Try to load metadata
-	metaPath := fullPath + ".meta"
-	if metaBytes, err := os.ReadFile(metaPath); err == nil {
-		var metadata Metadata
-		if err := json.Unmarshal(metaBytes, &metadata); err == nil {
-			info.Metadata = &metadata
-			info.ContentType = metadata.ContentType
+	// Add compression info if applicable
+	if isCompressed {
+		info.Metadata = &Metadata{
+			Custom: map[string]string{"compressed": "true"},
 		}
 	}
 
@@ -179,30 +163,33 @@ func (s *LocalStorage) GetInfo(ctx context.Context, key string) (*FileInfo, erro
 func (s *LocalStorage) Exists(ctx context.Context, key string) (bool, error) {
 	fullPath := s.keyToPath(key)
 
-	_, err := os.Stat(fullPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to stat file %s: %w", fullPath, err)
+	// Check for uncompressed file
+	if _, err := os.Stat(fullPath); err == nil {
+		return true, nil
 	}
 
-	return true, nil
+	// Check for compressed file
+	gzPath := fullPath + ".gz"
+	if _, err := os.Stat(gzPath); err == nil {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // Delete removes a file at the given key
 func (s *LocalStorage) Delete(ctx context.Context, key string) error {
 	fullPath := s.keyToPath(key)
 
-	// Delete content file
+	// Delete uncompressed content file
 	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete file %s: %w", fullPath, err)
 	}
 
-	// Delete metadata file if exists
-	metaPath := fullPath + ".meta"
-	if err := os.Remove(metaPath); err != nil && !os.IsNotExist(err) {
-		// Ignore metadata deletion errors
+	// Delete compressed file if exists
+	gzPath := fullPath + ".gz"
+	if err := os.Remove(gzPath); err != nil && !os.IsNotExist(err) {
+		// Ignore deletion errors for gz file
 	}
 
 	return nil
@@ -234,13 +221,14 @@ func (s *LocalStorage) List(ctx context.Context, prefix string) ([]string, error
 			return err
 		}
 
-		// Skip directories and metadata files
-		if info.IsDir() || strings.HasSuffix(path, ".meta") {
+		// Skip directories
+		if info.IsDir() {
 			return nil
 		}
 
-		// Convert path back to key
+		// Convert path back to key, stripping .gz extension if present
 		key := s.pathToKey(path)
+		key = strings.TrimSuffix(key, ".gz")
 
 		// Filter by prefix
 		if strings.HasPrefix(key, prefix) {
@@ -260,6 +248,13 @@ func (s *LocalStorage) List(ctx context.Context, prefix string) ([]string, error
 // GetChecksum returns the checksum for a file
 func (s *LocalStorage) GetChecksum(ctx context.Context, key string) (string, error) {
 	fullPath := s.keyToPath(key)
+
+	// Check for compressed version first
+	gzPath := fullPath + ".gz"
+	if _, err := os.Stat(gzPath); err == nil {
+		return s.computeFileChecksum(gzPath)
+	}
+
 	return s.computeFileChecksum(fullPath)
 }
 

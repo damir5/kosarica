@@ -28,6 +28,7 @@ import (
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/handlers"
 	"github.com/kosarica/price-service/internal/middleware"
+	"github.com/kosarica/price-service/internal/optimizer"
 	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/sweepers"
 )
@@ -63,6 +64,19 @@ func main() {
 	defer database.Close()
 
 	logger.Info().Msg("Database connected")
+
+	// Initialize optimizer components
+	optimizerConfig := optimizer.DefaultOptimizerConfig()
+	priceCache := optimizer.NewPriceCache(database.Pool(), optimizerConfig)
+	metricsRecorder := optimizer.NewMetricsRecorder()
+	optimizerHandler := handlers.NewOptimizerHandler(priceCache, optimizerConfig, metricsRecorder)
+
+	// Start cache warmup in background
+	go func() {
+		if err := priceCache.StartWarmup(ctx); err != nil {
+			logger.Error().Err(err).Msg("Failed to warmup price cache")
+		}
+	}()
 
 	if err := resumeInterruptedRuns(ctx, logger); err != nil {
 		logger.Warn().Err(err).Msg("Failed to resume interrupted runs")
@@ -124,6 +138,9 @@ func main() {
 		{
 			items.GET("/search", handlers.SearchItems)
 		}
+
+		// Register optimizer routes
+		handlers.RegisterOptimizerRoutes(internal, optimizerHandler)
 	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

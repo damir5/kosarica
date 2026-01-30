@@ -7,8 +7,6 @@ import { type DatabaseType, getDatabase } from "@/db";
 export interface AppEnv {
 	/** Postgres connection string */
 	DATABASE_URL: string;
-	/** Path to file storage directory */
-	STORAGE_PATH: string;
 	/** Better Auth secret */
 	BETTER_AUTH_SECRET: string;
 	/** Better Auth URL */
@@ -34,7 +32,6 @@ export function getEnv(): AppEnv {
 	}
 	return {
 		DATABASE_URL,
-		STORAGE_PATH: process.env.STORAGE_PATH || "./data/storage",
 		BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || "",
 		BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || "http://localhost:3002",
 		PASSKEY_RP_ID: process.env.PASSKEY_RP_ID || "localhost",

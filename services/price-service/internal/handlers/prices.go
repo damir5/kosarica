@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 )
@@ -343,19 +342,34 @@ func GetStorePricesViaGroup(c *gin.Context) {
 		return
 	}
 
-	// Enrich with retailer item details using sqlc
+	// Enrich with retailer item details using batch query to avoid N+1
+	// Collect all item IDs for batch fetch
+	itemIDs := make([]string, len(prices))
+	for i, price := range prices {
+		itemIDs[i] = price.RetailerItemID
+	}
+
+	// Batch fetch all item details in a single query
+	itemDetailsMap := make(map[string]sqlcgen.GetRetailerItemDetailsBatchRow)
+	if len(itemIDs) > 0 {
+		itemDetails, err := queries.GetRetailerItemDetailsBatch(ctx, itemIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch item details"})
+			return
+		}
+		// Build lookup map for O(1) access
+		for _, detail := range itemDetails {
+			itemDetailsMap[detail.ID] = detail
+		}
+	}
+
+	// Enrich prices using the batch-fetched data
 	enrichedPrices := []StorePrice{}
 	for _, price := range prices {
 		itemName := "Unknown Item"
 		var itemExternalID, brand, unit, unitQuantity *string
 
-		details, err := queries.GetRetailerItemDetails(ctx, price.RetailerItemID)
-		if err != nil {
-			if err != pgx.ErrNoRows {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch item details"})
-				return
-			}
-		} else {
+		if details, ok := itemDetailsMap[price.RetailerItemID]; ok {
 			itemName = details.Name
 			if details.ExternalID.Valid {
 				itemExternalID = &details.ExternalID.String

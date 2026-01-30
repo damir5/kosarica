@@ -11,6 +11,7 @@ import (
 	"github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/storage"
 	"github.com/kosarica/price-service/internal/types"
 	"github.com/rs/zerolog/log"
@@ -48,6 +49,12 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 	hash := computeSha256(fetched.Content)
 	fileSize := len(fetched.Content)
 
+	// Check file size limit (100MB max to prevent OOM)
+	const maxFileSize = 100 * 1024 * 1024 // 100MB
+	if fileSize > maxFileSize {
+		return nil, fmt.Errorf("file %s exceeds maximum size of 100MB (got %d bytes)", file.Filename, fileSize)
+	}
+
 	// Check for duplicate by checksum in archives table
 	existingArchive, err := database.GetArchiveByChecksum(ctx, hash)
 	if err != nil && err != pgx.ErrNoRows {
@@ -71,16 +78,12 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 	// Build storage key
 	storageKey := buildArchiveKey(chainID, file.Filename, time.Now())
 
-	// Store file in archive storage with metadata including file type
-	metadata := &storage.Metadata{
-		OriginalName: file.Filename,
-		ChainSlug:    chainID,
-		SourceURL:    file.URL,
-		DownloadedAt: time.Now(),
-		Custom:       map[string]string{"file_type": string(file.Type)},
+	// Storage metadata for compression decisions (file type determines if we compress)
+	storageMetadata := &storage.Metadata{
+		Custom: map[string]string{"file_type": string(file.Type)},
 	}
 
-	if err := storageBackend.Put(ctx, storageKey, fetched.Content, metadata); err != nil {
+	if err := storageBackend.Put(ctx, storageKey, fetched.Content, storageMetadata); err != nil {
 		return nil, fmt.Errorf("failed to store file: %w", err)
 	}
 
@@ -90,10 +93,17 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 	var isCompressed bool
 
 	// Check if file was compressed by storage layer
-	if metadata.CompressedSize > 0 {
-		cs := metadata.CompressedSize
+	if storageMetadata.CompressedSize > 0 {
+		cs := storageMetadata.CompressedSize
 		compressedSize64 = &cs
 		isCompressed = true
+	}
+
+	// Build database metadata (replaces .meta files)
+	fileTypeStr := string(file.Type)
+	dbMetadata := jsonb.ArchiveMetadata{
+		OriginalFilename: &file.Filename,
+		FileType:         &fileTypeStr,
 	}
 
 	archive := &database.Archive{
@@ -109,6 +119,7 @@ func FetchPhase(ctx context.Context, chainID string, file types.DiscoveredFile, 
 		IsCompressed:   isCompressed,
 		Checksum:       hash,
 		DownloadedAt:   time.Now(),
+		Metadata:       dbMetadata,
 	}
 
 	if err := database.CreateArchive(ctx, archive); err != nil {

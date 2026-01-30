@@ -170,6 +170,8 @@ func loadDotEnvFile(filename string) error {
 func bindEnvVars(v *viper.Viper) {
 	// Database
 	v.BindEnv("database.url", "DATABASE_URL")
+	v.BindEnv("database.max_connections", "PRICE_SERVICE_DATABASE_MAX_CONNECTIONS")
+	v.BindEnv("database.min_connections", "PRICE_SERVICE_DATABASE_MIN_CONNECTIONS")
 
 	// Server
 	v.BindEnv("server.port", "PORT")
@@ -191,8 +193,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.write_timeout", 30*time.Second)
 
 	// Database defaults
-	v.SetDefault("database.max_connections", 25)
-	v.SetDefault("database.min_connections", 5)
+	v.SetDefault("database.max_connections", 10)
+	v.SetDefault("database.min_connections", 2)
 	v.SetDefault("database.max_conn_lifetime", 1*time.Hour)
 	v.SetDefault("database.max_conn_idle_time", 30*time.Minute)
 

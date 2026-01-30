@@ -46,12 +46,12 @@ type Archive struct {
 	ContentType    pgtype.Text           `db:"content_type" json:"content_type"`
 	FileSize       pgtype.Int8           `db:"file_size" json:"file_size"`
 	CompressedSize pgtype.Int8           `db:"compressed_size" json:"compressed_size"`
-	IsCompressed   pgtype.Bool           `db:"is_compressed" json:"is_compressed"`
 	Checksum       string                `db:"checksum" json:"checksum"`
 	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
 	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
 	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
+	IsCompressed   pgtype.Bool           `db:"is_compressed" json:"is_compressed"`
 }
 
 type CanonicalBarcode struct {

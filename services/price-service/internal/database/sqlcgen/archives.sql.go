@@ -22,9 +22,28 @@ WHERE checksum = $1
 LIMIT 1
 `
 
-func (q *Queries) GetArchiveByChecksum(ctx context.Context, checksum string) (Archive, error) {
+type GetArchiveByChecksumRow struct {
+	ID             string                `db:"id" json:"id"`
+	ChainSlug      string                `db:"chain_slug" json:"chain_slug"`
+	SourceUrl      string                `db:"source_url" json:"source_url"`
+	Filename       string                `db:"filename" json:"filename"`
+	OriginalFormat string                `db:"original_format" json:"original_format"`
+	ArchivePath    string                `db:"archive_path" json:"archive_path"`
+	ArchiveType    string                `db:"archive_type" json:"archive_type"`
+	ContentType    pgtype.Text           `db:"content_type" json:"content_type"`
+	FileSize       pgtype.Int8           `db:"file_size" json:"file_size"`
+	CompressedSize pgtype.Int8           `db:"compressed_size" json:"compressed_size"`
+	IsCompressed   pgtype.Bool           `db:"is_compressed" json:"is_compressed"`
+	Checksum       string                `db:"checksum" json:"checksum"`
+	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
+	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
+	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetArchiveByChecksum(ctx context.Context, checksum string) (GetArchiveByChecksumRow, error) {
 	row := q.db.QueryRow(ctx, getArchiveByChecksum, checksum)
-	var i Archive
+	var i GetArchiveByChecksumRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChainSlug,
@@ -55,9 +74,28 @@ FROM archives
 WHERE id = $1
 `
 
-func (q *Queries) GetArchiveById(ctx context.Context, id string) (Archive, error) {
+type GetArchiveByIdRow struct {
+	ID             string                `db:"id" json:"id"`
+	ChainSlug      string                `db:"chain_slug" json:"chain_slug"`
+	SourceUrl      string                `db:"source_url" json:"source_url"`
+	Filename       string                `db:"filename" json:"filename"`
+	OriginalFormat string                `db:"original_format" json:"original_format"`
+	ArchivePath    string                `db:"archive_path" json:"archive_path"`
+	ArchiveType    string                `db:"archive_type" json:"archive_type"`
+	ContentType    pgtype.Text           `db:"content_type" json:"content_type"`
+	FileSize       pgtype.Int8           `db:"file_size" json:"file_size"`
+	CompressedSize pgtype.Int8           `db:"compressed_size" json:"compressed_size"`
+	IsCompressed   pgtype.Bool           `db:"is_compressed" json:"is_compressed"`
+	Checksum       string                `db:"checksum" json:"checksum"`
+	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
+	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
+	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetArchiveById(ctx context.Context, id string) (GetArchiveByIdRow, error) {
 	row := q.db.QueryRow(ctx, getArchiveById, id)
-	var i Archive
+	var i GetArchiveByIdRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChainSlug,
@@ -115,15 +153,34 @@ type ListArchivesByChainParams struct {
 	Offset    int32  `db:"offset" json:"offset"`
 }
 
-func (q *Queries) ListArchivesByChain(ctx context.Context, arg ListArchivesByChainParams) ([]Archive, error) {
+type ListArchivesByChainRow struct {
+	ID             string                `db:"id" json:"id"`
+	ChainSlug      string                `db:"chain_slug" json:"chain_slug"`
+	SourceUrl      string                `db:"source_url" json:"source_url"`
+	Filename       string                `db:"filename" json:"filename"`
+	OriginalFormat string                `db:"original_format" json:"original_format"`
+	ArchivePath    string                `db:"archive_path" json:"archive_path"`
+	ArchiveType    string                `db:"archive_type" json:"archive_type"`
+	ContentType    pgtype.Text           `db:"content_type" json:"content_type"`
+	FileSize       pgtype.Int8           `db:"file_size" json:"file_size"`
+	CompressedSize pgtype.Int8           `db:"compressed_size" json:"compressed_size"`
+	IsCompressed   pgtype.Bool           `db:"is_compressed" json:"is_compressed"`
+	Checksum       string                `db:"checksum" json:"checksum"`
+	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
+	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
+	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListArchivesByChain(ctx context.Context, arg ListArchivesByChainParams) ([]ListArchivesByChainRow, error) {
 	rows, err := q.db.Query(ctx, listArchivesByChain, arg.ChainSlug, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Archive{}
+	items := []ListArchivesByChainRow{}
 	for rows.Next() {
-		var i Archive
+		var i ListArchivesByChainRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ChainSlug,

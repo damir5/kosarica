@@ -52,6 +52,56 @@ func (q *Queries) CountStorePrices(ctx context.Context, arg CountStorePricesPara
 	return count, err
 }
 
+const getRetailerItemDetailsBatch = `-- name: GetRetailerItemDetailsBatch :many
+SELECT
+    ri.id,
+    ri.name,
+    ri.external_id,
+    ri.brand,
+    ri.unit,
+    ri.unit_quantity
+FROM retailer_items ri
+WHERE ri.id = ANY($1::text[])
+`
+
+type GetRetailerItemDetailsBatchRow struct {
+	ID           string      `db:"id" json:"id"`
+	Name         string      `db:"name" json:"name"`
+	ExternalID   pgtype.Text `db:"external_id" json:"external_id"`
+	Brand        pgtype.Text `db:"brand" json:"brand"`
+	Unit         pgtype.Text `db:"unit" json:"unit"`
+	UnitQuantity pgtype.Text `db:"unit_quantity" json:"unit_quantity"`
+}
+
+// Batch fetch retailer item details for multiple IDs
+// Used to avoid N+1 queries when enriching price data
+func (q *Queries) GetRetailerItemDetailsBatch(ctx context.Context, itemIds []string) ([]GetRetailerItemDetailsBatchRow, error) {
+	rows, err := q.db.Query(ctx, getRetailerItemDetailsBatch, itemIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRetailerItemDetailsBatchRow{}
+	for rows.Next() {
+		var i GetRetailerItemDetailsBatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.ExternalID,
+			&i.Brand,
+			&i.Unit,
+			&i.UnitQuantity,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listStorePricesWithDetails = `-- name: ListStorePricesWithDetails :many
 SELECT
     ri.id as retailer_item_id,

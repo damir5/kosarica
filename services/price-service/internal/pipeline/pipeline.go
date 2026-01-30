@@ -63,7 +63,7 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 	}
 
 	// Initialize storage backend
-	storageBackend, err := storage.NewLocalStorage("./data/archives")
+	storageBackend, err := storage.NewLocalStorage("./data")
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
@@ -118,7 +118,7 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 
 	// Calculate parallelism based on DB pool size
 	dbPool := database.Pool()
-	dbMaxConns := int32(25) // Default from config
+	dbMaxConns := int32(10) // Default from config
 	if dbPool != nil {
 		dbMaxConns = dbPool.Config().MaxConns
 	}

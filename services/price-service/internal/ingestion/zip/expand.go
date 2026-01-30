@@ -280,13 +280,10 @@ func (e *Expander) ExpandAndStore(
 
 		key := storage.BuildExpandedKey(chainSlug, date, parentFilename, file.InnerFilename)
 
+		// Metadata only for compression decisions (file type)
 		metadata := &storage.Metadata{
-			ContentType:  detectContentType(file.InnerFilename),
-			OriginalName: file.InnerFilename,
-			ChainSlug:    chainSlug,
-			DownloadedAt: time.Now(),
 			Custom: map[string]string{
-				"parentZip": parentFilename,
+				"file_type": string(detectFileType(file.InnerFilename)),
 			},
 		}
 

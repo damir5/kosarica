@@ -6,7 +6,7 @@
  * Can be called via cron schedule (6 AM daily) or manual trigger.
  */
 
-import { goFetch } from "@/lib/go-service-client";
+import { goFetchWithRetry } from "@/lib/go-service-client";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("daily-ingestion");
@@ -18,19 +18,96 @@ export interface DailyIngestionResult {
 }
 
 /**
+ * Process an array of items with limited concurrency
+ * Similar to p-limit but implemented natively
+ */
+async function asyncPool<T, R>(
+	concurrency: number,
+	items: T[],
+	fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+	const results: R[] = new Array(items.length);
+	const executing: Promise<void>[] = [];
+
+	for (let i = 0; i < items.length; i++) {
+		const promise = fn(items[i]).then((result) => {
+			results[i] = result;
+		});
+
+		executing.push(promise);
+
+		if (executing.length >= concurrency) {
+			await Promise.race(executing);
+			// Remove completed promises
+			const index = executing.indexOf(promise);
+			if (index > -1) {
+				executing.splice(index, 1);
+			}
+		}
+	}
+
+	await Promise.all(executing);
+	return results;
+}
+
+/**
+ * Trigger ingestion for a single chain with timeout and retry
+ */
+async function triggerChainIngestion(chain: string): Promise<boolean> {
+	try {
+		log.info(`Triggering ingestion for chain: ${chain}`);
+
+		// Trigger ingestion via Go service with 30s timeout and retry
+		const response = await goFetchWithRetry(`/internal/admin/ingest/${chain}`, {
+			method: "POST",
+			timeout: 30000, // 30 seconds
+			maxRetries: 2,
+			retryDelay: 1000,
+		});
+
+		if (!response.success) {
+			throw new Error(response.error || "Failed to trigger ingestion");
+		}
+
+		const result = response.data as {
+			runId: string;
+			status: string;
+			pollUrl: string;
+		};
+
+		log.info(`Ingestion triggered for ${chain}`, {
+			runId: result.runId,
+			status: result.status,
+		});
+
+		return true;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		log.error(`Failed to trigger ingestion for ${chain}`, { error: message });
+		return false;
+	}
+}
+
+/**
  * Run daily ingestion for all chains.
  * Fetches chain list from Go service and triggers ingestion for each.
+ * Processes chains in parallel with limited concurrency for better performance.
  */
 export async function runDailyIngestion(): Promise<DailyIngestionResult> {
 	log.info("Starting daily ingestion job");
 
-	// Fetch chains dynamically from Go service
+	// Fetch chains dynamically from Go service with timeout
 	let chains: string[];
 	try {
-		const response = await goFetch("/internal/chains");
+		const response = await goFetchWithRetry("/internal/chains", {
+			timeout: 10000, // 10 seconds
+			maxRetries: 2,
+		});
+
 		if (!response.success) {
 			throw new Error(response.error || "Failed to fetch chains");
 		}
+
 		const data = response.data as { chains: string[] };
 		chains = data.chains;
 		log.info(`Fetched ${chains.length} chains from Go service`);
@@ -39,45 +116,17 @@ export async function runDailyIngestion(): Promise<DailyIngestionResult> {
 		throw error;
 	}
 
-	let successful = 0;
-	let failed = 0;
+	// Process chains in parallel with limited concurrency (5 concurrent)
+	const CONCURRENCY_LIMIT = 5;
+	const results = await asyncPool(
+		CONCURRENCY_LIMIT,
+		chains,
+		triggerChainIngestion,
+	);
 
-	for (const chain of chains) {
-		try {
-			log.info(`Triggering ingestion for chain: ${chain}`);
-
-			// Trigger ingestion via Go service (returns 202 immediately)
-			const response = await goFetch(`/internal/admin/ingest/${chain}`, {
-				method: "POST",
-			});
-
-			if (!response.success) {
-				throw new Error(response.error || "Failed to trigger ingestion");
-			}
-
-			const result = response.data as {
-				runId: string;
-				status: string;
-				pollUrl: string;
-			};
-
-			log.info(`Ingestion triggered for ${chain}`, {
-				runId: result.runId,
-				status: result.status,
-			});
-
-			successful++;
-
-			// Add 1 second delay between chains to avoid overwhelming the service
-			if (chain !== chains[chains.length - 1]) {
-				await new Promise((resolve) => setTimeout(resolve, 1000));
-			}
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			log.error(`Failed to trigger ingestion for ${chain}`, { error: message });
-			failed++;
-		}
-	}
+	// Count results
+	const successful = results.filter((r) => r).length;
+	const failed = results.length - successful;
 
 	const summary: DailyIngestionResult = {
 		totalChains: chains.length,

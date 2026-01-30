@@ -91,7 +91,7 @@ func GetArchiveByChecksum(ctx context.Context, checksum string) (*Archive, error
 		return nil, err
 	}
 
-	return convertSqlcArchive(row), nil
+	return convertGetArchiveByChecksumRow(row), nil
 }
 
 // GetArchiveByID retrieves an archive by its ID
@@ -106,7 +106,7 @@ func GetArchiveByID(ctx context.Context, id string) (*Archive, error) {
 		return nil, err
 	}
 
-	return convertSqlcArchive(row), nil
+	return convertGetArchiveByIdRow(row), nil
 }
 
 // GetArchivesByChain retrieves archives for a chain with pagination
@@ -124,7 +124,7 @@ func GetArchivesByChain(ctx context.Context, chainSlug string, limit, offset int
 
 	archives := make([]Archive, len(rows))
 	for i, row := range rows {
-		archives[i] = *convertSqlcArchive(row)
+		archives[i] = *convertListArchivesByChainRow(row)
 	}
 
 	return archives, nil
@@ -189,6 +189,69 @@ func convertSqlcArchive(a sqlcgen.Archive) *Archive {
 	}
 }
 
+func convertGetArchiveByChecksumRow(a sqlcgen.GetArchiveByChecksumRow) *Archive {
+	return &Archive{
+		ID:             a.ID,
+		ChainSlug:      a.ChainSlug,
+		SourceURL:      a.SourceUrl,
+		Filename:       a.Filename,
+		OriginalFormat: a.OriginalFormat,
+		ArchivePath:    a.ArchivePath,
+		ArchiveType:    a.ArchiveType,
+		ContentType:    pgTextToStringPtr(a.ContentType),
+		FileSize:       pgInt8ToInt64Ptr(a.FileSize),
+		CompressedSize: pgInt8ToInt64Ptr(a.CompressedSize),
+		IsCompressed:   a.IsCompressed.Bool,
+		Checksum:       a.Checksum,
+		DownloadedAt:   a.DownloadedAt.Time,
+		Metadata:       a.Metadata,
+		CreatedAt:      a.CreatedAt.Time,
+		UpdatedAt:      a.UpdatedAt.Time,
+	}
+}
+
+func convertGetArchiveByIdRow(a sqlcgen.GetArchiveByIdRow) *Archive {
+	return &Archive{
+		ID:             a.ID,
+		ChainSlug:      a.ChainSlug,
+		SourceURL:      a.SourceUrl,
+		Filename:       a.Filename,
+		OriginalFormat: a.OriginalFormat,
+		ArchivePath:    a.ArchivePath,
+		ArchiveType:    a.ArchiveType,
+		ContentType:    pgTextToStringPtr(a.ContentType),
+		FileSize:       pgInt8ToInt64Ptr(a.FileSize),
+		CompressedSize: pgInt8ToInt64Ptr(a.CompressedSize),
+		IsCompressed:   a.IsCompressed.Bool,
+		Checksum:       a.Checksum,
+		DownloadedAt:   a.DownloadedAt.Time,
+		Metadata:       a.Metadata,
+		CreatedAt:      a.CreatedAt.Time,
+		UpdatedAt:      a.UpdatedAt.Time,
+	}
+}
+
+func convertListArchivesByChainRow(a sqlcgen.ListArchivesByChainRow) *Archive {
+	return &Archive{
+		ID:             a.ID,
+		ChainSlug:      a.ChainSlug,
+		SourceURL:      a.SourceUrl,
+		Filename:       a.Filename,
+		OriginalFormat: a.OriginalFormat,
+		ArchivePath:    a.ArchivePath,
+		ArchiveType:    a.ArchiveType,
+		ContentType:    pgTextToStringPtr(a.ContentType),
+		FileSize:       pgInt8ToInt64Ptr(a.FileSize),
+		CompressedSize: pgInt8ToInt64Ptr(a.CompressedSize),
+		IsCompressed:   a.IsCompressed.Bool,
+		Checksum:       a.Checksum,
+		DownloadedAt:   a.DownloadedAt.Time,
+		Metadata:       a.Metadata,
+		CreatedAt:      a.CreatedAt.Time,
+		UpdatedAt:      a.UpdatedAt.Time,
+	}
+}
+
 func stringPtrToPgText(s *string) pgtype.Text {
 	if s == nil {
 		return pgtype.Text{Valid: false}
@@ -216,4 +279,3 @@ func pgInt8ToInt64Ptr(p pgtype.Int8) *int64 {
 	}
 	return &p.Int64
 }
-

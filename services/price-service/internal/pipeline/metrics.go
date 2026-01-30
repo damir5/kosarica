@@ -2,22 +2,36 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
 var (
-	meter                           = otel.Meter("github.com/kosarica/price-service/pipeline")
-	phaseDurationHistogram      metric.Float64Histogram
-	entriesPerSecondCounter     metric.Float64Counter
-	filesProcessedCounter       metric.Int64Counter
-	concurrentWorkersGauge      metric.Int64UpDownCounter
+	meter                   = otel.Meter("github.com/kosarica/price-service/pipeline")
+	phaseDurationHistogram  metric.Float64Histogram
+	entriesPerSecondCounter metric.Float64Counter
+	filesProcessedCounter   metric.Int64Counter
+	concurrentWorkersGauge  metric.Int64UpDownCounter
+	metricsInitialized      bool
+	metricsInitError        error
 )
 
 func init() {
+	if err := initMetrics(); err != nil {
+		// Log error but don't panic - metrics are not critical for functionality
+		log.Error().Err(err).Msg("Failed to initialize pipeline metrics, continuing without metrics")
+		metricsInitError = err
+	}
+}
+
+// initMetrics initializes the OpenTelemetry metrics for the pipeline
+// Returns an error if initialization fails instead of panicking
+func initMetrics() error {
 	var err error
 
 	// Phase duration histogram: measures how long each pipeline phase takes
@@ -27,7 +41,7 @@ func init() {
 		metric.WithUnit("s"),
 	)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to create phase duration histogram: %w", err)
 	}
 
 	// Entries per second counter: measures throughput of persisted entries
@@ -37,7 +51,7 @@ func init() {
 		metric.WithUnit("{entries}"),
 	)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to create entries counter: %w", err)
 	}
 
 	// Files processed counter: measures number of files processed
@@ -47,7 +61,7 @@ func init() {
 		metric.WithUnit("{files}"),
 	)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to create files counter: %w", err)
 	}
 
 	// Concurrent workers gauge: measures current number of parallel workers
@@ -57,8 +71,21 @@ func init() {
 		metric.WithUnit("{workers}"),
 	)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to create workers gauge: %w", err)
 	}
+
+	metricsInitialized = true
+	return nil
+}
+
+// MetricsInitialized returns true if metrics were successfully initialized
+func MetricsInitialized() bool {
+	return metricsInitialized
+}
+
+// MetricsInitError returns the error from metrics initialization (if any)
+func MetricsInitError() error {
+	return metricsInitError
 }
 
 // PipelinePhase represents the different phases of the ingestion pipeline

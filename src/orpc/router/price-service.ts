@@ -32,7 +32,7 @@ import {
 	type HandlersSearchItemsResponse,
 	postInternalIngestionRunsByRunIdRerun,
 } from "@/lib/go-api";
-import { unwrapSdkResponse } from "@/lib/go-api/client-config";
+import { unwrapSdkResponse } from "@/lib/go-api/utils";
 import { goFetchWithRetry, unwrapResponse } from "@/lib/go-service-client";
 import { procedure } from "../base";
 
@@ -91,7 +91,11 @@ export const getRun = procedure
 		const result = await getInternalIngestionRunsByRunId({
 			path: { runId: input.runId },
 		});
-		return unwrapSdkResponse<HandlersIngestionRun>(result);
+		const data = unwrapSdkResponse<HandlersIngestionRun>(result);
+		if (!data) {
+			throw new Error(`Run not found: ${input.runId}`);
+		}
+		return data;
 	});
 
 /**
@@ -244,6 +248,9 @@ export const getStats = procedure
 			},
 		});
 		const response = unwrapSdkResponse<HandlersGetStatsResponse>(result);
+		if (!response) {
+			throw new Error("Failed to get ingestion stats");
+		}
 
 		// Find the matching bucket or use the first one
 		const bucket =
@@ -352,7 +359,11 @@ export const getFile = procedure
 		const result = await getInternalIngestionFilesByFileId({
 			path: { fileId: input.fileId },
 		});
-		return unwrapSdkResponse<HandlersIngestionFile>(result);
+		const data = unwrapSdkResponse<HandlersIngestionFile>(result);
+		if (!data) {
+			throw new Error(`File not found: ${input.fileId}`);
+		}
+		return data;
 	});
 
 /**

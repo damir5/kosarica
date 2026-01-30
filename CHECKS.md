@@ -45,3 +45,8 @@ pnpm test              # Run tests
 | `src/db/schema.ts` | `pnpm db:generate && pnpm db:migrate && mise run generate-all` |
 | `src/db/jsonb-schemas.ts` | `mise run generate-all` |
 | Go handler responses | `mise run generate-all` |
+
+
+## more
+
+- NEVER use RAW sql queries - use SQLC in go and drizzle in ts

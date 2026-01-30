@@ -130,12 +130,14 @@ export class TaskQueueWorker {
 			}
 		};
 
-		this.runningTasks.add(executeTask());
+		// Store the promise reference to properly track it
+		const taskPromise = executeTask();
+		this.runningTasks.add(taskPromise);
 
 		try {
-			await executeTask();
+			await taskPromise;
 		} finally {
-			this.runningTasks.delete(executeTask());
+			this.runningTasks.delete(taskPromise);
 		}
 	}
 

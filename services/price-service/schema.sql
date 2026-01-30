@@ -27,13 +27,20 @@ CREATE SCHEMA drizzle;
 ALTER SCHEMA drizzle OWNER TO kosarica;
 
 --
--- Name: public; Type: SCHEMA; Schema: -; Owner: damir
+-- Name: public; Type: SCHEMA; Schema: -; Owner: kosarica
 --
 
 -- *not* creating schema, since initdb creates it
 
 
-ALTER SCHEMA public OWNER TO damir;
+ALTER SCHEMA public OWNER TO kosarica;
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: kosarica
+--
+
+COMMENT ON SCHEMA public IS '';
+
 
 --
 -- Name: claim_tasks(text, text[], integer); Type: FUNCTION; Schema: public; Owner: kosarica
@@ -67,38 +74,6 @@ $$;
 
 
 ALTER FUNCTION public.claim_tasks(p_worker_id text, p_task_types text[], p_max_tasks integer) OWNER TO kosarica;
-
---
--- Name: claim_tasks(text, text[], integer, integer); Type: FUNCTION; Schema: public; Owner: kosarica
---
-
-CREATE FUNCTION public.claim_tasks(p_worker_id text, p_task_types text[], p_max_tasks integer, lease_duration_minutes integer DEFAULT 30) RETURNS TABLE(out_id text, out_task_type text, out_payload jsonb)
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  RETURN QUERY
-  UPDATE task_queue
-  SET status = 'processing',
-      started_at = NOW(),
-      worker_id = p_worker_id,
-      leased_until = NOW() + (lease_duration_minutes || ' minutes')::INTERVAL,
-      updated_at = NOW()
-  WHERE id IN (
-    SELECT id
-    FROM task_queue
-    WHERE status = 'pending'
-      AND scheduled_for <= NOW()
-      AND (p_task_types IS NULL OR task_type = ANY(p_task_types))
-    ORDER BY priority DESC, scheduled_for ASC
-    FOR UPDATE SKIP LOCKED
-    LIMIT p_max_tasks
-  )
-  RETURNING id, task_type, payload;
-END;
-$$;
-
-
-ALTER FUNCTION public.claim_tasks(p_worker_id text, p_task_types text[], p_max_tasks integer, lease_duration_minutes integer) OWNER TO kosarica;
 
 --
 -- Name: cleanup_old_tasks(integer); Type: FUNCTION; Schema: public; Owner: kosarica
@@ -220,27 +195,6 @@ $$;
 
 ALTER FUNCTION public.recover_orphaned_tasks() OWNER TO kosarica;
 
---
--- Name: schedule_task(text, jsonb, integer, timestamp with time zone, integer); Type: FUNCTION; Schema: public; Owner: kosarica
---
-
-CREATE FUNCTION public.schedule_task(task_type text, payload jsonb, priority integer, scheduled_for timestamp with time zone, max_retries integer) RETURNS text
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  new_id TEXT;
-BEGIN
-  INSERT INTO task_queue (task_type, payload, priority, scheduled_for, max_retries)
-  VALUES ($1, $2, $3, $4, $5)
-  RETURNING id INTO new_id;
-  
-  RETURN new_id;
-END;
-$_$;
-
-
-ALTER FUNCTION public.schedule_task(task_type text, payload jsonb, priority integer, scheduled_for timestamp with time zone, max_retries integer) OWNER TO kosarica;
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -335,12 +289,12 @@ CREATE TABLE public.archives (
     content_type text,
     file_size bigint,
     compressed_size bigint,
-    is_compressed boolean DEFAULT false,
     checksum text NOT NULL,
     downloaded_at timestamp with time zone NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_compressed boolean DEFAULT false
 );
 
 
@@ -2540,19 +2494,10 @@ ALTER TABLE ONLY public.stores
 
 
 --
--- Name: SCHEMA public; Type: ACL; Schema: -; Owner: damir
+-- Name: SCHEMA public; Type: ACL; Schema: -; Owner: kosarica
 --
 
 REVOKE USAGE ON SCHEMA public FROM PUBLIC;
-GRANT ALL ON SCHEMA public TO PUBLIC;
-GRANT ALL ON SCHEMA public TO kosarica;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: damir
---
-
-ALTER DEFAULT PRIVILEGES FOR ROLE damir IN SCHEMA public GRANT ALL ON TABLES  TO kosarica;
 
 
 --

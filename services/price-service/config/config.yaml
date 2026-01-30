@@ -8,8 +8,8 @@ server:
 
 database:
   url: ""
-  max_connections: 100
-  min_connections: 10
+  max_connections: 10
+  min_connections: 2
   max_conn_lifetime: 1h
   max_conn_idle_time: 30m
 
@@ -21,7 +21,7 @@ rate_limit:
 
 storage:
   type: "local"
-  base_path: "./data/archives"
+  base_path: "./data"
 
 logging:
   level: "info"
