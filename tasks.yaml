@@ -1,266 +1,506 @@
 tasks:
-  # Phase 1: Schema Fixes (enables ingestion)
-  - title: Make retailer_items.barcode nullable
-    description: |
-      In `src/db/schema.ts`:
-      Make `retailer_items.barcode` nullable (legacy column, not used)
-    completed: true
+  # ==================================
+  # PHASE 1: Environment Setup
+  # ==================================
 
-  - title: Make retailer_items.retailer_item_id nullable
+  - title: Reset database to clean state
     description: |
-      In `src/db/schema.ts`:
-      Make `retailer_items.retailer_item_id` nullable (legacy column, not used)
-    completed: true
+      Run `mise run reset-data --yes` to clear all ingestion data while preserving admin users.
 
-  - title: Add retailer_item_barcodes table definition
-    description: |
-      In `src/db/schema.ts`:
-      Add `retailer_item_barcodes` table definition
-    completed: true
+      This ensures a known starting state for debugging. Verify with:
+      ```sql
+      SELECT COUNT(*) FROM retailer_items;  -- Should be 0
+      SELECT COUNT(*) FROM stores;          -- Should be 0
+      SELECT COUNT(*) FROM ingestion_runs;  -- Should be 0
+      SELECT COUNT(*) FROM task_queue;      -- Should be 0
+      ```
+    completed: false
 
-  - title: Add unique index on retailer_items(chain_slug, external_id)
+  - title: Start main Node.js app with logging
     description: |
-      In `src/db/schema.ts`:
-      Add unique index on `retailer_items(chain_slug, external_id)`
-    completed: true
-
-  - title: Add unique index on store_item_state(store_id, retailer_item_id)
-    description: |
-      In `src/db/schema.ts`:
-      Make `store_item_state(store_id, retailer_item_id)` unique index
-    completed: true
-
-  - title: Generate and apply schema migration
-    description: |
-      Test Phase 1 schema changes:
+      In Terminal 1, run:
       ```bash
-      pnpm db:generate  # creates migration
-      pnpm db:migrate   # applies to DB
+      cd /workspace && mise run dev | tee log/log.txt
       ```
-    completed: true
 
-  # Phase 2: sqlc Query Files
-  - title: Create sqlc query files for all Go queries
-    description: |
-      Goal: Create .sql files for ALL queries currently in Go
-
-      New files in `services/price-service/internal/database/queries/`:
-
-      | File | Queries from |
-      |------|--------------|
-      | `stores.sql` | persist.go (createStore, findStoreByIdentifier) |
-      | `store_identifiers.sql` | persist.go |
-      | `retailer_items.sql` | persist.go (findOrCreate, update) |
-      | `retailer_item_barcodes.sql` | persist.go (insert barcode) |
-      | `store_item_state.sql` | persist.go (upsert) |
-      | `price_groups.sql` | price_groups.go (all 13 queries) |
-      | `archives.sql` | archive.go (all 6 queries) |
-      | `ingestion.sql` | existing + ingest.go, parse.go, discover.go, pipeline.go |
-      | `prices.sql` | handlers/prices.go (7 queries) |
-      | `runs.sql` | handlers/runs.go (11 queries) |
-      | `failed_rows.sql` | handlers/failed_rows.go (6 queries) |
-      | `errors.sql` | handlers/error_summary.go |
-      | `workers.sql` | workers/worker.go |
-      | `jobs.sql` | jobs/cleanup_database.go |
-      | `sweepers.sql` | sweepers/taskqueue.go |
-    completed: true
-
-  - title: Generate and verify sqlc types
-    description: |
-      Test Phase 2:
+      Ensure the `log/` directory exists first:
       ```bash
-      cd services/price-service
-      mise run sqlc-generate  # should generate all types
-      go build ./...          # should compile
+      mkdir -p /workspace/log
       ```
-    completed: true
 
-  # Phase 3: Update persist.go (Barcode Fix)
-  - title: Update persist.go to use sqlc and fix barcode saving
+      Verify app is running by checking for "Server listening on port" message.
+      Keep this terminal open throughout the session.
+    completed: false
+
+  - title: Start Go price-service with logging
     description: |
-      Goal: Replace raw SQL with sqlc, ensure barcode saved
-
-      Key changes:
-      1. Import `sqlcgen` package
-      2. Replace `pool.Exec/Query` with `queries.XXX()`
-      3. In `findOrCreateRetailerItem`: after creating item, insert first barcode to `retailer_item_barcodes`
-      4. Remove duplicate barcode insertion loop (was inserting to non-existent table)
-
-      Barcode flow:
-      ```go
-      // In persistRowsForStore or findOrCreateRetailerItem:
-      if len(row.Barcodes) > 0 && row.Barcodes[0] != "" {
-          queries.InsertRetailerItemBarcode(ctx, sqlcgen.InsertRetailerItemBarcodeParams{
-              ID:             cuid2.Generate("rib"),
-              RetailerItemID: itemID,
-              Barcode:        row.Barcodes[0],
-              IsPrimary:      true,
-          })
-      }
-      ```
-    completed: true
-
-  - title: Test barcode ingestion
-    description: |
-      Test Phase 3:
+      In Terminal 2, run:
       ```bash
-      DATABASE_URL=... ./cli ingest konzum
-      psql -c "SELECT COUNT(*) FROM retailer_item_barcodes"  # should have barcodes
+      cd /workspace/services/price-service && mise run dev | tee ../../log/price-service.txt
       ```
 
-      Completed: Created comprehensive automated tests in barcode_ingestion_test.go (16 tests)
-      that verify the barcode ingestion flow without requiring a live database:
-      - SqlcQueryExists: verifies InsertRetailerItemBarcode query is generated
-      - ParamsHaveCorrectFields: verifies all required fields (ID, RetailerItemID, Barcode, IsPrimary)
-      - QueryFileHasOnConflictDoNothing: verifies SQL handles duplicates gracefully
-      - PersistGoCallsBarcodeInsertion: verifies persist.go calls InsertRetailerItemBarcode
-      - BarcodeInsertedInFindOrCreate: verifies barcode insertion is in findOrCreateRetailerItem
-      - NoDuplicateBarcodeLoop: verifies no duplicate insertion loop in persistRowsForStore
-      - CuidPrefixUsed: verifies "rib" prefix is used for barcode IDs
-      - RetailerItemBarcodesTableSchema: verifies schema has required columns
-      - UpsertRetailerItemReturnsID: verifies item upsert returns ID for barcode linking
-      - BarcodeInsertionWithPgtypeBool: verifies pgtype.Bool handling for is_primary
-      - NormalizedRowHasBarcodes: verifies NormalizedRow type has Barcodes field
-      - FlowFromRowToDatabase: verifies complete barcode flow
-      - QueryFileLocation: verifies query file is in correct location
-      - SqlcGeneratedFileExists: verifies generated Go file exists
+      Verify service is running by checking for:
+      - "Starting HTTP server on :8081" (or configured port)
+      - "Starting worker pool" messages for each worker type
+      - "Resuming interrupted runs" (may be empty on clean DB)
 
-      Note: Manual database connectivity tests (live ingestion) require a running database.
-    completed: true
+      Keep this terminal open throughout the session.
+    completed: false
 
-  # Phase 4: Update All Other Go Files
-  - title: Convert all remaining raw SQL queries to sqlc
+  - title: Verify service connectivity
     description: |
-      Goal: Convert remaining 70+ raw queries
+      Test that both services are running and can communicate:
 
-      Files to update:
-      - `internal/database/price_groups.go` → use queries from price_groups.sql ✅
-      - `internal/database/archive.go` → use queries from archives.sql ✅
-      - `internal/handlers/prices.go` → use queries from prices.sql ✅
-      - `internal/handlers/runs.go` → use queries from runs.sql ✅
-      - `internal/handlers/ingest.go` → use queries from ingestion.sql ✅
-      - `internal/handlers/failed_rows.go` → use queries from failed_rows.sql ✅
-      - `internal/handlers/error_summary.go` → use queries from errors.sql ✅
-      - `internal/pipeline/parse.go` → use queries from ingestion.sql ✅
-      - `internal/pipeline/discover.go` → use queries from ingestion.sql ✅
-      - `internal/pipeline/pipeline.go` → use queries from ingestion.sql ✅
-      - `internal/workers/worker.go` → use queries from taskqueue.sql ✅
-      - `internal/jobs/cleanup_database.go` → use queries from price_groups.sql ✅
-      - `internal/sweepers/taskqueue.go` → raw SQL (stored procedure limitation) ✅
-      - `internal/taskqueue/queue.go` → use queries from taskqueue.sql ✅
-
-      Progress: 14/14 files converted
-
-      Note: sweepers/taskqueue.go and parts of taskqueue/queue.go still use raw SQL
-      for stored procedure calls (claim_tasks, complete_task, fail_task, cleanup_old_tasks,
-      recover_orphaned_tasks) because sqlc cannot properly infer return types from
-      PL/pgSQL functions that return TABLE or record types.
-    completed: true
-
-  - title: Build and test all Go code
-    description: |
-      Test Phase 4:
+      1. Check Node.js app health:
       ```bash
-      go build ./...
-      go test ./...
-      ```
-    completed: true
-
-  # Phase 5: Documentation
-  - title: Update AGENTS.md with sqlc-only rule
-    description: |
-      Goal: Forbid raw SQL, document sqlc-only rule
-
-      Update `services/price-service/AGENTS.md`:
-
-      Add section:
-      ```markdown
-      ## Database Access Rules
-
-      ### REQUIRED: Use sqlc for ALL queries
-
-      ```go
-      // CORRECT - type-safe, compile-time validated
-      store, err := queries.CreateStore(ctx, sqlcgen.CreateStoreParams{...})
+      curl http://localhost:3000/health
       ```
 
-      ```go
-      // FORBIDDEN - compiles with wrong columns, fails at runtime
-      pool.Exec(ctx, `INSERT INTO stores ...`)
-      ```
-
-      ### Adding New Queries
-
-      1. Add SQL to `internal/database/queries/*.sql`
-      2. Run `mise run sqlc-generate`
-      3. Use generated functions from `internal/database/sqlcgen/`
-
-      ### Why?
-      - Raw SQL compiles even with wrong column names
-      - Errors only appear at runtime
-      - sqlc catches ALL mismatches at compile time
-      ```
-    completed: true
-
-  - title: Verify no raw SQL remains
-    description: |
-      Test Phase 5:
+      2. Check Go service health:
       ```bash
-      grep -r "pool\.\(Exec\|Query\)" internal/  # should return 0 results (except documented exceptions)
+      curl http://localhost:8081/health
       ```
 
-      Completed: Converted remaining raw SQL in handlers/prices.go (SearchItems) and
-      handlers/runs.go (ListRuns) to sqlc queries. Created:
-      - CountSearchItems, SearchItemsWithStats queries in prices.sql
-      - CountIngestionRunsFiltered, ListIngestionRunsFiltered queries in runs.sql
+      3. Test internal communication by listing chains:
+      ```bash
+      curl http://localhost:3000/api/chains
+      ```
 
-      Remaining raw SQL (documented exceptions for stored procedures):
-      - sweepers/taskqueue.go: recover_orphaned_tasks()
-      - taskqueue/queue.go: claim_tasks, complete_task, fail_task, cleanup_old_tasks
-    completed: true
+      All should return 200 OK responses.
+    completed: false
 
-  # Final Verification
-  - title: Run full verification checklist
+  # ==================================
+  # PHASE 2: Konzum Chain (Primary Test)
+  # ==================================
+
+  - title: "Konzum: Single-day ingestion test"
     description: |
-      After all phases, verify:
-      - [x] `go build ./...` passes
-      - [x] `go test ./...` passes
-      - [x] `grep -r "pool\.\(Exec\|Query\)" internal/` returns nothing (except documented stored proc exceptions)
-      - [ ] Ingestion creates stores: `SELECT COUNT(*) FROM stores WHERE chain_slug='konzum'`
-      - [ ] Ingestion creates items: `SELECT COUNT(*) FROM retailer_items WHERE chain_slug='konzum'`
-      - [ ] Barcodes saved: `SELECT COUNT(*) FROM retailer_item_barcodes`
-      - [x] AGENTS.md has sqlc-only rule
+      Trigger ingestion for Konzum with today's date:
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "konzum", "targetDate": "2026-01-31"}'
+      ```
 
-      Note: Database connectivity tests (stores/items/barcodes) require a running database
-      and are covered by Phase 3 Task 2. All programmatic verification tests pass.
-    completed: true
+      Expected: 202 Accepted with runId
 
-  # Collaborative Review
-  - title: "Collaborative Review: Schema Type Safety Migration"
+      Monitor in Terminal 2 for:
+      - "Discovered X files for konzum"
+      - "Processing file X of Y"
+      - "Ingestion completed for konzum"
+
+      Check logs for ERROR, panic, deadlock keywords:
+      ```bash
+      grep -E "ERROR|panic|deadlock|timeout" log/price-service.txt
+      ```
+    completed: false
+
+  - title: "Konzum: Verify single-day data integrity"
     description: |
-      Multi-model collaborative review with weighted consensus.
+      Run detection probes after Konzum ingestion:
 
-      ## Review Process
-      Use `/dev:collab reviewer consensus` to review implementation:
+      ```sql
+      -- Row counts
+      SELECT chain_slug, COUNT(*) as items FROM retailer_items
+      WHERE chain_slug = 'konzum' GROUP BY chain_slug;
 
-      Models (from ~/claude-collab/collaboration.yaml):
-      1. github-copilot/gpt-5.2 (weight: 3) - Implementation review
-      2. github-copilot/gemini-3-pro-preview (weight: 3) - Architecture review
-      3. opencode/grok-code (weight: 1) - Investigation/fact-checking
-      4. claude-cli/opus (weight: 4) - Final comprehensive review
+      -- Stores discovered
+      SELECT chain_slug, COUNT(*) as stores FROM stores
+      WHERE chain_slug = 'konzum' GROUP BY chain_slug;
 
-      ## Consensus Rules
-      - Load weights from ~/claude-collab/collaboration.yaml
-      - Model weights: grok=1, gemini-pro=3, gpt-5.2=3, opus=4
-      - If models disagree, favor higher-weighted model opinions
-      - All critical issues flagged by ANY model must be addressed
-      - Document consensus and any dissenting opinions
+      -- Run status
+      SELECT id, status, total_files, processed_files, total_entries, error_count
+      FROM ingestion_runs WHERE chain_slug = 'konzum' ORDER BY created_at DESC LIMIT 1;
 
-      ## Review Focus Areas
-      - Bugs and logic errors in sqlc query conversions
-      - Security vulnerabilities (SQL injection prevention)
-      - Code quality and patterns consistency
-      - Architecture alignment with existing codebase
-      - Edge cases in barcode handling
-      - Migration safety (nullable columns, indexes)
-    completed: true
+      -- Price entries
+      SELECT COUNT(*) as price_entries FROM store_item_state sis
+      JOIN stores s ON sis.store_id = s.id WHERE s.chain_slug = 'konzum';
+      ```
+
+      Expected:
+      - retailer_items count > 0 (typically 5,000-20,000 for Konzum)
+      - stores count > 0 (Konzum has ~700 stores)
+      - ingestion_runs.status = 'completed'
+      - error_count = 0 or very low
+    completed: false
+
+  - title: "Konzum: Analyze and fix any single-day issues"
+    description: |
+      If single-day ingestion failed or has issues:
+
+      1. Check run errors:
+      ```sql
+      SELECT * FROM ingestion_errors WHERE run_id = '<runId>' ORDER BY created_at;
+      ```
+
+      2. Check file processing status:
+      ```sql
+      SELECT filename, status, total_rows, processed_rows, failed_rows
+      FROM ingestion_files WHERE run_id = '<runId>';
+      ```
+
+      3. Common issues to look for:
+      - Deadlocks: Check for concurrent insert conflicts in store_item_state
+      - Parse errors: Check column mapping in internal/adapters/chains/konzum.go
+      - Connection exhaustion: Check pool settings in config/config.go
+      - Timeout on discovery: Check rate limiting in konzum adapter
+
+      4. Document the issue and fix applied before proceeding.
+    completed: false
+
+  - title: "Konzum: 7-day historical ingestion"
+    description: |
+      Once single-day works, test 7 consecutive days:
+
+      ```bash
+      for i in {0..6}; do
+        date=$(date -d "2026-01-31 - $i days" +%Y-%m-%d)
+        echo "Triggering konzum for $date"
+        curl -X POST http://localhost:3000/api/price-service/trigger \
+          -H "Content-Type: application/json" \
+          -d "{\"chain\": \"konzum\", \"targetDate\": \"$date\"}"
+        sleep 5  # Allow task to be queued
+      done
+      ```
+
+      Monitor worker logs for parallel processing behavior.
+
+      Key observations:
+      - Do tasks queue correctly?
+      - Are workers processing in parallel?
+      - Any deadlocks during concurrent DB writes?
+      - Memory usage stable?
+    completed: false
+
+  - title: "Konzum: Verify 7-day integrity and fix issues"
+    description: |
+      Verify all 7 runs completed successfully:
+
+      ```sql
+      SELECT target_date, status, total_files, processed_files, error_count
+      FROM ingestion_runs
+      WHERE chain_slug = 'konzum'
+      ORDER BY target_date DESC LIMIT 7;
+      ```
+
+      All should show status = 'completed' and error_count = 0.
+
+      If any failed:
+      1. Identify the failure pattern (same day? random?)
+      2. Check if it's a transient issue (retry successful?)
+      3. Fix any systematic issues before moving to next chain
+
+      Document findings.
+    completed: false
+
+  # ==================================
+  # PHASE 3: Lidl Chain
+  # ==================================
+
+  - title: "Lidl: Single-day ingestion test"
+    description: |
+      Trigger Lidl ingestion (uses ZIP archives with per-store CSVs):
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "lidl", "targetDate": "2026-01-31"}'
+      ```
+
+      Lidl-specific concerns:
+      - ZIP file extraction
+      - Multiple CSV files per ZIP
+      - Different encoding per file (UTF-8 vs Windows-1250)
+
+      Monitor for:
+      - ZIP extraction errors
+      - Encoding detection issues
+      - Memory usage during large ZIP processing
+    completed: false
+
+  - title: "Lidl: Verify data and expand to 7 days"
+    description: |
+      Run probes for Lidl:
+      ```sql
+      SELECT chain_slug, COUNT(*) FROM retailer_items WHERE chain_slug = 'lidl';
+      SELECT chain_slug, COUNT(*) FROM stores WHERE chain_slug = 'lidl';
+      SELECT status, error_count FROM ingestion_runs WHERE chain_slug = 'lidl';
+      ```
+
+      If single-day works, run 7-day ingestion:
+      ```bash
+      for i in {0..6}; do
+        date=$(date -d "2026-01-31 - $i days" +%Y-%m-%d)
+        curl -X POST http://localhost:3000/api/price-service/trigger \
+          -H "Content-Type: application/json" \
+          -d "{\"chain\": \"lidl\", \"targetDate\": \"$date\"}"
+        sleep 5
+      done
+      ```
+
+      Fix any Lidl-specific issues before proceeding.
+    completed: false
+
+  # ==================================
+  # PHASE 4: Interspar Chain
+  # ==================================
+
+  - title: "Interspar: Single-day ingestion test"
+    description: |
+      Trigger Interspar ingestion (JSON API discovery, CSV data):
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "interspar", "targetDate": "2026-01-31"}'
+      ```
+
+      Interspar-specific concerns:
+      - JSON API for store discovery
+      - Pagination handling
+      - Rate limiting on API calls
+      - CSV with semicolon separator
+
+      Monitor for API rate limiting (429 responses) and pagination edge cases.
+    completed: false
+
+  - title: "Interspar: Verify data and expand to 7 days"
+    description: |
+      Run probes:
+      ```sql
+      SELECT chain_slug, COUNT(*) FROM retailer_items WHERE chain_slug = 'interspar';
+      SELECT chain_slug, COUNT(*) FROM stores WHERE chain_slug = 'interspar';
+      ```
+
+      If single-day succeeds, run 7-day ingestion and verify all complete.
+      Document any rate limiting or API-specific issues.
+    completed: false
+
+  # ==================================
+  # PHASE 5: Kaufland Chain
+  # ==================================
+
+  - title: "Kaufland: Single-day ingestion test"
+    description: |
+      Trigger Kaufland ingestion (JSON API discovery, tab-delimited data):
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "kaufland", "targetDate": "2026-01-31"}'
+      ```
+
+      Kaufland-specific concerns:
+      - Tab-delimited data (not comma)
+      - JSON API for file discovery
+      - German number format (comma as decimal separator)
+
+      Watch for parsing issues with tab delimiter and decimal handling.
+    completed: false
+
+  - title: "Kaufland: Verify data and expand to 7 days"
+    description: |
+      Run probes and fix any Kaufland-specific issues.
+      Expand to 7-day ingestion once single-day is stable.
+    completed: false
+
+  # ==================================
+  # PHASE 6: Plodine Chain
+  # ==================================
+
+  - title: "Plodine: Single-day ingestion test"
+    description: |
+      Trigger Plodine ingestion (CSV in ZIP archives):
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "plodine", "targetDate": "2026-01-31"}'
+      ```
+
+      Plodine-specific concerns:
+      - ZIP archive handling (similar to Lidl)
+      - Croatian number format
+      - Different column headers
+
+      Monitor ZIP extraction and CSV parsing.
+    completed: false
+
+  - title: "Plodine: Verify data and expand to 7 days"
+    description: |
+      Run probes and fix any Plodine-specific issues.
+      Expand to 7-day ingestion once single-day is stable.
+    completed: false
+
+  # ==================================
+  # PHASE 7: Remaining Chains (After Core Chains Stable)
+  # ==================================
+
+  - title: "Studenac: Test ingestion (XML format)"
+    description: |
+      Studenac uses XML format with dynamic store IDs:
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "studenac", "targetDate": "2026-01-31"}'
+      ```
+
+      XML-specific concerns:
+      - XML namespace handling
+      - Dynamic store ID extraction from filenames
+      - Large XML file parsing performance
+
+      Test single-day first, then expand.
+    completed: false
+
+  - title: "DM: Test ingestion (XLSX format)"
+    description: |
+      DM uses XLSX files with numeric columns:
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "dm", "targetDate": "2026-01-31"}'
+      ```
+
+      XLSX-specific concerns:
+      - Excel file parsing (excelize library)
+      - Numeric column type handling
+      - Date/time cell formatting
+
+      Test single-day, verify data, expand if successful.
+    completed: false
+
+  - title: "Eurospin: Test ingestion (HTML discovery)"
+    description: |
+      Eurospin uses HTML option tag discovery:
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "eurospin", "targetDate": "2026-01-31"}'
+      ```
+
+      HTML-specific concerns:
+      - HTML parsing for store/file discovery
+      - JavaScript-rendered content (if any)
+      - Form data extraction
+
+      Test single-day, verify data, expand if successful.
+    completed: false
+
+  - title: "KTC: Test ingestion (Windows-1250 encoding)"
+    description: |
+      KTC uses CSV with Windows-1250 encoding:
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "ktc", "targetDate": "2026-01-31"}'
+      ```
+
+      Encoding-specific concerns:
+      - Windows-1250 → UTF-8 conversion
+      - Croatian special characters (č, ć, ž, š, đ)
+      - Encoding detection accuracy
+
+      Verify product names display correctly with Croatian characters.
+    completed: false
+
+  - title: "Metro: Test ingestion (UTF-8 CSV)"
+    description: |
+      Metro uses standard UTF-8 CSV:
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "metro", "targetDate": "2026-01-31"}'
+      ```
+
+      Should be straightforward. Test single-day and expand.
+    completed: false
+
+  - title: "Trgocentar: Test ingestion (XML with anchor prices)"
+    description: |
+      Trgocentar uses XML with dynamic anchor prices:
+      ```bash
+      curl -X POST http://localhost:3000/api/price-service/trigger \
+        -H "Content-Type: application/json" \
+        -d '{"chain": "trgocentar", "targetDate": "2026-01-31"}'
+      ```
+
+      Special concerns:
+      - Anchor price calculation from XML
+      - Croatian transparency law compliance
+
+      Test single-day, verify anchor prices are captured correctly.
+    completed: false
+
+  # ==================================
+  # PHASE 8: Full System Validation
+  # ==================================
+
+  - title: Verify all chains completed without errors
+    description: |
+      Run comprehensive probe across all chains:
+
+      ```sql
+      -- Summary by chain
+      SELECT
+        chain_slug,
+        COUNT(*) as runs,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+        SUM(error_count) as total_errors
+      FROM ingestion_runs
+      GROUP BY chain_slug
+      ORDER BY chain_slug;
+
+      -- Item counts by chain
+      SELECT chain_slug, COUNT(*) as items
+      FROM retailer_items GROUP BY chain_slug ORDER BY chain_slug;
+
+      -- Store counts by chain
+      SELECT chain_slug, COUNT(*) as stores
+      FROM stores GROUP BY chain_slug ORDER BY chain_slug;
+
+      -- Price entry counts by chain
+      SELECT s.chain_slug, COUNT(*) as price_entries
+      FROM store_item_state sis
+      JOIN stores s ON sis.store_id = s.id
+      GROUP BY s.chain_slug ORDER BY s.chain_slug;
+      ```
+
+      All chains should show:
+      - completed runs > 0
+      - failed runs = 0
+      - items count > 0
+      - stores count > 0
+      - price_entries count > 0
+    completed: false
+
+  - title: Analyze logs for any remaining issues
+    description: |
+      Search logs for error patterns:
+
+      ```bash
+      # Price service errors
+      grep -E "ERROR|panic|deadlock|timeout|connection refused|pool exhausted" log/price-service.txt
+
+      # Node.js app errors
+      grep -E "error|Error|ERR" log/log.txt
+
+      # Task queue issues
+      grep -E "task_queue|claim|orphan" log/price-service.txt
+      ```
+
+      Document any remaining issues that need future attention.
+    completed: false
+
+  - title: Document all problems found and fixes applied
+    description: |
+      Create a summary document of the debugging session:
+
+      1. List each problem encountered
+      2. Describe the symptoms (error message, behavior)
+      3. Document the root cause analysis
+      4. Record the fix applied (code changes, config changes)
+      5. Note any workarounds or temporary fixes
+      6. List any issues deferred for future work
+
+      This documentation helps prevent regression and assists future debugging.
+
+      Consider adding to /workspace/docs/ingestion-troubleshooting.md or similar.
+    completed: false
