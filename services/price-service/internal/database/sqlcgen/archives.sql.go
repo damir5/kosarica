@@ -16,7 +16,7 @@ const getArchiveByChecksum = `-- name: GetArchiveByChecksum :one
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
     compressed_size, is_compressed, checksum, downloaded_at, metadata,
-    created_at, updated_at
+    run_id, created_at, updated_at
 FROM archives
 WHERE checksum = $1
 LIMIT 1
@@ -37,6 +37,7 @@ type GetArchiveByChecksumRow struct {
 	Checksum       string                `db:"checksum" json:"checksum"`
 	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
 	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
+	RunID          pgtype.Text           `db:"run_id" json:"run_id"`
 	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
 }
@@ -59,6 +60,7 @@ func (q *Queries) GetArchiveByChecksum(ctx context.Context, checksum string) (Ge
 		&i.Checksum,
 		&i.DownloadedAt,
 		&i.Metadata,
+		&i.RunID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -69,7 +71,7 @@ const getArchiveById = `-- name: GetArchiveById :one
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
     compressed_size, is_compressed, checksum, downloaded_at, metadata,
-    created_at, updated_at
+    run_id, created_at, updated_at
 FROM archives
 WHERE id = $1
 `
@@ -89,6 +91,7 @@ type GetArchiveByIdRow struct {
 	Checksum       string                `db:"checksum" json:"checksum"`
 	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
 	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
+	RunID          pgtype.Text           `db:"run_id" json:"run_id"`
 	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
 }
@@ -111,6 +114,7 @@ func (q *Queries) GetArchiveById(ctx context.Context, id string) (GetArchiveById
 		&i.Checksum,
 		&i.DownloadedAt,
 		&i.Metadata,
+		&i.RunID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -140,7 +144,7 @@ const listArchivesByChain = `-- name: ListArchivesByChain :many
 SELECT id, chain_slug, source_url, filename, original_format,
     archive_path, archive_type, content_type, file_size,
     compressed_size, is_compressed, checksum, downloaded_at, metadata,
-    created_at, updated_at
+    run_id, created_at, updated_at
 FROM archives
 WHERE chain_slug = $1
 ORDER BY downloaded_at DESC
@@ -168,6 +172,7 @@ type ListArchivesByChainRow struct {
 	Checksum       string                `db:"checksum" json:"checksum"`
 	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
 	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
+	RunID          pgtype.Text           `db:"run_id" json:"run_id"`
 	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
 }
@@ -196,6 +201,7 @@ func (q *Queries) ListArchivesByChain(ctx context.Context, arg ListArchivesByCha
 			&i.Checksum,
 			&i.DownloadedAt,
 			&i.Metadata,
+			&i.RunID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -207,6 +213,90 @@ func (q *Queries) ListArchivesByChain(ctx context.Context, arg ListArchivesByCha
 		return nil, err
 	}
 	return items, nil
+}
+
+const listArchivesByRunId = `-- name: ListArchivesByRunId :many
+SELECT id, chain_slug, source_url, filename, original_format,
+    archive_path, archive_type, content_type, file_size,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
+    run_id, created_at, updated_at
+FROM archives
+WHERE run_id = $1
+ORDER BY created_at ASC
+`
+
+type ListArchivesByRunIdRow struct {
+	ID             string                `db:"id" json:"id"`
+	ChainSlug      string                `db:"chain_slug" json:"chain_slug"`
+	SourceUrl      string                `db:"source_url" json:"source_url"`
+	Filename       string                `db:"filename" json:"filename"`
+	OriginalFormat string                `db:"original_format" json:"original_format"`
+	ArchivePath    string                `db:"archive_path" json:"archive_path"`
+	ArchiveType    string                `db:"archive_type" json:"archive_type"`
+	ContentType    pgtype.Text           `db:"content_type" json:"content_type"`
+	FileSize       pgtype.Int8           `db:"file_size" json:"file_size"`
+	CompressedSize pgtype.Int8           `db:"compressed_size" json:"compressed_size"`
+	IsCompressed   pgtype.Bool           `db:"is_compressed" json:"is_compressed"`
+	Checksum       string                `db:"checksum" json:"checksum"`
+	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
+	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
+	RunID          pgtype.Text           `db:"run_id" json:"run_id"`
+	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListArchivesByRunId(ctx context.Context, runID pgtype.Text) ([]ListArchivesByRunIdRow, error) {
+	rows, err := q.db.Query(ctx, listArchivesByRunId, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListArchivesByRunIdRow{}
+	for rows.Next() {
+		var i ListArchivesByRunIdRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChainSlug,
+			&i.SourceUrl,
+			&i.Filename,
+			&i.OriginalFormat,
+			&i.ArchivePath,
+			&i.ArchiveType,
+			&i.ContentType,
+			&i.FileSize,
+			&i.CompressedSize,
+			&i.IsCompressed,
+			&i.Checksum,
+			&i.DownloadedAt,
+			&i.Metadata,
+			&i.RunID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateArchiveRunId = `-- name: UpdateArchiveRunId :exec
+UPDATE archives
+SET run_id = $1, updated_at = NOW()
+WHERE id = $2
+`
+
+type UpdateArchiveRunIdParams struct {
+	RunID pgtype.Text `db:"run_id" json:"run_id"`
+	ID    string      `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateArchiveRunId(ctx context.Context, arg UpdateArchiveRunIdParams) error {
+	_, err := q.db.Exec(ctx, updateArchiveRunId, arg.RunID, arg.ID)
+	return err
 }
 
 const upsertArchive = `-- name: UpsertArchive :exec
@@ -269,6 +359,75 @@ func (q *Queries) UpsertArchive(ctx context.Context, arg UpsertArchiveParams) er
 		arg.Checksum,
 		arg.DownloadedAt,
 		arg.Metadata,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const upsertArchiveWithRunId = `-- name: UpsertArchiveWithRunId :exec
+INSERT INTO archives (
+    id, chain_slug, source_url, filename, original_format,
+    archive_path, archive_type, content_type, file_size,
+    compressed_size, is_compressed, checksum, downloaded_at, metadata,
+    run_id, created_at, updated_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+)
+ON CONFLICT (id) DO UPDATE SET
+    source_url = EXCLUDED.source_url,
+    filename = EXCLUDED.filename,
+    archive_path = EXCLUDED.archive_path,
+    original_format = EXCLUDED.original_format,
+    archive_type = EXCLUDED.archive_type,
+    content_type = EXCLUDED.content_type,
+    file_size = EXCLUDED.file_size,
+    compressed_size = EXCLUDED.compressed_size,
+    is_compressed = EXCLUDED.is_compressed,
+    checksum = EXCLUDED.checksum,
+    downloaded_at = EXCLUDED.downloaded_at,
+    metadata = EXCLUDED.metadata,
+    run_id = COALESCE(EXCLUDED.run_id, archives.run_id),
+    updated_at = EXCLUDED.updated_at
+`
+
+type UpsertArchiveWithRunIdParams struct {
+	ID             string                `db:"id" json:"id"`
+	ChainSlug      string                `db:"chain_slug" json:"chain_slug"`
+	SourceUrl      string                `db:"source_url" json:"source_url"`
+	Filename       string                `db:"filename" json:"filename"`
+	OriginalFormat string                `db:"original_format" json:"original_format"`
+	ArchivePath    string                `db:"archive_path" json:"archive_path"`
+	ArchiveType    string                `db:"archive_type" json:"archive_type"`
+	ContentType    pgtype.Text           `db:"content_type" json:"content_type"`
+	FileSize       pgtype.Int8           `db:"file_size" json:"file_size"`
+	CompressedSize pgtype.Int8           `db:"compressed_size" json:"compressed_size"`
+	IsCompressed   pgtype.Bool           `db:"is_compressed" json:"is_compressed"`
+	Checksum       string                `db:"checksum" json:"checksum"`
+	DownloadedAt   pgtype.Timestamptz    `db:"downloaded_at" json:"downloaded_at"`
+	Metadata       jsonb.ArchiveMetadata `db:"metadata" json:"metadata"`
+	RunID          pgtype.Text           `db:"run_id" json:"run_id"`
+	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertArchiveWithRunId(ctx context.Context, arg UpsertArchiveWithRunIdParams) error {
+	_, err := q.db.Exec(ctx, upsertArchiveWithRunId,
+		arg.ID,
+		arg.ChainSlug,
+		arg.SourceUrl,
+		arg.Filename,
+		arg.OriginalFormat,
+		arg.ArchivePath,
+		arg.ArchiveType,
+		arg.ContentType,
+		arg.FileSize,
+		arg.CompressedSize,
+		arg.IsCompressed,
+		arg.Checksum,
+		arg.DownloadedAt,
+		arg.Metadata,
+		arg.RunID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)

@@ -52,6 +52,7 @@ type Archive struct {
 	CreatedAt      pgtype.Timestamptz    `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz    `db:"updated_at" json:"updated_at"`
 	IsCompressed   pgtype.Bool           `db:"is_compressed" json:"is_compressed"`
+	RunID          pgtype.Text           `db:"run_id" json:"run_id"`
 }
 
 type CanonicalBarcode struct {

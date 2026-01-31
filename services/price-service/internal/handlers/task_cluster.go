@@ -4,17 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"runtime"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kosarica/price-service/config"
+	adaptersconfig "github.com/kosarica/price-service/internal/adapters/config"
+	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/ingestion"
+	zipexpand "github.com/kosarica/price-service/internal/ingestion/zip"
 	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
 	"github.com/kosarica/price-service/internal/storage"
 	"github.com/kosarica/price-service/internal/taskqueue"
+	"github.com/kosarica/price-service/internal/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,7 +30,7 @@ import (
 // storeRowData holds a single row from a store's data file
 type storeRowData struct {
 	StoreIdentifier string
-	Row             jsonb.ParsedPriceRow
+	Row             types.NormalizedRow
 }
 
 // itemKey uniquely identifies an item by external ID or barcodes
@@ -59,8 +64,11 @@ type storePriceRef struct {
 }
 
 // HandleClusterTask processes an ingestion_cluster task from the queue.
-// It reads all parsed data from intermediate storage, creates price tiers,
-// and creates store price references using memory-first clustering with batch writes.
+// In the redesigned pipeline, this is the Load+Cluster task that:
+// 1. Acquires a semaphore slot for heap-based concurrency control
+// 2. Loads archives from the database for this run
+// 3. Parses content directly from storage (no intermediate JSON files)
+// 4. Creates price tiers and store price references using memory-first clustering
 func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *taskqueue.TaskQueue, taskID string) error {
 	// Extract cluster payload from generic payload
 	var clusterPayload jsonb.ClusterPayload
@@ -83,7 +91,30 @@ func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *
 		Str("chain", chainSlug).
 		Str("runId", runID).
 		Str("taskId", taskID).
-		Msg("Processing cluster task")
+		Msg("Processing load+cluster task")
+
+	// Acquire semaphore slot for heap-based concurrency control
+	if err := ingestion.AcquireClusterSlot(ctx); err != nil {
+		return fmt.Errorf("failed to acquire cluster slot: %w", err)
+	}
+	defer ingestion.ReleaseClusterSlot()
+
+	log.Info().
+		Str("runId", runID).
+		Msg("Acquired cluster slot")
+
+	startTime := time.Now()
+
+	// Initialize chain registry
+	if err := registry.InitializeDefaultAdapters(); err != nil {
+		return fmt.Errorf("failed to initialize chain registry: %w", err)
+	}
+
+	// Get adapter for parsing
+	adapter, err := registry.GetAdapter(adaptersconfig.ChainID(chainSlug))
+	if err != nil {
+		return fmt.Errorf("failed to get adapter for %s: %w", chainSlug, err)
+	}
 
 	// Initialize storage backend
 	storageBackend, err := storage.NewStorageBackend(&config.Get().Storage)
@@ -91,79 +122,73 @@ func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *
 		return fmt.Errorf("failed to initialize storage: %w", err)
 	}
 
-	intermediateStorage, ok := storageBackend.(storage.IntermediateStorage)
-	if !ok {
-		return fmt.Errorf("storage backend does not support intermediate storage")
-	}
-
-	// List all intermediate files for this run
-	files, err := intermediateStorage.ListIntermediateFiles(ctx, runID)
+	// ========================================================================
+	// Phase 1: Load and Parse Archives
+	// ========================================================================
+	loadStart := time.Now()
+	allStoreData, storeIdentifiers, loadStats, err := loadAndParseArchives(ctx, adapter, storageBackend, runID)
 	if err != nil {
-		return fmt.Errorf("failed to list intermediate files: %w", err)
+		return fmt.Errorf("failed to load archives: %w", err)
 	}
+	loadDuration := time.Since(loadStart)
 
 	log.Info().
 		Str("runId", runID).
-		Int("filesFound", len(files)).
-		Msg("Found intermediate files")
+		Int("archivesLoaded", loadStats.archivesLoaded).
+		Int("archivesSkipped", loadStats.archivesSkipped).
+		Int("storesLoaded", len(storeIdentifiers)).
+		Int("totalRows", len(allStoreData)).
+		Dur("loadDuration", loadDuration).
+		Msg("Phase 1 complete: loaded and parsed archives")
 
-	// Filter for store data files only (exclude manifest, duplicates, empty markers)
-	storeFiles := make([]string, 0)
-	for _, f := range files {
-		if strings.HasPrefix(f, "stores/") && strings.HasSuffix(f, ".json") {
-			storeFiles = append(storeFiles, f)
-		}
-	}
-
-	log.Info().
-		Str("runId", runID).
-		Int("storeFiles", len(storeFiles)).
-		Msg("Found store data files")
-
-	if len(storeFiles) == 0 {
-		log.Warn().Str("runId", runID).Msg("No store data files found, nothing to cluster")
+	if len(allStoreData) == 0 {
+		log.Warn().Str("runId", runID).Msg("No data loaded from archives, spawning finalize anyway")
 		return spawnFinalizeTask(ctx, tq, taskID, chainSlug, runID)
 	}
 
 	// ========================================================================
-	// Phase 1: Load All Store Data Into Memory
-	// ========================================================================
-	startLoad := time.Now()
-	allStoreData, storeIdentifiers, err := loadAllStoreData(ctx, intermediateStorage, runID, storeFiles)
-	if err != nil {
-		return fmt.Errorf("failed to load store data: %w", err)
-	}
-
-	log.Info().
-		Str("runId", runID).
-		Int("storesLoaded", len(storeIdentifiers)).
-		Int("totalRows", len(allStoreData)).
-		Dur("loadDuration", time.Since(startLoad)).
-		Msg("Phase 1 complete: loaded all store data")
-
-	// ========================================================================
 	// Phase 2: Deduplicate Items and Group by Price Tier
 	// ========================================================================
-	startGroup := time.Now()
+	clusterStart := time.Now()
 	uniqueItems := deduplicateItems(allStoreData)
 	priceTiers, storePriceRefs := groupByPriceTier(allStoreData)
+	clusterDuration := time.Since(clusterStart)
 
 	log.Info().
 		Str("runId", runID).
 		Int("uniqueItems", len(uniqueItems)).
 		Int("priceTiers", len(priceTiers)).
 		Int("storePriceRefs", len(storePriceRefs)).
-		Dur("groupDuration", time.Since(startGroup)).
+		Dur("clusterDuration", clusterDuration).
 		Msg("Phase 2 complete: grouped data")
 
 	// ========================================================================
 	// Phase 3: Batch Write to Database
 	// ========================================================================
-	startWrite := time.Now()
+	persistStart := time.Now()
 	stats, err := batchWriteToDatabase(ctx, chainSlug, storeIdentifiers, uniqueItems, priceTiers, storePriceRefs)
 	if err != nil {
 		return fmt.Errorf("failed to write to database: %w", err)
 	}
+	persistDuration := time.Since(persistStart)
+
+	// Calculate memory usage estimate
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	memoryMB := int64(memStats.Alloc / 1024 / 1024)
+
+	// Log detailed stats
+	log.Info().
+		Int("archives_loaded", loadStats.archivesLoaded).
+		Int("total_rows", len(allStoreData)).
+		Int("unique_stores", len(storeIdentifiers)).
+		Int("unique_items", len(uniqueItems)).
+		Int("price_tiers", len(priceTiers)).
+		Int64("memory_estimate_mb", memoryMB).
+		Dur("load_duration", loadDuration).
+		Dur("cluster_duration", clusterDuration).
+		Dur("persist_duration", persistDuration).
+		Msg("Cluster task complete")
 
 	log.Info().
 		Str("runId", runID).
@@ -171,54 +196,168 @@ func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *
 		Int("itemsUpserted", stats.itemsUpserted).
 		Int("tiersUpserted", stats.tiersUpserted).
 		Int("refsUpserted", stats.refsUpserted).
-		Dur("writeDuration", time.Since(startWrite)).
-		Msg("Phase 3 complete: wrote to database")
-
-	log.Info().
-		Str("runId", runID).
-		Dur("totalDuration", time.Since(startLoad)).
-		Msg("Cluster task complete")
+		Dur("totalDuration", time.Since(startTime)).
+		Msg("Load+Cluster task complete")
 
 	// Spawn finalize task
 	return spawnFinalizeTask(ctx, tq, taskID, chainSlug, runID)
 }
 
 // ============================================================================
-// Phase 1: Load All Store Data
+// Phase 1: Load and Parse Archives
 // ============================================================================
 
-// loadAllStoreData loads all store files into memory
-func loadAllStoreData(ctx context.Context, storage storage.IntermediateStorage, runID string, storeFiles []string) ([]storeRowData, []string, error) {
-	var allData []storeRowData
-	storeIdentifiers := make([]string, 0, len(storeFiles))
+type loadStats struct {
+	archivesLoaded  int
+	archivesSkipped int
+}
 
-	for i, storeFile := range storeFiles {
-		var storeData jsonb.ParsedStoreData
-		if err := storage.ReadIntermediateJSON(ctx, runID, storeFile, &storeData); err != nil {
-			log.Warn().Err(err).Str("file", storeFile).Msg("Failed to read store data, skipping")
+// loadAndParseArchives loads archives for this run and parses them directly from storage
+func loadAndParseArchives(
+	ctx context.Context,
+	adapter interface{},
+	storageBackend storage.Storage,
+	runID string,
+) ([]storeRowData, []string, *loadStats, error) {
+	// Get archives for this run from the database
+	archives, err := database.GetArchivesByRunId(ctx, runID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to get archives for run %s: %w", runID, err)
+	}
+
+	log.Info().
+		Str("runId", runID).
+		Int("archiveCount", len(archives)).
+		Msg("Found archives to load")
+
+	stats := &loadStats{}
+	var allData []storeRowData
+	storeIdentifierSet := make(map[string]struct{})
+
+	for i, archive := range archives {
+		// Load archive content from storage
+		content, err := storageBackend.Get(ctx, archive.ArchivePath)
+		if err != nil {
+			log.Warn().Err(err).
+				Str("archiveId", archive.ID).
+				Str("archivePath", archive.ArchivePath).
+				Msg("Failed to load archive, skipping")
+			stats.archivesSkipped++
 			continue
 		}
 
-		storeIdentifiers = append(storeIdentifiers, storeData.StoreIdentifier)
+		// Parse archive content
+		fileType := types.FileType(archive.OriginalFormat)
+		var parseResult *types.ParseResult
 
-		for _, row := range storeData.Rows {
+		if fileType == types.FileTypeZIP {
+			parseResult, err = parseZipArchive(ctx, adapter, content, archive.Filename)
+		} else {
+			parseResult, err = parseSingleFile(adapter, content, archive.Filename)
+		}
+
+		if err != nil {
+			log.Warn().Err(err).
+				Str("archiveId", archive.ID).
+				Str("filename", archive.Filename).
+				Msg("Failed to parse archive, skipping")
+			stats.archivesSkipped++
+			continue
+		}
+
+		// Convert parsed rows to storeRowData
+		for _, row := range parseResult.Rows {
+			if row.StoreIdentifier != "" {
+				storeIdentifierSet[row.StoreIdentifier] = struct{}{}
+			}
+
 			allData = append(allData, storeRowData{
-				StoreIdentifier: storeData.StoreIdentifier,
+				StoreIdentifier: row.StoreIdentifier,
 				Row:             row,
 			})
 		}
 
-		if (i+1)%50 == 0 {
+		stats.archivesLoaded++
+
+		if (i+1)%10 == 0 {
 			log.Info().
 				Str("runId", runID).
-				Int("filesLoaded", i+1).
-				Int("totalFiles", len(storeFiles)).
+				Int("archivesLoaded", i+1).
+				Int("totalArchives", len(archives)).
 				Int("rowsLoaded", len(allData)).
-				Msg("Loading progress")
+				Msg("Archive loading progress")
 		}
 	}
 
-	return allData, storeIdentifiers, nil
+	// Convert store identifier set to slice
+	storeIdentifiers := make([]string, 0, len(storeIdentifierSet))
+	for id := range storeIdentifierSet {
+		storeIdentifiers = append(storeIdentifiers, id)
+	}
+
+	return allData, storeIdentifiers, stats, nil
+}
+
+// parseSingleFile parses a single CSV/XML file
+func parseSingleFile(adapter interface{}, content []byte, filename string) (*types.ParseResult, error) {
+	type parser interface {
+		Parse(content []byte, filename string, options *types.ParseOptions) (*types.ParseResult, error)
+	}
+
+	parseAdapter, ok := adapter.(parser)
+	if !ok {
+		return nil, fmt.Errorf("adapter does not implement Parse interface")
+	}
+
+	return parseAdapter.Parse(content, filename, nil)
+}
+
+// parseZipArchive expands and parses all CSV files from a ZIP archive
+func parseZipArchive(ctx context.Context, adapter interface{}, content []byte, filename string) (*types.ParseResult, error) {
+	// Expand ZIP using the zipexpand package
+	expanded, err := zipexpand.ExpandInMemory(content, filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand ZIP: %w", err)
+	}
+
+	if len(expanded) == 0 {
+		return nil, fmt.Errorf("no supported files extracted from %s", filename)
+	}
+
+	type parser interface {
+		Parse(content []byte, filename string, options *types.ParseOptions) (*types.ParseResult, error)
+	}
+
+	parseAdapter, ok := adapter.(parser)
+	if !ok {
+		return nil, fmt.Errorf("adapter does not implement Parse interface")
+	}
+
+	result := &types.ParseResult{
+		Rows:     make([]types.NormalizedRow, 0),
+		Errors:   make([]types.ParseError, 0),
+		Warnings: make([]types.ParseWarning, 0),
+	}
+
+	for _, inner := range expanded {
+		if inner.Type != types.FileTypeCSV {
+			continue
+		}
+
+		innerResult, err := parseAdapter.Parse(inner.Content, inner.InnerFilename, nil)
+		if err != nil {
+			log.Warn().Err(err).Str("innerFile", inner.InnerFilename).Msg("Failed to parse inner file")
+			continue
+		}
+
+		result.TotalRows += innerResult.TotalRows
+		result.ValidRows += innerResult.ValidRows
+		result.Rows = append(result.Rows, innerResult.Rows...)
+		result.Errors = append(result.Errors, innerResult.Errors...)
+		result.Warnings = append(result.Warnings, innerResult.Warnings...)
+	}
+
+	return result, nil
 }
 
 // ============================================================================
@@ -231,8 +370,12 @@ func deduplicateItems(allData []storeRowData) map[itemKey]itemData {
 
 	for _, sd := range allData {
 		row := sd.Row
+		externalID := ""
+		if row.ExternalID != nil {
+			externalID = *row.ExternalID
+		}
 		key := itemKey{
-			ExternalID: row.ExternalID,
+			ExternalID: externalID,
 		}
 		if len(row.Barcodes) > 0 {
 			key.Barcode = row.Barcodes[0]
@@ -246,7 +389,7 @@ func deduplicateItems(allData []storeRowData) map[itemKey]itemData {
 		if _, exists := items[key]; !exists {
 			items[key] = itemData{
 				Name:        row.Name,
-				ExternalID:  row.ExternalID,
+				ExternalID:  externalID,
 				Barcodes:    row.Barcodes,
 				UnitPrice:   row.UnitPrice,
 				AnchorPrice: row.AnchorPrice,
@@ -264,8 +407,12 @@ func groupByPriceTier(allData []storeRowData) (map[priceTierKey]struct{}, []stor
 
 	for _, sd := range allData {
 		row := sd.Row
+		externalID := ""
+		if row.ExternalID != nil {
+			externalID = *row.ExternalID
+		}
 		iKey := itemKey{
-			ExternalID: row.ExternalID,
+			ExternalID: externalID,
 		}
 		if len(row.Barcodes) > 0 {
 			iKey.Barcode = row.Barcodes[0]
@@ -291,17 +438,12 @@ func groupByPriceTier(allData []storeRowData) (map[priceTierKey]struct{}, []stor
 		// Track unique tiers
 		tiers[ptKey] = struct{}{}
 
-		// Track store→tier references
-		inStock := true
-		if row.InStock != nil {
-			inStock = *row.InStock
-		}
-
+		// Track store→tier references (assume in stock - NormalizedRow doesn't track this)
 		refs = append(refs, storePriceRef{
 			StoreIdentifier: sd.StoreIdentifier,
 			ItemKey:         iKey,
 			PriceTierKey:    ptKey,
-			InStock:         inStock,
+			InStock:         true,
 		})
 	}
 
@@ -396,16 +538,15 @@ func upsertStoresBatch(ctx context.Context, pool *pgxpool.Pool, chainSlug string
 	if err != nil {
 		return nil, fmt.Errorf("failed to query existing stores: %w", err)
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var identifier, storeID string
 		if err := rows.Scan(&identifier, &storeID); err != nil {
-			rows.Close()
 			return nil, fmt.Errorf("failed to scan store row: %w", err)
 		}
 		result[identifier] = storeID
 	}
-	rows.Close()
 
 	// Find stores that need to be created
 	var newStores []string
@@ -652,7 +793,7 @@ func upsertPriceTiersBatch(
 
 	// Build list of tiers with resolved item IDs for lookup
 	type tierWithDBID struct {
-		ptKey         priceTierKey
+		ptKey          priceTierKey
 		retailerItemID string
 	}
 	var tiersToProcess []tierWithDBID
@@ -667,7 +808,7 @@ func upsertPriceTiersBatch(
 			continue
 		}
 		tiersToProcess = append(tiersToProcess, tierWithDBID{
-			ptKey:         ptKey,
+			ptKey:          ptKey,
 			retailerItemID: itemID,
 		})
 	}

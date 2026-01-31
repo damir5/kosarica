@@ -7,21 +7,19 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/kosarica/price-service/config"
 	adaptersconfig "github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
-	"github.com/kosarica/price-service/internal/storage"
 	"github.com/kosarica/price-service/internal/taskqueue"
 	"github.com/rs/zerolog/log"
 )
 
 // HandleDiscoverTask processes an ingestion_discover task from the queue.
-// It discovers available files, writes a manifest to storage, and spawns
-// fetch_parse subtasks for each discovered file.
+// It discovers available files and spawns fetch_parse subtasks for each discovered file.
+// After all fetch tasks complete, it spawns a store_prep task.
 func HandleDiscoverTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *taskqueue.TaskQueue, taskID string) error {
 	// Extract discover payload from generic payload
 	var discoverPayload jsonb.DiscoverPayload
@@ -61,17 +59,17 @@ func HandleDiscoverTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq 
 			Str("taskId", taskID).
 			Int("expectedChildren", task.ExpectedChildren).
 			Int("completedChildren", task.CompletedChildren).
-			Msg("All fetch_parse children completed, spawning cluster task")
+			Msg("All fetch_parse children completed, spawning store_prep task")
 
-		clusterRunID := runID
-		if clusterRunID == "" {
+		storePrepRunID := runID
+		if storePrepRunID == "" {
 			// Recover runID from database
-			clusterRunID, err = recoverRunIDFromDatabase(ctx, chainSlug)
+			storePrepRunID, err = recoverRunIDFromDatabase(ctx, chainSlug)
 			if err != nil {
 				return fmt.Errorf("failed to recover runID: %w", err)
 			}
 		}
-		return spawnClusterTask(ctx, tq, taskID, chainSlug, clusterRunID)
+		return spawnStorePrepTask(ctx, tq, taskID, chainSlug, storePrepRunID)
 	}
 
 	// Validate chain ID
@@ -138,48 +136,6 @@ func HandleDiscoverTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq 
 			log.Warn().Err(err).Str("runId", runID).Msg("Failed to mark run as completed")
 		}
 		return nil // No subtasks to spawn
-	}
-
-	// Initialize storage backend
-	storageBackend, err := storage.NewStorageBackend(&config.Get().Storage)
-	if err != nil {
-		markDiscoverFailed(ctx, runID, fmt.Sprintf("Failed to initialize storage: %v", err))
-		return fmt.Errorf("failed to initialize storage: %w", err)
-	}
-
-	intermediateStorage, ok := storageBackend.(storage.IntermediateStorage)
-	if !ok {
-		markDiscoverFailed(ctx, runID, "Storage backend does not support intermediate storage")
-		return fmt.Errorf("storage backend does not support intermediate storage")
-	}
-
-	// Build manifest
-	manifest := jsonb.RunManifest{
-		RunID:        runID,
-		ChainSlug:    chainSlug,
-		TargetDate:   targetDate,
-		DiscoveredAt: time.Now().Format(time.RFC3339),
-		TotalStores:  0,
-		ParsedStores: 0,
-	}
-
-	manifestFiles := make([]jsonb.ManifestFile, 0, len(files))
-	for i, file := range files {
-		fileID := fmt.Sprintf("file_%d", i)
-		manifestFiles = append(manifestFiles, jsonb.ManifestFile{
-			FileID:   fileID,
-			Filename: file.Filename,
-			URL:      file.URL,
-			FileType: string(file.Type),
-			Status:   "pending",
-		})
-	}
-	manifest.Files = manifestFiles
-
-	// Write manifest to intermediate storage
-	if err := intermediateStorage.WriteIntermediateJSON(ctx, runID, storage.BuildManifestKey(), manifest); err != nil {
-		log.Warn().Err(err).Str("runId", runID).Msg("Failed to write manifest")
-		// Continue anyway - manifest is informational
 	}
 
 	// Build fetch_parse payloads for each file
@@ -253,30 +209,30 @@ func markDiscoverFailed(ctx context.Context, runID string, errorMsg string) {
 	}
 }
 
-// spawnClusterTask schedules a cluster task after all fetch_parse tasks complete
-func spawnClusterTask(ctx context.Context, tq *taskqueue.TaskQueue, parentTaskID, chainSlug, runID string) error {
-	clusterPayload := jsonb.ClusterPayload{
-		Type:      string(taskqueue.TaskTypeIngestionCluster),
+// spawnStorePrepTask schedules a store_prep task after all fetch_parse tasks complete
+func spawnStorePrepTask(ctx context.Context, tq *taskqueue.TaskQueue, parentTaskID, chainSlug, runID string) error {
+	storePrepPayload := StorePrepPayload{
+		Type:      string(taskqueue.TaskTypeIngestionStorePrep),
 		ChainSlug: chainSlug,
 		RunID:     runID,
 	}
 
 	result := tq.ScheduleChildTask(ctx, taskqueue.ScheduleChildTaskInput{
 		ParentTaskID: parentTaskID,
-		TaskType:     string(taskqueue.TaskTypeIngestionCluster),
-		Payload:      clusterPayload,
+		TaskType:     string(taskqueue.TaskTypeIngestionStorePrep),
+		Payload:      storePrepPayload,
 		Priority:     0,
 	})
 
 	if result.Err != nil {
-		return fmt.Errorf("failed to schedule cluster task: %w", result.Err)
+		return fmt.Errorf("failed to schedule store_prep task: %w", result.Err)
 	}
 
 	if err := tq.TransitionToWaiting(ctx, parentTaskID, 1); err != nil {
 		log.Warn().Err(err).Str("taskId", parentTaskID).Msg("Failed to transition to waiting")
 	}
 
-	log.Info().Str("runId", runID).Str("clusterTaskId", result.ID).Msg("Scheduled cluster task")
+	log.Info().Str("runId", runID).Str("storePrepTaskId", result.ID).Msg("Scheduled store_prep task")
 	return nil
 }
 

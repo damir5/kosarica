@@ -7,16 +7,14 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/kosarica/price-service/config"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/jsonb"
-	"github.com/kosarica/price-service/internal/storage"
 	"github.com/rs/zerolog/log"
 )
 
 // HandleFinalizeTask processes an ingestion_finalize task from the queue.
-// It updates the run status, calculates statistics, and cleans up intermediate files.
+// It updates the run status and calculates statistics from the database.
 func HandleFinalizeTask(ctx context.Context, payload jsonb.TaskQueuePayload) error {
 	// Extract finalize payload from generic payload
 	var finalizePayload jsonb.FinalizePayload
@@ -40,18 +38,8 @@ func HandleFinalizeTask(ctx context.Context, payload jsonb.TaskQueuePayload) err
 		Str("runId", runID).
 		Msg("Processing finalize task")
 
-	// Get run statistics from intermediate storage
-	storageBackend, err := storage.NewStorageBackend(&config.Get().Storage)
-	if err != nil {
-		log.Warn().Err(err).Msg("Failed to initialize storage for stats calculation")
-	}
-
-	var processedFiles, processedEntries int
-	if storageBackend != nil {
-		if intermediateStorage, ok := storageBackend.(storage.IntermediateStorage); ok {
-			processedFiles, processedEntries = calculateRunStats(ctx, intermediateStorage, runID)
-		}
-	}
+	// Get run statistics from database (archives and price tiers)
+	processedFiles, processedEntries := calculateRunStatsFromDB(ctx, runID)
 
 	// Update run status to completed
 	queries := sqlcgen.New(database.Pool())
@@ -74,18 +62,6 @@ func HandleFinalizeTask(ctx context.Context, payload jsonb.TaskQueuePayload) err
 		Int("processedEntries", processedEntries).
 		Msg("Updated run status to completed")
 
-	// Clean up intermediate files
-	if storageBackend != nil {
-		if intermediateStorage, ok := storageBackend.(storage.IntermediateStorage); ok {
-			if err := intermediateStorage.DeleteIntermediateDir(ctx, runID); err != nil {
-				log.Warn().Err(err).Str("runId", runID).Msg("Failed to delete intermediate files")
-				// Don't fail the task for cleanup errors
-			} else {
-				log.Info().Str("runId", runID).Msg("Deleted intermediate files")
-			}
-		}
-	}
-
 	// Update price tier store counts
 	if err := updatePriceTierStoreCounts(ctx, chainSlug); err != nil {
 		log.Warn().Err(err).Str("chain", chainSlug).Msg("Failed to update price tier store counts")
@@ -100,40 +76,37 @@ func HandleFinalizeTask(ctx context.Context, payload jsonb.TaskQueuePayload) err
 	return nil
 }
 
-// calculateRunStats calculates statistics from intermediate storage
-func calculateRunStats(ctx context.Context, storage storage.IntermediateStorage, runID string) (processedFiles, processedEntries int) {
-	files, err := storage.ListIntermediateFiles(ctx, runID)
+// calculateRunStatsFromDB calculates statistics from database tables
+func calculateRunStatsFromDB(ctx context.Context, runID string) (processedFiles, processedEntries int) {
+	pool := database.Pool()
+
+	// Count archives for this run
+	var archiveCount int
+	err := pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM archives WHERE run_id = $1
+	`, runID).Scan(&archiveCount)
 	if err != nil {
-		log.Warn().Err(err).Str("runId", runID).Msg("Failed to list intermediate files for stats")
-		return 0, 0
+		log.Warn().Err(err).Str("runId", runID).Msg("Failed to count archives")
+		archiveCount = 0
 	}
 
-	storeCount := 0
-	totalEntries := 0
-
-	for _, file := range files {
-		// Count store files
-		if len(file) > 7 && file[:7] == "stores/" {
-			storeCount++
-
-			// Try to read store data for entry count
-			var storeData jsonb.ParsedStoreData
-			if err := storage.ReadIntermediateJSON(ctx, runID, file, &storeData); err == nil {
-				totalEntries += len(storeData.Rows)
-			}
-		}
+	// Count price entries created (store_price_refs) for stores in this run
+	// This is an approximation based on archives linked to the run
+	var entryCount int
+	err = pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM store_price_refs spr
+		WHERE EXISTS (
+			SELECT 1 FROM stores s
+			WHERE s.id = spr.store_id
+			AND s.updated_at >= (SELECT MIN(created_at) FROM archives WHERE run_id = $1)
+		)
+	`, runID).Scan(&entryCount)
+	if err != nil {
+		log.Warn().Err(err).Str("runId", runID).Msg("Failed to count price entries")
+		entryCount = 0
 	}
 
-	// Also try to read manifest for accurate file count
-	var manifest jsonb.RunManifest
-	if err := storage.ReadIntermediateJSON(ctx, runID, "manifest.json", &manifest); err == nil {
-		processedFiles = len(manifest.Files)
-	} else {
-		// Fall back to store count as file count approximation
-		processedFiles = storeCount
-	}
-
-	return processedFiles, totalEntries
+	return archiveCount, entryCount
 }
 
 // updatePriceTierStoreCounts updates the store_count field on price_tiers

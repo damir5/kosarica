@@ -28,6 +28,7 @@ import (
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/handlers"
+	"github.com/kosarica/price-service/internal/ingestion"
 	"github.com/kosarica/price-service/internal/middleware"
 	"github.com/kosarica/price-service/internal/optimizer"
 	"github.com/kosarica/price-service/internal/pipeline"
@@ -38,21 +39,13 @@ import (
 
 // startIngestionWorkers creates and starts dedicated ingestion worker pools
 // Returns all worker instances for proper shutdown
-func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, logger *zerolog.Logger) []*workers.Worker {
+func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config, logger *zerolog.Logger) []*workers.Worker {
 	tq := taskqueue.New(pool)
 	workersList := make([]*workers.Worker, 0, 5)
 
-	// Legacy ingestion worker (for backwards compatibility during migration)
-	legacyWorker := workers.New(tq, workers.WorkerConfig{
-		WorkerID:   "ingestion-worker",
-		TaskTypes:  []string{"ingestion"},
-		MaxTasks:   1,
-		NumWorkers: 2, // Reduced - new pipeline handles most work
-		PollDelay:  5 * time.Second,
-	})
-	legacyWorker.RegisterHandler("ingestion", handlers.HandleIngestionTask)
-	legacyWorker.Start(ctx)
-	workersList = append(workersList, legacyWorker)
+	// Initialize cluster semaphore based on configured heap size
+	ingestion.InitClusterSemaphore(cfg.Ingestion.HeapMB)
+	clusterSlots := ingestion.GetClusterSlots()
 
 	// Discovery workers (light DB usage - creates run, discovers files)
 	discoverWorker := workers.New(tq, workers.WorkerConfig{
@@ -66,7 +59,7 @@ func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, logger *zero
 	discoverWorker.Start(ctx)
 	workersList = append(workersList, discoverWorker)
 
-	// Fetch+Parse workers (no DB connections held - writes to storage)
+	// Fetch+Parse workers (no DB connections held - archives to storage)
 	fetchParseWorker := workers.New(tq, workers.WorkerConfig{
 		WorkerID:   "fetch-parse-worker",
 		TaskTypes:  []string{"ingestion_fetch_parse"},
@@ -78,19 +71,32 @@ func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, logger *zero
 	fetchParseWorker.Start(ctx)
 	workersList = append(workersList, fetchParseWorker)
 
-	// Cluster workers (heavy DB usage - batched writes)
+	// Store Prep workers (short DB transactions - upserts stores)
+	storePrepWorker := workers.New(tq, workers.WorkerConfig{
+		WorkerID:   "store-prep-worker",
+		TaskTypes:  []string{"ingestion_store_prep"},
+		MaxTasks:   1,
+		NumWorkers: 2,
+		PollDelay:  5 * time.Second,
+	})
+	storePrepWorker.RegisterExtendedHandler("ingestion_store_prep", handlers.HandleStorePrepTask)
+	storePrepWorker.Start(ctx)
+	workersList = append(workersList, storePrepWorker)
+
+	// Cluster workers (heavy memory usage - controlled by semaphore)
+	// NumWorkers should match or exceed semaphore slots to avoid starvation
 	clusterWorker := workers.New(tq, workers.WorkerConfig{
 		WorkerID:   "cluster-worker",
 		TaskTypes:  []string{"ingestion_cluster"},
 		MaxTasks:   1,
-		NumWorkers: 2, // Limited - these hold DB connections
+		NumWorkers: int(clusterSlots) + 1, // Semaphore controls actual concurrency
 		PollDelay:  5 * time.Second,
 	})
 	clusterWorker.RegisterExtendedHandler("ingestion_cluster", handlers.HandleClusterTask)
 	clusterWorker.Start(ctx)
 	workersList = append(workersList, clusterWorker)
 
-	// Finalize workers (light DB usage - updates status, cleanup)
+	// Finalize workers (light DB usage - updates status)
 	finalizeWorker := workers.New(tq, workers.WorkerConfig{
 		WorkerID:   "finalize-worker",
 		TaskTypes:  []string{"ingestion_finalize"},
@@ -104,10 +110,10 @@ func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, logger *zero
 
 	logger.Info().
 		Str("component", "workers").
-		Int("legacy_workers", 2).
 		Int("discover_workers", 2).
 		Int("fetch_parse_workers", 10).
-		Int("cluster_workers", 2).
+		Int("store_prep_workers", 2).
+		Int64("cluster_slots", clusterSlots).
 		Int("finalize_workers", 2).
 		Msg("Ingestion worker pools started")
 
@@ -168,7 +174,7 @@ func main() {
 	go taskSweeper.Start(ctx)
 
 	// Start dedicated ingestion workers
-	ingestionWorkers := startIngestionWorkers(ctx, database.Pool(), logger)
+	ingestionWorkers := startIngestionWorkers(ctx, database.Pool(), cfg, logger)
 	defer func() {
 		for _, w := range ingestionWorkers {
 			w.Stop()

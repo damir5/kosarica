@@ -17,15 +17,19 @@ const (
 type TaskType string
 
 const (
-	TaskTypeIngestion TaskType = "ingestion"
-	TaskTypeRerun     TaskType = "rerun"
-	TaskTypeCleanup   TaskType = "cleanup"
+	TaskTypeRerun   TaskType = "rerun"
+	TaskTypeCleanup TaskType = "cleanup"
 
-	// New ingestion pipeline task types (parent-child architecture)
+	// Ingestion pipeline task types (parent-child architecture)
 	TaskTypeIngestionDiscover   TaskType = "ingestion_discover"
 	TaskTypeIngestionFetchParse TaskType = "ingestion_fetch_parse"
 	TaskTypeIngestionCluster    TaskType = "ingestion_cluster"
 	TaskTypeIngestionFinalize   TaskType = "ingestion_finalize"
+
+	// New ingestion pipeline task types (redesigned architecture)
+	TaskTypeIngestionFetchArchive TaskType = "ingestion_fetch_archive"
+	TaskTypeIngestionStorePrep    TaskType = "ingestion_store_prep"
+	TaskTypeIngestionLoadCluster  TaskType = "ingestion_load_cluster"
 )
 
 type Task struct {

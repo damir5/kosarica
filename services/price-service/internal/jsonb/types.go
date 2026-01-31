@@ -7,12 +7,19 @@ package jsonb
 type TaskQueuePayload struct {
 	Type string `json:"type"`
 
-	// Ingestion task fields
+	// Common ingestion task fields
 	ChainSlug  string  `json:"chainSlug,omitempty"`
 	RunID      *string `json:"runId,omitempty"`
 	TargetDate *string `json:"targetDate,omitempty"`
 	SourceURL  *string `json:"sourceUrl,omitempty"`
 	ArchiveID  *string `json:"archiveId,omitempty"`
+
+	// Fetch_parse task fields
+	FileURL    *string `json:"fileUrl,omitempty"`
+	Filename   *string `json:"filename,omitempty"`
+	FileType   *string `json:"fileType,omitempty"`
+	FileIndex  *int    `json:"fileIndex,omitempty"`
+	TotalFiles *int    `json:"totalFiles,omitempty"`
 
 	// Rerun task fields
 	OriginalRunID *string `json:"originalRunId,omitempty"`
@@ -21,11 +28,6 @@ type TaskQueuePayload struct {
 
 	// Cleanup task fields
 	DaysToKeep *int `json:"daysToKeep,omitempty"`
-}
-
-// IsIngestion returns true if this is an ingestion task payload.
-func (p TaskQueuePayload) IsIngestion() bool {
-	return p.Type == "ingestion"
 }
 
 // IsRerun returns true if this is a rerun task payload.
@@ -146,51 +148,3 @@ func (p FinalizePayload) IsFinalize() bool {
 	return p.Type == "ingestion_finalize"
 }
 
-// ============================================================================
-// Intermediate Storage Data Structures
-// ============================================================================
-
-// ParsedStoreData represents parsed data for a single store.
-// Written to intermediate storage during fetch_parse phase.
-type ParsedStoreData struct {
-	RunID           string           `json:"runId"`
-	FileID          string           `json:"fileId,omitempty"`
-	ArchiveID       string           `json:"archiveId,omitempty"`
-	StoreIdentifier string           `json:"storeIdentifier"`
-	ChainSlug       string           `json:"chainSlug"`
-	ParsedAt        string           `json:"parsedAt"`
-	Rows            []ParsedPriceRow `json:"rows"`
-}
-
-// ParsedPriceRow represents a single parsed price row.
-type ParsedPriceRow struct {
-	Name          string   `json:"name"`
-	ExternalID    string   `json:"externalId,omitempty"`
-	Price         int      `json:"price"`
-	DiscountPrice *int     `json:"discountPrice,omitempty"`
-	UnitPrice     *int     `json:"unitPrice,omitempty"`
-	AnchorPrice   *int     `json:"anchorPrice,omitempty"`
-	Barcodes      []string `json:"barcodes,omitempty"`
-	InStock       *bool    `json:"inStock,omitempty"`
-}
-
-// RunManifest represents the manifest for an ingestion run.
-// Written to intermediate storage during discover phase.
-type RunManifest struct {
-	RunID        string             `json:"runId"`
-	ChainSlug    string             `json:"chainSlug"`
-	TargetDate   string             `json:"targetDate"`
-	DiscoveredAt string             `json:"discoveredAt"`
-	Files        []ManifestFile     `json:"files"`
-	TotalStores  int                `json:"totalStores"`
-	ParsedStores int                `json:"parsedStores"`
-}
-
-// ManifestFile represents a file in the run manifest.
-type ManifestFile struct {
-	FileID   string `json:"fileId"`
-	Filename string `json:"filename"`
-	URL      string `json:"url"`
-	FileType string `json:"fileType"`
-	Status   string `json:"status"` // "pending", "parsed", "failed"
-}

@@ -18,6 +18,12 @@ type Config struct {
 	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
 	Storage   StorageConfig   `mapstructure:"storage"`
 	Logging   LoggingConfig   `mapstructure:"logging"`
+	Ingestion IngestionConfig `mapstructure:"ingestion"`
+}
+
+// IngestionConfig holds ingestion pipeline configuration
+type IngestionConfig struct {
+	HeapMB int `mapstructure:"heap_mb"` // Heap size for cluster semaphore (1 slot per 1GB)
 }
 
 // ServerConfig holds HTTP server configuration
@@ -197,6 +203,9 @@ func bindEnvVars(v *viper.Viper) {
 	v.BindEnv("storage.s3.prefix", "STORAGE_S3_PREFIX")
 	v.BindEnv("storage.s3.endpoint", "STORAGE_S3_ENDPOINT")
 	v.BindEnv("storage.s3.force_path_style", "STORAGE_S3_FORCE_PATH_STYLE")
+
+	// Ingestion
+	v.BindEnv("ingestion.heap_mb", "INGESTION_HEAP_MB")
 }
 
 // setDefaults sets default configuration values
@@ -227,6 +236,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "json")
 	v.SetDefault("logging.no_color", false)
+
+	// Ingestion defaults
+	v.SetDefault("ingestion.heap_mb", 2048) // 2GB default = 2 concurrent cluster slots
 }
 
 // Get returns the global configuration

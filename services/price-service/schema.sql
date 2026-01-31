@@ -294,7 +294,8 @@ CREATE TABLE public.archives (
     metadata jsonb DEFAULT '{}'::jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    is_compressed boolean DEFAULT false
+    is_compressed boolean DEFAULT false,
+    run_id text
 );
 
 

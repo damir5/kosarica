@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -321,96 +320,3 @@ func BuildExpandedKey(chainSlug string, date time.Time, parentFilename, innerFil
 	return fmt.Sprintf("expanded/%s/%s/%s/%s", chainSlug, dateStr, parentBase, innerFilename)
 }
 
-// ============================================================================
-// IntermediateStorage Implementation
-// ============================================================================
-
-// WriteIntermediateJSON writes a JSON object to intermediate storage.
-func (s *LocalStorage) WriteIntermediateJSON(ctx context.Context, runID, filename string, data interface{}) error {
-	key := BuildIntermediateKey(runID, filename)
-
-	jsonBytes, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-
-	return s.Put(ctx, key, jsonBytes, &Metadata{
-		ContentType: "application/json",
-		Custom: map[string]string{
-			"file_type": "json",
-		},
-	})
-}
-
-// ReadIntermediateJSON reads a JSON object from intermediate storage.
-func (s *LocalStorage) ReadIntermediateJSON(ctx context.Context, runID, filename string, dest interface{}) error {
-	key := BuildIntermediateKey(runID, filename)
-
-	content, err := s.Get(ctx, key)
-	if err != nil {
-		return fmt.Errorf("failed to read intermediate file %s: %w", key, err)
-	}
-
-	if err := json.Unmarshal(content, dest); err != nil {
-		return fmt.Errorf("failed to unmarshal JSON from %s: %w", key, err)
-	}
-
-	return nil
-}
-
-// ListIntermediateFiles returns all files in intermediate storage for a run.
-func (s *LocalStorage) ListIntermediateFiles(ctx context.Context, runID string) ([]string, error) {
-	prefix := "intermediate/" + runID + "/"
-
-	keys, err := s.List(ctx, prefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list intermediate files for run %s: %w", runID, err)
-	}
-
-	// Return just the filenames, not full keys
-	filenames := make([]string, 0, len(keys))
-	for _, key := range keys {
-		filename := strings.TrimPrefix(key, prefix)
-		if filename != "" {
-			filenames = append(filenames, filename)
-		}
-	}
-
-	return filenames, nil
-}
-
-// DeleteIntermediateDir deletes all intermediate files for a run.
-func (s *LocalStorage) DeleteIntermediateDir(ctx context.Context, runID string) error {
-	prefix := "intermediate/" + runID + "/"
-
-	keys, err := s.List(ctx, prefix)
-	if err != nil {
-		return fmt.Errorf("failed to list intermediate files for deletion: %w", err)
-	}
-
-	for _, key := range keys {
-		if err := s.Delete(ctx, key); err != nil {
-			return fmt.Errorf("failed to delete intermediate file %s: %w", key, err)
-		}
-	}
-
-	// Also try to remove the directory itself
-	dirPath := s.keyToPath(prefix)
-	os.RemoveAll(dirPath) // Ignore errors - directory might not be empty or might not exist
-
-	return nil
-}
-
-// BuildStoreDataKey builds a key for parsed store data.
-func BuildStoreDataKey(runID, storeIdentifier string) string {
-	// Sanitize store identifier for use in filename
-	safeIdentifier := strings.ReplaceAll(storeIdentifier, "/", "_")
-	safeIdentifier = strings.ReplaceAll(safeIdentifier, "\\", "_")
-	safeIdentifier = strings.ReplaceAll(safeIdentifier, ":", "_")
-	return "stores/" + safeIdentifier + ".json"
-}
-
-// BuildManifestKey builds a key for the run manifest.
-func BuildManifestKey() string {
-	return "manifest.json"
-}

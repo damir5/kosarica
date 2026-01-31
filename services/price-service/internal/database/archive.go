@@ -29,6 +29,7 @@ type Archive struct {
 	Checksum       string                `json:"checksum"`        // SHA-256 checksum
 	DownloadedAt   time.Time             `json:"downloaded_at"`   // When file was downloaded
 	Metadata       jsonb.ArchiveMetadata `json:"metadata"`        // Typed archive metadata
+	RunID          *string               `json:"run_id"`          // Ingestion run ID (for Load+Cluster)
 	CreatedAt      time.Time             `json:"created_at"`
 	UpdatedAt      time.Time             `json:"updated_at"`
 }
@@ -77,6 +78,61 @@ func CreateArchive(ctx context.Context, archive *Archive) error {
 			Valid: true,
 		},
 	})
+}
+
+// CreateArchiveWithRunId creates a new archive record with run_id in the database
+func CreateArchiveWithRunId(ctx context.Context, archive *Archive) error {
+	queries := sqlcgen.New(Pool())
+
+	now := time.Now()
+	archive.CreatedAt = now
+	archive.UpdatedAt = now
+
+	return queries.UpsertArchiveWithRunId(ctx, sqlcgen.UpsertArchiveWithRunIdParams{
+		ID:             archive.ID,
+		ChainSlug:      archive.ChainSlug,
+		SourceUrl:      archive.SourceURL,
+		Filename:       archive.Filename,
+		OriginalFormat: archive.OriginalFormat,
+		ArchivePath:    archive.ArchivePath,
+		ArchiveType:    archive.ArchiveType,
+		ContentType:    stringPtrToPgText(archive.ContentType),
+		FileSize:       int64PtrToPgInt8(archive.FileSize),
+		CompressedSize: int64PtrToPgInt8(archive.CompressedSize),
+		IsCompressed:   pgtype.Bool{Bool: archive.IsCompressed, Valid: true},
+		Checksum:       archive.Checksum,
+		DownloadedAt: pgtype.Timestamptz{
+			Time:  archive.DownloadedAt,
+			Valid: true,
+		},
+		Metadata: archive.Metadata,
+		RunID:    stringPtrToPgText(archive.RunID),
+		CreatedAt: pgtype.Timestamptz{
+			Time:  archive.CreatedAt,
+			Valid: true,
+		},
+		UpdatedAt: pgtype.Timestamptz{
+			Time:  archive.UpdatedAt,
+			Valid: true,
+		},
+	})
+}
+
+// GetArchivesByRunId retrieves all archives for a given run ID
+func GetArchivesByRunId(ctx context.Context, runID string) ([]Archive, error) {
+	queries := sqlcgen.New(Pool())
+
+	rows, err := queries.ListArchivesByRunId(ctx, pgtype.Text{String: runID, Valid: true})
+	if err != nil {
+		return nil, err
+	}
+
+	archives := make([]Archive, len(rows))
+	for i, row := range rows {
+		archives[i] = *convertListArchivesByRunIdRow(row)
+	}
+
+	return archives, nil
 }
 
 // GetArchiveByChecksum looks up an archive by its checksum for deduplication
@@ -205,6 +261,7 @@ func convertGetArchiveByChecksumRow(a sqlcgen.GetArchiveByChecksumRow) *Archive 
 		Checksum:       a.Checksum,
 		DownloadedAt:   a.DownloadedAt.Time,
 		Metadata:       a.Metadata,
+		RunID:          pgTextToStringPtr(a.RunID),
 		CreatedAt:      a.CreatedAt.Time,
 		UpdatedAt:      a.UpdatedAt.Time,
 	}
@@ -226,6 +283,7 @@ func convertGetArchiveByIdRow(a sqlcgen.GetArchiveByIdRow) *Archive {
 		Checksum:       a.Checksum,
 		DownloadedAt:   a.DownloadedAt.Time,
 		Metadata:       a.Metadata,
+		RunID:          pgTextToStringPtr(a.RunID),
 		CreatedAt:      a.CreatedAt.Time,
 		UpdatedAt:      a.UpdatedAt.Time,
 	}
@@ -247,6 +305,29 @@ func convertListArchivesByChainRow(a sqlcgen.ListArchivesByChainRow) *Archive {
 		Checksum:       a.Checksum,
 		DownloadedAt:   a.DownloadedAt.Time,
 		Metadata:       a.Metadata,
+		RunID:          pgTextToStringPtr(a.RunID),
+		CreatedAt:      a.CreatedAt.Time,
+		UpdatedAt:      a.UpdatedAt.Time,
+	}
+}
+
+func convertListArchivesByRunIdRow(a sqlcgen.ListArchivesByRunIdRow) *Archive {
+	return &Archive{
+		ID:             a.ID,
+		ChainSlug:      a.ChainSlug,
+		SourceURL:      a.SourceUrl,
+		Filename:       a.Filename,
+		OriginalFormat: a.OriginalFormat,
+		ArchivePath:    a.ArchivePath,
+		ArchiveType:    a.ArchiveType,
+		ContentType:    pgTextToStringPtr(a.ContentType),
+		FileSize:       pgInt8ToInt64Ptr(a.FileSize),
+		CompressedSize: pgInt8ToInt64Ptr(a.CompressedSize),
+		IsCompressed:   a.IsCompressed.Bool,
+		Checksum:       a.Checksum,
+		DownloadedAt:   a.DownloadedAt.Time,
+		Metadata:       a.Metadata,
+		RunID:          pgTextToStringPtr(a.RunID),
 		CreatedAt:      a.CreatedAt.Time,
 		UpdatedAt:      a.UpdatedAt.Time,
 	}
