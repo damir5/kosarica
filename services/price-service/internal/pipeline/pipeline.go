@@ -104,7 +104,7 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 			Severity: types.SeverityError,
 		})
 		UpdateRunStatusSummary(ctx, runID, "Communication failure", types.SeverityError, string(types.StatusTypeCommunicationFailure))
-		markRunFailed(ctx, runID, err.Error())
+		MarkRunFailed(ctx, runID, err.Error())
 		result.Success = false
 		return result, nil
 	}
@@ -356,7 +356,7 @@ waitForWorkers:
 	}
 
 	// Update run status to completed
-	if err := markRunCompleted(ctx, runID, result.FilesProcessed, result.EntriesPersisted); err != nil {
+	if err := MarkRunCompleted(ctx, runID, result.FilesProcessed, result.EntriesPersisted); err != nil {
 		log.Warn().Err(err).Msg("Failed to mark run as completed")
 	}
 

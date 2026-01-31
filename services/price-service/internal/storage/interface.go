@@ -58,3 +58,27 @@ const (
 	StorageTypeLocal StorageType = "local"
 	StorageTypeS3    StorageType = "s3"
 )
+
+// IntermediateStorage extends Storage with methods for intermediate data.
+// These methods are used during ingestion to store parsed data before clustering.
+type IntermediateStorage interface {
+	Storage
+
+	// WriteIntermediateJSON writes a JSON object to intermediate storage.
+	// Path format: intermediate/{runId}/{filename}.json
+	WriteIntermediateJSON(ctx context.Context, runID, filename string, data interface{}) error
+
+	// ReadIntermediateJSON reads a JSON object from intermediate storage.
+	ReadIntermediateJSON(ctx context.Context, runID, filename string, dest interface{}) error
+
+	// ListIntermediateFiles returns all files in intermediate storage for a run.
+	ListIntermediateFiles(ctx context.Context, runID string) ([]string, error)
+
+	// DeleteIntermediateDir deletes all intermediate files for a run.
+	DeleteIntermediateDir(ctx context.Context, runID string) error
+}
+
+// BuildIntermediateKey builds a storage key for intermediate files.
+func BuildIntermediateKey(runID, filename string) string {
+	return "intermediate/" + runID + "/" + filename
+}

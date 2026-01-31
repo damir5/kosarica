@@ -24,8 +24,8 @@ import {
 	type HandlersGetStorePricesResponse,
 	type HandlersIngestionFile,
 	type HandlersIngestionRun,
-	type HandlersListErrorsResponse,
 	type HandlersListChunksResponse,
+	type HandlersListErrorsResponse,
 	type HandlersListFilesResponse,
 	type HandlersListRunsResponse,
 	type HandlersListStoreStatsResponse,
@@ -290,24 +290,36 @@ export const getStats = procedure
 /**
  * Trigger ingestion for a chain
  * POST /internal/admin/ingest/:chain
- * Note: Not in OpenAPI spec yet - using goFetchWithRetry
+ * Simple proxy to Go service - no retry logic, no timeout, no duplicate checks
+ * Go handles everything: duplicate detection, queueing, execution
  */
 export const triggerChain = procedure
 	.input(
 		z.object({
 			chain: ChainSlugSchema,
 			targetDate: z.string().optional(), // YYYY-MM-DD format
+			priority: z.number().optional().default(0), // 0=normal, higher=more urgent
+			force: z.boolean().optional().default(false), // Force re-ingestion
 		}),
 	)
 	.handler(async ({ input }) => {
+		// Simple validation only
+		if (!input.chain) {
+			throw new Error("Chain is required");
+		}
+
+		// Forward to Go service - no timeout, no retries
+		// Go handles everything: duplicate detection, queueing, execution
 		const response = await goFetchWithRetry(
 			`/internal/admin/ingest/${input.chain}`,
 			{
 				method: "POST",
-				body: input.targetDate
-					? JSON.stringify({ targetDate: input.targetDate })
-					: undefined,
-				timeout: 10000, // 10s timeout - should return 202 immediately
+				body: JSON.stringify({
+					targetDate: input.targetDate,
+					priority: input.priority,
+					force: input.force,
+				}),
+				// No timeout - let Go respond immediately (202 or 200)
 			},
 		);
 		return unwrapResponse(response);

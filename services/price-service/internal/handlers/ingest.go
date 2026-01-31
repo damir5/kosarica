@@ -2,41 +2,55 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"runtime/debug"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kosarica/price-service/internal/chains"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
-	"github.com/kosarica/price-service/internal/pipeline"
+	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/pkg/cuid2"
-	"github.com/kosarica/price-service/internal/types"
+	"github.com/kosarica/price-service/internal/taskqueue"
 	"github.com/rs/zerolog/log"
 )
-
-// ingestionSem limits concurrent ingestion goroutines to prevent resource exhaustion
-var ingestionSem = make(chan struct{}, 10) // Max 10 concurrent ingestion runs
 
 // IngestChainRequest represents a request body for triggering ingestion
 type IngestChainRequest struct {
 	TargetDate string `json:"targetDate,omitempty"` // YYYY-MM-DD format
+	Priority   int    `json:"priority,omitempty"`   // 0=normal, higher=more urgent
+	Force      bool   `json:"force,omitempty"`      // Force re-ingestion even if exists
 }
 
-// IngestChainStartedResponse represents the 202 response when ingestion is started
-type IngestChainStartedResponse struct {
-	RunID   string `json:"runId"`
-	Status  string `json:"status"`
-	PollURL string `json:"pollUrl"`
-	Message string `json:"message,omitempty"`
+// IngestChainScheduledResponse represents the 202 response when ingestion is scheduled
+type IngestChainScheduledResponse struct {
+	RunID         string `json:"runId"`
+	Status        string `json:"status"`
+	PollURL       string `json:"pollUrl"`
+	Message       string `json:"message,omitempty"`
+	TaskID        string `json:"taskId,omitempty"`
+	PreviousRunID string `json:"previousRunId,omitempty"`
+	IsForced      bool   `json:"isForced"`
 }
 
-// IngestChain triggers ingestion for a specific chain asynchronously
+// ExistingIngestionResponse represents the 200 response when ingestion already exists
+type ExistingIngestionResponse struct {
+	RunID       string `json:"runId"`
+	Status      string `json:"status"`
+	PollURL     string `json:"pollUrl"`
+	Message     string `json:"message,omitempty"`
+	CompletedAt string `json:"completedAt,omitempty"`
+	StartedAt   string `json:"startedAt,omitempty"`
+	IsForced    bool   `json:"isForced"`
+}
+
+// IngestChain triggers ingestion for a specific chain
 // POST /internal/admin/ingest/:chain
-// Returns 202 Accepted immediately with runId and pollUrl
+// Returns 202 Accepted for new ingestion, 200 OK for existing ingestion
 func IngestChain(c *gin.Context) {
 	chainID := c.Param("chain")
 	if chainID == "" {
@@ -46,7 +60,7 @@ func IngestChain(c *gin.Context) {
 		return
 	}
 
-	// Parse optional request body
+	// Parse request body
 	var req IngestChainRequest
 	if c.Request.Body != nil && c.Request.ContentLength > 0 {
 		if err := c.BindJSON(&req); err != nil {
@@ -62,186 +76,177 @@ func IngestChain(c *gin.Context) {
 		return
 	}
 
-	// Create run record in database using sqlc
-	queries := sqlcgen.New(database.Pool())
-	ctx := c.Request.Context()
+	// Default target date to today
+	targetDate := req.TargetDate
+	if targetDate == "" {
+		targetDate = time.Now().Format("2006-01-02")
+	}
 
+	ctx := c.Request.Context()
+	queries := sqlcgen.New(database.Pool())
+
+	// Check for existing ingestion (duplicate detection)
+	existingRun, err := checkExistingIngestion(ctx, chainID, targetDate)
+	if err != nil {
+		log.Error().Err(err).Str("chain", chainID).Str("date", targetDate).Msg("Failed to check existing ingestion")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to check existing ingestion",
+		})
+		return
+	}
+
+	// Handle existing ingestion
+	if existingRun != nil {
+		// If not forcing, return existing run info
+		if !req.Force {
+			response := ExistingIngestionResponse{
+				RunID:    existingRun.ID,
+				Status:   existingRun.Status,
+				PollURL:  fmt.Sprintf("/internal/ingestion/runs/%s", existingRun.ID),
+				Message:  fmt.Sprintf("Ingestion already %s for %s", existingRun.Status, targetDate),
+				IsForced: existingRun.IsForced.Bool,
+			}
+
+			if existingRun.StartedAt.Valid {
+				response.StartedAt = existingRun.StartedAt.Time.Format(time.RFC3339)
+			}
+			if existingRun.CompletedAt.Valid {
+				response.CompletedAt = existingRun.CompletedAt.Time.Format(time.RFC3339)
+			}
+
+			c.JSON(http.StatusOK, response)
+			return
+		}
+
+		// Force flag is set - create new ingestion
+		log.Info().
+			Str("chain", chainID).
+			Str("date", targetDate).
+			Str("previousRunId", existingRun.ID).
+			Msg("Force re-ingestion requested")
+	}
+
+	// Create new run record with pending status
 	runID := cuid2.GeneratePrefixedId("run", cuid2.PrefixedIdOptions{})
 	now := time.Now()
 
-	_, err := queries.CreateIngestionRun(ctx, sqlcgen.CreateIngestionRunParams{
+	// Parse target date for storage
+	targetDateTime, err := time.Parse("2006-01-02", targetDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Invalid targetDate format: %s", targetDate),
+		})
+		return
+	}
+
+	_, err = queries.CreateIngestionRun(ctx, sqlcgen.CreateIngestionRunParams{
 		ID:        runID,
 		ChainSlug: chainID,
 		Source:    "api",
-		Status:    "running",
-		StartedAt: pgtype.Timestamp{Time: now, Valid: true},
+		Status:    "pending",
 		CreatedAt: pgtype.Timestamp{Time: now, Valid: true},
 	})
-
 	if err != nil {
+		log.Error().Err(err).Str("runId", runID).Msg("Failed to create ingestion run")
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": fmt.Sprintf("Failed to create ingestion run: %v", err),
+			"error": "Failed to create ingestion run",
 		})
 		return
 	}
 
-	// Spawn goroutine for actual processing
-	go func() {
-		// Use a background context for the goroutine
-		bgCtx := context.Background()
-
-		// Add panic recovery to prevent silent crashes
-		defer func() {
-			if r := recover(); r != nil {
-				log.Error().
-					Interface("panic", r).
-					Str("runID", runID).
-					Str("chain", chainID).
-					Str("stack", string(debug.Stack())).
-					Msg("Ingestion goroutine panicked")
-				markRunFailed(bgCtx, runID, fmt.Sprintf("panic: %v", r))
-			}
-		}()
-
-		// Acquire semaphore slot (blocks if max concurrent reached)
-		ingestionSem <- struct{}{}
-		defer func() { <-ingestionSem }() // Release semaphore slot when done
-
-		// Pass the handler's runID to the pipeline to avoid duplicate run creation
-		result, runErr := pipeline.Run(bgCtx, chainID, req.TargetDate, runID)
-
-		// Update run status based on result with proper logging
-		if runErr != nil {
-			log.Error().Err(runErr).Str("runID", runID).Str("chain", chainID).Msg("Ingestion failed")
-			markRunFailed(bgCtx, runID, runErr.Error())
-		} else if !result.Success {
-			log.Warn().Str("runID", runID).Int("errors", len(result.Errors)).Msg("Ingestion completed with errors")
-			markRunFailed(bgCtx, runID, fmt.Sprintf("Ingestion completed with %d errors", len(result.Errors)))
-		} else {
-			log.Info().Str("runID", runID).Int("files", result.FilesProcessed).Int("entries", result.EntriesPersisted).Msg("Ingestion completed successfully")
-			markRunCompleted(bgCtx, runID, result.FilesProcessed, result.EntriesPersisted)
-		}
-	}()
-
-	// Return 202 Accepted immediately
-	c.JSON(http.StatusAccepted, IngestChainStartedResponse{
-		RunID:   runID,
-		Status:  "started",
-		PollURL: fmt.Sprintf("/internal/ingestion/runs/%s", runID),
-		Message: fmt.Sprintf("Ingestion started for chain %s", chainID),
+	// Update target_date and is_forced (required for duplicate detection)
+	err = queries.UpdateIngestionRunTargetDate(ctx, sqlcgen.UpdateIngestionRunTargetDateParams{
+		ID:         runID,
+		TargetDate: pgtype.Timestamptz{Time: targetDateTime, Valid: true},
+		IsForced:   pgtype.Bool{Bool: req.Force, Valid: true},
 	})
-}
-
-// GetIngestionStatus returns the status of an ingestion run
-// GET /internal/admin/ingest/status/:runId
-func GetIngestionStatus(c *gin.Context) {
-	runID := c.Param("runId")
-	if runID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "runId parameter is required",
+	if err != nil {
+		log.Error().Err(err).Str("runId", runID).Msg("Failed to update run target date")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to configure ingestion run",
 		})
 		return
 	}
 
-	// Look up status from database using sqlc
-	queries := sqlcgen.New(database.Pool())
-	run, err := queries.GetIngestionRun(c.Request.Context(), runID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to lookup status"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"runId":  runID,
-		"status": run.Status,
+	// Schedule task in queue
+	tq := taskqueue.New(database.Pool())
+	scheduleResult := tq.ScheduleTask(ctx, taskqueue.ScheduleTaskInput{
+		TaskType: "ingestion",
+		Payload: jsonb.TaskQueuePayload{
+			Type:       "ingestion",
+			ChainSlug:  chainID,
+			RunID:      &runID,
+			TargetDate: &targetDate,
+		},
+		Priority:   req.Priority,
+		MaxRetries: 3,
 	})
-}
 
-// ListIngestionRuns returns recent ingestion runs for a chain
-// GET /internal/admin/ingest/runs/:chain
-func ListIngestionRuns(c *gin.Context) {
-	chainID := c.Param("chain")
-	if chainID == "" {
-		c.JSON(http.StatusOK, gin.H{
-			"runs":    []interface{}{},
-			"message": "Listing all runs (chain not specified)",
+	if scheduleResult.Err != nil {
+		log.Error().Err(scheduleResult.Err).Str("runId", runID).Msg("Failed to schedule ingestion task")
+		// Mark run as failed since we couldn't schedule it
+		errorMeta := map[string]string{"error": fmt.Sprintf("Failed to schedule task: %s", scheduleResult.Err.Error())}
+		metaJSON, _ := json.Marshal(errorMeta)
+		queries.UpdateIngestionRunFailed(ctx, sqlcgen.UpdateIngestionRunFailedParams{
+			ID:       runID,
+			Metadata: pgtype.Text{String: string(metaJSON), Valid: true},
+		})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to schedule ingestion task",
 		})
 		return
 	}
 
-	// Look up runs from database using sqlc
-	queries := sqlcgen.New(database.Pool())
-	rows, err := queries.ListIngestionRunsByChain(c.Request.Context(), sqlcgen.ListIngestionRunsByChainParams{
-		ChainSlug: chainID,
-		Limit:     20,
-	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to lookup runs"})
-		return
+	// Return 202 Accepted with scheduled status
+	response := IngestChainScheduledResponse{
+		RunID:    runID,
+		Status:   "scheduled",
+		PollURL:  fmt.Sprintf("/internal/ingestion/runs/%s", runID),
+		Message:  fmt.Sprintf("Ingestion scheduled for %s", targetDate),
+		TaskID:   scheduleResult.ID,
+		IsForced: req.Force,
 	}
 
-	// Convert to response format
-	var runs []interface{}
-	for _, row := range rows {
-		run := struct {
-			ID               string  `json:"id"`
-			Status           string  `json:"status"`
-			StartedAt        string  `json:"startedAt"`
-			CompletedAt      *string `json:"completedAt,omitempty"`
-			FilesProcessed   int     `json:"filesProcessed"`
-			EntriesPersisted int     `json:"entriesPersisted"`
-		}{
-			ID:     row.ID,
-			Status: row.Status,
-		}
-
-		if row.StartedAt.Valid {
-			s := row.StartedAt.Time.Format(time.RFC3339)
-			run.StartedAt = s
-		}
-		if row.CompletedAt.Valid {
-			s := row.CompletedAt.Time.Format(time.RFC3339)
-			run.CompletedAt = &s
-		}
-		if row.ProcessedFiles.Valid {
-			run.FilesProcessed = int(row.ProcessedFiles.Int32)
-		}
-		if row.ProcessedEntries.Valid {
-			run.EntriesPersisted = int(row.ProcessedEntries.Int32)
-		}
-		runs = append(runs, run)
+	if existingRun != nil && req.Force {
+		response.PreviousRunID = existingRun.ID
+		response.Message = fmt.Sprintf("Forced re-ingestion scheduled for %s", targetDate)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"chain": chainID,
-		"runs":  runs,
-	})
+	log.Info().
+		Str("runId", runID).
+		Str("chain", chainID).
+		Str("date", targetDate).
+		Str("taskId", scheduleResult.ID).
+		Bool("forced", req.Force).
+		Int("priority", req.Priority).
+		Msg("Ingestion scheduled")
+
+	c.JSON(http.StatusAccepted, response)
 }
 
-// markRunFailed marks an ingestion run as failed using sqlc
-func markRunFailed(ctx context.Context, runID string, errorMsg string) {
+// checkExistingIngestion looks for an active or completed ingestion for chain+date
+// Returns the existing run if found, nil if not found
+func checkExistingIngestion(ctx context.Context, chainSlug string, targetDate string) (*sqlcgen.IngestionRun, error) {
 	queries := sqlcgen.New(database.Pool())
-	pipeline.UpdateRunStatusSummary(ctx, runID, errorMsg, types.SeverityError, "run_failed")
-	err := queries.UpdateIngestionRunFailed(ctx, sqlcgen.UpdateIngestionRunFailedParams{
-		ID:       runID,
-		Metadata: pgtype.Text{String: fmt.Sprintf(`{"error": "%s"}`, errorMsg), Valid: true},
-	})
-	if err != nil {
-		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as failed")
-	}
-}
 
-// markRunCompleted marks an ingestion run as completed using sqlc
-func markRunCompleted(ctx context.Context, runID string, filesProcessed int, entriesPersisted int) {
-	queries := sqlcgen.New(database.Pool())
-	err := queries.UpdateIngestionRunStatus(ctx, sqlcgen.UpdateIngestionRunStatusParams{
-		ID:               runID,
-		Status:           "completed",
-		CompletedAt:      pgtype.Timestamp{Time: time.Now(), Valid: true},
-		ProcessedFiles:   pgtype.Int4{Int32: int32(filesProcessed), Valid: true},
-		ProcessedEntries: pgtype.Int4{Int32: int32(entriesPersisted), Valid: true},
-	})
+	// Parse target date
+	targetDateTime, err := time.Parse("2006-01-02", targetDate)
 	if err != nil {
-		log.Error().Err(err).Str("runID", runID).Msg("Failed to mark run as completed")
+		return nil, err
 	}
+
+	// Look for any run (active or completed) for this chain+date
+	run, err := queries.GetIngestionRunByChainAndDate(ctx, sqlcgen.GetIngestionRunByChainAndDateParams{
+		ChainSlug:  chainSlug,
+		TargetDate: pgtype.Timestamptz{Time: targetDateTime, Valid: true},
+	})
+
+	if err == pgx.ErrNoRows {
+		return nil, nil // No existing ingestion
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &run, nil
 }

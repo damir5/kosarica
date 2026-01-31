@@ -16,7 +16,7 @@ INSERT INTO ingestion_runs (
   id, chain_slug, source, status, started_at, created_at
 ) VALUES (
   $1, $2, $3, $4, $5, $6
-) RETURNING id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type
+) RETURNING id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type, target_date, is_forced
 `
 
 type CreateIngestionRunParams struct {
@@ -60,12 +60,14 @@ func (q *Queries) CreateIngestionRun(ctx context.Context, arg CreateIngestionRun
 		&i.StatusReason,
 		&i.StatusSeverity,
 		&i.StatusType,
+		&i.TargetDate,
+		&i.IsForced,
 	)
 	return i, err
 }
 
 const getIngestionRun = `-- name: GetIngestionRun :one
-SELECT id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type FROM ingestion_runs WHERE id = $1
+SELECT id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type, target_date, is_forced FROM ingestion_runs WHERE id = $1
 `
 
 func (q *Queries) GetIngestionRun(ctx context.Context, id string) (IngestionRun, error) {
@@ -93,12 +95,65 @@ func (q *Queries) GetIngestionRun(ctx context.Context, id string) (IngestionRun,
 		&i.StatusReason,
 		&i.StatusSeverity,
 		&i.StatusType,
+		&i.TargetDate,
+		&i.IsForced,
+	)
+	return i, err
+}
+
+const getIngestionRunByChainAndDate = `-- name: GetIngestionRunByChainAndDate :one
+SELECT id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type, target_date, is_forced FROM ingestion_runs 
+WHERE chain_slug = $1 
+  AND target_date = $2
+  AND status IN ('pending', 'running', 'completed')
+ORDER BY 
+  CASE status 
+    WHEN 'running' THEN 1 
+    WHEN 'pending' THEN 2 
+    ELSE 3 
+  END,
+  created_at DESC
+LIMIT 1
+`
+
+type GetIngestionRunByChainAndDateParams struct {
+	ChainSlug  string             `db:"chain_slug" json:"chain_slug"`
+	TargetDate pgtype.Timestamptz `db:"target_date" json:"target_date"`
+}
+
+func (q *Queries) GetIngestionRunByChainAndDate(ctx context.Context, arg GetIngestionRunByChainAndDateParams) (IngestionRun, error) {
+	row := q.db.QueryRow(ctx, getIngestionRunByChainAndDate, arg.ChainSlug, arg.TargetDate)
+	var i IngestionRun
+	err := row.Scan(
+		&i.ID,
+		&i.ChainSlug,
+		&i.Source,
+		&i.Status,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.TotalFiles,
+		&i.ProcessedFiles,
+		&i.TotalEntries,
+		&i.ProcessedEntries,
+		&i.ErrorCount,
+		&i.Metadata,
+		&i.ParentRunID,
+		&i.RerunType,
+		&i.RerunTargetID,
+		&i.CreatedAt,
+		&i.ArchiveID,
+		&i.SourceUrl,
+		&i.StatusReason,
+		&i.StatusSeverity,
+		&i.StatusType,
+		&i.TargetDate,
+		&i.IsForced,
 	)
 	return i, err
 }
 
 const listIngestionRuns = `-- name: ListIngestionRuns :many
-SELECT id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type FROM ingestion_runs
+SELECT id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type, target_date, is_forced FROM ingestion_runs
 WHERE ($3::text IS NULL OR chain_slug = $3)
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
@@ -141,6 +196,8 @@ func (q *Queries) ListIngestionRuns(ctx context.Context, arg ListIngestionRunsPa
 			&i.StatusReason,
 			&i.StatusSeverity,
 			&i.StatusType,
+			&i.TargetDate,
+			&i.IsForced,
 		); err != nil {
 			return nil, err
 		}
@@ -153,7 +210,7 @@ func (q *Queries) ListIngestionRuns(ctx context.Context, arg ListIngestionRunsPa
 }
 
 const listIngestionRunsByChain = `-- name: ListIngestionRunsByChain :many
-SELECT id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type FROM ingestion_runs
+SELECT id, chain_slug, source, status, started_at, completed_at, total_files, processed_files, total_entries, processed_entries, error_count, metadata, parent_run_id, rerun_type, rerun_target_id, created_at, archive_id, source_url, status_reason, status_severity, status_type, target_date, is_forced FROM ingestion_runs
 WHERE chain_slug = $1 AND source = 'api'
 ORDER BY started_at DESC
 LIMIT $2
@@ -195,6 +252,8 @@ func (q *Queries) ListIngestionRunsByChain(ctx context.Context, arg ListIngestio
 			&i.StatusReason,
 			&i.StatusSeverity,
 			&i.StatusType,
+			&i.TargetDate,
+			&i.IsForced,
 		); err != nil {
 			return nil, err
 		}
@@ -249,5 +308,35 @@ func (q *Queries) UpdateIngestionRunStatus(ctx context.Context, arg UpdateIngest
 		arg.ProcessedFiles,
 		arg.ProcessedEntries,
 	)
+	return err
+}
+
+const updateIngestionRunTargetDate = `-- name: UpdateIngestionRunTargetDate :exec
+UPDATE ingestion_runs
+SET target_date = $2,
+    is_forced = $3
+WHERE id = $1
+`
+
+type UpdateIngestionRunTargetDateParams struct {
+	ID         string             `db:"id" json:"id"`
+	TargetDate pgtype.Timestamptz `db:"target_date" json:"target_date"`
+	IsForced   pgtype.Bool        `db:"is_forced" json:"is_forced"`
+}
+
+func (q *Queries) UpdateIngestionRunTargetDate(ctx context.Context, arg UpdateIngestionRunTargetDateParams) error {
+	_, err := q.db.Exec(ctx, updateIngestionRunTargetDate, arg.ID, arg.TargetDate, arg.IsForced)
+	return err
+}
+
+const updateIngestionRunToRunning = `-- name: UpdateIngestionRunToRunning :exec
+UPDATE ingestion_runs
+SET status = 'running',
+    started_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) UpdateIngestionRunToRunning(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, updateIngestionRunToRunning, id)
 	return err
 }

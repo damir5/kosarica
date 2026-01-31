@@ -568,7 +568,9 @@ CREATE TABLE public.ingestion_runs (
     source_url text,
     status_reason text,
     status_severity text,
-    status_type text
+    status_type text,
+    target_date timestamp with time zone,
+    is_forced boolean DEFAULT false
 );
 
 
@@ -1692,10 +1694,24 @@ CREATE INDEX idx_archives_downloaded_at ON public.archives USING btree (download
 
 
 --
+-- Name: idx_ingestion_runs_active; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_ingestion_runs_active ON public.ingestion_runs USING btree (chain_slug, target_date, status);
+
+
+--
 -- Name: idx_ingestion_runs_archive_id; Type: INDEX; Schema: public; Owner: kosarica
 --
 
 CREATE INDEX idx_ingestion_runs_archive_id ON public.ingestion_runs USING btree (archive_id);
+
+
+--
+-- Name: idx_ingestion_runs_chain_date; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_ingestion_runs_chain_date ON public.ingestion_runs USING btree (chain_slug, target_date);
 
 
 --
@@ -2503,5 +2519,145 @@ REVOKE USAGE ON SCHEMA public FROM PUBLIC;
 --
 -- PostgreSQL database dump complete
 --
+
+-- ============================================================================
+-- Phase 1: Item-Level Price Clustering (price_tiers, store_price_refs)
+-- ============================================================================
+
+--
+-- Name: price_tiers; Type: TABLE; Schema: public; Owner: kosarica
+-- Item-level price groups: unique (item, price, discount) combinations
+--
+
+CREATE TABLE public.price_tiers (
+    id text PRIMARY KEY DEFAULT 'pt_' || gen_random_uuid()::text,
+    chain_slug text NOT NULL,
+    retailer_item_id text NOT NULL,
+    price integer NOT NULL,
+    discount_price integer,
+    unit_price integer,
+    anchor_price integer,
+    first_seen_at timestamp with time zone DEFAULT NOW() NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT NOW() NOT NULL,
+    store_count integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT NOW() NOT NULL
+);
+
+ALTER TABLE public.price_tiers OWNER TO kosarica;
+
+--
+-- Name: store_price_refs; Type: TABLE; Schema: public; Owner: kosarica
+-- Lightweight join table: store references to price tiers
+--
+
+CREATE TABLE public.store_price_refs (
+    store_id text NOT NULL,
+    retailer_item_id text NOT NULL,
+    price_tier_id text NOT NULL,
+    in_stock boolean DEFAULT true,
+    last_seen_at timestamp with time zone DEFAULT NOW() NOT NULL,
+    PRIMARY KEY (store_id, retailer_item_id)
+);
+
+ALTER TABLE public.store_price_refs OWNER TO kosarica;
+
+--
+-- Name: price_tiers indexes
+--
+
+CREATE INDEX idx_price_tiers_item ON public.price_tiers(retailer_item_id);
+CREATE INDEX idx_price_tiers_chain ON public.price_tiers(chain_slug);
+CREATE INDEX idx_price_tiers_last_seen ON public.price_tiers(last_seen_at);
+CREATE UNIQUE INDEX idx_price_tiers_unique ON public.price_tiers(chain_slug, retailer_item_id, price, COALESCE(discount_price, -1));
+
+--
+-- Name: store_price_refs indexes
+--
+
+CREATE INDEX idx_store_price_refs_tier ON public.store_price_refs(price_tier_id);
+CREATE INDEX idx_store_price_refs_store ON public.store_price_refs(store_id);
+
+--
+-- Name: price_tiers foreign keys
+--
+
+ALTER TABLE ONLY public.price_tiers
+    ADD CONSTRAINT price_tiers_chain_slug_chains_slug_fk FOREIGN KEY (chain_slug) REFERENCES public.chains(slug) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.price_tiers
+    ADD CONSTRAINT price_tiers_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
+
+--
+-- Name: store_price_refs foreign keys
+--
+
+ALTER TABLE ONLY public.store_price_refs
+    ADD CONSTRAINT store_price_refs_store_id_stores_id_fk FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.store_price_refs
+    ADD CONSTRAINT store_price_refs_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.store_price_refs
+    ADD CONSTRAINT store_price_refs_price_tier_id_price_tiers_id_fk FOREIGN KEY (price_tier_id) REFERENCES public.price_tiers(id) ON DELETE CASCADE;
+
+-- ============================================================================
+-- Phase 1: Parent-Child Task Support
+-- ============================================================================
+
+--
+-- Name: task_queue parent-child columns
+--
+
+ALTER TABLE public.task_queue ADD COLUMN IF NOT EXISTS parent_task_id text REFERENCES public.task_queue(id);
+ALTER TABLE public.task_queue ADD COLUMN IF NOT EXISTS expected_children integer DEFAULT 0;
+ALTER TABLE public.task_queue ADD COLUMN IF NOT EXISTS completed_children integer DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_task_queue_parent ON public.task_queue(parent_task_id) WHERE parent_task_id IS NOT NULL;
+
+--
+-- Name: task_queue_status_check; Type: CONSTRAINT; Update to include 'waiting_for_children'
+--
+
+ALTER TABLE public.task_queue DROP CONSTRAINT IF EXISTS task_queue_status_check;
+ALTER TABLE public.task_queue ADD CONSTRAINT task_queue_status_check
+  CHECK (status = ANY (ARRAY['pending'::text, 'claimed'::text, 'processing'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'waiting_for_children'::text]));
+
+--
+-- Name: on_subtask_complete(); Type: FUNCTION; Schema: public
+-- Trigger function to handle subtask completion and wake parent tasks
+--
+
+CREATE OR REPLACE FUNCTION public.on_subtask_complete() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'completed' AND NEW.parent_task_id IS NOT NULL THEN
+    -- Increment parent's completed_children counter
+    UPDATE task_queue
+    SET completed_children = completed_children + 1,
+        updated_at = NOW()
+    WHERE id = NEW.parent_task_id;
+
+    -- Check if parent can proceed (all children completed)
+    UPDATE task_queue
+    SET status = 'pending', scheduled_for = NOW()
+    WHERE id = NEW.parent_task_id
+      AND status = 'waiting_for_children'
+      AND completed_children >= expected_children;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+ALTER FUNCTION public.on_subtask_complete() OWNER TO kosarica;
+
+--
+-- Name: subtask_completion_trigger; Type: TRIGGER
+--
+
+DROP TRIGGER IF EXISTS subtask_completion_trigger ON public.task_queue;
+CREATE TRIGGER subtask_completion_trigger
+  AFTER UPDATE OF status ON public.task_queue
+  FOR EACH ROW
+  WHEN (NEW.status = 'completed')
+  EXECUTE FUNCTION public.on_subtask_complete();
 
 

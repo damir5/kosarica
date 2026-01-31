@@ -65,7 +65,7 @@ func DiscoverPhase(ctx context.Context, chainID string, runID string, targetDate
 			Msg("No files discovered")
 		reason := fmt.Sprintf("No files for %s", effectiveDate)
 		UpdateRunStatusSummary(ctx, runID, reason, types.SeverityWarning, string(types.StatusTypeNoFilesForDate))
-		if err := markRunCompleted(ctx, runID, 0, 0); err != nil {
+		if err := MarkRunCompleted(ctx, runID, 0, 0); err != nil {
 			return nil, fmt.Errorf("failed to mark run as completed: %w", err)
 		}
 	}
@@ -88,8 +88,8 @@ func recordTotalFiles(ctx context.Context, runID string, totalFiles int) error {
 	})
 }
 
-// markRunCompleted marks an ingestion run as completed using sqlc
-func markRunCompleted(ctx context.Context, runID string, processedFiles int, processedEntries int) error {
+// MarkRunCompleted marks an ingestion run as completed using sqlc
+func MarkRunCompleted(ctx context.Context, runID string, processedFiles int, processedEntries int) error {
 	queries := sqlcgen.New(database.Pool())
 	now := time.Now()
 	return queries.UpdateRunCompleted(ctx, sqlcgen.UpdateRunCompletedParams{
@@ -110,8 +110,8 @@ func MarkRunInterrupted(ctx context.Context, runID string) error {
 	})
 }
 
-// markRunFailed marks an ingestion run as failed using sqlc
-func markRunFailed(ctx context.Context, runID string, errorMsg string) error {
+// MarkRunFailed marks an ingestion run as failed using sqlc
+func MarkRunFailed(ctx context.Context, runID string, errorMsg string) error {
 	queries := sqlcgen.New(database.Pool())
 	return queries.UpdateRunFailed(ctx, sqlcgen.UpdateRunFailedParams{
 		Column1: errorMsg,
@@ -155,7 +155,7 @@ func checkAndUpdateRunCompletion(ctx context.Context, runID string) (bool, error
 
 	// Check if all files processed
 	if totalFiles > 0 && processedFiles >= totalFiles {
-		if err := markRunCompleted(ctx, runID, processedFiles, 0); err != nil {
+		if err := MarkRunCompleted(ctx, runID, processedFiles, 0); err != nil {
 			return false, err
 		}
 		return true, nil

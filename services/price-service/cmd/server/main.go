@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
@@ -31,7 +32,87 @@ import (
 	"github.com/kosarica/price-service/internal/optimizer"
 	"github.com/kosarica/price-service/internal/pipeline"
 	"github.com/kosarica/price-service/internal/sweepers"
+	"github.com/kosarica/price-service/internal/taskqueue"
+	"github.com/kosarica/price-service/internal/workers"
 )
+
+// startIngestionWorkers creates and starts dedicated ingestion worker pools
+// Returns all worker instances for proper shutdown
+func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, logger *zerolog.Logger) []*workers.Worker {
+	tq := taskqueue.New(pool)
+	workersList := make([]*workers.Worker, 0, 5)
+
+	// Legacy ingestion worker (for backwards compatibility during migration)
+	legacyWorker := workers.New(tq, workers.WorkerConfig{
+		WorkerID:   "ingestion-worker",
+		TaskTypes:  []string{"ingestion"},
+		MaxTasks:   1,
+		NumWorkers: 2, // Reduced - new pipeline handles most work
+		PollDelay:  5 * time.Second,
+	})
+	legacyWorker.RegisterHandler("ingestion", handlers.HandleIngestionTask)
+	legacyWorker.Start(ctx)
+	workersList = append(workersList, legacyWorker)
+
+	// Discovery workers (light DB usage - creates run, discovers files)
+	discoverWorker := workers.New(tq, workers.WorkerConfig{
+		WorkerID:   "discover-worker",
+		TaskTypes:  []string{"ingestion_discover"},
+		MaxTasks:   1,
+		NumWorkers: 2,
+		PollDelay:  5 * time.Second,
+	})
+	discoverWorker.RegisterExtendedHandler("ingestion_discover", handlers.HandleDiscoverTask)
+	discoverWorker.Start(ctx)
+	workersList = append(workersList, discoverWorker)
+
+	// Fetch+Parse workers (no DB connections held - writes to storage)
+	fetchParseWorker := workers.New(tq, workers.WorkerConfig{
+		WorkerID:   "fetch-parse-worker",
+		TaskTypes:  []string{"ingestion_fetch_parse"},
+		MaxTasks:   1,
+		NumWorkers: 10, // High parallelism - no DB connection contention
+		PollDelay:  3 * time.Second,
+	})
+	fetchParseWorker.RegisterHandler("ingestion_fetch_parse", handlers.HandleFetchParseTask)
+	fetchParseWorker.Start(ctx)
+	workersList = append(workersList, fetchParseWorker)
+
+	// Cluster workers (heavy DB usage - batched writes)
+	clusterWorker := workers.New(tq, workers.WorkerConfig{
+		WorkerID:   "cluster-worker",
+		TaskTypes:  []string{"ingestion_cluster"},
+		MaxTasks:   1,
+		NumWorkers: 2, // Limited - these hold DB connections
+		PollDelay:  5 * time.Second,
+	})
+	clusterWorker.RegisterExtendedHandler("ingestion_cluster", handlers.HandleClusterTask)
+	clusterWorker.Start(ctx)
+	workersList = append(workersList, clusterWorker)
+
+	// Finalize workers (light DB usage - updates status, cleanup)
+	finalizeWorker := workers.New(tq, workers.WorkerConfig{
+		WorkerID:   "finalize-worker",
+		TaskTypes:  []string{"ingestion_finalize"},
+		MaxTasks:   1,
+		NumWorkers: 2,
+		PollDelay:  5 * time.Second,
+	})
+	finalizeWorker.RegisterHandler("ingestion_finalize", handlers.HandleFinalizeTask)
+	finalizeWorker.Start(ctx)
+	workersList = append(workersList, finalizeWorker)
+
+	logger.Info().
+		Str("component", "workers").
+		Int("legacy_workers", 2).
+		Int("discover_workers", 2).
+		Int("fetch_parse_workers", 10).
+		Int("cluster_workers", 2).
+		Int("finalize_workers", 2).
+		Msg("Ingestion worker pools started")
+
+	return workersList
+}
 
 func main() {
 	cfg, err := config.Load()
@@ -85,6 +166,14 @@ func main() {
 	sweeperInterval := 5 * time.Minute
 	taskSweeper := sweepers.NewTaskQueueSweeper(database.Pool(), logger, sweeperInterval)
 	go taskSweeper.Start(ctx)
+
+	// Start dedicated ingestion workers
+	ingestionWorkers := startIngestionWorkers(ctx, database.Pool(), logger)
+	defer func() {
+		for _, w := range ingestionWorkers {
+			w.Stop()
+		}
+	}()
 
 	if cfg.Logging.Level == "info" || cfg.Logging.Level == "debug" {
 		gin.SetMode(gin.DebugMode)

@@ -15,9 +15,9 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// PriceCache implements the group-aware price cache with per-chain sharding.
-// It mirrors the database structure with groupPrices + storeToGroup mappings,
-// NOT map[storeID]map[itemID]Price which would defeat price group deduplication.
+// PriceCache implements the tier-aware price cache with per-chain sharding.
+// It uses tierPrices + storeItemTier mappings for memory-efficient price storage.
+// Multiple stores sharing the same price for an item reference the same tier.
 type PriceCache struct {
 	chainsMu sync.RWMutex
 	chains   map[string]*ChainCache
@@ -56,13 +56,17 @@ type ChainCache struct {
 // ChainCacheSnapshot is an immutable snapshot of chain's price data.
 // It is built off-lock and swapped atomically to minimize lock contention.
 type ChainCacheSnapshot struct {
-	// groupPrices maps groupID -> itemID -> price
-	// This mirrors the database structure and enables price group deduplication.
-	// If 300 stores share the same "National Price Group", prices are stored ONCE.
-	groupPrices map[string]map[string]CachedPrice
+	// tierPrices maps tierID -> CachedPrice
+	// Each price tier represents a unique (item, price, discount) combination.
+	// Multiple stores can share the same tier for deduplication.
+	tierPrices map[string]CachedPrice
 
-	// storeToGroup maps storeID -> current groupID
-	storeToGroup map[string]string
+	// storeItemTier maps storeID -> itemID -> tierID
+	// This provides O(1) lookup from store+item to price tier.
+	storeItemTier map[string]map[string]string
+
+	// storeIDs tracks all active store IDs for this chain
+	storeIDs map[string]bool
 
 	// exceptions maps storeID -> itemID -> exception price
 	// These are rare store-specific price overrides.
@@ -225,7 +229,7 @@ func (c *PriceCache) RefreshChain(ctx context.Context, chainSlug string) error {
 }
 
 // loadChainSnapshot loads a complete snapshot of chain's price data in a single transaction.
-// This ensures consistency between store->group mappings and group prices.
+// This ensures consistency between store->tier mappings and tier prices.
 func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*ChainCacheSnapshot, error) {
 	startTime := time.Now()
 
@@ -257,21 +261,20 @@ func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*
 	log.Debug().Str("operation", "loadChainSnapshot").Str("chain", chainSlug).Msg("Transaction began")
 
 	snapshot := &ChainCacheSnapshot{
-		groupPrices:      make(map[string]map[string]CachedPrice),
-		storeToGroup:     make(map[string]string),
+		tierPrices:       make(map[string]CachedPrice),
+		storeItemTier:    make(map[string]map[string]string),
+		storeIDs:         make(map[string]bool),
 		exceptions:       make(map[string]map[string]CachedPrice),
 		storeLocations:   make(map[string]Location),
 		itemAveragePrice: make(map[string]int64),
 	}
 
-	// Load store->group mappings with locations
+	// Load stores with locations
 	storeRows, err := tx.Query(ctx, `
-		SELECT s.id, s.latitude, s.longitude, sgh.price_group_id
+		SELECT s.id, s.latitude, s.longitude
 		FROM stores s
-		JOIN store_group_history sgh ON sgh.store_id = s.id
 		WHERE s.chain_slug = $1
 		  AND s.status = 'active'
-		  AND sgh.valid_to IS NULL
 	`, chainSlug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stores: %w", err)
@@ -279,22 +282,26 @@ func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*
 	defer storeRows.Close()
 
 	for storeRows.Next() {
-		var storeID, groupID string
-		var lat, lon *float64 // Use pointers for nullable float64
+		var storeID string
+		var lat, lon *string // Stored as text in DB
 
-		// Note: pgx handles NULLs correctly with pointers or NullFloat64
-		// Assuming latitude/longitude are nullable numeric/float columns in DB
-		if err := storeRows.Scan(&storeID, &lat, &lon, &groupID); err != nil {
+		if err := storeRows.Scan(&storeID, &lat, &lon); err != nil {
 			return nil, fmt.Errorf("failed to scan store: %w", err)
 		}
 
-		snapshot.storeToGroup[storeID] = groupID
+		snapshot.storeIDs[storeID] = true
+		snapshot.storeItemTier[storeID] = make(map[string]string)
 
 		// Parse location if available
 		if lat != nil && lon != nil {
-			snapshot.storeLocations[storeID] = Location{
-				Latitude:  *lat,
-				Longitude: *lon,
+			var latF, lonF float64
+			if _, err := fmt.Sscanf(*lat, "%f", &latF); err == nil {
+				if _, err := fmt.Sscanf(*lon, "%f", &lonF); err == nil {
+					snapshot.storeLocations[storeID] = Location{
+						Latitude:  latF,
+						Longitude: lonF,
+					}
+				}
 			}
 		}
 	}
@@ -303,33 +310,26 @@ func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*
 		return nil, fmt.Errorf("error iterating stores: %w", err)
 	}
 
-	// Load group prices for all groups in this chain
-	groupPriceRows, err := tx.Query(ctx, `
-		SELECT gp.price_group_id, gp.retailer_item_id,
-		       gp.price, gp.discount_price
-		FROM group_prices gp
-		JOIN price_groups pg ON pg.id = gp.price_group_id
-		WHERE pg.chain_slug = $1
+	// Load price tiers for this chain
+	tierRows, err := tx.Query(ctx, `
+		SELECT id, retailer_item_id, price, discount_price
+		FROM price_tiers
+		WHERE chain_slug = $1
 	`, chainSlug)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query group prices: %w", err)
+		return nil, fmt.Errorf("failed to query price tiers: %w", err)
 	}
-	defer groupPriceRows.Close()
+	defer tierRows.Close()
 
 	// Track prices for average calculation
 	itemPrices := make(map[string][]int64)
 
-	for groupPriceRows.Next() {
-		var groupID, itemID string
+	for tierRows.Next() {
+		var tierID, itemID string
 		var price int
 		var discountPrice *int
-		if err := groupPriceRows.Scan(&groupID, &itemID, &price, &discountPrice); err != nil {
-			return nil, fmt.Errorf("failed to scan group price: %w", err)
-		}
-
-		// Initialize group map if needed
-		if snapshot.groupPrices[groupID] == nil {
-			snapshot.groupPrices[groupID] = make(map[string]CachedPrice)
+		if err := tierRows.Scan(&tierID, &itemID, &price, &discountPrice); err != nil {
+			return nil, fmt.Errorf("failed to scan price tier: %w", err)
 		}
 
 		// Build cached price
@@ -344,14 +344,46 @@ func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*
 			cachedPrice.DiscountPrice = cachedPrice.Price
 		}
 
-		snapshot.groupPrices[groupID][itemID] = cachedPrice
+		snapshot.tierPrices[tierID] = cachedPrice
 
-		// Track for average calculation
+		// Track for average calculation (each tier represents one unique price point)
 		itemPrices[itemID] = append(itemPrices[itemID], cachedPrice.Price)
 	}
 
-	if err := groupPriceRows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating group prices: %w", err)
+	if err := tierRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating price tiers: %w", err)
+	}
+
+	// Load store->tier references
+	refRows, err := tx.Query(ctx, `
+		SELECT spr.store_id, spr.retailer_item_id, spr.price_tier_id
+		FROM store_price_refs spr
+		JOIN stores s ON s.id = spr.store_id
+		WHERE s.chain_slug = $1 AND s.status = 'active'
+	`, chainSlug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query store price refs: %w", err)
+	}
+	defer refRows.Close()
+
+	refCount := 0
+	for refRows.Next() {
+		var storeID, itemID, tierID string
+		if err := refRows.Scan(&storeID, &itemID, &tierID); err != nil {
+			return nil, fmt.Errorf("failed to scan store price ref: %w", err)
+		}
+
+		// Initialize store map if needed (may not exist if store was added after stores query)
+		if snapshot.storeItemTier[storeID] == nil {
+			snapshot.storeItemTier[storeID] = make(map[string]string)
+		}
+
+		snapshot.storeItemTier[storeID][itemID] = tierID
+		refCount++
+	}
+
+	if err := refRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating store price refs: %w", err)
 	}
 
 	// Load store exceptions
@@ -359,7 +391,7 @@ func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*
 		SELECT spe.store_id, spe.retailer_item_id, spe.price, spe.discount_price
 		FROM store_price_exceptions spe
 		JOIN stores s ON s.id = spe.store_id
-		WHERE s.chain_slug = $1 AND spe.valid_to > NOW()
+		WHERE s.chain_slug = $1 AND spe.expires_at > NOW()
 	`, chainSlug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query exceptions: %w", err)
@@ -419,8 +451,9 @@ func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*
 	duration := time.Since(startTime)
 	log.Info().
 		Str("chain", chainSlug).
-		Int("stores", len(snapshot.storeToGroup)).
-		Int("groups", len(snapshot.groupPrices)).
+		Int("stores", len(snapshot.storeIDs)).
+		Int("tiers", len(snapshot.tierPrices)).
+		Int("refs", refCount).
 		Int("exceptions", len(snapshot.exceptions)).
 		Dur("duration", duration).
 		Msg("Loaded chain cache snapshot")
@@ -429,7 +462,7 @@ func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*
 }
 
 // GetPrice retrieves the price for a specific item at a store.
-// It checks exceptions first, then resolves via group mapping.
+// It checks exceptions first, then resolves via tier mapping.
 // Safe for concurrent use and handles nil-maps gracefully.
 func (c *PriceCache) GetPrice(chainSlug string, storeID, itemID string) (CachedPrice, bool) {
 	c.chainsMu.RLock()
@@ -452,19 +485,19 @@ func (c *PriceCache) GetPrice(chainSlug string, storeID, itemID string) (CachedP
 		}
 	}
 
-	// 2. Get group for store (nil-map safe)
-	groupID, ok := snapshot.storeToGroup[storeID]
+	// 2. Get tier for store+item (nil-map safe)
+	storeItems, ok := snapshot.storeItemTier[storeID]
 	if !ok {
 		return CachedPrice{}, false
 	}
 
-	// 3. Get price from group (nil-map safe)
-	groupPrices, ok := snapshot.groupPrices[groupID]
+	tierID, ok := storeItems[itemID]
 	if !ok {
 		return CachedPrice{}, false
 	}
 
-	price, ok := groupPrices[itemID]
+	// 3. Get price from tier (nil-map safe)
+	price, ok := snapshot.tierPrices[tierID]
 	if !ok {
 		return CachedPrice{}, false
 	}
@@ -556,8 +589,8 @@ func (c *PriceCache) GetStoreIDs(chainSlug string) []string {
 		return nil
 	}
 
-	storeIDs := make([]string, 0, len(snapshot.storeToGroup))
-	for storeID := range snapshot.storeToGroup {
+	storeIDs := make([]string, 0, len(snapshot.storeIDs))
+	for storeID := range snapshot.storeIDs {
 		storeIDs = append(storeIDs, storeID)
 	}
 
@@ -577,20 +610,25 @@ func (c *PriceCache) getSnapshot(chainCache *ChainCache) *ChainCacheSnapshot {
 func (c *PriceCache) estimateSnapshotSize(s *ChainCacheSnapshot) int64 {
 	size := int64(0)
 
-	// groupPrices: map overhead + entries
-	size += int64(len(s.groupPrices)) * 64 // map overhead
-	for groupID, items := range s.groupPrices {
-		size += int64(len(groupID)) + 64 // groupID + map entry overhead
-		size += int64(len(items)) * 64   // items map overhead
-		for itemID := range items {
-			size += int64(len(itemID)) + 32 // itemID + CachedPrice
+	// tierPrices: map overhead + entries
+	size += int64(len(s.tierPrices)) * 64 // map overhead
+	for tierID := range s.tierPrices {
+		size += int64(len(tierID)) + 32 // tierID + CachedPrice
+	}
+
+	// storeItemTier: nested map
+	size += int64(len(s.storeItemTier)) * 64 // outer map overhead
+	for storeID, items := range s.storeItemTier {
+		size += int64(len(storeID)) + 64 // storeID + inner map overhead
+		for itemID, tierID := range items {
+			size += int64(len(itemID)+len(tierID)) + 16 // itemID + tierID + entry overhead
 		}
 	}
 
-	// storeToGroup
-	size += int64(len(s.storeToGroup)) * 64
-	for storeID, groupID := range s.storeToGroup {
-		size += int64(len(storeID)+len(groupID)) + 16
+	// storeIDs
+	size += int64(len(s.storeIDs)) * 64
+	for storeID := range s.storeIDs {
+		size += int64(len(storeID)) + 8 // storeID + bool
 	}
 
 	// exceptions

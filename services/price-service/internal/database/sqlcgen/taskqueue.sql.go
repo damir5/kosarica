@@ -109,7 +109,7 @@ func (q *Queries) FailTaskFunc(ctx context.Context, arg FailTaskFuncParams) (boo
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, task_type, payload, priority, status, scheduled_for, started_at, completed_at, failed_at, worker_id, retry_count, max_retries, error_message, created_at, updated_at FROM task_queue WHERE id = $1
+SELECT id, task_type, payload, priority, status, scheduled_for, started_at, completed_at, failed_at, worker_id, retry_count, max_retries, error_message, created_at, updated_at, parent_task_id, expected_children, completed_children FROM task_queue WHERE id = $1
 `
 
 func (q *Queries) GetTask(ctx context.Context, id string) (TaskQueue, error) {
@@ -131,12 +131,15 @@ func (q *Queries) GetTask(ctx context.Context, id string) (TaskQueue, error) {
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentTaskID,
+		&i.ExpectedChildren,
+		&i.CompletedChildren,
 	)
 	return i, err
 }
 
 const listPendingTasks = `-- name: ListPendingTasks :many
-SELECT id, task_type, payload, priority, status, scheduled_for, started_at, completed_at, failed_at, worker_id, retry_count, max_retries, error_message, created_at, updated_at FROM task_queue
+SELECT id, task_type, payload, priority, status, scheduled_for, started_at, completed_at, failed_at, worker_id, retry_count, max_retries, error_message, created_at, updated_at, parent_task_id, expected_children, completed_children FROM task_queue
 WHERE status = 'pending'
   AND scheduled_for <= NOW()
 ORDER BY priority DESC, scheduled_for ASC
@@ -168,6 +171,9 @@ func (q *Queries) ListPendingTasks(ctx context.Context, limit int32) ([]TaskQueu
 			&i.ErrorMessage,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ParentTaskID,
+			&i.ExpectedChildren,
+			&i.CompletedChildren,
 		); err != nil {
 			return nil, err
 		}
@@ -180,7 +186,7 @@ func (q *Queries) ListPendingTasks(ctx context.Context, limit int32) ([]TaskQueu
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, task_type, payload, priority, status, scheduled_for, started_at, completed_at, failed_at, worker_id, retry_count, max_retries, error_message, created_at, updated_at FROM task_queue
+SELECT id, task_type, payload, priority, status, scheduled_for, started_at, completed_at, failed_at, worker_id, retry_count, max_retries, error_message, created_at, updated_at, parent_task_id, expected_children, completed_children FROM task_queue
 WHERE status = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -217,6 +223,9 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusPa
 			&i.ErrorMessage,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ParentTaskID,
+			&i.ExpectedChildren,
+			&i.CompletedChildren,
 		); err != nil {
 			return nil, err
 		}

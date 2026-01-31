@@ -108,7 +108,7 @@ waitForWorkers:
 
 	// 7. Update run status based on results
 	if len(result.Errors) == 0 {
-		markRunCompleted(ctx, runID, result.FilesProcessed, result.EntriesPersisted)
+		MarkRunCompleted(ctx, runID, result.FilesProcessed, result.EntriesPersisted)
 	} else {
 		UpdateRunStatusSummary(ctx, runID, "Resume completed with errors", types.SeverityWarning, "resume_partial")
 	}

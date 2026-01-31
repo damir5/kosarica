@@ -441,10 +441,24 @@ export const ingestionRuns = pgTable(
 		parentRunId: text("parent_run_id"), // FK to ingestionRuns.id for rerun tracking
 		rerunType: text("rerun_type"), // 'file', 'chunk', 'entry', null for original runs
 		rerunTargetId: text("rerun_target_id"), // ID of file/chunk/entry being rerun
+		// Target date for duplicate detection
+		targetDate: timestamp("target_date", { withTimezone: true }),
+		isForced: boolean("is_forced").default(false),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => ({
 		archiveIdIdx: index("idx_ingestion_runs_archive_id").on(table.archiveId),
+		// Fast duplicate detection by chain and date
+		chainDateIdx: index("idx_ingestion_runs_chain_date").on(
+			table.chainSlug,
+			table.targetDate,
+		),
+		// Partial index for active runs only (pending, running)
+		activeRunsIdx: index("idx_ingestion_runs_active").on(
+			table.chainSlug,
+			table.targetDate,
+			table.status,
+		),
 	}),
 );
 
@@ -967,6 +981,10 @@ export const taskQueue = pgTable(
 		retryCount: integer("retry_count").default(0),
 		maxRetries: integer("max_retries").default(3),
 		errorMessage: text("error_message"),
+		// Parent-child task support
+		parentTaskId: text("parent_task_id"),
+		expectedChildren: integer("expected_children").default(0),
+		completedChildren: integer("completed_children").default(0),
 		createdAt: timestamp("created_at").default(sql`NOW()`),
 		updatedAt: timestamp("updated_at").default(sql`NOW()`),
 	},
@@ -979,5 +997,80 @@ export const taskQueue = pgTable(
 			table.priority,
 			table.scheduledFor,
 		),
+		parentIdx: index("idx_task_queue_parent")
+			.on(table.parentTaskId)
+			.where(sql`parent_task_id IS NOT NULL`),
+	}),
+);
+
+// ============================================================================
+// Price Tiers: Item-level price clustering for storage deduplication
+// Replaces the store-level price_groups approach with item-level tiers
+// ============================================================================
+
+export const priceTiers = pgTable(
+	"price_tiers",
+	{
+		id: text("id").primaryKey().default(sql`'pt_' || gen_random_uuid()::TEXT`),
+		chainSlug: text("chain_slug")
+			.notNull()
+			.references(() => chains.slug, { onDelete: "cascade" }),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		price: integer("price").notNull(),
+		discountPrice: integer("discount_price"),
+		unitPrice: integer("unit_price"),
+		anchorPrice: integer("anchor_price"),
+		firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		storeCount: integer("store_count").notNull().default(0),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		itemIdx: index("idx_price_tiers_item").on(table.retailerItemId),
+		chainIdx: index("idx_price_tiers_chain").on(table.chainSlug),
+		lastSeenIdx: index("idx_price_tiers_last_seen").on(table.lastSeenAt),
+		// Unique constraint: one tier per (chain, item, price, discount)
+		uniqueTier: uniqueIndex("idx_price_tiers_unique").on(
+			table.chainSlug,
+			table.retailerItemId,
+			table.price,
+			sql`COALESCE(discount_price, -1)`,
+		),
+	}),
+);
+
+export const storePriceRefs = pgTable(
+	"store_price_refs",
+	{
+		storeId: text("store_id")
+			.notNull()
+			.references(() => stores.id, { onDelete: "cascade" }),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		priceTierId: text("price_tier_id")
+			.notNull()
+			.references(() => priceTiers.id, { onDelete: "cascade" }),
+		inStock: boolean("in_stock").default(true),
+		lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		// Composite primary key
+		pk: uniqueIndex("store_price_refs_pkey").on(
+			table.storeId,
+			table.retailerItemId,
+		),
+		tierIdx: index("idx_store_price_refs_tier").on(table.priceTierId),
+		storeIdx: index("idx_store_price_refs_store").on(table.storeId),
 	}),
 );

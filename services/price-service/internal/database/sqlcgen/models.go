@@ -178,27 +178,29 @@ type IngestionFileEntry struct {
 }
 
 type IngestionRun struct {
-	ID               string           `db:"id" json:"id"`
-	ChainSlug        string           `db:"chain_slug" json:"chain_slug"`
-	Source           string           `db:"source" json:"source"`
-	Status           string           `db:"status" json:"status"`
-	StartedAt        pgtype.Timestamp `db:"started_at" json:"started_at"`
-	CompletedAt      pgtype.Timestamp `db:"completed_at" json:"completed_at"`
-	TotalFiles       pgtype.Int4      `db:"total_files" json:"total_files"`
-	ProcessedFiles   pgtype.Int4      `db:"processed_files" json:"processed_files"`
-	TotalEntries     pgtype.Int4      `db:"total_entries" json:"total_entries"`
-	ProcessedEntries pgtype.Int4      `db:"processed_entries" json:"processed_entries"`
-	ErrorCount       pgtype.Int4      `db:"error_count" json:"error_count"`
-	Metadata         pgtype.Text      `db:"metadata" json:"metadata"`
-	ParentRunID      pgtype.Text      `db:"parent_run_id" json:"parent_run_id"`
-	RerunType        pgtype.Text      `db:"rerun_type" json:"rerun_type"`
-	RerunTargetID    pgtype.Text      `db:"rerun_target_id" json:"rerun_target_id"`
-	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
-	ArchiveID        pgtype.Text      `db:"archive_id" json:"archive_id"`
-	SourceUrl        pgtype.Text      `db:"source_url" json:"source_url"`
-	StatusReason     pgtype.Text      `db:"status_reason" json:"status_reason"`
-	StatusSeverity   pgtype.Text      `db:"status_severity" json:"status_severity"`
-	StatusType       pgtype.Text      `db:"status_type" json:"status_type"`
+	ID               string             `db:"id" json:"id"`
+	ChainSlug        string             `db:"chain_slug" json:"chain_slug"`
+	Source           string             `db:"source" json:"source"`
+	Status           string             `db:"status" json:"status"`
+	StartedAt        pgtype.Timestamp   `db:"started_at" json:"started_at"`
+	CompletedAt      pgtype.Timestamp   `db:"completed_at" json:"completed_at"`
+	TotalFiles       pgtype.Int4        `db:"total_files" json:"total_files"`
+	ProcessedFiles   pgtype.Int4        `db:"processed_files" json:"processed_files"`
+	TotalEntries     pgtype.Int4        `db:"total_entries" json:"total_entries"`
+	ProcessedEntries pgtype.Int4        `db:"processed_entries" json:"processed_entries"`
+	ErrorCount       pgtype.Int4        `db:"error_count" json:"error_count"`
+	Metadata         pgtype.Text        `db:"metadata" json:"metadata"`
+	ParentRunID      pgtype.Text        `db:"parent_run_id" json:"parent_run_id"`
+	RerunType        pgtype.Text        `db:"rerun_type" json:"rerun_type"`
+	RerunTargetID    pgtype.Text        `db:"rerun_target_id" json:"rerun_target_id"`
+	CreatedAt        pgtype.Timestamp   `db:"created_at" json:"created_at"`
+	ArchiveID        pgtype.Text        `db:"archive_id" json:"archive_id"`
+	SourceUrl        pgtype.Text        `db:"source_url" json:"source_url"`
+	StatusReason     pgtype.Text        `db:"status_reason" json:"status_reason"`
+	StatusSeverity   pgtype.Text        `db:"status_severity" json:"status_severity"`
+	StatusType       pgtype.Text        `db:"status_type" json:"status_type"`
+	TargetDate       pgtype.Timestamptz `db:"target_date" json:"target_date"`
+	IsForced         pgtype.Bool        `db:"is_forced" json:"is_forced"`
 }
 
 type IngestionStoreStat struct {
@@ -239,6 +241,20 @@ type PriceGroup struct {
 	LastSeenAt  pgtype.Timestamp `db:"last_seen_at" json:"last_seen_at"`
 	CreatedAt   pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt   pgtype.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type PriceTier struct {
+	ID             string             `db:"id" json:"id"`
+	ChainSlug      string             `db:"chain_slug" json:"chain_slug"`
+	RetailerItemID string             `db:"retailer_item_id" json:"retailer_item_id"`
+	Price          int32              `db:"price" json:"price"`
+	DiscountPrice  pgtype.Int4        `db:"discount_price" json:"discount_price"`
+	UnitPrice      pgtype.Int4        `db:"unit_price" json:"unit_price"`
+	AnchorPrice    pgtype.Int4        `db:"anchor_price" json:"anchor_price"`
+	FirstSeenAt    pgtype.Timestamptz `db:"first_seen_at" json:"first_seen_at"`
+	LastSeenAt     pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	StoreCount     int32              `db:"store_count" json:"store_count"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Product struct {
@@ -472,22 +488,33 @@ type StorePriceException struct {
 	CreatedBy      pgtype.Text      `db:"created_by" json:"created_by"`
 }
 
+type StorePriceRef struct {
+	StoreID        string             `db:"store_id" json:"store_id"`
+	RetailerItemID string             `db:"retailer_item_id" json:"retailer_item_id"`
+	PriceTierID    string             `db:"price_tier_id" json:"price_tier_id"`
+	InStock        pgtype.Bool        `db:"in_stock" json:"in_stock"`
+	LastSeenAt     pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+}
+
 type TaskQueue struct {
-	ID           string                 `db:"id" json:"id"`
-	TaskType     string                 `db:"task_type" json:"task_type"`
-	Payload      jsonb.TaskQueuePayload `db:"payload" json:"payload"`
-	Priority     pgtype.Int4            `db:"priority" json:"priority"`
-	Status       string                 `db:"status" json:"status"`
-	ScheduledFor pgtype.Timestamp       `db:"scheduled_for" json:"scheduled_for"`
-	StartedAt    pgtype.Timestamp       `db:"started_at" json:"started_at"`
-	CompletedAt  pgtype.Timestamp       `db:"completed_at" json:"completed_at"`
-	FailedAt     pgtype.Timestamp       `db:"failed_at" json:"failed_at"`
-	WorkerID     pgtype.Text            `db:"worker_id" json:"worker_id"`
-	RetryCount   pgtype.Int4            `db:"retry_count" json:"retry_count"`
-	MaxRetries   pgtype.Int4            `db:"max_retries" json:"max_retries"`
-	ErrorMessage pgtype.Text            `db:"error_message" json:"error_message"`
-	CreatedAt    pgtype.Timestamp       `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamp       `db:"updated_at" json:"updated_at"`
+	ID                string                 `db:"id" json:"id"`
+	TaskType          string                 `db:"task_type" json:"task_type"`
+	Payload           jsonb.TaskQueuePayload `db:"payload" json:"payload"`
+	Priority          pgtype.Int4            `db:"priority" json:"priority"`
+	Status            string                 `db:"status" json:"status"`
+	ScheduledFor      pgtype.Timestamp       `db:"scheduled_for" json:"scheduled_for"`
+	StartedAt         pgtype.Timestamp       `db:"started_at" json:"started_at"`
+	CompletedAt       pgtype.Timestamp       `db:"completed_at" json:"completed_at"`
+	FailedAt          pgtype.Timestamp       `db:"failed_at" json:"failed_at"`
+	WorkerID          pgtype.Text            `db:"worker_id" json:"worker_id"`
+	RetryCount        pgtype.Int4            `db:"retry_count" json:"retry_count"`
+	MaxRetries        pgtype.Int4            `db:"max_retries" json:"max_retries"`
+	ErrorMessage      pgtype.Text            `db:"error_message" json:"error_message"`
+	CreatedAt         pgtype.Timestamp       `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamp       `db:"updated_at" json:"updated_at"`
+	ParentTaskID      pgtype.Text            `db:"parent_task_id" json:"parent_task_id"`
+	ExpectedChildren  pgtype.Int4            `db:"expected_children" json:"expected_children"`
+	CompletedChildren pgtype.Int4            `db:"completed_children" json:"completed_children"`
 }
 
 type Todo struct {

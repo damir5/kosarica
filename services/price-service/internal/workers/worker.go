@@ -19,27 +19,38 @@ type WorkerConfig struct {
 	PollDelay  time.Duration
 }
 
+// ExtendedHandler is a handler that receives the task queue and task ID for parent-child task support
+type ExtendedHandler func(ctx context.Context, payload jsonb.TaskQueuePayload, tq *taskqueue.TaskQueue, taskID string) error
+
 type Worker struct {
-	queue    *taskqueue.TaskQueue
-	config   WorkerConfig
-	handlers map[string]func(context.Context, jsonb.TaskQueuePayload) error
-	stopChan chan struct{}
-	running  chan struct{}
-	wg       sync.WaitGroup
+	queue            *taskqueue.TaskQueue
+	config           WorkerConfig
+	handlers         map[string]func(context.Context, jsonb.TaskQueuePayload) error
+	extendedHandlers map[string]ExtendedHandler
+	stopChan         chan struct{}
+	running          chan struct{}
+	wg               sync.WaitGroup
 }
 
 func New(queue *taskqueue.TaskQueue, config WorkerConfig) *Worker {
 	return &Worker{
-		queue:    queue,
-		config:   config,
-		handlers: make(map[string]func(context.Context, jsonb.TaskQueuePayload) error),
-		stopChan: make(chan struct{}),
-		running:  make(chan struct{}),
+		queue:            queue,
+		config:           config,
+		handlers:         make(map[string]func(context.Context, jsonb.TaskQueuePayload) error),
+		extendedHandlers: make(map[string]ExtendedHandler),
+		stopChan:         make(chan struct{}),
+		running:          make(chan struct{}),
 	}
 }
 
 func (w *Worker) RegisterHandler(taskType string, handler func(context.Context, jsonb.TaskQueuePayload) error) {
 	w.handlers[taskType] = handler
+}
+
+// RegisterExtendedHandler registers a handler that receives the task queue and task ID
+// Use this for handlers that need to schedule child tasks
+func (w *Worker) RegisterExtendedHandler(taskType string, handler ExtendedHandler) {
+	w.extendedHandlers[taskType] = handler
 }
 
 func (w *Worker) Start(ctx context.Context) {
@@ -130,8 +141,11 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 	w.wg.Add(1)
 	defer w.wg.Done()
 
-	handler, exists := w.handlers[task.TaskType]
-	if !exists {
+	// Check for extended handler first, then regular handler
+	handler, hasHandler := w.handlers[task.TaskType]
+	extHandler, hasExtHandler := w.extendedHandlers[task.TaskType]
+
+	if !hasHandler && !hasExtHandler {
 		log.Warn().
 			Str("task_type", task.TaskType).
 			Msg("No handler for task type")
@@ -156,7 +170,14 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 		return
 	}
 
-	handlerErr := handler(ctx, task.Payload)
+	// Execute the appropriate handler
+	var handlerErr error
+	if hasExtHandler {
+		handlerErr = extHandler(ctx, task.Payload, w.queue, task.ID)
+	} else {
+		handlerErr = handler(ctx, task.Payload)
+	}
+
 	if handlerErr != nil {
 		w.queue.FailTask(ctx, task.ID, handlerErr.Error(), true)
 		log.Error().

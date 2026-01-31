@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestNilMapSafety verifies that accessing missing stores, groups, or items
+// TestNilMapSafety verifies that accessing missing stores, tiers, or items
 // doesn't panic and returns appropriate empty values.
 func TestNilMapSafety(t *testing.T) {
 	cache := &PriceCache{
@@ -15,8 +15,9 @@ func TestNilMapSafety(t *testing.T) {
 
 	chainCache := &ChainCache{}
 	snapshot := &ChainCacheSnapshot{
-		groupPrices:      make(map[string]map[string]CachedPrice),
-		storeToGroup:     make(map[string]string),
+		tierPrices:       make(map[string]CachedPrice),
+		storeItemTier:    make(map[string]map[string]string),
+		storeIDs:         make(map[string]bool),
 		exceptions:       make(map[string]map[string]CachedPrice),
 		storeLocations:   make(map[string]Location),
 		itemAveragePrice: make(map[string]int64),
