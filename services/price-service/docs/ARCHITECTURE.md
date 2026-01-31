@@ -301,15 +301,17 @@ Per Croatian law, retailers must display:
 ## Configuration
 
 **Hierarchy (highest to lowest priority):**
-1. Environment variables (`PRICE_SERVICE_*`)
-2. Config file (`config/config.yaml`)
+1. Environment variables (`PRICE_SERVICE_*`, `PORT`, `DATABASE_URL`, etc.)
+2. `.env` / `.env.development` file
 3. Defaults (hardcoded)
 
 **Key Settings:**
-- `server.port` - HTTP port (default: 3000)
-- `database.url` - PostgreSQL connection
-- `rate_limit.requests_per_second` - Throttle (default: 2)
-- `storage.base_path` - Archive location
+- `PORT` - HTTP port (default: 3000)
+- `DATABASE_URL` - PostgreSQL connection
+- `PRICE_SERVICE_RATE_LIMIT_REQUESTS_PER_SECOND` - Throttle (default: 2)
+- `STORAGE_PATH` - Archive location
+
+See `.env.example` for all available configuration options.
 
 ## Error Handling
 

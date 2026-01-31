@@ -75,25 +75,15 @@ type LoggingConfig struct {
 
 var globalConfig *Config
 
-// Load loads the configuration from file, .env, and environment variables
-func Load(configPath string) (*Config, error) {
+// Load loads the configuration from .env and environment variables
+func Load() (*Config, error) {
 	v := viper.New()
 
 	// Set defaults
 	setDefaults(v)
 
-	// Read config file
-	if configPath != "" {
-		v.SetConfigFile(configPath)
-	} else {
-		v.SetConfigName("config")
-		v.SetConfigType("yaml")
-		v.AddConfigPath("./config")
-		v.AddConfigPath(".")
-	}
-
-	// Load .env file using godotenv
-	if err := loadEnvFile(v); err != nil {
+	// Load .env file
+	if err := loadEnvFile(); err != nil {
 		// .env is optional, log but don't fail
 		log.Warn().Err(err).Msg("Warning: .env file not loaded")
 	}
@@ -105,14 +95,6 @@ func Load(configPath string) (*Config, error) {
 	// Bind env keys for nested config
 	bindEnvVars(v)
 
-	// Read config file (optional)
-	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("error reading config file: %w", err)
-		}
-		// Config file not found, use defaults and env vars
-	}
-
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
@@ -123,7 +105,7 @@ func Load(configPath string) (*Config, error) {
 }
 
 // loadEnvFile loads .env file by parsing KEY=VALUE lines and setting them as environment variables
-func loadEnvFile(v *viper.Viper) error {
+func loadEnvFile() error {
 	// Try to load .env file from various locations
 	envPaths := []string{
 		".",
@@ -183,17 +165,29 @@ func loadDotEnvFile(filename string) error {
 
 // bindEnvVars binds environment variables to config keys
 func bindEnvVars(v *viper.Viper) {
+	// Server
+	v.BindEnv("server.port", "PORT")
+	v.BindEnv("server.host", "HOST")
+	v.BindEnv("server.read_timeout", "PRICE_SERVICE_SERVER_READ_TIMEOUT")
+	v.BindEnv("server.write_timeout", "PRICE_SERVICE_SERVER_WRITE_TIMEOUT")
+
 	// Database
 	v.BindEnv("database.url", "DATABASE_URL")
 	v.BindEnv("database.max_connections", "PRICE_SERVICE_DATABASE_MAX_CONNECTIONS")
 	v.BindEnv("database.min_connections", "PRICE_SERVICE_DATABASE_MIN_CONNECTIONS")
+	v.BindEnv("database.max_conn_lifetime", "PRICE_SERVICE_DATABASE_MAX_CONN_LIFETIME")
+	v.BindEnv("database.max_conn_idle_time", "PRICE_SERVICE_DATABASE_MAX_CONN_IDLE_TIME")
 
-	// Server
-	v.BindEnv("server.port", "PORT")
-	v.BindEnv("server.host", "HOST")
+	// Rate Limiting
+	v.BindEnv("rate_limit.requests_per_second", "PRICE_SERVICE_RATE_LIMIT_REQUESTS_PER_SECOND")
+	v.BindEnv("rate_limit.max_retries", "PRICE_SERVICE_RATE_LIMIT_MAX_RETRIES")
+	v.BindEnv("rate_limit.initial_backoff_ms", "PRICE_SERVICE_RATE_LIMIT_INITIAL_BACKOFF_MS")
+	v.BindEnv("rate_limit.max_backoff_ms", "PRICE_SERVICE_RATE_LIMIT_MAX_BACKOFF_MS")
 
 	// Logging
 	v.BindEnv("logging.level", "LOG_LEVEL")
+	v.BindEnv("logging.format", "LOG_FORMAT")
+	v.BindEnv("logging.no_color", "LOG_NO_COLOR")
 
 	// Storage
 	v.BindEnv("storage.type", "STORAGE_TYPE")

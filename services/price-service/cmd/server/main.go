@@ -34,7 +34,7 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load("")
+	cfg, err := config.Load()
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)

@@ -13,9 +13,8 @@ import (
 )
 
 var (
-	cfgFile string
-	cfg     *config.Config
-	logger  *zerolog.Logger
+	cfg    *config.Config
+	logger *zerolog.Logger
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -35,14 +34,11 @@ func Execute() error {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-
-	// Persistent flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config/config.yaml or ./config.yaml)")
 }
 
 func initConfig() {
 	var err error
-	cfg, err = config.Load(cfgFile)
+	cfg, err = config.Load()
 	if err != nil {
 		// Config is optional for some commands, don't fail here
 		fmt.Fprintf(os.Stderr, "Warning: failed to load config: %v\n", err)
