@@ -47,8 +47,23 @@ type RateLimitConfig struct {
 
 // StorageConfig holds storage configuration
 type StorageConfig struct {
-	Type     string `mapstructure:"type"`
+	Type  string      `mapstructure:"type"`
+	Local LocalConfig `mapstructure:"local"`
+	S3    S3Config    `mapstructure:"s3"`
+}
+
+// LocalConfig holds local filesystem storage configuration
+type LocalConfig struct {
 	BasePath string `mapstructure:"base_path"`
+}
+
+// S3Config holds S3 storage configuration
+type S3Config struct {
+	Region         string `mapstructure:"region"`
+	Bucket         string `mapstructure:"bucket"`
+	Prefix         string `mapstructure:"prefix"`
+	Endpoint       string `mapstructure:"endpoint"`
+	ForcePathStyle bool   `mapstructure:"force_path_style"`
 }
 
 // LoggingConfig holds logging configuration
@@ -181,7 +196,13 @@ func bindEnvVars(v *viper.Viper) {
 	v.BindEnv("logging.level", "LOG_LEVEL")
 
 	// Storage
-	v.BindEnv("storage.base_path", "STORAGE_PATH")
+	v.BindEnv("storage.type", "STORAGE_TYPE")
+	v.BindEnv("storage.local.base_path", "STORAGE_PATH")
+	v.BindEnv("storage.s3.region", "STORAGE_S3_REGION")
+	v.BindEnv("storage.s3.bucket", "STORAGE_S3_BUCKET")
+	v.BindEnv("storage.s3.prefix", "STORAGE_S3_PREFIX")
+	v.BindEnv("storage.s3.endpoint", "STORAGE_S3_ENDPOINT")
+	v.BindEnv("storage.s3.force_path_style", "STORAGE_S3_FORCE_PATH_STYLE")
 }
 
 // setDefaults sets default configuration values
@@ -206,7 +227,7 @@ func setDefaults(v *viper.Viper) {
 
 	// Storage defaults
 	v.SetDefault("storage.type", "local")
-	v.SetDefault("storage.base_path", "./data/archives")
+	v.SetDefault("storage.local.base_path", "./data")
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")

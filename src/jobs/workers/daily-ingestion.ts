@@ -27,22 +27,21 @@ async function asyncPool<T, R>(
 	fn: (item: T) => Promise<R>,
 ): Promise<R[]> {
 	const results: R[] = new Array(items.length);
-	const executing: Promise<void>[] = [];
+	const executing: Set<Promise<void>> = new Set();
 
 	for (let i = 0; i < items.length; i++) {
-		const promise = fn(items[i]).then((result) => {
-			results[i] = result;
-		});
+		const wrappedPromise = fn(items[i])
+			.then((result) => {
+				results[i] = result;
+			})
+			.finally(() => {
+				executing.delete(wrappedPromise);
+			});
 
-		executing.push(promise);
+		executing.add(wrappedPromise);
 
-		if (executing.length >= concurrency) {
+		if (executing.size >= concurrency) {
 			await Promise.race(executing);
-			// Remove completed promises
-			const index = executing.indexOf(promise);
-			if (index > -1) {
-				executing.splice(index, 1);
-			}
 		}
 	}
 

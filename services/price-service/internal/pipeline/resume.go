@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/kosarica/price-service/config"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/storage"
@@ -51,8 +52,8 @@ func ResumeRun(ctx context.Context, runID string, chainID string) (bool, error) 
 		return false, fmt.Errorf("failed to update run status: %w", err)
 	}
 
-	// 5. Initialize storage backend
-	storageBackend, err := storage.NewLocalStorage("./data/archives")
+	// 5. Initialize storage backend from config
+	storageBackend, err := storage.NewStorageBackend(&config.Get().Storage)
 	if err != nil {
 		return false, fmt.Errorf("failed to initialize storage: %w", err)
 	}

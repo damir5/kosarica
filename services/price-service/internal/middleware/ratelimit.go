@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -79,6 +80,12 @@ func RateLimitMiddleware(config ...RateLimiterConfig) gin.HandlerFunc {
 
 	limiter := NewIPRateLimiter(cfg)
 
+	// Initialize trusted proxy matcher once at startup (not per-request)
+	var proxyMatcher *TrustedProxyMatcher
+	if len(cfg.TrustedProxies) > 0 {
+		proxyMatcher = NewTrustedProxyMatcher(cfg.TrustedProxies)
+	}
+
 	// Start cleanup goroutine
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
@@ -94,9 +101,9 @@ func RateLimitMiddleware(config ...RateLimiterConfig) gin.HandlerFunc {
 
 		// Only use X-Forwarded-For if we have trusted proxies configured
 		// and the request comes from one of them
-		if len(cfg.TrustedProxies) > 0 {
+		if proxyMatcher != nil {
 			clientIP := c.RemoteIP()
-			if isTrustedProxy(clientIP, cfg.TrustedProxies) {
+			if proxyMatcher.IsTrusted(clientIP) {
 				// Use X-Forwarded-For from trusted proxy
 				forwardedFor := c.GetHeader("X-Forwarded-For")
 				if forwardedFor != "" {
@@ -124,15 +131,62 @@ func RateLimitMiddleware(config ...RateLimiterConfig) gin.HandlerFunc {
 	}
 }
 
-// isTrustedProxy checks if the given IP is in the list of trusted proxies
-func isTrustedProxy(ip string, trustedProxies []string) bool {
-	for _, trusted := range trustedProxies {
-		// Simple string match for now - could be enhanced to support CIDR ranges
-		if ip == trusted {
+// TrustedProxyMatcher checks if IPs are trusted, supporting both exact IPs and CIDR ranges
+type TrustedProxyMatcher struct {
+	exactIPs map[string]bool
+	networks []*net.IPNet
+}
+
+// NewTrustedProxyMatcher creates a matcher from a list of IPs and/or CIDR ranges
+func NewTrustedProxyMatcher(proxies []string) *TrustedProxyMatcher {
+	m := &TrustedProxyMatcher{
+		exactIPs: make(map[string]bool),
+		networks: make([]*net.IPNet, 0),
+	}
+
+	for _, proxy := range proxies {
+		// Try parsing as CIDR first
+		if strings.Contains(proxy, "/") {
+			_, network, err := net.ParseCIDR(proxy)
+			if err == nil {
+				m.networks = append(m.networks, network)
+				continue
+			}
+		}
+		// Treat as exact IP
+		m.exactIPs[proxy] = true
+	}
+
+	return m
+}
+
+// IsTrusted checks if the given IP is trusted
+func (m *TrustedProxyMatcher) IsTrusted(ip string) bool {
+	// Fast path: exact match
+	if m.exactIPs[ip] {
+		return true
+	}
+
+	// Parse IP for CIDR checking
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+
+	// Check CIDR ranges
+	for _, network := range m.networks {
+		if network.Contains(parsedIP) {
 			return true
 		}
 	}
+
 	return false
+}
+
+// isTrustedProxy checks if the given IP is in the list of trusted proxies (legacy wrapper)
+func isTrustedProxy(ip string, trustedProxies []string) bool {
+	matcher := NewTrustedProxyMatcher(trustedProxies)
+	return matcher.IsTrusted(ip)
 }
 
 // ServiceRateLimitMiddleware applies rate limiting for service-to-service calls

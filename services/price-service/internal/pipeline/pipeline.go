@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/kosarica/price-service/internal/adapters/config"
+	"github.com/kosarica/price-service/config"
+	adaptersconfig "github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
@@ -53,7 +54,7 @@ func getIngestionParallelism(dbMaxConns int32) int {
 // Returns the ingestion result with success status, run ID, and statistics
 func Run(ctx context.Context, chainID string, targetDate string, runID string) (*IngestionResult, error) {
 	// Validate chain ID
-	if !config.IsValidChainID(chainID) {
+	if !adaptersconfig.IsValidChainID(chainID) {
 		return nil, fmt.Errorf("invalid chain ID: %s", chainID)
 	}
 
@@ -62,8 +63,8 @@ func Run(ctx context.Context, chainID string, targetDate string, runID string) (
 		return nil, fmt.Errorf("failed to initialize chain registry: %w", err)
 	}
 
-	// Initialize storage backend
-	storageBackend, err := storage.NewLocalStorage("./data")
+	// Initialize storage backend from config
+	storageBackend, err := storage.NewStorageBackend(&config.Get().Storage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}

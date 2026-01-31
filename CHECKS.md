@@ -50,3 +50,4 @@ pnpm test              # Run tests
 ## more
 
 - NEVER use RAW sql queries - use SQLC in go and drizzle in ts
+- NEVER use any or go equivalent types especially on system boundaries

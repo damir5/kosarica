@@ -1,13 +1,14 @@
 #!/usr/bin/env tsx
-import { eq } from "drizzle-orm";
-import { user, account } from "@/db/schema";
-import { getDb } from "@/utils/bindings";
-import { hashPassword } from "better-auth/crypto";
-import { generatePrefixedId } from "@/utils/id";
+import {account,user} from "@/db/schema";
+import {getDb} from "@/utils/bindings";
+import {generatePrefixedId} from "@/utils/id";
+import {hashPassword} from "better-auth/crypto";
+import {eq} from "drizzle-orm";
 
 async function ensureAdmin() {
 	const db = getDb();
 
+	// THIS FOR USE IN DEV ONLY AND DONT WORRY ABOUT HARDCODED PASS
 	const email = "admin@dev.local";
 	const password = "admin123456";
 

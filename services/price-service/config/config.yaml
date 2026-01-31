@@ -21,7 +21,14 @@ rate_limit:
 
 storage:
   type: "local"
-  base_path: "./data"
+  local:
+    base_path: "./data"
+  # s3:
+  #   region: "us-east-1"
+  #   bucket: "my-bucket"
+  #   prefix: ""
+  #   endpoint: ""
+  #   force_path_style: false
 
 logging:
   level: "info"
