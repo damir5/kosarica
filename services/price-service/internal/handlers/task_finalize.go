@@ -41,6 +41,22 @@ func HandleFinalizeTask(ctx context.Context, payload jsonb.TaskQueuePayload) err
 	// Get run statistics from database (archives and price tiers)
 	processedFiles, processedEntries := calculateRunStatsFromDB(ctx, runID)
 
+	// Check for failed tasks for this run
+	var failedCount int
+	err = database.Pool().QueryRow(ctx, `
+		SELECT COUNT(*) FROM task_queue
+		WHERE status = 'failed' AND payload::text LIKE '%' || $1 || '%'
+	`, runID).Scan(&failedCount)
+	if err != nil {
+		log.Warn().Err(err).Str("runId", runID).Msg("Failed to check for failed tasks")
+		failedCount = 0
+	}
+
+	if failedCount > 0 {
+		log.Warn().Str("runId", runID).Int("failedTasks", failedCount).
+			Msg("Run completed with failed tasks")
+	}
+
 	// Update run status to completed
 	queries := sqlcgen.New(database.Pool())
 	now := time.Now()

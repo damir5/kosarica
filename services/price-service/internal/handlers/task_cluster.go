@@ -1131,7 +1131,7 @@ func swapPriceSnapshot(
 	if _, err := tx.Exec(ctx, `SET LOCAL synchronous_commit = off`); err != nil {
 		return nil, fmt.Errorf("failed to set synchronous_commit: %w", err)
 	}
-	if _, err := tx.Exec(ctx, `SET LOCAL lock_timeout = '5s'`); err != nil {
+	if _, err := tx.Exec(ctx, `SET LOCAL lock_timeout = '30s'`); err != nil {
 		return nil, fmt.Errorf("failed to set lock_timeout: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `SET LOCAL statement_timeout = '30min'`); err != nil {
