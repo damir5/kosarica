@@ -93,6 +93,19 @@ func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *
 		Str("taskId", taskID).
 		Msg("Processing load+cluster task")
 
+	// If this task is re-queued after its finalize child completes, skip reprocessing.
+	task, err := tq.GetTask(ctx, taskID)
+	if err != nil {
+		log.Warn().Err(err).Str("taskId", taskID).Msg("Failed to load task record")
+	} else if task.ExpectedChildren > 0 && task.CompletedChildren >= task.ExpectedChildren {
+		log.Info().
+			Str("taskId", taskID).
+			Int("expectedChildren", task.ExpectedChildren).
+			Int("completedChildren", task.CompletedChildren).
+			Msg("Finalize child completed; skipping re-run of cluster task")
+		return nil
+	}
+
 	// Acquire semaphore slot for heap-based concurrency control
 	if err := ingestion.AcquireClusterSlot(ctx); err != nil {
 		return fmt.Errorf("failed to acquire cluster slot: %w", err)
