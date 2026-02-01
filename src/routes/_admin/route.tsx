@@ -8,10 +8,7 @@ export const Route = createFileRoute("/_admin")({
 			!session ||
 			(session.user as Record<string, unknown>).role !== "superadmin"
 		) {
-			const redirectTo =
-				location.pathname +
-				location.search +
-				(location.hash ? location.hash : "");
+			const redirectTo = location.href;
 			throw redirect({
 				to: "/login",
 				search: {
