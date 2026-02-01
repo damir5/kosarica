@@ -168,15 +168,15 @@ func IngestChain(c *gin.Context) {
 		return
 	}
 
-	// Schedule task in queue
+	// Schedule task in queue (using new parent-child architecture)
 	tq := taskqueue.New(database.Pool())
 	scheduleResult := tq.ScheduleTask(ctx, taskqueue.ScheduleTaskInput{
-		TaskType: "ingestion",
+		TaskType: string(taskqueue.TaskTypeIngestionDiscover),
 		Payload: jsonb.TaskQueuePayload{
-			Type:       "ingestion",
+			Type:       "ingestion_discover",
 			ChainSlug:  chainID,
-			RunID:      &runID,
 			TargetDate: &targetDate,
+			RunID:      &runID,
 		},
 		Priority:   req.Priority,
 		MaxRetries: 3,

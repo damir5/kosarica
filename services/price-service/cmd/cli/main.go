@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/kosarica/price-service/config"
+	adaptersconfig "github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/database"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
@@ -56,7 +57,7 @@ func persistentPreRun(cmd *cobra.Command, args []string) error {
 	logger = initLogger()
 
 	// Check if this command needs database
-	cmdNeedsDB := cmd.Name() == "ingest" || cmd.Name() == "run"
+	cmdNeedsDB := cmd.Name() == "run"
 
 	if cmdNeedsDB {
 		if cfg == nil {
@@ -122,4 +123,13 @@ func main() {
 	if err := Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// validChains returns a list of all valid chain IDs for display purposes
+func validChains() []string {
+	chains := make([]string, len(adaptersconfig.ChainIDs))
+	for i, c := range adaptersconfig.ChainIDs {
+		chains[i] = string(c)
+	}
+	return chains
 }

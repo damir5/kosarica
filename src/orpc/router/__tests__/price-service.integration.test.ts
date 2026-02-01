@@ -119,14 +119,14 @@ describe("Price Service Proxy Integration Tests", () => {
 
 	describe("Trigger Ingestion", () => {
 		it.skipIf(!goServiceAvailable)(
-			"should return 202 with runId and status: started",
+			"should return 202 with runId and status: scheduled",
 			async () => {
 				const result = await orpc.admin.ingestion.triggerChain({
 					chain: "dm",
 				});
 
 				expect(result).toBeDefined();
-				expect(result.status).toBe("started");
+				expect(result.status).toBe("scheduled");
 				expect(result.runId).toBeDefined();
 				expect(typeof result.runId).toBe("string");
 				expect(result.pollUrl).toBeDefined();

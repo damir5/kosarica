@@ -3,13 +3,17 @@ package workers
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/jsonb"
 	"github.com/kosarica/price-service/internal/taskqueue"
+	"github.com/rs/zerolog"
 )
+
+var log = zerolog.New(os.Stdout).With().Timestamp().Str("component", "worker").Logger()
 
 type WorkerConfig struct {
 	WorkerID   string
@@ -141,6 +145,12 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 	w.wg.Add(1)
 	defer w.wg.Done()
 
+	// Extract runId from payload for logging
+	runID := ""
+	if task.Payload.RunID != nil {
+		runID = *task.Payload.RunID
+	}
+
 	// Check for extended handler first, then regular handler
 	handler, hasHandler := w.handlers[task.TaskType]
 	extHandler, hasExtHandler := w.extendedHandlers[task.TaskType]
@@ -158,6 +168,7 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 		Str("worker_id", workerID).
 		Str("task_id", task.ID).
 		Str("task_type", task.TaskType).
+		Str("run_id", runID).
 		Msg("Worker processing task")
 
 	// Transition to 'processing' status
@@ -182,6 +193,7 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 		w.queue.FailTask(ctx, task.ID, handlerErr.Error(), true)
 		log.Error().
 			Str("task_id", task.ID).
+			Str("run_id", runID).
 			Err(handlerErr).
 			Msg("Task failed")
 		return
@@ -197,5 +209,6 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 		Str("component", "worker").
 		Str("worker_id", workerID).
 		Str("task_id", task.ID).
+		Str("run_id", runID).
 		Msg("Worker completed task")
 }

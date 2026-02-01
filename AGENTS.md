@@ -82,6 +82,7 @@ When a change touches DB schema, Go sqlc, Swagger, and the TS SDK, run these in 
 - Seed data (like chains) should be included in migrations with `ON CONFLICT DO NOTHING`
 - Schema source of truth: `src/db/schema.ts`
 - Migrations output: `drizzle/`
+- **NEVER manually create migration files** - always use `pnpm db:generate` then edit the generated SQL if needed. Manually created files break drizzle's journal tracking.
 
 ---
 
