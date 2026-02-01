@@ -484,3 +484,24 @@ func GetLatestStorePricesViaTiers(ctx context.Context, storeID string) ([]StoreP
 
 	return results, nil
 }
+
+// ============================================================================
+// Helper functions for pgtype conversions
+// ============================================================================
+
+// intPtrToPgInt4 converts *int to pgtype.Int4
+func intPtrToPgInt4(p *int) pgtype.Int4 {
+	if p == nil {
+		return pgtype.Int4{Valid: false}
+	}
+	return pgtype.Int4{Int32: int32(*p), Valid: true}
+}
+
+// pgInt4ToIntPtr converts pgtype.Int4 to *int
+func pgInt4ToIntPtr(p pgtype.Int4) *int {
+	if !p.Valid {
+		return nil
+	}
+	v := int(p.Int32)
+	return &v
+}
