@@ -13,7 +13,7 @@
     "check": "biome check",
     "generate": "pnpm db:generate",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "bash scripts/db-migrate.sh",
     "db:studio": "drizzle-kit studio",
     "analyze:price-variation": "node scripts/analyze-price-variation.mjs",
     "test:integration": "vitest run --run",

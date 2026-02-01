@@ -169,6 +169,8 @@ definitions:
         type: string
       storeCount:
         type: integer
+      targetDate:
+        type: string
       totalEntries:
         type: integer
       totalFiles:

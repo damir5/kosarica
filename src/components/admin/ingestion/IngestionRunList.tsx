@@ -98,6 +98,11 @@ export function IngestionRunList({
 		return `${seconds}s`;
 	};
 
+	const formatTargetDate = (date: Date | null) => {
+		if (!date) return "-";
+		return new Date(date).toISOString().split("T")[0];
+	};
+
 	if (isLoading) {
 		return (
 			<div className="rounded-md border">
@@ -105,6 +110,7 @@ export function IngestionRunList({
 					<TableHeader>
 						<TableRow>
 							<TableHead>Chain</TableHead>
+							<TableHead>Date</TableHead>
 							<TableHead>Status</TableHead>
 							<TableHead>Progress</TableHead>
 							<TableHead>Errors</TableHead>
@@ -116,7 +122,7 @@ export function IngestionRunList({
 					<TableBody>
 						{[...Array(5)].map((_, i) => (
 							<TableRow key={`skeleton-${i}`}>
-								<TableCell colSpan={7}>
+								<TableCell colSpan={8}>
 									<div className="h-8 bg-muted animate-pulse rounded" />
 								</TableCell>
 							</TableRow>
@@ -141,6 +147,7 @@ export function IngestionRunList({
 				<TableHeader>
 					<TableRow>
 						<TableHead>Chain</TableHead>
+						<TableHead>Date</TableHead>
 						<TableHead>Status</TableHead>
 						<TableHead>Progress</TableHead>
 						<TableHead>Errors</TableHead>
@@ -192,6 +199,11 @@ export function IngestionRunList({
 											</p>
 										)}
 									</div>
+								</TableCell>
+								<TableCell>
+									<span className="text-sm text-muted-foreground">
+										{formatTargetDate(run.targetDate)}
+									</span>
 								</TableCell>
 								<TableCell>
 									<Badge

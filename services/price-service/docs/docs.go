@@ -1473,6 +1473,9 @@ const docTemplate = `{
                 "storeCount": {
                     "type": "integer"
                 },
+                "targetDate": {
+                    "type": "string"
+                },
                 "totalEntries": {
                     "type": "integer"
                 },

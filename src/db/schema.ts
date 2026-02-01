@@ -304,71 +304,6 @@ export const productRelations = pgTable("product_relations", {
 	createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ============================================================================
-// Prices: store_item_state, store_item_price_periods
-// ============================================================================
-
-export const storeItemState = pgTable(
-	"store_item_state",
-	{
-		id: bigserial({ mode: "bigint" }).primaryKey(),
-		storeId: text("store_id")
-			.notNull()
-			.references(() => stores.id, { onDelete: "cascade" }),
-		retailerItemId: text("retailer_item_id")
-			.notNull()
-			.references(() => retailerItems.id, { onDelete: "cascade" }),
-		currentPrice: integer("current_price"), // price in cents/lipa
-		previousPrice: integer("previous_price"), // for comparison
-		discountPrice: integer("discount_price"), // promotional price if active
-		discountStart: timestamp("discount_start"),
-		discountEnd: timestamp("discount_end"),
-		inStock: boolean("in_stock").default(true),
-		// Price transparency fields (Croatian regulation)
-		unitPrice: integer("unit_price"), // price per unit in cents (e.g., per kg/l)
-		unitPriceBaseQuantity: text("unit_price_base_quantity"), // base quantity for unit price (e.g., "1", "100")
-		unitPriceBaseUnit: text("unit_price_base_unit"), // unit for unit price (e.g., "kg", "l", "kom")
-		lowestPrice30d: integer("lowest_price_30d"), // lowest price in last 30 days, in cents
-		anchorPrice: integer("anchor_price"), // "sidrena cijena" anchor/reference price in cents
-		anchorPriceAsOf: timestamp("anchor_price_as_of"), // date when anchor price was set
-		priceSignature: text("price_signature"), // hash for deduplication (excludes lowestPrice30d to avoid churn)
-		lastSeenAt: timestamp("last_seen_at").defaultNow(),
-		updatedAt: timestamp("updated_at").defaultNow(),
-	},
-	(table) => ({
-		storeRetailerUnique: uniqueIndex(
-			"store_item_state_store_retailer_unique",
-		).on(table.storeId, table.retailerItemId),
-		lastSeenIdx: index("store_item_state_last_seen_idx").on(table.lastSeenAt),
-		priceSignatureIdx: index("store_item_state_price_signature_idx").on(
-			table.priceSignature,
-		),
-	}),
-);
-
-export const storeItemPricePeriods = pgTable(
-	"store_item_price_periods",
-	{
-		id: bigserial({ mode: "bigint" }).primaryKey(),
-		storeItemStateId: bigint("store_item_state_id", { mode: "bigint" })
-			.notNull()
-			.references(() => storeItemState.id, { onDelete: "cascade" }),
-		price: integer("price").notNull(), // price in cents/lipa
-		discountPrice: integer("discount_price"),
-		startedAt: timestamp("started_at").notNull(),
-		endedAt: timestamp("ended_at"),
-		createdAt: timestamp("created_at").defaultNow(),
-	},
-	(table) => ({
-		storeItemStateIdx: index("store_item_price_periods_state_idx").on(
-			table.storeItemStateId,
-		),
-		timeRangeIdx: index("store_item_price_periods_time_range_idx").on(
-			table.startedAt,
-			table.endedAt,
-		),
-	}),
-);
 
 // ============================================================================
 // Archives: track all downloaded files
@@ -397,6 +332,7 @@ export const archives = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
+		runId: text("run_id"),
 	},
 	(table) => ({
 		chainSlugIdx: index("idx_archives_chain_slug").on(table.chainSlug),
@@ -406,6 +342,7 @@ export const archives = pgTable(
 			table.chainSlug,
 			table.downloadedAt,
 		),
+		runIdIdx: index("idx_archives_run_id").on(table.runId),
 	}),
 );
 
@@ -513,22 +450,6 @@ export const ingestionChunks = pgTable(
 	}),
 );
 
-export const ingestionFileEntries = pgTable("ingestion_file_entries", {
-	id: cuid2("ige").primaryKey(),
-	fileId: bigint("file_id", { mode: "bigint" })
-		.notNull()
-		.references(() => ingestionFiles.id, { onDelete: "cascade" }),
-	rowNumber: integer("row_number"),
-	storeIdentifier: text("store_identifier"), // resolved to store
-	itemExternalId: text("item_external_id"),
-	itemName: text("item_name"),
-	price: integer("price"), // price in cents/lipa
-	discountPrice: integer("discount_price"),
-	barcode: text("barcode"),
-	rawData: text("raw_data"), // JSON of original row
-	status: text("status").notNull().default("pending"), // 'pending', 'processed', 'skipped', 'failed'
-	createdAt: timestamp("created_at").defaultNow(),
-});
 
 export const ingestionErrors = pgTable("ingestion_errors", {
 	id: bigserial({ mode: "bigint" }).primaryKey(),
@@ -544,9 +465,7 @@ export const ingestionErrors = pgTable("ingestion_errors", {
 	chunkId: text("chunk_id").references(() => ingestionChunks.id, {
 		onDelete: "set null",
 	}),
-	entryId: text("entry_id").references(() => ingestionFileEntries.id, {
-		onDelete: "set null",
-	}),
+	entryId: text("entry_id"), // orphaned - ingestion_file_entries table removed
 	errorType: text("error_type").notNull(), // 'parse', 'validation', 'store_resolution', 'persist', etc.
 	errorMessage: text("error_message").notNull(),
 	errorDetails: text("error_details"), // JSON with stack trace, context, etc.
@@ -640,136 +559,6 @@ export const storeEnrichmentTasks = pgTable(
 	}),
 );
 
-// ============================================================================
-// Price Groups: price_groups, group_prices, store_group_history, store_price_exceptions
-// Content-addressable price storage for 50%+ storage reduction
-// ============================================================================
-
-export const priceGroups = pgTable(
-	"price_groups",
-	{
-		id: cuid2("prg").primaryKey(),
-		chainSlug: text("chain_slug")
-			.notNull()
-			.references(() => chains.slug, { onDelete: "cascade" }),
-		priceHash: text("price_hash").notNull(), // SHA-256 hex
-		hashVersion: integer("hash_version").notNull().default(1), // For hash algorithm versioning
-		storeCount: integer("store_count").notNull().default(0),
-		itemCount: integer("item_count").notNull().default(0),
-		firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
-		lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
-		createdAt: timestamp("created_at").notNull().defaultNow(),
-		updatedAt: timestamp("updated_at").notNull().defaultNow(),
-	},
-	(table) => ({
-		chainSlugIdx: index("price_groups_chain_slug_idx").on(table.chainSlug),
-		priceHashIdx: index("price_groups_price_hash_idx").on(table.priceHash),
-		lastSeenIdx: index("price_groups_last_seen_idx").on(table.lastSeenAt),
-		storeCountIdx: index("price_groups_store_count_idx").on(table.storeCount),
-		// Content-addressable uniqueness constraint
-		chainHashVersionUnique: uniqueIndex("price_groups_chain_hash_unique").on(
-			table.chainSlug,
-			table.priceHash,
-			table.hashVersion,
-		),
-	}),
-);
-
-export const groupPrices = pgTable(
-	"group_prices",
-	{
-		priceGroupId: text("price_group_id")
-			.notNull()
-			.references(() => priceGroups.id, { onDelete: "cascade" }),
-		retailerItemId: text("retailer_item_id")
-			.notNull()
-			.references(() => retailerItems.id, { onDelete: "cascade" }),
-		price: integer("price").notNull(), // cents/lipa, NOT NULL
-		discountPrice: integer("discount_price"), // NULL = no discount (distinct from 0!)
-		unitPrice: integer("unit_price"), // price per unit in cents (e.g., per kg/l)
-		anchorPrice: integer("anchor_price"), // "sidrena cijena" anchor/reference price in cents
-		createdAt: timestamp("created_at").notNull().defaultNow(),
-	},
-	(table) => ({
-		// Composite primary key
-		priceGroupRetailerItemPk: uniqueIndex("group_prices_pkey").on(
-			table.priceGroupId,
-			table.retailerItemId,
-		),
-		priceGroupIdIdx: index("group_prices_price_group_id_idx").on(
-			table.priceGroupId,
-		),
-		retailerItemIdIdx: index("group_prices_retailer_item_id_idx").on(
-			table.retailerItemId,
-		),
-	}),
-);
-
-export const storeGroupHistory = pgTable(
-	"store_group_history",
-	{
-		id: cuid2("sgh").primaryKey(),
-		storeId: text("store_id")
-			.notNull()
-			.references(() => stores.id, { onDelete: "cascade" }),
-		priceGroupId: text("price_group_id")
-			.notNull()
-			.references(() => priceGroups.id, { onDelete: "cascade" }),
-		validFrom: timestamp("valid_from").notNull(),
-		validTo: timestamp("valid_to"), // NULL = current membership
-		createdAt: timestamp("created_at").notNull().defaultNow(),
-	},
-	(table) => ({
-		storeIdIdx: index("store_group_history_store_id_idx").on(table.storeId),
-		priceGroupIdIdx: index("store_group_history_price_group_id_idx").on(
-			table.priceGroupId,
-		),
-		validFromIdx: index("store_group_history_valid_from_idx").on(
-			table.validFrom,
-		),
-		// Partial unique index for current membership (valid_to IS NULL)
-		// Ensures each store has exactly one current price group
-		currentMembershipUnique: uniqueIndex("store_group_history_current")
-			.on(table.storeId)
-			.where(sql`valid_to IS NULL`),
-		// Note: GiST exclusion constraint for no-overlap must be added manually in SQL
-		// as Drizzle doesn't support EXCLUDE constraints natively
-	}),
-);
-
-export const storePriceExceptions = pgTable(
-	"store_price_exceptions",
-	{
-		storeId: text("store_id")
-			.notNull()
-			.references(() => stores.id, { onDelete: "cascade" }),
-		retailerItemId: text("retailer_item_id")
-			.notNull()
-			.references(() => retailerItems.id, { onDelete: "cascade" }),
-		price: integer("price").notNull(), // cents/lipa
-		discountPrice: integer("discount_price"), // NULL = no discount (distinct from 0!)
-		reason: text("reason").notNull(), // why this exception exists
-		expiresAt: timestamp("expires_at").notNull(), // exceptions MUST expire
-		createdAt: timestamp("created_at").notNull().defaultNow(),
-		createdBy: text("created_by").references(() => user.id, {
-			onDelete: "set null",
-		}),
-	},
-	(table) => ({
-		// Composite primary key
-		storeRetailerItemPk: uniqueIndex("store_price_exceptions_pkey").on(
-			table.storeId,
-			table.retailerItemId,
-		),
-		storeIdIdx: index("store_price_exceptions_store_id_idx").on(table.storeId),
-		retailerItemIdIdx: index("store_price_exceptions_retailer_item_id_idx").on(
-			table.retailerItemId,
-		),
-		expiresAtIdx: index("store_price_exceptions_expires_at_idx").on(
-			table.expiresAt,
-		),
-	}),
-);
 
 // ============================================================================
 // Product Matching: Match candidates, review queue, rejections, audit

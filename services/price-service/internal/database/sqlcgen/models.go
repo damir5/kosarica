@@ -105,16 +105,6 @@ type DrizzleDrizzleMigration struct {
 	CreatedAt pgtype.Int8 `db:"created_at" json:"created_at"`
 }
 
-type GroupPrice struct {
-	PriceGroupID   string           `db:"price_group_id" json:"price_group_id"`
-	RetailerItemID string           `db:"retailer_item_id" json:"retailer_item_id"`
-	Price          int32            `db:"price" json:"price"`
-	DiscountPrice  pgtype.Int4      `db:"discount_price" json:"discount_price"`
-	UnitPrice      pgtype.Int4      `db:"unit_price" json:"unit_price"`
-	AnchorPrice    pgtype.Int4      `db:"anchor_price" json:"anchor_price"`
-	CreatedAt      pgtype.Timestamp `db:"created_at" json:"created_at"`
-}
-
 type IngestionChunk struct {
 	ID             string           `db:"id" json:"id"`
 	FileID         int64            `db:"file_id" json:"file_id"`
@@ -161,21 +151,6 @@ type IngestionFile struct {
 	StatusReason    pgtype.Text      `db:"status_reason" json:"status_reason"`
 	StatusSeverity  pgtype.Text      `db:"status_severity" json:"status_severity"`
 	StatusType      pgtype.Text      `db:"status_type" json:"status_type"`
-}
-
-type IngestionFileEntry struct {
-	ID              string           `db:"id" json:"id"`
-	FileID          int64            `db:"file_id" json:"file_id"`
-	RowNumber       pgtype.Int4      `db:"row_number" json:"row_number"`
-	StoreIdentifier pgtype.Text      `db:"store_identifier" json:"store_identifier"`
-	ItemExternalID  pgtype.Text      `db:"item_external_id" json:"item_external_id"`
-	ItemName        pgtype.Text      `db:"item_name" json:"item_name"`
-	Price           pgtype.Int4      `db:"price" json:"price"`
-	DiscountPrice   pgtype.Int4      `db:"discount_price" json:"discount_price"`
-	Barcode         pgtype.Text      `db:"barcode" json:"barcode"`
-	RawData         pgtype.Text      `db:"raw_data" json:"raw_data"`
-	Status          string           `db:"status" json:"status"`
-	CreatedAt       pgtype.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type IngestionRun struct {
@@ -229,19 +204,6 @@ type Passkey struct {
 	BackedUp     bool             `db:"backedUp" json:"backedUp"`
 	Transports   pgtype.Text      `db:"transports" json:"transports"`
 	CreatedAt    pgtype.Timestamp `db:"createdAt" json:"createdAt"`
-}
-
-type PriceGroup struct {
-	ID          string           `db:"id" json:"id"`
-	ChainSlug   string           `db:"chain_slug" json:"chain_slug"`
-	PriceHash   string           `db:"price_hash" json:"price_hash"`
-	HashVersion int32            `db:"hash_version" json:"hash_version"`
-	StoreCount  int32            `db:"store_count" json:"store_count"`
-	ItemCount   int32            `db:"item_count" json:"item_count"`
-	FirstSeenAt pgtype.Timestamp `db:"first_seen_at" json:"first_seen_at"`
-	LastSeenAt  pgtype.Timestamp `db:"last_seen_at" json:"last_seen_at"`
-	CreatedAt   pgtype.Timestamp `db:"created_at" json:"created_at"`
-	UpdatedAt   pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type PriceTier struct {
@@ -431,63 +393,12 @@ type StoreEnrichmentTask struct {
 	UpdatedAt    pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-type StoreGroupHistory struct {
-	ID           string           `db:"id" json:"id"`
-	StoreID      string           `db:"store_id" json:"store_id"`
-	PriceGroupID string           `db:"price_group_id" json:"price_group_id"`
-	ValidFrom    pgtype.Timestamp `db:"valid_from" json:"valid_from"`
-	ValidTo      pgtype.Timestamp `db:"valid_to" json:"valid_to"`
-	CreatedAt    pgtype.Timestamp `db:"created_at" json:"created_at"`
-}
-
 type StoreIdentifier struct {
 	ID        string           `db:"id" json:"id"`
 	StoreID   string           `db:"store_id" json:"store_id"`
 	Type      string           `db:"type" json:"type"`
 	Value     string           `db:"value" json:"value"`
 	CreatedAt pgtype.Timestamp `db:"created_at" json:"created_at"`
-}
-
-type StoreItemPricePeriod struct {
-	ID               int64            `db:"id" json:"id"`
-	StoreItemStateID int64            `db:"store_item_state_id" json:"store_item_state_id"`
-	Price            int32            `db:"price" json:"price"`
-	DiscountPrice    pgtype.Int4      `db:"discount_price" json:"discount_price"`
-	StartedAt        pgtype.Timestamp `db:"started_at" json:"started_at"`
-	EndedAt          pgtype.Timestamp `db:"ended_at" json:"ended_at"`
-	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
-}
-
-type StoreItemState struct {
-	ID                    int64            `db:"id" json:"id"`
-	StoreID               string           `db:"store_id" json:"store_id"`
-	RetailerItemID        string           `db:"retailer_item_id" json:"retailer_item_id"`
-	CurrentPrice          pgtype.Int4      `db:"current_price" json:"current_price"`
-	PreviousPrice         pgtype.Int4      `db:"previous_price" json:"previous_price"`
-	DiscountPrice         pgtype.Int4      `db:"discount_price" json:"discount_price"`
-	DiscountStart         pgtype.Timestamp `db:"discount_start" json:"discount_start"`
-	DiscountEnd           pgtype.Timestamp `db:"discount_end" json:"discount_end"`
-	InStock               pgtype.Bool      `db:"in_stock" json:"in_stock"`
-	UnitPrice             pgtype.Int4      `db:"unit_price" json:"unit_price"`
-	UnitPriceBaseQuantity pgtype.Text      `db:"unit_price_base_quantity" json:"unit_price_base_quantity"`
-	UnitPriceBaseUnit     pgtype.Text      `db:"unit_price_base_unit" json:"unit_price_base_unit"`
-	LowestPrice30d        pgtype.Int4      `db:"lowest_price_30d" json:"lowest_price_30d"`
-	AnchorPrice           pgtype.Int4      `db:"anchor_price" json:"anchor_price"`
-	AnchorPriceAsOf       pgtype.Timestamp `db:"anchor_price_as_of" json:"anchor_price_as_of"`
-	PriceSignature        pgtype.Text      `db:"price_signature" json:"price_signature"`
-	LastSeenAt            pgtype.Timestamp `db:"last_seen_at" json:"last_seen_at"`
-	UpdatedAt             pgtype.Timestamp `db:"updated_at" json:"updated_at"`
-}
-
-type StorePriceException struct {
-	StoreID        string           `db:"store_id" json:"store_id"`
-	RetailerItemID string           `db:"retailer_item_id" json:"retailer_item_id"`
-	Price          int32            `db:"price" json:"price"`
-	DiscountPrice  pgtype.Int4      `db:"discount_price" json:"discount_price"`
-	Reason         string           `db:"reason" json:"reason"`
-	ExpiresAt      pgtype.Timestamp `db:"expires_at" json:"expires_at"`
-	CreatedAt      pgtype.Timestamp `db:"created_at" json:"created_at"`
-	CreatedBy      pgtype.Text      `db:"created_by" json:"created_by"`
 }
 
 type StorePriceRef struct {

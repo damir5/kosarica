@@ -19,6 +19,7 @@ export interface IngestionRun {
 	statusType?: string | null;
 	startedAt: Date | null;
 	completedAt: Date | null;
+	targetDate: Date | null;
 	totalFiles: number | null;
 	processedFiles: number | null;
 	totalEntries: number | null;

@@ -25,6 +25,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -32,6 +33,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { orpc } from "@/orpc/client";
 
 export const Route = createFileRoute("/_admin/admin/ingestion/" as any)({
@@ -46,9 +48,22 @@ import type { IngestionRun } from "@/components/admin/ingestion";
 import type { HandlersIngestionRun } from "@/lib/go-api";
 
 interface TriggerResponse {
-	runId: string;
-	status: string;
+	runId?: string;
+	status?: string;
+	message?: string;
 }
+
+type TriggerBatchInput = {
+	chainSlug: string;
+	dates: string[];
+};
+
+type TriggerBatchResult = {
+	chainSlug: string;
+	dates: string[];
+	successes: Array<{ date: string; response: TriggerResponse }>;
+	failures: Array<{ date: string; error: string }>;
+};
 
 // Map SDK response to component's expected interface
 function mapToIngestionRun(run: HandlersIngestionRun): IngestionRun {
@@ -62,6 +77,7 @@ function mapToIngestionRun(run: HandlersIngestionRun): IngestionRun {
 		statusType: run.statusType ?? null,
 		startedAt: run.startedAt ? new Date(run.startedAt) : null,
 		completedAt: run.completedAt ? new Date(run.completedAt) : null,
+		targetDate: run.targetDate ? new Date(run.targetDate) : null,
 		totalFiles: run.totalFiles ?? null,
 		processedFiles: run.processedFiles ?? null,
 		totalEntries: run.totalEntries ?? null,
@@ -89,6 +105,37 @@ const CHAINS = [
 	{ slug: "trgocentar", name: "Trgocentar" },
 ];
 
+function parseIsoDate(value: string): Date | null {
+	if (!value) return null;
+	const parts = value.split("-").map((part) => Number(part));
+	if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
+		return null;
+	}
+	const [year, month, day] = parts;
+	if (year <= 0 || month <= 0 || month > 12 || day <= 0 || day > 31) {
+		return null;
+	}
+	return new Date(Date.UTC(year, month - 1, day));
+}
+
+function buildDateRange(startValue: string, endValue: string) {
+	const startDate = parseIsoDate(startValue);
+	const endDate = parseIsoDate(endValue);
+	if (!startDate || !endDate) {
+		return { dates: [] as string[], error: "Select a valid start and end date." };
+	}
+	if (endDate < startDate) {
+		return { dates: [] as string[], error: "End date must be after start date." };
+	}
+	const dates: string[] = [];
+	const cursor = new Date(startDate.getTime());
+	while (cursor <= endDate) {
+		dates.push(cursor.toISOString().split("T")[0]);
+		cursor.setUTCDate(cursor.getUTCDate() + 1);
+	}
+	return { dates, error: null as string | null };
+}
+
 function IngestionDashboard() {
 	const queryClient = useQueryClient();
 
@@ -101,6 +148,15 @@ function IngestionDashboard() {
 
 	// Date state for filtering - defaults to today
 	const [selectedDate, setSelectedDate] = useState<string>(() => {
+		const now = new Date();
+		return now.toISOString().split("T")[0];
+	});
+	const [rangeEnabled, setRangeEnabled] = useState(false);
+	const [rangeStart, setRangeStart] = useState<string>(() => {
+		const now = new Date();
+		return now.toISOString().split("T")[0];
+	});
+	const [rangeEnd, setRangeEnd] = useState<string>(() => {
 		const now = new Date();
 		return now.toISOString().split("T")[0];
 	});
@@ -141,20 +197,53 @@ function IngestionDashboard() {
 	const hasActiveRuns = runsData?.runs?.some(
 		(run) => run.status === "pending" || run.status === "running",
 	);
+	const schedulePlan = buildDateRange(
+		rangeEnabled ? rangeStart : selectedDate,
+		rangeEnabled ? rangeEnd : selectedDate,
+	);
+	const scheduleDates = schedulePlan.dates;
+	const scheduleError = schedulePlan.error;
+	const scheduleLabel = rangeEnabled
+		? `${rangeStart} → ${rangeEnd}`
+		: selectedDate;
+	const canTrigger = scheduleDates.length > 0 && !scheduleError;
 
 	// Trigger chain mutation
 	const triggerMutation = useMutation({
-		mutationFn: async (chainSlug: string) => {
-			const response = (await orpc.admin.ingestion.triggerChain.call({
-				chain: chainSlug,
-				targetDate: selectedDate,
-			})) as TriggerResponse;
-			return response;
+		mutationFn: async ({
+			chainSlug,
+			dates,
+		}: TriggerBatchInput): Promise<TriggerBatchResult> => {
+			const successes: Array<{ date: string; response: TriggerResponse }> = [];
+			const failures: Array<{ date: string; error: string }> = [];
+
+			for (const date of dates) {
+				try {
+					const response = (await orpc.admin.ingestion.triggerChain.call({
+						chain: chainSlug,
+						targetDate: date,
+					})) as TriggerResponse;
+					successes.push({ date, response });
+				} catch (error) {
+					failures.push({
+						date,
+						error: error instanceof Error ? error.message : String(error),
+					});
+				}
+			}
+
+			return { chainSlug, dates, successes, failures };
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
 		},
 	});
+	const triggerResultLabel = triggerMutation.data
+		? triggerMutation.data.dates.length > 1
+			? `${triggerMutation.data.dates[0]} → ${triggerMutation.data.dates[triggerMutation.data.dates.length - 1]}`
+			: triggerMutation.data.dates[0]
+		: null;
+	const triggerResult = triggerMutation.data;
 
 	// Delete run mutation
 	const deleteMutation = useMutation({
@@ -341,18 +430,86 @@ function IngestionDashboard() {
 					</CardHeader>
 					<CardContent>
 						{/* Date picker for filtering discovery */}
-						<div className="flex items-center gap-2 mb-4">
-							<Calendar className="h-4 w-4 text-muted-foreground" />
-							<label htmlFor="target-date" className="text-sm font-medium">
-								Target Date:
-							</label>
-							<Input
-								id="target-date"
-								type="date"
-								value={selectedDate}
-								onChange={(e) => setSelectedDate(e.target.value)}
-								className="w-[150px]"
-							/>
+						<div className="mb-4 space-y-3">
+							<div className="flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<Calendar className="h-4 w-4 text-muted-foreground" />
+									<span className="text-sm font-medium">
+										{rangeEnabled ? "Date Range" : "Target Date"}
+									</span>
+								</div>
+								<div className="flex items-center gap-2">
+									<Label
+										htmlFor="range-toggle"
+										className="text-xs text-muted-foreground"
+									>
+										Range
+									</Label>
+									<Switch
+										id="range-toggle"
+										checked={rangeEnabled}
+										onCheckedChange={(checked) => {
+											setRangeEnabled(checked);
+											if (checked) {
+												setRangeStart((value) => value || selectedDate);
+												setRangeEnd((value) => value || selectedDate);
+											} else {
+												setSelectedDate(rangeStart || selectedDate);
+											}
+										}}
+									/>
+								</div>
+							</div>
+							{rangeEnabled ? (
+								<div className="flex flex-wrap items-center gap-3">
+									<div className="flex items-center gap-2">
+										<Label htmlFor="range-start" className="text-sm">
+											Start
+										</Label>
+										<Input
+											id="range-start"
+											type="date"
+											value={rangeStart}
+											onChange={(e) => setRangeStart(e.target.value)}
+											className="w-[150px]"
+										/>
+									</div>
+									<div className="flex items-center gap-2">
+										<Label htmlFor="range-end" className="text-sm">
+											End
+										</Label>
+										<Input
+											id="range-end"
+											type="date"
+											value={rangeEnd}
+											onChange={(e) => setRangeEnd(e.target.value)}
+											className="w-[150px]"
+										/>
+									</div>
+								</div>
+							) : (
+								<div className="flex items-center gap-2">
+									<Label htmlFor="target-date" className="text-sm">
+										Date
+									</Label>
+									<Input
+										id="target-date"
+										type="date"
+										value={selectedDate}
+										onChange={(e) => setSelectedDate(e.target.value)}
+										className="w-[150px]"
+									/>
+								</div>
+							)}
+							{scheduleError ? (
+								<p className="text-xs text-destructive">{scheduleError}</p>
+							) : (
+								<p className="text-xs text-muted-foreground">
+									{scheduleDates.length} task
+									{scheduleDates.length === 1 ? "" : "s"} will be scheduled
+									for {scheduleLabel}.
+								</p>
+							)}
 						</div>
 
 						<div className="flex flex-wrap gap-2">
@@ -361,30 +518,85 @@ function IngestionDashboard() {
 									key={chain.slug}
 									variant="outline"
 									size="sm"
-									onClick={() => triggerMutation.mutate(chain.slug)}
-									disabled={triggerMutation.isPending}
+									onClick={() =>
+										triggerMutation.mutate({
+											chainSlug: chain.slug,
+											dates: scheduleDates,
+										})
+									}
+									disabled={triggerMutation.isPending || !canTrigger}
 								>
 									{chain.name}
 									{triggerMutation.isPending &&
-										triggerMutation.variables === chain.slug && (
+										triggerMutation.variables?.chainSlug === chain.slug && (
 											<RefreshCw className="ml-2 h-3 w-3 animate-spin" />
 										)}
 								</Button>
 							))}
 						</div>
-						{triggerMutation.isSuccess && (
-							<div className="mt-3 p-3 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm">
-								Successfully triggered ingestion. Run ID:{" "}
-								<Badge variant="outline" className="font-mono ml-1">
-									{triggerMutation.data?.runId}
-								</Badge>
+						{triggerResult && triggerResult.successes.length > 0 ? (
+							<div className="mt-3 p-3 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm space-y-2">
+								<div>
+									Scheduled {triggerResult.successes.length} ingestion{" "}
+									{triggerResult.successes.length === 1
+										? "task"
+										: "tasks"}{" "}
+									for{" "}
+									{CHAINS.find(
+										(chain) => chain.slug === triggerResult.chainSlug,
+									)?.name ?? triggerResult.chainSlug}{" "}
+									{triggerResultLabel ? `(${triggerResultLabel}).` : "."}
+								</div>
+								{triggerResult.successes.some(
+									(item) => item.response.runId,
+								) && (
+									<div className="flex flex-wrap gap-1">
+										{triggerResult.successes
+											.map((item) => item.response.runId)
+											.filter(Boolean)
+											.slice(0, 3)
+											.map((runId) => (
+												<Badge
+													key={runId}
+													variant="outline"
+													className="font-mono"
+												>
+													{runId}
+												</Badge>
+											))}
+										{triggerResult.successes.filter(
+											(item) => item.response.runId,
+										).length > 3 && (
+											<Badge variant="outline">+more</Badge>
+										)}
+									</div>
+								)}
 							</div>
-						)}
-						{triggerMutation.isError && (
-							<div className="mt-3 p-3 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
-								Failed to trigger ingestion: {triggerMutation.error?.message}
+						) : null}
+						{triggerResult && triggerResult.failures.length > 0 ? (
+							<div className="mt-3 p-3 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-sm space-y-2">
+								<div>
+									Failed to schedule {triggerResult.failures.length}{" "}
+									{triggerResult.failures.length === 1
+										? "task"
+										: "tasks"}
+									. Please retry the affected dates.
+								</div>
+								<div className="space-y-1">
+									{triggerResult.failures.slice(0, 3).map((failure) => (
+										<div key={failure.date} className="text-xs">
+											<span className="font-medium">{failure.date}</span>:{" "}
+											{failure.error}
+										</div>
+									))}
+									{triggerResult.failures.length > 3 && (
+										<div className="text-xs text-muted-foreground">
+											+{triggerResult.failures.length - 3} more
+										</div>
+									)}
+								</div>
 							</div>
-						)}
+						) : null}
 					</CardContent>
 				</Card>
 			</div>

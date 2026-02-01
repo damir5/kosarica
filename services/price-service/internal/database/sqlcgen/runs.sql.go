@@ -118,28 +118,29 @@ const getIngestionRunById = `-- name: GetIngestionRunById :one
 SELECT id, chain_slug, source, status, started_at, completed_at,
        total_files, processed_files, total_entries, processed_entries,
        error_count, status_reason, status_severity, status_type, metadata,
-       created_at
+       created_at, target_date
 FROM ingestion_runs
 WHERE id = $1
 `
 
 type GetIngestionRunByIdRow struct {
-	ID               string           `db:"id" json:"id"`
-	ChainSlug        string           `db:"chain_slug" json:"chain_slug"`
-	Source           string           `db:"source" json:"source"`
-	Status           string           `db:"status" json:"status"`
-	StartedAt        pgtype.Timestamp `db:"started_at" json:"started_at"`
-	CompletedAt      pgtype.Timestamp `db:"completed_at" json:"completed_at"`
-	TotalFiles       pgtype.Int4      `db:"total_files" json:"total_files"`
-	ProcessedFiles   pgtype.Int4      `db:"processed_files" json:"processed_files"`
-	TotalEntries     pgtype.Int4      `db:"total_entries" json:"total_entries"`
-	ProcessedEntries pgtype.Int4      `db:"processed_entries" json:"processed_entries"`
-	ErrorCount       pgtype.Int4      `db:"error_count" json:"error_count"`
-	StatusReason     pgtype.Text      `db:"status_reason" json:"status_reason"`
-	StatusSeverity   pgtype.Text      `db:"status_severity" json:"status_severity"`
-	StatusType       pgtype.Text      `db:"status_type" json:"status_type"`
-	Metadata         pgtype.Text      `db:"metadata" json:"metadata"`
-	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
+	ID               string             `db:"id" json:"id"`
+	ChainSlug        string             `db:"chain_slug" json:"chain_slug"`
+	Source           string             `db:"source" json:"source"`
+	Status           string             `db:"status" json:"status"`
+	StartedAt        pgtype.Timestamp   `db:"started_at" json:"started_at"`
+	CompletedAt      pgtype.Timestamp   `db:"completed_at" json:"completed_at"`
+	TotalFiles       pgtype.Int4        `db:"total_files" json:"total_files"`
+	ProcessedFiles   pgtype.Int4        `db:"processed_files" json:"processed_files"`
+	TotalEntries     pgtype.Int4        `db:"total_entries" json:"total_entries"`
+	ProcessedEntries pgtype.Int4        `db:"processed_entries" json:"processed_entries"`
+	ErrorCount       pgtype.Int4        `db:"error_count" json:"error_count"`
+	StatusReason     pgtype.Text        `db:"status_reason" json:"status_reason"`
+	StatusSeverity   pgtype.Text        `db:"status_severity" json:"status_severity"`
+	StatusType       pgtype.Text        `db:"status_type" json:"status_type"`
+	Metadata         pgtype.Text        `db:"metadata" json:"metadata"`
+	CreatedAt        pgtype.Timestamp   `db:"created_at" json:"created_at"`
+	TargetDate       pgtype.Timestamptz `db:"target_date" json:"target_date"`
 }
 
 func (q *Queries) GetIngestionRunById(ctx context.Context, id string) (GetIngestionRunByIdRow, error) {
@@ -162,6 +163,7 @@ func (q *Queries) GetIngestionRunById(ctx context.Context, id string) (GetIngest
 		&i.StatusType,
 		&i.Metadata,
 		&i.CreatedAt,
+		&i.TargetDate,
 	)
 	return i, err
 }
@@ -221,7 +223,7 @@ const listIngestionRunsFiltered = `-- name: ListIngestionRunsFiltered :many
 SELECT id, chain_slug, source, status, started_at, completed_at,
        total_files, processed_files, total_entries, processed_entries,
        error_count, status_reason, status_severity, status_type, metadata,
-       created_at
+       created_at, target_date
 FROM ingestion_runs
 WHERE ($1::text = '' OR chain_slug = $1::text)
   AND ($2::text = '' OR status = $2::text)
@@ -237,22 +239,23 @@ type ListIngestionRunsFilteredParams struct {
 }
 
 type ListIngestionRunsFilteredRow struct {
-	ID               string           `db:"id" json:"id"`
-	ChainSlug        string           `db:"chain_slug" json:"chain_slug"`
-	Source           string           `db:"source" json:"source"`
-	Status           string           `db:"status" json:"status"`
-	StartedAt        pgtype.Timestamp `db:"started_at" json:"started_at"`
-	CompletedAt      pgtype.Timestamp `db:"completed_at" json:"completed_at"`
-	TotalFiles       pgtype.Int4      `db:"total_files" json:"total_files"`
-	ProcessedFiles   pgtype.Int4      `db:"processed_files" json:"processed_files"`
-	TotalEntries     pgtype.Int4      `db:"total_entries" json:"total_entries"`
-	ProcessedEntries pgtype.Int4      `db:"processed_entries" json:"processed_entries"`
-	ErrorCount       pgtype.Int4      `db:"error_count" json:"error_count"`
-	StatusReason     pgtype.Text      `db:"status_reason" json:"status_reason"`
-	StatusSeverity   pgtype.Text      `db:"status_severity" json:"status_severity"`
-	StatusType       pgtype.Text      `db:"status_type" json:"status_type"`
-	Metadata         pgtype.Text      `db:"metadata" json:"metadata"`
-	CreatedAt        pgtype.Timestamp `db:"created_at" json:"created_at"`
+	ID               string             `db:"id" json:"id"`
+	ChainSlug        string             `db:"chain_slug" json:"chain_slug"`
+	Source           string             `db:"source" json:"source"`
+	Status           string             `db:"status" json:"status"`
+	StartedAt        pgtype.Timestamp   `db:"started_at" json:"started_at"`
+	CompletedAt      pgtype.Timestamp   `db:"completed_at" json:"completed_at"`
+	TotalFiles       pgtype.Int4        `db:"total_files" json:"total_files"`
+	ProcessedFiles   pgtype.Int4        `db:"processed_files" json:"processed_files"`
+	TotalEntries     pgtype.Int4        `db:"total_entries" json:"total_entries"`
+	ProcessedEntries pgtype.Int4        `db:"processed_entries" json:"processed_entries"`
+	ErrorCount       pgtype.Int4        `db:"error_count" json:"error_count"`
+	StatusReason     pgtype.Text        `db:"status_reason" json:"status_reason"`
+	StatusSeverity   pgtype.Text        `db:"status_severity" json:"status_severity"`
+	StatusType       pgtype.Text        `db:"status_type" json:"status_type"`
+	Metadata         pgtype.Text        `db:"metadata" json:"metadata"`
+	CreatedAt        pgtype.Timestamp   `db:"created_at" json:"created_at"`
+	TargetDate       pgtype.Timestamptz `db:"target_date" json:"target_date"`
 }
 
 // List ingestion runs with optional chain and status filters, paginated
@@ -288,6 +291,7 @@ func (q *Queries) ListIngestionRunsFiltered(ctx context.Context, arg ListIngesti
 			&i.StatusType,
 			&i.Metadata,
 			&i.CreatedAt,
+			&i.TargetDate,
 		); err != nil {
 			return nil, err
 		}

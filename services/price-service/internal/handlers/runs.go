@@ -40,6 +40,7 @@ type IngestionRun struct {
 	StatusType       *string    `json:"statusType"`
 	StartedAt        *time.Time `json:"startedAt"`
 	CompletedAt      *time.Time `json:"completedAt"`
+	TargetDate       *time.Time `json:"targetDate"`
 	TotalFiles       *int       `json:"totalFiles"`
 	ProcessedFiles   *int       `json:"processedFiles"`
 	TotalEntries     *int       `json:"totalEntries"`
@@ -124,6 +125,10 @@ func ListRuns(c *gin.Context) {
 		if row.CompletedAt.Valid {
 			t := row.CompletedAt.Time
 			run.CompletedAt = &t
+		}
+		if row.TargetDate.Valid {
+			t := row.TargetDate.Time
+			run.TargetDate = &t
 		}
 		if row.StatusReason.Valid {
 			run.StatusReason = &row.StatusReason.String
@@ -218,6 +223,10 @@ func GetRun(c *gin.Context) {
 	if row.CompletedAt.Valid {
 		t := row.CompletedAt.Time
 		run.CompletedAt = &t
+	}
+	if row.TargetDate.Valid {
+		t := row.TargetDate.Time
+		run.TargetDate = &t
 	}
 	if row.StatusReason.Valid {
 		run.StatusReason = &row.StatusReason.String

@@ -82,6 +82,7 @@ export const zHandlersIngestionRun = z.object({
     statusSeverity: z.optional(z.string()),
     statusType: z.optional(z.string()),
     storeCount: z.optional(z.int()),
+    targetDate: z.optional(z.string()),
     totalEntries: z.optional(z.int()),
     totalFiles: z.optional(z.int()),
     warningRows: z.optional(z.int())

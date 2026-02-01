@@ -93,6 +93,7 @@ export type HandlersIngestionRun = {
     statusSeverity?: string;
     statusType?: string;
     storeCount?: number;
+    targetDate?: string;
     totalEntries?: number;
     totalFiles?: number;
     warningRows?: number;

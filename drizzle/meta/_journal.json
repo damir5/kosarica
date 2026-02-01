@@ -1,95 +1,26 @@
 {
-  "diary": [],
+  "version": "7",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
       "version": "7",
-      "when": 1769239023525,
-      "tag": "0000_warm_molecule_man",
+      "when": 1769941301563,
+      "tag": "0000_base_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1769365888198,
-      "tag": "0001_chemical_ultimatum",
+      "when": 1769941301564,
+      "tag": "0001_manual_functions",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1769542550950,
-      "tag": "0002_eminent_trish_tilby",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1769581957325,
-      "tag": "0003_dark_vampiro",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1769600466028,
-      "tag": "0004_open_roughhouse",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1769612815785,
-      "tag": "0005_lethal_wolfpack",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1769664238391,
-      "tag": "0006_flawless_randall_flagg",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1769669535803,
-      "tag": "0007_foamy_doorman",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1769752445112,
-      "tag": "0008_overconfident_boom_boom",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1769844218937,
-      "tag": "0009_robust_kitty_pryde",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1769884707086,
-      "tag": "0010_chilly_phalanx",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1769890000000,
-      "tag": "0011_add_run_id_to_archives",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1769932258446,
-      "tag": "0012_small_luckman",
+      "when": 1769941301565,
+      "tag": "0002_seed_data",
       "breakpoints": true
     }
   ]

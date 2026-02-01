@@ -12,11 +12,20 @@ async function seedTestData() {
 				INSERT INTO chains (slug, name, website, logo_url, created_at)
 				VALUES
 					('konzum', 'Konzum', 'https://www.konzum.hr', NULL, NOW()),
-					('dm', 'dm', 'https://www.dm.hr', NULL, NOW())
+					('lidl', 'Lidl', 'https://www.lidl.hr', NULL, NOW()),
+					('plodine', 'Plodine', 'https://www.plodine.hr', NULL, NOW()),
+					('interspar', 'Interspar', 'https://www.interspar.hr', NULL, NOW()),
+					('studenac', 'Studenac', 'https://www.studenac.hr', NULL, NOW()),
+					('kaufland', 'Kaufland', 'https://www.kaufland.hr', NULL, NOW()),
+					('eurospin', 'Eurospin', 'https://www.eurospin.hr', NULL, NOW()),
+					('dm', 'dm', 'https://www.dm.hr', NULL, NOW()),
+					('ktc', 'KTC', 'https://www.ktc.hr', NULL, NOW()),
+					('metro', 'Metro', 'https://www.metro.hr', NULL, NOW()),
+					('trgocentar', 'Trgocentar', 'https://www.trgocentar.hr', NULL, NOW())
 				ON CONFLICT (slug) DO NOTHING
 			`,
 		);
-		console.log("   ✓ Chains inserted (konzum, dm)");
+		console.log("   ✓ Chains inserted (11 chains)");
 
 		await db.execute(
 			sql`
@@ -48,33 +57,45 @@ async function seedTestData() {
 		);
 		console.log("   ✓ Retailer items inserted (3 items with 'milk' in name)");
 
+		// Insert price tiers for the retailer items
 		await db.execute(
 			sql`
-				INSERT INTO store_item_state (
-					store_id, retailer_item_id, current_price, previous_price, discount_price,
-					discount_start, discount_end, in_stock, unit_price, unit_price_base_quantity,
-					unit_price_base_unit, lowest_price_30d, anchor_price, anchor_price_as_of,
-					price_signature, last_seen_at, updated_at
+				INSERT INTO price_tiers (
+					id, chain_slug, retailer_item_id, price, discount_price, unit_price,
+					target_date, first_seen_at, last_seen_at, store_count, created_at
 				)
 				VALUES
-					('sto123456789', 'rit987654321', 1295, 1195, NULL, NULL, NULL, true, 1295, '1', 'L', 1195, 1295, NOW(), 'sig1', NOW(), NOW()),
-					('sto123456789', 'rit987654322', 1495, 1395, 1295, NOW(), NOW() + INTERVAL '7 days', true, 1495, '1', 'L', 1395, 1495, NOW(), 'sig2', NOW(), NOW()),
-					('sto234567890', 'rit987654321', 1295, 1295, NULL, NULL, NULL, true, 1295, '1', 'L', 1195, 1295, NOW(), 'sig3', NOW(), NOW()),
-					('sto345678901', 'rit987654323', 1895, 1795, NULL, NULL, NULL, true, 1895, '1', 'L', 1795, 1895, NOW(), 'sig4', NOW(), NOW())
+					('pt_seed_001', 'konzum', 'rit987654321', 1295, NULL, 1295, CURRENT_DATE, NOW(), NOW(), 2, NOW()),
+					('pt_seed_002', 'konzum', 'rit987654322', 1495, 1295, 1495, CURRENT_DATE, NOW(), NOW(), 1, NOW()),
+					('pt_seed_003', 'dm', 'rit987654323', 1895, NULL, 1895, CURRENT_DATE, NOW(), NOW(), 1, NOW())
+				ON CONFLICT (id) DO NOTHING
+			`,
+		);
+		console.log("   ✓ Price tiers inserted (3 tiers)");
+
+		// Insert store price references
+		await db.execute(
+			sql`
+				INSERT INTO store_price_refs (store_id, retailer_item_id, price_tier_id, in_stock, target_date, last_seen_at)
+				VALUES
+					('sto123456789', 'rit987654321', 'pt_seed_001', true, CURRENT_DATE, NOW()),
+					('sto123456789', 'rit987654322', 'pt_seed_002', true, CURRENT_DATE, NOW()),
+					('sto234567890', 'rit987654321', 'pt_seed_001', true, CURRENT_DATE, NOW()),
+					('sto345678901', 'rit987654323', 'pt_seed_003', true, CURRENT_DATE, NOW())
 				ON CONFLICT DO NOTHING
 			`,
 		);
-		console.log("   ✓ Store item state entries inserted (4 entries)");
+		console.log("   ✓ Store price refs inserted (4 entries)");
 
 		console.log("\n5. Verifying data...");
 		const chainsResult = await db.execute(
-			sql`SELECT COUNT(*) as count FROM chains WHERE slug IN ('konzum', 'dm')`,
+			sql`SELECT COUNT(*) as count FROM chains`,
 		);
 		const chainsCount = chainsResult[0]?.count ?? 0;
 		console.log(`   Chains: ${chainsCount} rows`);
 
 		const storesResult = await db.execute(
-			sql`SELECT COUNT(*) as count FROM stores WHERE chain_slug IN ('konzum', 'dm')`,
+			sql`SELECT COUNT(*) as count FROM stores`,
 		);
 		const storesCount = storesResult[0]?.count ?? 0;
 		console.log(`   Stores: ${storesCount} rows`);
@@ -85,13 +106,17 @@ async function seedTestData() {
 		const itemsCount = itemsResult[0]?.count ?? 0;
 		console.log(`   Retailer items (milk): ${itemsCount} rows`);
 
-		const stateResult = await db.execute(
-			sql`SELECT COUNT(*) as count FROM store_item_state sis
-				JOIN retailer_items ri ON sis.retailer_item_id = ri.id
-				WHERE ri.name ILIKE '%milk%'`,
+		const priceTiersResult = await db.execute(
+			sql`SELECT COUNT(*) as count FROM price_tiers`,
 		);
-		const stateCount = stateResult[0]?.count ?? 0;
-		console.log(`   Store item state: ${stateCount} rows`);
+		const priceTiersCount = priceTiersResult[0]?.count ?? 0;
+		console.log(`   Price tiers: ${priceTiersCount} rows`);
+
+		const storeRefsResult = await db.execute(
+			sql`SELECT COUNT(*) as count FROM store_price_refs`,
+		);
+		const storeRefsCount = storeRefsResult[0]?.count ?? 0;
+		console.log(`   Store price refs: ${storeRefsCount} rows`);
 
 		console.log("\n✅ Test data seeded successfully!");
 	} catch (error) {

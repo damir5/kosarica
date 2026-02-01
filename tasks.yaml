@@ -1,506 +1,285 @@
 tasks:
-  # ==================================
-  # PHASE 1: Environment Setup
-  # ==================================
+  # ============================================================================
+  # TypeScript (Drizzle) Migrations
+  # ============================================================================
 
-  - title: Reset database to clean state
+  - title: "Create PL/pgSQL function: get_pending_matches()"
     description: |
-      Run `mise run reset-data --yes` to clear all ingestion data while preserving admin users.
-
-      This ensures a known starting state for debugging. Verify with:
+      In `drizzle/0001_manual_functions.sql`, add:
       ```sql
-      SELECT COUNT(*) FROM retailer_items;  -- Should be 0
-      SELECT COUNT(*) FROM stores;          -- Should be 0
-      SELECT COUNT(*) FROM ingestion_runs;  -- Should be 0
-      SELECT COUNT(*) FROM task_queue;      -- Should be 0
+      CREATE OR REPLACE FUNCTION get_pending_matches(
+        p_status_filter text[],
+        p_chain_filter text[],
+        p_limit integer DEFAULT 100
+      ) RETURNS TABLE (
+        -- TODO: define return columns based on query in src/orpc/router/products.ts:97-159
+      ) AS $$
+        -- CTE with JSON aggregation from lines 97-159
+      $$ LANGUAGE plpgsql STABLE;
       ```
+
+      Migrate `src/orpc/router/products.ts` lines 97-159 (`getPendingMatches` function)
     completed: false
 
-  - title: Start main Node.js app with logging
+  - title: "Create PL/pgSQL function: bulk_approve_matches()"
     description: |
-      In Terminal 1, run:
-      ```bash
-      cd /workspace && mise run dev | tee log/log.txt
-      ```
-
-      Ensure the `log/` directory exists first:
-      ```bash
-      mkdir -p /workspace/log
-      ```
-
-      Verify app is running by checking for "Server listening on port" message.
-      Keep this terminal open throughout the session.
-    completed: false
-
-  - title: Start Go price-service with logging
-    description: |
-      In Terminal 2, run:
-      ```bash
-      cd /workspace/services/price-service && mise run dev | tee ../../log/price-service.txt
-      ```
-
-      Verify service is running by checking for:
-      - "Starting HTTP server on :8081" (or configured port)
-      - "Starting worker pool" messages for each worker type
-      - "Resuming interrupted runs" (may be empty on clean DB)
-
-      Keep this terminal open throughout the session.
-    completed: false
-
-  - title: Verify service connectivity
-    description: |
-      Test that both services are running and can communicate:
-
-      1. Check Node.js app health:
-      ```bash
-      curl http://localhost:3000/health
-      ```
-
-      2. Check Go service health:
-      ```bash
-      curl http://localhost:8081/health
-      ```
-
-      3. Test internal communication by listing chains:
-      ```bash
-      curl http://localhost:3000/api/chains
-      ```
-
-      All should return 200 OK responses.
-    completed: false
-
-  # ==================================
-  # PHASE 2: Konzum Chain (Primary Test)
-  # ==================================
-
-  - title: "Konzum: Single-day ingestion test"
-    description: |
-      Trigger ingestion for Konzum with today's date:
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "konzum", "targetDate": "2026-01-31"}'
-      ```
-
-      Expected: 202 Accepted with runId
-
-      Monitor in Terminal 2 for:
-      - "Discovered X files for konzum"
-      - "Processing file X of Y"
-      - "Ingestion completed for konzum"
-
-      Check logs for ERROR, panic, deadlock keywords:
-      ```bash
-      grep -E "ERROR|panic|deadlock|timeout" log/price-service.txt
-      ```
-    completed: false
-
-  - title: "Konzum: Verify single-day data integrity"
-    description: |
-      Run detection probes after Konzum ingestion:
-
+      In `drizzle/0001_manual_functions.sql`, add:
       ```sql
-      -- Row counts
-      SELECT chain_slug, COUNT(*) as items FROM retailer_items
-      WHERE chain_slug = 'konzum' GROUP BY chain_slug;
-
-      -- Stores discovered
-      SELECT chain_slug, COUNT(*) as stores FROM stores
-      WHERE chain_slug = 'konzum' GROUP BY chain_slug;
-
-      -- Run status
-      SELECT id, status, total_files, processed_files, total_entries, error_count
-      FROM ingestion_runs WHERE chain_slug = 'konzum' ORDER BY created_at DESC LIMIT 1;
-
-      -- Price entries
-      SELECT COUNT(*) as price_entries FROM store_item_state sis
-      JOIN stores s ON sis.store_id = s.id WHERE s.chain_slug = 'konzum';
+      CREATE OR REPLACE FUNCTION bulk_approve_matches(
+        p_queue_ids text[],
+        p_user_id text
+      ) RETURNS TABLE (
+        -- TODO: define return columns
+      ) AS $$
+        -- CTE with INSERT/UPDATE/ON CONFLICT from lines 367-403
+      $$ LANGUAGE plpgsql;
       ```
 
-      Expected:
-      - retailer_items count > 0 (typically 5,000-20,000 for Konzum)
-      - stores count > 0 (Konzum has ~700 stores)
-      - ingestion_runs.status = 'completed'
-      - error_count = 0 or very low
+      Migrate `src/orpc/router/products.ts` lines 367-403 (`bulkApprove` function)
     completed: false
 
-  - title: "Konzum: Analyze and fix any single-day issues"
+  - title: "Migrate searchProducts pg_trgm to Drizzle"
     description: |
-      If single-day ingestion failed or has issues:
+      `src/orpc/router/products.ts` lines 480-494 (`searchProducts` function)
+      - Current: pg_trgm similarity raw SQL
+      - Migration: Drizzle with `sql` fragment
+    completed: false
 
-      1. Check run errors:
+  - title: "Migrate getStats aggregations to Drizzle"
+    description: |
+      `src/orpc/router/products.ts` lines 512-545 (`getStats` function)
+      - Current: 3x aggregate queries
+      - Migration: Drizzle aggregations
+    completed: false
+
+  - title: "Migrate scheduleTask INSERT to Drizzle"
+    description: |
+      `src/lib/taskqueue/index.ts` lines 30-36 (`scheduleTask` function)
+      - Current: INSERT with RETURNING raw SQL
+      - Migration: Drizzle `.insert().returning()`
+    completed: false
+
+  - title: "Migrate startProcessing UPDATE to Drizzle"
+    description: |
+      `src/lib/taskqueue/index.ts` lines 64-68 (`startProcessing` function)
+      - Current: UPDATE statement raw SQL
+      - Migration: Drizzle `.update().set()`
+    completed: false
+
+  - title: "Migrate getTask SELECT to Drizzle"
+    description: |
+      `src/lib/taskqueue/index.ts` lines 85-92 (`getTask` function)
+      - Current: SELECT statement raw SQL
+      - Migration: Drizzle `.select().where()`
+    completed: false
+
+  - title: "Create PL/pgSQL function: claim_due_cron_jobs()"
+    description: |
+      In `drizzle/0001_manual_functions.sql`, add:
       ```sql
-      SELECT * FROM ingestion_errors WHERE run_id = '<runId>' ORDER BY created_at;
+      CREATE OR REPLACE FUNCTION claim_due_cron_jobs(
+        p_cutoff timestamptz
+      ) RETURNS TABLE (
+        -- TODO: define return columns
+      ) AS $$
+        -- UPDATE with FOR UPDATE SKIP LOCKED from lines 46-70
+      $$ LANGUAGE plpgsql;
       ```
 
-      2. Check file processing status:
-      ```sql
-      SELECT filename, status, total_rows, processed_rows, failed_rows
-      FROM ingestion_files WHERE run_id = '<runId>';
-      ```
-
-      3. Common issues to look for:
-      - Deadlocks: Check for concurrent insert conflicts in store_item_state
-      - Parse errors: Check column mapping in internal/adapters/chains/konzum.go
-      - Connection exhaustion: Check pool settings in config/config.go
-      - Timeout on discovery: Check rate limiting in konzum adapter
-
-      4. Document the issue and fix applied before proceeding.
+      Migrate `src/jobs/cron/executor.ts` lines 46-70 (`claimDueJobs` function)
+      - Exception: Drizzle doesn't support SKIP LOCKED, hence PL/pgSQL function
     completed: false
 
-  - title: "Konzum: 7-day historical ingestion"
+  # ============================================================================
+  # Go sqlc Query Files to Create
+  # ============================================================================
+
+  - title: "Create internal/database/queries/matching.sql"
     description: |
-      Once single-day works, test 7 consecutive days:
+      Barcode matching queries for `services/price-service/internal/matching/barcode.go`:
+      - Lines 42-62: `AutoMatchByBarcode` - Streaming SELECT
+      - Lines 149-155: barcode mapping INSERT
+      - Lines 168-176: product links INSERT with ON CONFLICT
+      - Lines 281-285: create product INSERT with RETURNING
+      - Lines 298-314: queue for review INSERT with ON CONFLICT
 
-      ```bash
-      for i in {0..6}; do
-        date=$(date -d "2026-01-31 - $i days" +%Y-%m-%d)
-        echo "Triggering konzum for $date"
-        curl -X POST http://localhost:3000/api/price-service/trigger \
-          -H "Content-Type: application/json" \
-          -d "{\"chain\": \"konzum\", \"targetDate\": \"$date\"}"
-        sleep 5  # Allow task to be queued
-      done
-      ```
-
-      Monitor worker logs for parallel processing behavior.
-
-      Key observations:
-      - Do tasks queue correctly?
-      - Are workers processing in parallel?
-      - Any deadlocks during concurrent DB writes?
-      - Memory usage stable?
+      Note: Lines 117 advisory lock `pg_advisory_xact_lock()` - keep as-is (Postgres-specific)
     completed: false
 
-  - title: "Konzum: Verify 7-day integrity and fix issues"
+  - title: "Create internal/database/queries/ai_matching.sql"
     description: |
-      Verify all 7 runs completed successfully:
-
-      ```sql
-      SELECT target_date, status, total_files, processed_files, error_count
-      FROM ingestion_runs
-      WHERE chain_slug = 'konzum'
-      ORDER BY target_date DESC LIMIT 7;
-      ```
-
-      All should show status = 'completed' and error_count = 0.
-
-      If any failed:
-      1. Identify the failure pattern (same day? random?)
-      2. Check if it's a transient issue (retry successful?)
-      3. Fix any systematic issues before moving to next chain
-
-      Document findings.
+      AI matching queries for `services/price-service/internal/matching/ai.go`:
+      - Lines 276-277: similarity search with pg_trgm
+      - Lines 340-345: rejection check EXISTS subquery
+      - Lines 390-408: insert candidate INSERT with ON CONFLICT UPDATE
+      - Lines 422-426: create link INSERT with ON CONFLICT
     completed: false
 
-  # ==================================
-  # PHASE 3: Lidl Chain
-  # ==================================
-
-  - title: "Lidl: Single-day ingestion test"
+  - title: "Create internal/database/queries/cleanup.sql"
     description: |
-      Trigger Lidl ingestion (uses ZIP archives with per-store CSVs):
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "lidl", "targetDate": "2026-01-31"}'
-      ```
-
-      Lidl-specific concerns:
-      - ZIP file extraction
-      - Multiple CSV files per ZIP
-      - Different encoding per file (UTF-8 vs Windows-1250)
-
-      Monitor for:
-      - ZIP extraction errors
-      - Encoding detection issues
-      - Memory usage during large ZIP processing
+      Cleanup job queries for `services/price-service/internal/jobs/cleanup_audit.go`:
+      - Lines 31-44: DELETE candidates with date filter
+      - Lines 72-88: UPDATE queue with status + date
+      - Lines 166-195: 3x COUNT queries
     completed: false
 
-  - title: "Lidl: Verify data and expand to 7 days"
+  - title: "Create internal/database/queries/embeddings.sql"
     description: |
-      Run probes for Lidl:
-      ```sql
-      SELECT chain_slug, COUNT(*) FROM retailer_items WHERE chain_slug = 'lidl';
-      SELECT chain_slug, COUNT(*) FROM stores WHERE chain_slug = 'lidl';
-      SELECT status, error_count FROM ingestion_runs WHERE chain_slug = 'lidl';
-      ```
-
-      If single-day works, run 7-day ingestion:
-      ```bash
-      for i in {0..6}; do
-        date=$(date -d "2026-01-31 - $i days" +%Y-%m-%d)
-        curl -X POST http://localhost:3000/api/price-service/trigger \
-          -H "Content-Type: application/json" \
-          -d "{\"chain\": \"lidl\", \"targetDate\": \"$date\"}"
-        sleep 5
-      done
-      ```
-
-      Fix any Lidl-specific issues before proceeding.
+      Embedding cache queries for `services/price-service/internal/matching/embedding.go`:
+      - Lines 63-71: `getCachedEmbeddings` - SELECT with ANY()
+      - Lines 120-124: `getCachedProductEmbeddings` - SELECT with ANY()
+      - Lines 170-179: `storeEmbeddingCache` - INSERT with ON CONFLICT UPDATE
+      - Lines 265-273: `EnsureProductEmbeddings` - SELECT with NOT EXISTS
     completed: false
 
-  # ==================================
-  # PHASE 4: Interspar Chain
-  # ==================================
-
-  - title: "Interspar: Single-day ingestion test"
+  - title: "Create internal/database/queries/optimizer.sql"
     description: |
-      Trigger Interspar ingestion (JSON API discovery, CSV data):
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "interspar", "targetDate": "2026-01-31"}'
-      ```
-
-      Interspar-specific concerns:
-      - JSON API for store discovery
-      - Pagination handling
-      - Rate limiting on API calls
-      - CSV with semicolon separator
-
-      Monitor for API rate limiting (429 responses) and pagination edge cases.
+      Price cache queries for `services/price-service/internal/optimizer/cache.go`:
+      - Lines 273-278: load stores SELECT with filter
+      - Lines 314-318: load price tiers SELECT with filter
+      - Lines 358-363: load store refs SELECT with JOIN
+      - Lines 612-616: `getActiveChains` - SELECT DISTINCT
     completed: false
 
-  - title: "Interspar: Verify data and expand to 7 days"
+  - title: "Create internal/database/queries/taskqueue_extended.sql"
     description: |
-      Run probes:
-      ```sql
-      SELECT chain_slug, COUNT(*) FROM retailer_items WHERE chain_slug = 'interspar';
-      SELECT chain_slug, COUNT(*) FROM stores WHERE chain_slug = 'interspar';
-      ```
-
-      If single-day succeeds, run 7-day ingestion and verify all complete.
-      Document any rate limiting or API-specific issues.
+      Extended task queue operations for `services/price-service/internal/taskqueue/queue.go`:
+      - Lines 155-159: `ScheduleChildTask` - INSERT with RETURNING
+      - Lines 171-178: `TransitionToWaiting` - UPDATE statement
+      - Lines 201-204: `ScheduleBatchChildTasks` - Batch INSERT
     completed: false
 
-  # ==================================
-  # PHASE 5: Kaufland Chain
-  # ==================================
+  # ============================================================================
+  # Go Handler Migrations to sqlc
+  # ============================================================================
 
-  - title: "Kaufland: Single-day ingestion test"
+  - title: "Migrate barcode.go to use sqlc"
     description: |
-      Trigger Kaufland ingestion (JSON API discovery, tab-delimited data):
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "kaufland", "targetDate": "2026-01-31"}'
-      ```
-
-      Kaufland-specific concerns:
-      - Tab-delimited data (not comma)
-      - JSON API for file discovery
-      - German number format (comma as decimal separator)
-
-      Watch for parsing issues with tab delimiter and decimal handling.
+      `services/price-service/internal/matching/barcode.go`
+      - Use queries from matching.sql
+      - Keep lines 117 advisory lock as-is
     completed: false
 
-  - title: "Kaufland: Verify data and expand to 7 days"
+  - title: "Migrate ai.go to use sqlc"
     description: |
-      Run probes and fix any Kaufland-specific issues.
-      Expand to 7-day ingestion once single-day is stable.
+      `services/price-service/internal/matching/ai.go`
+      - Use queries from ai_matching.sql
     completed: false
 
-  # ==================================
-  # PHASE 6: Plodine Chain
-  # ==================================
-
-  - title: "Plodine: Single-day ingestion test"
+  - title: "Migrate embedding.go to use sqlc"
     description: |
-      Trigger Plodine ingestion (CSV in ZIP archives):
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "plodine", "targetDate": "2026-01-31"}'
-      ```
-
-      Plodine-specific concerns:
-      - ZIP archive handling (similar to Lidl)
-      - Croatian number format
-      - Different column headers
-
-      Monitor ZIP extraction and CSV parsing.
+      `services/price-service/internal/matching/embedding.go`
+      - Use queries from embeddings.sql
     completed: false
 
-  - title: "Plodine: Verify data and expand to 7 days"
+  - title: "Migrate cleanup_audit.go to use sqlc"
     description: |
-      Run probes and fix any Plodine-specific issues.
-      Expand to 7-day ingestion once single-day is stable.
+      `services/price-service/internal/jobs/cleanup_audit.go`
+      - Use queries from cleanup.sql
     completed: false
 
-  # ==================================
-  # PHASE 7: Remaining Chains (After Core Chains Stable)
-  # ==================================
-
-  - title: "Studenac: Test ingestion (XML format)"
+  - title: "Migrate cache.go (optimizer) to use sqlc"
     description: |
-      Studenac uses XML format with dynamic store IDs:
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "studenac", "targetDate": "2026-01-31"}'
-      ```
-
-      XML-specific concerns:
-      - XML namespace handling
-      - Dynamic store ID extraction from filenames
-      - Large XML file parsing performance
-
-      Test single-day first, then expand.
+      `services/price-service/internal/optimizer/cache.go`
+      - Use queries from optimizer.sql
     completed: false
 
-  - title: "DM: Test ingestion (XLSX format)"
+  - title: "Create internal/database/queries/task_finalize.sql"
     description: |
-      DM uses XLSX files with numeric columns:
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "dm", "targetDate": "2026-01-31"}'
-      ```
-
-      XLSX-specific concerns:
-      - Excel file parsing (excelize library)
-      - Numeric column type handling
-      - Date/time cell formatting
-
-      Test single-day, verify data, expand if successful.
+      Task finalize queries for `services/price-service/internal/handlers/task_finalize.go`:
+      - Lines 46-49: check failed tasks - SELECT COUNT with LIKE
+      - Lines 100-115: `calculateRunStatsFromDB` - 2x COUNT queries
+      - Lines 120-130: `updatePriceTierStoreCounts` - UPDATE with subquery
     completed: false
 
-  - title: "Eurospin: Test ingestion (HTML discovery)"
+  - title: "Migrate task_finalize.go to use sqlc"
     description: |
-      Eurospin uses HTML option tag discovery:
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "eurospin", "targetDate": "2026-01-31"}'
-      ```
-
-      HTML-specific concerns:
-      - HTML parsing for store/file discovery
-      - JavaScript-rendered content (if any)
-      - Form data extraction
-
-      Test single-day, verify data, expand if successful.
+      `services/price-service/internal/handlers/task_finalize.go`
+      - Use queries from task_finalize.sql
     completed: false
 
-  - title: "KTC: Test ingestion (Windows-1250 encoding)"
+  - title: "Create internal/database/queries/task_discover.sql"
     description: |
-      KTC uses CSV with Windows-1250 encoding:
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "ktc", "targetDate": "2026-01-31"}'
-      ```
+      Task discover queries for `services/price-service/internal/handlers/task_discover.go`:
+      - Lines 67-70: `recoverRunIDFromDatabase` - SELECT ORDER BY
+      - Lines 87-91: `createIngestionRunForDiscover` - INSERT with RETURNING (already sqlc)
 
-      Encoding-specific concerns:
-      - Windows-1250 → UTF-8 conversion
-      - Croatian special characters (č, ć, ž, š, đ)
-      - Encoding detection accuracy
-
-      Verify product names display correctly with Croatian characters.
+      Note: Lines 87-91 already using sqlc, skip if already implemented
     completed: false
 
-  - title: "Metro: Test ingestion (UTF-8 CSV)"
+  - title: "Migrate task_discover.go to use sqlc"
     description: |
-      Metro uses standard UTF-8 CSV:
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "metro", "targetDate": "2026-01-31"}'
-      ```
-
-      Should be straightforward. Test single-day and expand.
+      `services/price-service/internal/handlers/task_discover.go`
+      - Use queries from task_discover.sql
     completed: false
 
-  - title: "Trgocentar: Test ingestion (XML with anchor prices)"
+  - title: "Add sqlc queries for queue.go child task operations"
     description: |
-      Trgocentar uses XML with dynamic anchor prices:
-      ```bash
-      curl -X POST http://localhost:3000/api/price-service/trigger \
-        -H "Content-Type: application/json" \
-        -d '{"chain": "trgocentar", "targetDate": "2026-01-31"}'
-      ```
+      `services/price-service/internal/taskqueue/queue.go`
+      - Add queries from taskqueue_extended.sql for child task operations
 
-      Special concerns:
-      - Anchor price calculation from XML
-      - Croatian transparency law compliance
-
-      Test single-day, verify anchor prices are captured correctly.
+      Note: Keep lines 82-84, 113, 118, 124 as-is (PL/pgSQL function calls that sqlc can't infer)
     completed: false
 
-  # ==================================
-  # PHASE 8: Full System Validation
-  # ==================================
+  # ============================================================================
+  # Exceptions (Keep as-is - reference only)
+  # ============================================================================
 
-  - title: Verify all chains completed without errors
+  - title: "Verify exceptions are kept as-is"
     description: |
-      Run comprehensive probe across all chains:
+      Verify the following are NOT migrated (already correct):
 
-      ```sql
-      -- Summary by chain
-      SELECT
-        chain_slug,
-        COUNT(*) as runs,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-        SUM(error_count) as total_errors
-      FROM ingestion_runs
-      GROUP BY chain_slug
-      ORDER BY chain_slug;
+      **Existing PL/pgSQL function calls** (sqlc cannot infer complex return types):
+      - `src/lib/taskqueue/index.ts` line 50: `claim_tasks()` - Keep as-is
+      - `src/lib/taskqueue/index.ts` line 58: `complete_task()` - Keep as-is
+      - `src/lib/taskqueue/index.ts` line 77: `fail_task()` - Keep as-is
+      - `services/price-service/internal/taskqueue/queue.go` line 82-84: `ClaimTasks` calling `claim_tasks()` - Keep as-is
+      - `services/price-service/internal/taskqueue/queue.go` line 113: `CompleteTask` calling `complete_task()` - Keep as-is
+      - `services/price-service/internal/taskqueue/queue.go` line 118: `FailTask` calling `fail_task()` - Keep as-is
+      - `services/price-service/internal/taskqueue/queue.go` line 124: `CleanupOldTasks` calling `cleanup_old_tasks()` - Keep as-is
+      - `services/price-service/internal/sweepers/taskqueue.go` line 69-71: `RecoverOrphanedTasks` calling `recover_orphaned_tasks()` - Keep as-is
 
-      -- Item counts by chain
-      SELECT chain_slug, COUNT(*) as items
-      FROM retailer_items GROUP BY chain_slug ORDER BY chain_slug;
+      **Advisory locks** (Postgres-specific, no ORM equivalent):
+      - `services/price-service/internal/matching/barcode.go` line 117: `pg_advisory_xact_lock()` - Keep as-is
+      - `services/price-service/internal/handlers/task_cluster.go` line 1142: `pg_advisory_xact_lock()` - Keep as-is
 
-      -- Store counts by chain
-      SELECT chain_slug, COUNT(*) as stores
-      FROM stores GROUP BY chain_slug ORDER BY chain_slug;
+      **SET LOCAL** (Session configuration):
+      - `services/price-service/internal/handlers/task_cluster.go` lines 1131-1139 - Keep as-is
 
-      -- Price entry counts by chain
-      SELECT s.chain_slug, COUNT(*) as price_entries
-      FROM store_item_state sis
-      JOIN stores s ON sis.store_id = s.id
-      GROUP BY s.chain_slug ORDER BY s.chain_slug;
-      ```
-
-      All chains should show:
-      - completed runs > 0
-      - failed runs = 0
-      - items count > 0
-      - stores count > 0
-      - price_entries count > 0
+      **Complex temp tables** (Multi-step bulk operations):
+      - `services/price-service/internal/handlers/task_cluster.go` lines 928-975 - Keep as-is
+      - `services/price-service/internal/handlers/task_cluster.go` lines 1146-1303 - Keep as-is
     completed: false
 
-  - title: Analyze logs for any remaining issues
+  # ============================================================================
+  # Collaborative Review
+  # ============================================================================
+
+  - title: "Collaborative Review: SQL Migration Tracking List"
     description: |
-      Search logs for error patterns:
+      Multi-model collaborative review with weighted consensus.
 
-      ```bash
-      # Price service errors
-      grep -E "ERROR|panic|deadlock|timeout|connection refused|pool exhausted" log/price-service.txt
+      ## Review Process
+      Use `/dev:collab reviewer consensus` to review implementation:
 
-      # Node.js app errors
-      grep -E "error|Error|ERR" log/log.txt
+      Models (from ~/claude-collab/collaboration.yaml):
+      1. github-copilot/gpt-5.2 (weight: 3) - Implementation review
+      2. github-copilot/gemini-3-pro-preview (weight: 3) - Architecture review
+      3. opencode/grok-code (weight: 1) - Investigation/fact-checking
+      4. claude-cli/opus (weight: 4) - Final comprehensive review
 
-      # Task queue issues
-      grep -E "task_queue|claim|orphan" log/price-service.txt
-      ```
+      ## Consensus Rules
+      - Load weights from ~/claude-collab/collaboration.yaml
+      - Model weights: grok=1, gemini-pro=3, gpt-5.2=3, opus=4
+      - If models disagree, favor higher-weighted model opinions
+      - All critical issues flagged by ANY model must be addressed
+      - Document consensus and any dissenting opinions
 
-      Document any remaining issues that need future attention.
-    completed: false
-
-  - title: Document all problems found and fixes applied
-    description: |
-      Create a summary document of the debugging session:
-
-      1. List each problem encountered
-      2. Describe the symptoms (error message, behavior)
-      3. Document the root cause analysis
-      4. Record the fix applied (code changes, config changes)
-      5. Note any workarounds or temporary fixes
-      6. List any issues deferred for future work
-
-      This documentation helps prevent regression and assists future debugging.
-
-      Consider adding to /workspace/docs/ingestion-troubleshooting.md or similar.
+      ## Review Focus Areas
+      - PL/pgSQL function correctness and return types
+      - Drizzle query builder patterns
+      - sqlc query file syntax and type inference
+      - Advisory lock usage is preserved where needed
+      - All exceptions are properly documented
+      - No raw SQL remains in TypeScript/Go except documented exceptions
     completed: false
