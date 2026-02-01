@@ -4,6 +4,7 @@ import {
 	bigint,
 	bigserial,
 	boolean,
+	date,
 	index,
 	integer,
 	pgTable,
@@ -1022,6 +1023,8 @@ export const priceTiers = pgTable(
 		discountPrice: integer("discount_price"),
 		unitPrice: integer("unit_price"),
 		anchorPrice: integer("anchor_price"),
+		// Date scope for historical snapshots
+		targetDate: date("target_date").notNull(),
 		firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
@@ -1037,8 +1040,14 @@ export const priceTiers = pgTable(
 		itemIdx: index("idx_price_tiers_item").on(table.retailerItemId),
 		chainIdx: index("idx_price_tiers_chain").on(table.chainSlug),
 		lastSeenIdx: index("idx_price_tiers_last_seen").on(table.lastSeenAt),
-		// Unique constraint: one tier per (chain, item, price, discount)
+		// Index for efficient MAX(target_date) queries
+		chainDateIdx: index("idx_price_tiers_chain_date").on(
+			table.chainSlug,
+			sql`target_date DESC`,
+		),
+		// Unique constraint: one tier per (date, chain, item, price, discount)
 		uniqueTier: uniqueIndex("idx_price_tiers_unique").on(
+			table.targetDate,
 			table.chainSlug,
 			table.retailerItemId,
 			table.price,
@@ -1060,17 +1069,22 @@ export const storePriceRefs = pgTable(
 			.notNull()
 			.references(() => priceTiers.id, { onDelete: "cascade" }),
 		inStock: boolean("in_stock").default(true),
+		// Date scope (denormalized for query efficiency)
+		targetDate: date("target_date").notNull(),
 		lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
 	},
 	(table) => ({
-		// Composite primary key
+		// Composite primary key scoped by date
 		pk: uniqueIndex("store_price_refs_pkey").on(
+			table.targetDate,
 			table.storeId,
 			table.retailerItemId,
 		),
 		tierIdx: index("idx_store_price_refs_tier").on(table.priceTierId),
 		storeIdx: index("idx_store_price_refs_store").on(table.storeId),
+		// Index for date-based queries
+		dateIdx: index("idx_store_price_refs_date").on(table.targetDate),
 	}),
 );

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kosarica/price-service/internal/database"
@@ -109,10 +108,13 @@ func GetStorePrices(c *gin.Context) {
 	// Convert sqlc rows to response type
 	prices := make([]StorePrice, 0, len(priceRows))
 	for _, row := range priceRows {
+		// CurrentPrice is always present (int32, not nullable)
+		currentPrice := int(row.CurrentPrice)
 		price := StorePrice{
 			RetailerItemID: row.RetailerItemID,
 			ItemName:       row.ItemName,
 			LastSeenAt:     row.LastSeenAt,
+			CurrentPrice:   &currentPrice,
 		}
 
 		// Convert pgtype fields to *string/*int
@@ -127,10 +129,6 @@ func GetStorePrices(c *gin.Context) {
 		}
 		if row.UnitQuantity.Valid {
 			price.UnitQuantity = &row.UnitQuantity.String
-		}
-		if row.CurrentPrice.Valid {
-			v := int(row.CurrentPrice.Int32)
-			price.CurrentPrice = &v
 		}
 		if row.PreviousPrice.Valid {
 			v := int(row.PreviousPrice.Int32)
@@ -318,218 +316,4 @@ func SearchItems(c *gin.Context) {
 	})
 }
 
-// ============================================================================
-// Price Groups Endpoints
-// ============================================================================
 
-// GetStorePricesViaGroup returns prices for a store using price groups
-// GET /internal/prices/group/:storeId
-func GetStorePricesViaGroup(c *gin.Context) {
-	storeID := c.Param("storeId")
-
-	if storeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "storeId is required"})
-		return
-	}
-
-	queries := sqlcgen.New(database.Pool())
-	ctx := c.Request.Context()
-
-	// Get prices via price group
-	prices, err := database.GetStorePrices(ctx, storeID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch store prices: " + err.Error()})
-		return
-	}
-
-	// Enrich with retailer item details using batch query to avoid N+1
-	// Collect all item IDs for batch fetch
-	itemIDs := make([]string, len(prices))
-	for i, price := range prices {
-		itemIDs[i] = price.RetailerItemID
-	}
-
-	// Batch fetch all item details in a single query
-	itemDetailsMap := make(map[string]sqlcgen.GetRetailerItemDetailsBatchRow)
-	if len(itemIDs) > 0 {
-		itemDetails, err := queries.GetRetailerItemDetailsBatch(ctx, itemIDs)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch item details"})
-			return
-		}
-		// Build lookup map for O(1) access
-		for _, detail := range itemDetails {
-			itemDetailsMap[detail.ID] = detail
-		}
-	}
-
-	// Enrich prices using the batch-fetched data
-	enrichedPrices := []StorePrice{}
-	for _, price := range prices {
-		itemName := "Unknown Item"
-		var itemExternalID, brand, unit, unitQuantity *string
-
-		if details, ok := itemDetailsMap[price.RetailerItemID]; ok {
-			itemName = details.Name
-			if details.ExternalID.Valid {
-				itemExternalID = &details.ExternalID.String
-			}
-			if details.Brand.Valid {
-				brand = &details.Brand.String
-			}
-			if details.Unit.Valid {
-				unit = &details.Unit.String
-			}
-			if details.UnitQuantity.Valid {
-				unitQuantity = &details.UnitQuantity.String
-			}
-		}
-
-		enrichedPrices = append(enrichedPrices, StorePrice{
-			RetailerItemID: price.RetailerItemID,
-			ItemName:       itemName,
-			ItemExternalID: itemExternalID,
-			Brand:          brand,
-			Unit:           unit,
-			UnitQuantity:   unitQuantity,
-			CurrentPrice:   &price.Price,
-			DiscountPrice:  price.DiscountPrice,
-			UnitPrice:      price.UnitPrice,
-			AnchorPrice:    price.AnchorPrice,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"prices": enrichedPrices,
-		"total":  len(enrichedPrices),
-	})
-}
-
-// GetHistoricalPriceRequest represents query parameters for historical price lookup
-type GetHistoricalPriceRequest struct {
-	StoreID string `form:"storeId" json:"storeId" binding:"required" jsonschema:"required"`
-	ItemID  string `form:"itemId" json:"itemId" binding:"required" jsonschema:"required"`
-	AsOf    string `form:"asOf" json:"asOf"` // RFC3339 timestamp
-}
-
-// GetHistoricalPrice returns the historical price for an item at a store
-// GET /internal/prices/history?storeId=&itemId=&asOf=
-func GetHistoricalPrice(c *gin.Context) {
-	var req GetHistoricalPriceRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	queries := sqlcgen.New(database.Pool())
-	ctx := c.Request.Context()
-
-	// Parse asOf timestamp, default to now if not provided
-	asOfTime := time.Now()
-	if req.AsOf != "" {
-		parsedTime, err := time.Parse(time.RFC3339, req.AsOf)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asOf format, use RFC3339"})
-			return
-		}
-		asOfTime = parsedTime
-	}
-
-	// Get historical price
-	price, discountPrice, err := database.GetHistoricalPriceForStore(ctx, req.StoreID, req.ItemID, asOfTime)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Get item name using sqlc
-	itemName := "Unknown Item"
-	name, err := queries.GetRetailerItemName(ctx, req.ItemID)
-	if err == nil {
-		itemName = name
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"itemId":        req.ItemID,
-		"itemName":      itemName,
-		"price":         price,
-		"discountPrice": discountPrice,
-		"asOf":          asOfTime.Format(time.RFC3339),
-	})
-}
-
-// ListPriceGroupsRequest represents query parameters for listing price groups
-type ListPriceGroupsRequest struct {
-	ChainSlug string `form:"chainSlug" json:"chainSlug" binding:"required" jsonschema:"required"`
-	Limit     int    `form:"limit" json:"limit" binding:"min=1,max=100" jsonschema:"minimum=1,maximum=100"`
-	Offset    int    `form:"offset" json:"offset" binding:"min=0" jsonschema:"minimum=0"`
-}
-
-// PriceGroupSummary represents a price group summary for listing
-type PriceGroupSummary struct {
-	ID          string `json:"id" jsonschema:"required"`
-	ChainSlug   string `json:"chainSlug" jsonschema:"required"`
-	PriceHash   string `json:"priceHash" jsonschema:"required"`
-	StoreCount  int    `json:"storeCount" jsonschema:"required"`
-	ItemCount   int    `json:"itemCount" jsonschema:"required"`
-	FirstSeenAt string `json:"firstSeenAt" jsonschema:"required"`
-	LastSeenAt  string `json:"lastSeenAt" jsonschema:"required"`
-}
-
-// ListPriceGroups lists price groups for a chain
-// GET /internal/price-groups/:chainSlug
-func ListPriceGroups(c *gin.Context) {
-	chainSlug := c.Param("chainSlug")
-	if chainSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "chainSlug is required"})
-		return
-	}
-
-	var req ListPriceGroupsRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Set defaults
-	if req.Limit == 0 {
-		req.Limit = 50
-	}
-
-	queries := sqlcgen.New(database.Pool())
-	ctx := c.Request.Context()
-
-	// Get total count using sqlc
-	total, err := queries.CountPriceGroupsByChain(ctx, chainSlug)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count price groups"})
-		return
-	}
-
-	// List price groups (database package already uses sqlc internally)
-	groups, err := database.ListPriceGroups(ctx, chainSlug, req.Limit, req.Offset)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch price groups"})
-		return
-	}
-
-	summaries := make([]PriceGroupSummary, 0, len(groups))
-	for _, group := range groups {
-		summaries = append(summaries, PriceGroupSummary{
-			ID:          group.ID,
-			ChainSlug:   group.ChainSlug,
-			PriceHash:   group.PriceHash,
-			StoreCount:  group.StoreCount,
-			ItemCount:   group.ItemCount,
-			FirstSeenAt: group.FirstSeenAt.Format(time.RFC3339),
-			LastSeenAt:  group.LastSeenAt.Format(time.RFC3339),
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"groups": summaries,
-		"total":  int(total),
-		"limit":  req.Limit,
-		"offset": req.Offset,
-	})
-}

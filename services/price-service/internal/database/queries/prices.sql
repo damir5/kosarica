@@ -1,11 +1,13 @@
 -- name: CountStorePrices :one
+-- Count prices for a store using price_tiers system (uses latest target_date)
 SELECT COUNT(*)
-FROM store_item_state sis
-JOIN retailer_items ri ON sis.retailer_item_id = ri.id
-JOIN stores s ON sis.store_id = s.id
-WHERE s.id = $1 AND s.chain_slug = $2;
+FROM store_price_refs spr
+JOIN stores s ON spr.store_id = s.id
+WHERE s.id = $1 AND s.chain_slug = $2
+  AND spr.target_date = (SELECT MAX(target_date) FROM price_tiers WHERE chain_slug = $2);
 
 -- name: ListStorePricesWithDetails :many
+-- List prices for a store with item details using price_tiers system
 SELECT
     ri.id as retailer_item_id,
     ri.name as item_name,
@@ -13,23 +15,25 @@ SELECT
     ri.brand,
     ri.unit,
     ri.unit_quantity,
-    sis.current_price,
-    sis.previous_price,
-    sis.discount_price,
-    TO_CHAR(sis.discount_start, 'YYYY-MM-DD HH24:MI:SS') as discount_start,
-    TO_CHAR(sis.discount_end, 'YYYY-MM-DD HH24:MI:SS') as discount_end,
-    sis.in_stock,
-    sis.unit_price,
-    sis.unit_price_base_quantity,
-    sis.unit_price_base_unit,
-    sis.lowest_price_30d,
-    sis.anchor_price,
-    sis.price_signature,
-    TO_CHAR(sis.last_seen_at, 'YYYY-MM-DD HH24:MI:SS') as last_seen_at
-FROM store_item_state sis
-JOIN retailer_items ri ON sis.retailer_item_id = ri.id
-JOIN stores s ON sis.store_id = s.id
+    pt.price as current_price,
+    NULL::int4 as previous_price,
+    pt.discount_price,
+    ''::text as discount_start,
+    ''::text as discount_end,
+    spr.in_stock,
+    pt.unit_price,
+    NULL::text as unit_price_base_quantity,
+    NULL::text as unit_price_base_unit,
+    NULL::int4 as lowest_price_30d,
+    pt.anchor_price,
+    NULL::text as price_signature,
+    TO_CHAR(spr.last_seen_at, 'YYYY-MM-DD HH24:MI:SS') as last_seen_at
+FROM store_price_refs spr
+JOIN price_tiers pt ON pt.id = spr.price_tier_id
+JOIN retailer_items ri ON spr.retailer_item_id = ri.id
+JOIN stores s ON spr.store_id = s.id
 WHERE s.id = $1 AND s.chain_slug = $2
+  AND spr.target_date = (SELECT MAX(target_date) FROM price_tiers WHERE chain_slug = $2)
 ORDER BY ri.name
 LIMIT $3 OFFSET $4;
 
@@ -44,6 +48,7 @@ WHERE ri.name ILIKE '%' || @search_query::text || '%'
 -- name: SearchItemsWithStats :many
 -- Search items by name with aggregated stats, optional chain filter
 -- Pass empty string for chain_slug to search all chains
+-- Uses price_tiers for aggregation
 SELECT DISTINCT
     ri.id,
     ri.chain_slug::text as chain_slug,
@@ -56,10 +61,11 @@ SELECT DISTINCT
     ri.unit,
     ri.unit_quantity,
     ri.image_url,
-    COALESCE(AVG(sis.current_price), 0)::int as avg_price,
-    COUNT(DISTINCT sis.store_id)::int as store_count
+    COALESCE(AVG(pt.price), 0)::int as avg_price,
+    COUNT(DISTINCT spr.store_id)::int as store_count
 FROM retailer_items ri
-LEFT JOIN store_item_state sis ON ri.id = sis.retailer_item_id
+LEFT JOIN store_price_refs spr ON ri.id = spr.retailer_item_id
+LEFT JOIN price_tiers pt ON pt.id = spr.price_tier_id
 WHERE ri.name ILIKE '%' || @search_query::text || '%'
   AND (@chain_filter::text = '' OR ri.chain_slug = @chain_filter::text)
 GROUP BY ri.id, ri.chain_slug, ri.external_id, ri.name, ri.description,

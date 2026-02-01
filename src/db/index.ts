@@ -65,7 +65,5 @@ export function closeDatabase(): void {
 	}
 }
 
-// Re-export store query helpers
-export * from "./queries/stores";
 // Re-export schema for convenience
 export * from "./schema";

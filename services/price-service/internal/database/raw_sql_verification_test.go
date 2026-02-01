@@ -65,7 +65,6 @@ func TestNoRawSQLInPipeline(t *testing.T) {
 func TestNoRawSQLInDatabase(t *testing.T) {
 	databaseDir := "."
 	files := []string{
-		"price_groups.go",
 		"archive.go",
 	}
 
@@ -96,29 +95,6 @@ func TestNoRawSQLInWorkers(t *testing.T) {
 
 	for _, file := range files {
 		filePath := filepath.Join(workersDir, file)
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			t.Errorf("Failed to read %s: %v", file, err)
-			continue
-		}
-
-		if rawSQLPattern.Match(content) {
-			t.Errorf("%s contains raw SQL (pool.Exec/Query/QueryRow). Must use sqlc instead.", file)
-		}
-	}
-}
-
-// TestNoRawSQLInJobs verifies that job files use sqlc instead of raw SQL
-func TestNoRawSQLInJobs(t *testing.T) {
-	jobsDir := "../jobs"
-	files := []string{
-		"cleanup_database.go",
-	}
-
-	rawSQLPattern := regexp.MustCompile(`pool\.(Exec|Query|QueryRow)\(`)
-
-	for _, file := range files {
-		filePath := filepath.Join(jobsDir, file)
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			t.Errorf("Failed to read %s: %v", file, err)

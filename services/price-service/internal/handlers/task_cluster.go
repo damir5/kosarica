@@ -13,6 +13,7 @@ import (
 	adaptersconfig "github.com/kosarica/price-service/internal/adapters/config"
 	"github.com/kosarica/price-service/internal/adapters/registry"
 	"github.com/kosarica/price-service/internal/database"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 	"github.com/kosarica/price-service/internal/ingestion"
 	zipexpand "github.com/kosarica/price-service/internal/ingestion/zip"
 	"github.com/kosarica/price-service/internal/jsonb"
@@ -118,6 +119,24 @@ func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *
 
 	startTime := time.Now()
 
+	// Get target date from run record
+	queries := sqlcgen.New(database.Pool())
+	run, err := queries.GetIngestionRun(ctx, runID)
+	if err != nil {
+		return fmt.Errorf("failed to get ingestion run: %w", err)
+	}
+
+	// Extract target date (default to today if not set)
+	targetDate := time.Now()
+	if run.TargetDate.Valid {
+		targetDate = run.TargetDate.Time
+	}
+
+	log.Info().
+		Str("runId", runID).
+		Time("targetDate", targetDate).
+		Msg("Using target date for ingestion")
+
 	// Initialize chain registry
 	if err := registry.InitializeDefaultAdapters(); err != nil {
 		return fmt.Errorf("failed to initialize chain registry: %w", err)
@@ -179,7 +198,7 @@ func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *
 	// Phase 3: Batch Write to Database
 	// ========================================================================
 	persistStart := time.Now()
-	stats, err := batchWriteToDatabase(ctx, chainSlug, storeIdentifiers, uniqueItems, priceTiers, storePriceRefs)
+	stats, err := batchWriteToDatabase(ctx, chainSlug, storeIdentifiers, uniqueItems, priceTiers, storePriceRefs, targetDate)
 	if err != nil {
 		return fmt.Errorf("failed to write to database: %w", err)
 	}
@@ -481,6 +500,7 @@ func batchWriteToDatabase(
 	uniqueItems map[itemKey]itemData,
 	priceTiers map[priceTierKey]struct{},
 	storePriceRefs []storePriceRef,
+	targetDate time.Time,
 ) (*writeStats, error) {
 	pool := database.Pool()
 	stats := &writeStats{}
@@ -512,7 +532,7 @@ func batchWriteToDatabase(
 	// ========================================================================
 	log.Info().Int("tiers", len(priceTiers)).Msg("Upserting price tiers...")
 
-	tierIDMap, err := upsertPriceTiersBatch(ctx, pool, chainSlug, priceTiers, uniqueItems, itemIDMap)
+	tierIDMap, err := upsertPriceTiersBatch(ctx, pool, chainSlug, priceTiers, uniqueItems, itemIDMap, targetDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upsert price tiers: %w", err)
 	}
@@ -523,7 +543,7 @@ func batchWriteToDatabase(
 	// ========================================================================
 	log.Info().Int("refs", len(storePriceRefs)).Msg("Upserting store price refs...")
 
-	refsUpserted, err := upsertStorePriceRefsBatch(ctx, pool, storeIDMap, itemIDMap, tierIDMap, storePriceRefs)
+	refsUpserted, err := upsertStorePriceRefsBatch(ctx, pool, storeIDMap, itemIDMap, tierIDMap, storePriceRefs, targetDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upsert store price refs: %w", err)
 	}
@@ -792,7 +812,20 @@ func upsertRetailerItemsBatch(ctx context.Context, pool *pgxpool.Pool, chainSlug
 	return result, nil
 }
 
-// upsertPriceTiersBatch upserts all price tiers using pgx.Batch
+// tierCopyRow represents a row for COPY into the temp table
+type tierCopyRow struct {
+	id             string
+	chainSlug      string
+	retailerItemID string
+	price          int
+	discountPrice  *int
+	unitPrice      *int
+	anchorPrice    *int
+	targetDate     time.Time
+}
+
+// upsertPriceTiersBatch upserts all price tiers using pgx.CopyFrom for high performance.
+// Uses temp table + COPY + INSERT SELECT pattern for 10-100x speedup over individual INSERTs.
 func upsertPriceTiersBatch(
 	ctx context.Context,
 	pool *pgxpool.Pool,
@@ -800,11 +833,12 @@ func upsertPriceTiersBatch(
 	priceTiers map[priceTierKey]struct{},
 	uniqueItems map[itemKey]itemData,
 	itemIDMap map[itemKey]string,
+	targetDate time.Time,
 ) (map[priceTierKey]string, error) {
 	result := make(map[priceTierKey]string)
 	now := time.Now()
 
-	// Build list of tiers with resolved item IDs for lookup
+	// Build list of tiers with resolved item IDs
 	type tierWithDBID struct {
 		ptKey          priceTierKey
 		retailerItemID string
@@ -830,148 +864,159 @@ func upsertPriceTiersBatch(
 		return result, nil
 	}
 
-	// Query existing tiers in batches
-	const lookupBatchSize = 1000
-	existingTiers := make(map[string]string) // "itemID:price:discountPrice" -> tierID
+	log.Info().Int("tiers", len(tiersToProcess)).Msg("Starting COPY-based price tier upsert")
 
-	for i := 0; i < len(tiersToProcess); i += lookupBatchSize {
-		end := i + lookupBatchSize
-		if end > len(tiersToProcess) {
-			end = len(tiersToProcess)
-		}
-		batch := tiersToProcess[i:end]
+	// Begin transaction for atomic COPY + merge
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
-		// Collect item IDs for query
-		itemIDSet := make(map[string]struct{})
-		for _, t := range batch {
-			itemIDSet[t.retailerItemID] = struct{}{}
-		}
-		var itemIDs []string
-		for id := range itemIDSet {
-			itemIDs = append(itemIDs, id)
-		}
-
-		rows, err := pool.Query(ctx, `
-			SELECT id, retailer_item_id, price, COALESCE(discount_price, -1) as dp
-			FROM price_tiers
-			WHERE chain_slug = $1 AND retailer_item_id = ANY($2)
-		`, chainSlug, itemIDs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to query existing tiers: %w", err)
-		}
-
-		for rows.Next() {
-			var tierID, itemID string
-			var price, dp int
-			if err := rows.Scan(&tierID, &itemID, &price, &dp); err != nil {
-				rows.Close()
-				return nil, fmt.Errorf("failed to scan tier row: %w", err)
-			}
-			key := fmt.Sprintf("%s:%d:%d", itemID, price, dp)
-			existingTiers[key] = tierID
-		}
-		rows.Close()
+	// Create temp table (dropped automatically on commit)
+	_, err = tx.Exec(ctx, `
+		CREATE TEMP TABLE temp_price_tiers (
+			id TEXT,
+			chain_slug TEXT,
+			retailer_item_id TEXT,
+			price INTEGER,
+			discount_price INTEGER,
+			unit_price INTEGER,
+			anchor_price INTEGER,
+			target_date DATE
+		) ON COMMIT DROP
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp table: %w", err)
 	}
 
-	// Map existing tiers to result
-	var newTiers []tierWithDBID
+	// Prepare rows for COPY
+	copyRows := make([]tierCopyRow, 0, len(tiersToProcess))
+	tierKeyByID := make(map[string]priceTierKey) // map generated ID -> priceTierKey
+
 	for _, t := range tiersToProcess {
-		key := fmt.Sprintf("%s:%d:%d", t.retailerItemID, t.ptKey.Price, t.ptKey.DiscountPrice)
-		if tierID, exists := existingTiers[key]; exists {
-			result[t.ptKey] = tierID
-		} else {
-			newTiers = append(newTiers, t)
+		tierID := cuid2.GeneratePrefixedId("pt", cuid2.PrefixedIdOptions{})
+		tierKeyByID[tierID] = t.ptKey
+
+		var discountPrice *int
+		if t.ptKey.DiscountPrice != -1 {
+			dp := t.ptKey.DiscountPrice
+			discountPrice = &dp
 		}
+
+		// Get unit_price and anchor_price from item data
+		data := uniqueItems[t.ptKey.ItemKey]
+
+		copyRows = append(copyRows, tierCopyRow{
+			id:             tierID,
+			chainSlug:      chainSlug,
+			retailerItemID: t.retailerItemID,
+			price:          t.ptKey.Price,
+			discountPrice:  discountPrice,
+			unitPrice:      data.UnitPrice,
+			anchorPrice:    data.AnchorPrice,
+			targetDate:     targetDate,
+		})
 	}
 
-	// Update last_seen_at for existing tiers
-	if len(result) > 0 {
-		var tierIDs []string
-		for _, id := range result {
-			tierIDs = append(tierIDs, id)
-		}
-		_, err := pool.Exec(ctx, `
-			UPDATE price_tiers SET last_seen_at = $1 WHERE id = ANY($2)
-		`, now, tierIDs)
-		if err != nil {
-			log.Warn().Err(err).Msg("Failed to update last_seen_at for existing tiers")
-		}
+	// COPY data into temp table
+	copyCount, err := tx.CopyFrom(
+		ctx,
+		pgx.Identifier{"temp_price_tiers"},
+		[]string{"id", "chain_slug", "retailer_item_id", "price", "discount_price", "unit_price", "anchor_price", "target_date"},
+		pgx.CopyFromSlice(len(copyRows), func(i int) ([]any, error) {
+			r := copyRows[i]
+			return []any{r.id, r.chainSlug, r.retailerItemID, r.price, r.discountPrice, r.unitPrice, r.anchorPrice, r.targetDate}, nil
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to COPY price tiers: %w", err)
 	}
 
-	if len(newTiers) == 0 {
-		return result, nil
+	log.Info().Int64("copied", copyCount).Msg("COPY to temp_price_tiers complete")
+
+	// INSERT from temp table with ON CONFLICT
+	_, err = tx.Exec(ctx, `
+		INSERT INTO price_tiers (id, chain_slug, retailer_item_id, price, discount_price, unit_price, anchor_price, target_date, first_seen_at, last_seen_at)
+		SELECT id, chain_slug, retailer_item_id, price, discount_price, unit_price, anchor_price, target_date, $1, $1
+		FROM temp_price_tiers
+		ON CONFLICT (target_date, chain_slug, retailer_item_id, price, COALESCE(discount_price, -1)) DO UPDATE SET
+			last_seen_at = $1
+	`, now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to INSERT from temp table: %w", err)
 	}
 
-	// Insert new tiers in batches
-	const batchSize = 500
-	for i := 0; i < len(newTiers); i += batchSize {
-		end := i + batchSize
-		if end > len(newTiers) {
-			end = len(newTiers)
+	// Query back the actual tier IDs (some may have been existing)
+	// Build lookup key for quick mapping
+	type lookupKey struct {
+		retailerItemID string
+		price          int
+		discountPrice  int
+	}
+	tierKeyByLookup := make(map[lookupKey]priceTierKey)
+	for _, t := range tiersToProcess {
+		lk := lookupKey{
+			retailerItemID: t.retailerItemID,
+			price:          t.ptKey.Price,
+			discountPrice:  t.ptKey.DiscountPrice,
 		}
-		batch := newTiers[i:end]
+		tierKeyByLookup[lk] = t.ptKey
+	}
 
-		pgxBatch := &pgx.Batch{}
-		newIDs := make(map[priceTierKey]string)
+	// Query all tiers we just upserted
+	rows, err := tx.Query(ctx, `
+		SELECT pt.id, pt.retailer_item_id, pt.price, COALESCE(pt.discount_price, -1)
+		FROM price_tiers pt
+		INNER JOIN temp_price_tiers tmp ON
+			pt.target_date = tmp.target_date AND
+			pt.chain_slug = tmp.chain_slug AND
+			pt.retailer_item_id = tmp.retailer_item_id AND
+			pt.price = tmp.price AND
+			COALESCE(pt.discount_price, -1) = COALESCE(tmp.discount_price, -1)
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query upserted tiers: %w", err)
+	}
+	defer rows.Close()
 
-		for _, t := range batch {
-			tierID := cuid2.GeneratePrefixedId("pt", cuid2.PrefixedIdOptions{})
-			newIDs[t.ptKey] = tierID
-
-			var discountPrice *int
-			if t.ptKey.DiscountPrice != -1 {
-				dp := t.ptKey.DiscountPrice
-				discountPrice = &dp
-			}
-
-			// Find unit_price and anchor_price from item data
-			data := uniqueItems[t.ptKey.ItemKey]
-			unitPrice := data.UnitPrice
-			anchorPrice := data.AnchorPrice
-
-			pgxBatch.Queue(`
-				INSERT INTO price_tiers (id, chain_slug, retailer_item_id, price, discount_price, unit_price, anchor_price, first_seen_at, last_seen_at)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-				ON CONFLICT (chain_slug, retailer_item_id, price, COALESCE(discount_price, -1)) DO UPDATE SET
-					last_seen_at = $8
-			`, tierID, chainSlug, t.retailerItemID, t.ptKey.Price, discountPrice, unitPrice, anchorPrice, now)
+	for rows.Next() {
+		var tierID, retailerItemID string
+		var price, dp int
+		if err := rows.Scan(&tierID, &retailerItemID, &price, &dp); err != nil {
+			return nil, fmt.Errorf("failed to scan tier result: %w", err)
 		}
-
-		br := pool.SendBatch(ctx, pgxBatch)
-		// We must read all results from the batch, even if errors occur
-		for j := 0; j < pgxBatch.Len(); j++ {
-			_, err := br.Exec()
-			if err != nil {
-				// ON CONFLICT errors are expected - just log at debug level
-				log.Debug().Err(err).Msg("Tier batch exec error (may be expected for conflicts)")
-			}
-		}
-		br.Close()
-
-		// For tiers with ON CONFLICT, query back the actual IDs
-		for _, t := range batch {
-			var actualID string
-			err := pool.QueryRow(ctx, `
-				SELECT id FROM price_tiers
-				WHERE chain_slug = $1 AND retailer_item_id = $2 AND price = $3
-				AND COALESCE(discount_price, -1) = $4
-			`, chainSlug, t.retailerItemID, t.ptKey.Price, t.ptKey.DiscountPrice).Scan(&actualID)
-			if err == nil {
-				result[t.ptKey] = actualID
-			} else {
-				result[t.ptKey] = newIDs[t.ptKey]
-			}
-		}
-
-		if (i+batchSize)/batchSize%10 == 0 {
-			log.Info().Int("progress", i+len(batch)).Int("total", len(newTiers)).Msg("Tier upsert progress")
+		lk := lookupKey{retailerItemID: retailerItemID, price: price, discountPrice: dp}
+		if ptKey, ok := tierKeyByLookup[lk]; ok {
+			result[ptKey] = tierID
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating tier results: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	log.Info().Int("tiersUpserted", len(result)).Msg("COPY-based price tier upsert complete")
 
 	return result, nil
 }
 
-// upsertStorePriceRefsBatch upserts all store price refs using pgx.Batch
+// refCopyRow represents a row for COPY into the temp refs table
+type refCopyRow struct {
+	storeID        string
+	retailerItemID string
+	priceTierID    string
+	inStock        bool
+	targetDate     time.Time
+	lastSeenAt     time.Time
+}
+
+// upsertStorePriceRefsBatch upserts all store price refs using pgx.CopyFrom for high performance.
+// Uses temp table + COPY + INSERT SELECT pattern for 10-100x speedup over individual INSERTs.
 func upsertStorePriceRefsBatch(
 	ctx context.Context,
 	pool *pgxpool.Pool,
@@ -979,65 +1024,105 @@ func upsertStorePriceRefsBatch(
 	itemIDMap map[itemKey]string,
 	tierIDMap map[priceTierKey]string,
 	storePriceRefs []storePriceRef,
+	targetDate time.Time,
 ) (int, error) {
 	now := time.Now()
-	upserted := 0
 
-	const batchSize = 2000
-	for i := 0; i < len(storePriceRefs); i += batchSize {
-		end := i + batchSize
-		if end > len(storePriceRefs) {
-			end = len(storePriceRefs)
-		}
-		batch := storePriceRefs[i:end]
+	// Prepare rows for COPY, resolving all IDs upfront
+	copyRows := make([]refCopyRow, 0, len(storePriceRefs))
 
-		pgxBatch := &pgx.Batch{}
-
-		for _, ref := range batch {
-			storeID, ok := storeIDMap[ref.StoreIdentifier]
-			if !ok {
-				continue
-			}
-
-			itemID, ok := itemIDMap[ref.ItemKey]
-			if !ok {
-				continue
-			}
-
-			tierID, ok := tierIDMap[ref.PriceTierKey]
-			if !ok {
-				continue
-			}
-
-			pgxBatch.Queue(`
-				INSERT INTO store_price_refs (store_id, retailer_item_id, price_tier_id, in_stock, last_seen_at)
-				VALUES ($1, $2, $3, $4, $5)
-				ON CONFLICT (store_id, retailer_item_id) DO UPDATE SET
-					price_tier_id = EXCLUDED.price_tier_id,
-					in_stock = EXCLUDED.in_stock,
-					last_seen_at = EXCLUDED.last_seen_at
-			`, storeID, itemID, tierID, ref.InStock, now)
-		}
-
-		if pgxBatch.Len() == 0 {
+	for _, ref := range storePriceRefs {
+		storeID, ok := storeIDMap[ref.StoreIdentifier]
+		if !ok {
 			continue
 		}
 
-		br := pool.SendBatch(ctx, pgxBatch)
-		for j := 0; j < pgxBatch.Len(); j++ {
-			_, err := br.Exec()
-			if err != nil {
-				br.Close()
-				return upserted, fmt.Errorf("failed to execute store price ref batch: %w", err)
-			}
-			upserted++
+		itemID, ok := itemIDMap[ref.ItemKey]
+		if !ok {
+			continue
 		}
-		br.Close()
 
-		if (i+batchSize)/batchSize%50 == 0 {
-			log.Info().Int("progress", i+len(batch)).Int("total", len(storePriceRefs)).Msg("Store price ref upsert progress")
+		tierID, ok := tierIDMap[ref.PriceTierKey]
+		if !ok {
+			continue
 		}
+
+		copyRows = append(copyRows, refCopyRow{
+			storeID:        storeID,
+			retailerItemID: itemID,
+			priceTierID:    tierID,
+			inStock:        ref.InStock,
+			targetDate:     targetDate,
+			lastSeenAt:     now,
+		})
 	}
+
+	if len(copyRows) == 0 {
+		return 0, nil
+	}
+
+	log.Info().Int("refs", len(copyRows)).Msg("Starting COPY-based store price refs upsert")
+
+	// Begin transaction for atomic COPY + merge
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Create temp table (dropped automatically on commit)
+	_, err = tx.Exec(ctx, `
+		CREATE TEMP TABLE temp_store_price_refs (
+			store_id TEXT,
+			retailer_item_id TEXT,
+			price_tier_id TEXT,
+			in_stock BOOLEAN,
+			target_date DATE,
+			last_seen_at TIMESTAMPTZ
+		) ON COMMIT DROP
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create temp table: %w", err)
+	}
+
+	// COPY data into temp table
+	copyCount, err := tx.CopyFrom(
+		ctx,
+		pgx.Identifier{"temp_store_price_refs"},
+		[]string{"store_id", "retailer_item_id", "price_tier_id", "in_stock", "target_date", "last_seen_at"},
+		pgx.CopyFromSlice(len(copyRows), func(i int) ([]any, error) {
+			r := copyRows[i]
+			return []any{r.storeID, r.retailerItemID, r.priceTierID, r.inStock, r.targetDate, r.lastSeenAt}, nil
+		}),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to COPY store price refs: %w", err)
+	}
+
+	log.Info().Int64("copied", copyCount).Msg("COPY to temp_store_price_refs complete")
+
+	// INSERT from temp table with ON CONFLICT
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO store_price_refs (store_id, retailer_item_id, price_tier_id, in_stock, target_date, last_seen_at)
+		SELECT store_id, retailer_item_id, price_tier_id, in_stock, target_date, last_seen_at
+		FROM temp_store_price_refs
+		ON CONFLICT (target_date, store_id, retailer_item_id) DO UPDATE SET
+			price_tier_id = EXCLUDED.price_tier_id,
+			in_stock = EXCLUDED.in_stock,
+			last_seen_at = EXCLUDED.last_seen_at
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to INSERT from temp table: %w", err)
+	}
+
+	upserted := int(tag.RowsAffected())
+
+	// Commit transaction
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	log.Info().Int("refsUpserted", upserted).Msg("COPY-based store price refs upsert complete")
 
 	return upserted, nil
 }

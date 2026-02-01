@@ -1,6 +1,12 @@
 import { and, count, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
 import * as z from "zod";
-import { chains, retailerItems, storeItemState, stores } from "@/db/schema";
+import {
+	chains,
+	priceTiers,
+	retailerItems,
+	storePriceRefs,
+	stores,
+} from "@/db/schema";
 import { getDb } from "@/utils/bindings";
 import { procedure } from "../base";
 
@@ -43,16 +49,18 @@ export const listCatalogPrices = procedure
 			);
 		}
 		if (input.minPrice !== undefined) {
-			conditions.push(gte(storeItemState.currentPrice, input.minPrice));
+			conditions.push(gte(priceTiers.price, input.minPrice));
 		}
 		if (input.maxPrice !== undefined) {
-			conditions.push(lte(storeItemState.currentPrice, input.maxPrice));
+			conditions.push(lte(priceTiers.price, input.maxPrice));
 		}
 		if (input.dateFrom) {
-			conditions.push(gte(storeItemState.lastSeenAt, new Date(input.dateFrom)));
+			conditions.push(
+				gte(storePriceRefs.lastSeenAt, new Date(input.dateFrom)),
+			);
 		}
 		if (input.dateTo) {
-			conditions.push(lte(storeItemState.lastSeenAt, new Date(input.dateTo)));
+			conditions.push(lte(storePriceRefs.lastSeenAt, new Date(input.dateTo)));
 		}
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -60,7 +68,7 @@ export const listCatalogPrices = procedure
 		const [prices, totalResult] = await Promise.all([
 			db
 				.select({
-					id: storeItemState.id,
+					id: priceTiers.id,
 					productName: retailerItems.name,
 					brand: retailerItems.brand,
 					category: retailerItems.category,
@@ -69,29 +77,31 @@ export const listCatalogPrices = procedure
 					storeId: stores.id,
 					storeName: stores.name,
 					storeCity: stores.city,
-					currentPrice: storeItemState.currentPrice,
-					discountPrice: storeItemState.discountPrice,
-					lastSeenAt: storeItemState.lastSeenAt,
+					currentPrice: priceTiers.price,
+					discountPrice: priceTiers.discountPrice,
+					lastSeenAt: storePriceRefs.lastSeenAt,
 				})
-				.from(storeItemState)
+				.from(storePriceRefs)
+				.innerJoin(priceTiers, eq(storePriceRefs.priceTierId, priceTiers.id))
 				.innerJoin(
 					retailerItems,
-					eq(storeItemState.retailerItemId, retailerItems.id),
+					eq(storePriceRefs.retailerItemId, retailerItems.id),
 				)
-				.innerJoin(stores, eq(storeItemState.storeId, stores.id))
+				.innerJoin(stores, eq(storePriceRefs.storeId, stores.id))
 				.innerJoin(chains, eq(stores.chainSlug, chains.slug))
 				.where(whereClause)
-				.orderBy(desc(storeItemState.lastSeenAt))
+				.orderBy(desc(storePriceRefs.lastSeenAt))
 				.limit(input.pageSize)
 				.offset(offset),
 			db
 				.select({ count: count() })
-				.from(storeItemState)
+				.from(storePriceRefs)
+				.innerJoin(priceTiers, eq(storePriceRefs.priceTierId, priceTiers.id))
 				.innerJoin(
 					retailerItems,
-					eq(storeItemState.retailerItemId, retailerItems.id),
+					eq(storePriceRefs.retailerItemId, retailerItems.id),
 				)
-				.innerJoin(stores, eq(storeItemState.storeId, stores.id))
+				.innerJoin(stores, eq(storePriceRefs.storeId, stores.id))
 				.innerJoin(chains, eq(stores.chainSlug, chains.slug))
 				.where(whereClause),
 		]);

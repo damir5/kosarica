@@ -84,6 +84,13 @@
       "when": 1769890000000,
       "tag": "0011_add_run_id_to_archives",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1769932258446,
+      "tag": "0012_small_luckman",
+      "breakpoints": true
     }
   ]
 }

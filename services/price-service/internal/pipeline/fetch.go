@@ -174,7 +174,13 @@ func FetchPhaseWithRunId(ctx context.Context, chainID string, file types.Discove
 		return nil, fmt.Errorf("failed to check archive: %w", err)
 	}
 	if existingArchive != nil {
-		log.Info().Str("filename", file.Filename).Str("existing_archive", existingArchive.ID).Msg("Skipping duplicate file")
+		// Update the archive's run_id to link it to the current run
+		// This allows the cluster task to find archives for this run
+		if err := database.UpdateArchiveRunId(ctx, existingArchive.ID, runID); err != nil {
+			log.Warn().Err(err).Str("archiveId", existingArchive.ID).Str("runId", runID).Msg("Failed to update archive run_id")
+		} else {
+			log.Info().Str("filename", file.Filename).Str("archiveId", existingArchive.ID).Str("runId", runID).Msg("Linked existing archive to current run")
+		}
 		return &FetchResult{
 			ArchiveID:   existingArchive.ID,
 			Content:     fetched.Content,

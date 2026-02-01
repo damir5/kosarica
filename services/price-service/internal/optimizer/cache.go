@@ -386,49 +386,6 @@ func (c *PriceCache) loadChainSnapshot(ctx context.Context, chainSlug string) (*
 		return nil, fmt.Errorf("error iterating store price refs: %w", err)
 	}
 
-	// Load store exceptions
-	exceptionRows, err := tx.Query(ctx, `
-		SELECT spe.store_id, spe.retailer_item_id, spe.price, spe.discount_price
-		FROM store_price_exceptions spe
-		JOIN stores s ON s.id = spe.store_id
-		WHERE s.chain_slug = $1 AND spe.expires_at > NOW()
-	`, chainSlug)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query exceptions: %w", err)
-	}
-	defer exceptionRows.Close()
-
-	for exceptionRows.Next() {
-		var storeID, itemID string
-		var price int
-		var discountPrice *int
-		if err := exceptionRows.Scan(&storeID, &itemID, &price, &discountPrice); err != nil {
-			return nil, fmt.Errorf("failed to scan exception: %w", err)
-		}
-
-		// Initialize store exception map if needed
-		if snapshot.exceptions[storeID] == nil {
-			snapshot.exceptions[storeID] = make(map[string]CachedPrice)
-		}
-
-		cachedPrice := CachedPrice{
-			Price:       int64(price),
-			IsException: true,
-		}
-		if discountPrice != nil && *discountPrice > 0 && *discountPrice < price {
-			cachedPrice.DiscountPrice = int64(*discountPrice)
-			cachedPrice.HasDiscount = true
-		} else {
-			cachedPrice.DiscountPrice = cachedPrice.Price
-		}
-
-		snapshot.exceptions[storeID][itemID] = cachedPrice
-	}
-
-	if err := exceptionRows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating exceptions: %w", err)
-	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}

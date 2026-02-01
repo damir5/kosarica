@@ -21,13 +21,25 @@ import (
 func ResumeRun(ctx context.Context, runID string, chainID string) (bool, error) {
 	queries := sqlcgen.New(database.Pool())
 
-	// 1. Get pending/processing files for this run
+	// 1. Get the run details to get the target date
+	run, err := queries.GetIngestionRun(ctx, runID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get run details: %w", err)
+	}
+
+	// Extract target date (default to today if not set)
+	targetDate := time.Now()
+	if run.TargetDate.Valid {
+		targetDate = run.TargetDate.Time
+	}
+
+	// 2. Get pending/processing files for this run
 	files, err := queries.ListPendingFilesForResume(ctx, runID)
 	if err != nil {
 		return false, fmt.Errorf("failed to list pending files: %w", err)
 	}
 
-	// 2. If no files: return false (nothing to resume)
+	// 3. If no files: return false (nothing to resume)
 	if len(files) == 0 {
 		return false, nil
 	}
@@ -95,7 +107,7 @@ func ResumeRun(ctx context.Context, runID string, chainID string) (bool, error) 
 			defer DecrementConcurrentWorkers(ctx, chainID)
 
 			// Process single file
-			if err := processFileResume(ctx, f, runID, chainID, storageBackend, resultMu, result); err != nil {
+			if err := processFileResume(ctx, f, runID, chainID, storageBackend, resultMu, result, targetDate); err != nil {
 				log.Error().Err(err).
 					Str("filename", f.Filename).
 					Msg("Failed to process file during resume")
@@ -125,6 +137,7 @@ func processFileResume(
 	storageBackend storage.Storage,
 	resultMu sync.Mutex,
 	result *IngestionResult,
+	targetDate time.Time,
 ) error {
 	log.Info().Str("filename", file.Filename).Msg("Resuming file")
 
@@ -232,7 +245,7 @@ func processFileResume(
 
 	// Phase 4: Persist
 	persistStart := time.Now()
-	persistResult, err := PersistPhase(ctx, chainID, parseResult, discoveredFile, runID, fetchResult.ArchiveID)
+	persistResult, err := PersistPhase(ctx, chainID, parseResult, discoveredFile, runID, fetchResult.ArchiveID, targetDate)
 	RecordPhaseDuration(ctx, PhasePersist, chainID, time.Since(persistStart))
 
 	if err != nil {

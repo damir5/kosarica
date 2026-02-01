@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/kosarica/price-service/internal/jobs"
 )
 
 var (
@@ -96,7 +95,3 @@ func Stats() *pgxpool.Stat {
 	return pool.Stat()
 }
 
-func init() {
-	// Register the pool getter with the jobs package
-	jobs.RegisterDBPoolGetter(Pool)
-}

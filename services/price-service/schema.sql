@@ -149,6 +149,33 @@ $$;
 ALTER FUNCTION public.fail_task(p_task_id text, p_error_message text, p_retry boolean) OWNER TO kosarica;
 
 --
+-- Name: on_subtask_complete(); Type: FUNCTION; Schema: public; Owner: kosarica
+--
+
+CREATE FUNCTION public.on_subtask_complete() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.status = 'completed' AND NEW.parent_task_id IS NOT NULL THEN
+    UPDATE task_queue
+    SET completed_children = completed_children + 1,
+        updated_at = NOW()
+    WHERE id = NEW.parent_task_id;
+
+    UPDATE task_queue
+    SET status = 'pending', scheduled_for = NOW()
+    WHERE id = NEW.parent_task_id
+      AND status = 'waiting_for_children'
+      AND completed_children >= expected_children;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.on_subtask_complete() OWNER TO kosarica;
+
+--
 -- Name: recover_orphaned_tasks(); Type: FUNCTION; Schema: public; Owner: kosarica
 --
 
@@ -395,23 +422,6 @@ ALTER SEQUENCE public.cron_runs_id_seq OWNED BY public.cron_runs.id;
 
 
 --
--- Name: group_prices; Type: TABLE; Schema: public; Owner: kosarica
---
-
-CREATE TABLE public.group_prices (
-    price_group_id text NOT NULL,
-    retailer_item_id text NOT NULL,
-    price integer NOT NULL,
-    discount_price integer,
-    unit_price integer,
-    anchor_price integer,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.group_prices OWNER TO kosarica;
-
---
 -- Name: ingestion_chunks; Type: TABLE; Schema: public; Owner: kosarica
 --
 
@@ -473,28 +483,6 @@ ALTER TABLE public.ingestion_errors_id_seq OWNER TO kosarica;
 
 ALTER SEQUENCE public.ingestion_errors_id_seq OWNED BY public.ingestion_errors.id;
 
-
---
--- Name: ingestion_file_entries; Type: TABLE; Schema: public; Owner: kosarica
---
-
-CREATE TABLE public.ingestion_file_entries (
-    id text NOT NULL,
-    file_id bigint NOT NULL,
-    row_number integer,
-    store_identifier text,
-    item_external_id text,
-    item_name text,
-    price integer,
-    discount_price integer,
-    barcode text,
-    raw_data text,
-    status text DEFAULT 'pending'::text NOT NULL,
-    created_at timestamp without time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.ingestion_file_entries OWNER TO kosarica;
 
 --
 -- Name: ingestion_files; Type: TABLE; Schema: public; Owner: kosarica
@@ -661,24 +649,26 @@ CREATE TABLE public.passkey (
 ALTER TABLE public.passkey OWNER TO kosarica;
 
 --
--- Name: price_groups; Type: TABLE; Schema: public; Owner: kosarica
+-- Name: price_tiers; Type: TABLE; Schema: public; Owner: kosarica
 --
 
-CREATE TABLE public.price_groups (
-    id text NOT NULL,
+CREATE TABLE public.price_tiers (
+    id text DEFAULT ('pt_'::text || (gen_random_uuid())::text) NOT NULL,
     chain_slug text NOT NULL,
-    price_hash text NOT NULL,
-    hash_version integer DEFAULT 1 NOT NULL,
+    retailer_item_id text NOT NULL,
+    price integer NOT NULL,
+    discount_price integer,
+    unit_price integer,
+    anchor_price integer,
+    first_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
     store_count integer DEFAULT 0 NOT NULL,
-    item_count integer DEFAULT 0 NOT NULL,
-    first_seen_at timestamp without time zone DEFAULT now() NOT NULL,
-    last_seen_at timestamp without time zone DEFAULT now() NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    target_date date NOT NULL
 );
 
 
-ALTER TABLE public.price_groups OWNER TO kosarica;
+ALTER TABLE public.price_tiers OWNER TO kosarica;
 
 --
 -- Name: product_aliases; Type: TABLE; Schema: public; Owner: kosarica
@@ -946,22 +936,6 @@ CREATE TABLE public.store_enrichment_tasks (
 ALTER TABLE public.store_enrichment_tasks OWNER TO kosarica;
 
 --
--- Name: store_group_history; Type: TABLE; Schema: public; Owner: kosarica
---
-
-CREATE TABLE public.store_group_history (
-    id text NOT NULL,
-    store_id text NOT NULL,
-    price_group_id text NOT NULL,
-    valid_from timestamp without time zone NOT NULL,
-    valid_to timestamp without time zone,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.store_group_history OWNER TO kosarica;
-
---
 -- Name: store_identifiers; Type: TABLE; Schema: public; Owner: kosarica
 --
 
@@ -977,109 +951,20 @@ CREATE TABLE public.store_identifiers (
 ALTER TABLE public.store_identifiers OWNER TO kosarica;
 
 --
--- Name: store_item_price_periods; Type: TABLE; Schema: public; Owner: kosarica
+-- Name: store_price_refs; Type: TABLE; Schema: public; Owner: kosarica
 --
 
-CREATE TABLE public.store_item_price_periods (
-    id bigint NOT NULL,
-    store_item_state_id bigint NOT NULL,
-    price integer NOT NULL,
-    discount_price integer,
-    started_at timestamp without time zone NOT NULL,
-    ended_at timestamp without time zone,
-    created_at timestamp without time zone DEFAULT now()
-);
-
-
-ALTER TABLE public.store_item_price_periods OWNER TO kosarica;
-
---
--- Name: store_item_price_periods_id_seq; Type: SEQUENCE; Schema: public; Owner: kosarica
---
-
-CREATE SEQUENCE public.store_item_price_periods_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE public.store_item_price_periods_id_seq OWNER TO kosarica;
-
---
--- Name: store_item_price_periods_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kosarica
---
-
-ALTER SEQUENCE public.store_item_price_periods_id_seq OWNED BY public.store_item_price_periods.id;
-
-
---
--- Name: store_item_state; Type: TABLE; Schema: public; Owner: kosarica
---
-
-CREATE TABLE public.store_item_state (
-    id bigint NOT NULL,
+CREATE TABLE public.store_price_refs (
     store_id text NOT NULL,
     retailer_item_id text NOT NULL,
-    current_price integer,
-    previous_price integer,
-    discount_price integer,
-    discount_start timestamp without time zone,
-    discount_end timestamp without time zone,
+    price_tier_id text NOT NULL,
     in_stock boolean DEFAULT true,
-    unit_price integer,
-    unit_price_base_quantity text,
-    unit_price_base_unit text,
-    lowest_price_30d integer,
-    anchor_price integer,
-    anchor_price_as_of timestamp without time zone,
-    price_signature text,
-    last_seen_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone DEFAULT now()
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    target_date date NOT NULL
 );
 
 
-ALTER TABLE public.store_item_state OWNER TO kosarica;
-
---
--- Name: store_item_state_id_seq; Type: SEQUENCE; Schema: public; Owner: kosarica
---
-
-CREATE SEQUENCE public.store_item_state_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE public.store_item_state_id_seq OWNER TO kosarica;
-
---
--- Name: store_item_state_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kosarica
---
-
-ALTER SEQUENCE public.store_item_state_id_seq OWNED BY public.store_item_state.id;
-
-
---
--- Name: store_price_exceptions; Type: TABLE; Schema: public; Owner: kosarica
---
-
-CREATE TABLE public.store_price_exceptions (
-    store_id text NOT NULL,
-    retailer_item_id text NOT NULL,
-    price integer NOT NULL,
-    discount_price integer,
-    reason text NOT NULL,
-    expires_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    created_by text
-);
-
-
-ALTER TABLE public.store_price_exceptions OWNER TO kosarica;
+ALTER TABLE public.store_price_refs OWNER TO kosarica;
 
 --
 -- Name: stores; Type: TABLE; Schema: public; Owner: kosarica
@@ -1127,8 +1012,11 @@ CREATE TABLE public.task_queue (
     error_message text,
     created_at timestamp without time zone DEFAULT now(),
     updated_at timestamp without time zone DEFAULT now(),
+    parent_task_id text,
+    expected_children integer DEFAULT 0,
+    completed_children integer DEFAULT 0,
     CONSTRAINT task_queue_priority_check CHECK (((priority >= 0) AND (priority <= 10))),
-    CONSTRAINT task_queue_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'claimed'::text, 'processing'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+    CONSTRAINT task_queue_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'claimed'::text, 'processing'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'waiting_for_children'::text])))
 );
 
 
@@ -1256,17 +1144,13 @@ ALTER TABLE ONLY public.product_match_audit ALTER COLUMN id SET DEFAULT nextval(
 
 
 --
--- Name: store_item_price_periods id; Type: DEFAULT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_item_price_periods ALTER COLUMN id SET DEFAULT nextval('public.store_item_price_periods_id_seq'::regclass);
 
 
 --
--- Name: store_item_state id; Type: DEFAULT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_item_state ALTER COLUMN id SET DEFAULT nextval('public.store_item_state_id_seq'::regclass);
 
 
 --
@@ -1357,11 +1241,8 @@ ALTER TABLE ONLY public.ingestion_errors
 
 
 --
--- Name: ingestion_file_entries ingestion_file_entries_pkey; Type: CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.ingestion_file_entries
-    ADD CONSTRAINT ingestion_file_entries_pkey PRIMARY KEY (id);
 
 
 --
@@ -1405,11 +1286,16 @@ ALTER TABLE ONLY public.passkey
 
 
 --
--- Name: price_groups price_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.price_groups
-    ADD CONSTRAINT price_groups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: price_tiers price_tiers_pkey; Type: CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.price_tiers
+    ADD CONSTRAINT price_tiers_pkey PRIMARY KEY (id);
 
 
 --
@@ -1517,11 +1403,8 @@ ALTER TABLE ONLY public.store_enrichment_tasks
 
 
 --
--- Name: store_group_history store_group_history_pkey; Type: CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_group_history
-    ADD CONSTRAINT store_group_history_pkey PRIMARY KEY (id);
 
 
 --
@@ -1533,19 +1416,13 @@ ALTER TABLE ONLY public.store_identifiers
 
 
 --
--- Name: store_item_price_periods store_item_price_periods_pkey; Type: CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_item_price_periods
-    ADD CONSTRAINT store_item_price_periods_pkey PRIMARY KEY (id);
 
 
 --
--- Name: store_item_state store_item_state_pkey; Type: CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_item_state
-    ADD CONSTRAINT store_item_state_pkey PRIMARY KEY (id);
 
 
 --
@@ -1646,24 +1523,18 @@ CREATE INDEX cron_runs_status_idx ON public.cron_runs USING btree (status);
 
 
 --
--- Name: group_prices_pkey; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE UNIQUE INDEX group_prices_pkey ON public.group_prices USING btree (price_group_id, retailer_item_id);
 
 
 --
--- Name: group_prices_price_group_id_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX group_prices_price_group_id_idx ON public.group_prices USING btree (price_group_id);
 
 
 --
--- Name: group_prices_retailer_item_id_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX group_prices_retailer_item_id_idx ON public.group_prices USING btree (retailer_item_id);
 
 
 --
@@ -1695,6 +1566,13 @@ CREATE INDEX idx_archives_downloaded_at ON public.archives USING btree (download
 
 
 --
+-- Name: idx_archives_run_id; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_archives_run_id ON public.archives USING btree (run_id) WHERE (run_id IS NOT NULL);
+
+
+--
 -- Name: idx_ingestion_runs_active; Type: INDEX; Schema: public; Owner: kosarica
 --
 
@@ -1716,10 +1594,73 @@ CREATE INDEX idx_ingestion_runs_chain_date ON public.ingestion_runs USING btree 
 
 
 --
+-- Name: idx_price_tiers_chain; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_price_tiers_chain ON public.price_tiers USING btree (chain_slug);
+
+
+--
+-- Name: idx_price_tiers_chain_date; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_price_tiers_chain_date ON public.price_tiers USING btree (chain_slug, target_date DESC);
+
+
+--
+-- Name: idx_price_tiers_item; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_price_tiers_item ON public.price_tiers USING btree (retailer_item_id);
+
+
+--
+-- Name: idx_price_tiers_last_seen; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_price_tiers_last_seen ON public.price_tiers USING btree (last_seen_at);
+
+
+--
+-- Name: idx_price_tiers_unique; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE UNIQUE INDEX idx_price_tiers_unique ON public.price_tiers USING btree (target_date, chain_slug, retailer_item_id, price, COALESCE(discount_price, '-1'::integer));
+
+
+--
 -- Name: idx_retailer_items_archive_id; Type: INDEX; Schema: public; Owner: kosarica
 --
 
 CREATE INDEX idx_retailer_items_archive_id ON public.retailer_items USING btree (archive_id);
+
+
+--
+-- Name: idx_store_price_refs_date; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_store_price_refs_date ON public.store_price_refs USING btree (target_date);
+
+
+--
+-- Name: idx_store_price_refs_store; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_store_price_refs_store ON public.store_price_refs USING btree (store_id);
+
+
+--
+-- Name: idx_store_price_refs_tier; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_store_price_refs_tier ON public.store_price_refs USING btree (price_tier_id);
+
+
+--
+-- Name: idx_task_queue_parent; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE INDEX idx_task_queue_parent ON public.task_queue USING btree (parent_task_id) WHERE (parent_task_id IS NOT NULL);
 
 
 --
@@ -1828,38 +1769,28 @@ CREATE INDEX pmq_status_idx ON public.product_match_queue USING btree (status);
 
 
 --
--- Name: price_groups_chain_hash_unique; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE UNIQUE INDEX price_groups_chain_hash_unique ON public.price_groups USING btree (chain_slug, price_hash, hash_version);
 
 
 --
--- Name: price_groups_chain_slug_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX price_groups_chain_slug_idx ON public.price_groups USING btree (chain_slug);
 
 
 --
--- Name: price_groups_last_seen_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX price_groups_last_seen_idx ON public.price_groups USING btree (last_seen_at);
 
 
 --
--- Name: price_groups_price_hash_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX price_groups_price_hash_idx ON public.price_groups USING btree (price_hash);
 
 
 --
--- Name: price_groups_store_count_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX price_groups_store_count_idx ON public.price_groups USING btree (store_count);
 
 
 --
@@ -1947,31 +1878,23 @@ CREATE INDEX store_enrichment_tasks_store_type_idx ON public.store_enrichment_ta
 
 
 --
--- Name: store_group_history_current; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE UNIQUE INDEX store_group_history_current ON public.store_group_history USING btree (store_id) WHERE (valid_to IS NULL);
 
 
 --
--- Name: store_group_history_price_group_id_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_group_history_price_group_id_idx ON public.store_group_history USING btree (price_group_id);
 
 
 --
--- Name: store_group_history_store_id_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_group_history_store_id_idx ON public.store_group_history USING btree (store_id);
 
 
 --
--- Name: store_group_history_valid_from_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_group_history_valid_from_idx ON public.store_group_history USING btree (valid_from);
 
 
 --
@@ -1989,66 +1912,55 @@ CREATE INDEX store_identifiers_type_value_idx ON public.store_identifiers USING 
 
 
 --
--- Name: store_item_price_periods_state_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_item_price_periods_state_idx ON public.store_item_price_periods USING btree (store_item_state_id);
 
 
 --
--- Name: store_item_price_periods_time_range_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_item_price_periods_time_range_idx ON public.store_item_price_periods USING btree (started_at, ended_at);
 
 
 --
--- Name: store_item_state_last_seen_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_item_state_last_seen_idx ON public.store_item_state USING btree (last_seen_at);
 
 
 --
--- Name: store_item_state_price_signature_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_item_state_price_signature_idx ON public.store_item_state USING btree (price_signature);
 
 
 --
--- Name: store_item_state_store_retailer_unique; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE UNIQUE INDEX store_item_state_store_retailer_unique ON public.store_item_state USING btree (store_id, retailer_item_id);
 
 
 --
--- Name: store_price_exceptions_expires_at_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_price_exceptions_expires_at_idx ON public.store_price_exceptions USING btree (expires_at);
 
 
 --
--- Name: store_price_exceptions_pkey; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE UNIQUE INDEX store_price_exceptions_pkey ON public.store_price_exceptions USING btree (store_id, retailer_item_id);
 
 
 --
--- Name: store_price_exceptions_retailer_item_id_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_price_exceptions_retailer_item_id_idx ON public.store_price_exceptions USING btree (retailer_item_id);
 
 
 --
--- Name: store_price_exceptions_store_id_idx; Type: INDEX; Schema: public; Owner: kosarica
 --
 
-CREATE INDEX store_price_exceptions_store_id_idx ON public.store_price_exceptions USING btree (store_id);
+
+
+--
+-- Name: store_price_refs_pkey; Type: INDEX; Schema: public; Owner: kosarica
+--
+
+CREATE UNIQUE INDEX store_price_refs_pkey ON public.store_price_refs USING btree (target_date, store_id, retailer_item_id);
 
 
 --
@@ -2087,11 +1999,26 @@ CREATE INDEX stores_status_idx ON public.stores USING btree (status);
 
 
 --
+-- Name: task_queue subtask_completion_trigger; Type: TRIGGER; Schema: public; Owner: kosarica
+--
+
+CREATE TRIGGER subtask_completion_trigger AFTER UPDATE OF status ON public.task_queue FOR EACH ROW WHEN ((new.status = 'completed'::text)) EXECUTE FUNCTION public.on_subtask_complete();
+
+
+--
 -- Name: account account_userId_user_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
 ALTER TABLE ONLY public.account
     ADD CONSTRAINT "account_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES public."user"(id) ON DELETE CASCADE;
+
+
+--
+-- Name: archives archives_run_id_ingestion_runs_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.archives
+    ADD CONSTRAINT archives_run_id_ingestion_runs_id_fk FOREIGN KEY (run_id) REFERENCES public.ingestion_runs(id) ON DELETE SET NULL;
 
 
 --
@@ -2111,19 +2038,13 @@ ALTER TABLE ONLY public.cron_runs
 
 
 --
--- Name: group_prices group_prices_price_group_id_price_groups_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.group_prices
-    ADD CONSTRAINT group_prices_price_group_id_price_groups_id_fk FOREIGN KEY (price_group_id) REFERENCES public.price_groups(id) ON DELETE CASCADE;
 
 
 --
--- Name: group_prices group_prices_retailer_item_id_retailer_items_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.group_prices
-    ADD CONSTRAINT group_prices_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
 
 
 --
@@ -2143,14 +2064,6 @@ ALTER TABLE ONLY public.ingestion_errors
 
 
 --
--- Name: ingestion_errors ingestion_errors_entry_id_ingestion_file_entries_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
---
-
-ALTER TABLE ONLY public.ingestion_errors
-    ADD CONSTRAINT ingestion_errors_entry_id_ingestion_file_entries_id_fk FOREIGN KEY (entry_id) REFERENCES public.ingestion_file_entries(id) ON DELETE SET NULL;
-
-
---
 -- Name: ingestion_errors ingestion_errors_file_id_ingestion_files_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
@@ -2164,14 +2077,6 @@ ALTER TABLE ONLY public.ingestion_errors
 
 ALTER TABLE ONLY public.ingestion_errors
     ADD CONSTRAINT ingestion_errors_run_id_ingestion_runs_id_fk FOREIGN KEY (run_id) REFERENCES public.ingestion_runs(id) ON DELETE CASCADE;
-
-
---
--- Name: ingestion_file_entries ingestion_file_entries_file_id_ingestion_files_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
---
-
-ALTER TABLE ONLY public.ingestion_file_entries
-    ADD CONSTRAINT ingestion_file_entries_file_id_ingestion_files_id_fk FOREIGN KEY (file_id) REFERENCES public.ingestion_files(id) ON DELETE CASCADE;
 
 
 --
@@ -2231,11 +2136,24 @@ ALTER TABLE ONLY public.passkey
 
 
 --
--- Name: price_groups price_groups_chain_slug_chains_slug_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.price_groups
-    ADD CONSTRAINT price_groups_chain_slug_chains_slug_fk FOREIGN KEY (chain_slug) REFERENCES public.chains(slug) ON DELETE CASCADE;
+
+
+--
+-- Name: price_tiers price_tiers_chain_slug_chains_slug_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.price_tiers
+    ADD CONSTRAINT price_tiers_chain_slug_chains_slug_fk FOREIGN KEY (chain_slug) REFERENCES public.chains(slug) ON DELETE CASCADE;
+
+
+--
+-- Name: price_tiers price_tiers_retailer_item_id_retailer_items_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.price_tiers
+    ADD CONSTRAINT price_tiers_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
 
 
 --
@@ -2415,19 +2333,13 @@ ALTER TABLE ONLY public.store_enrichment_tasks
 
 
 --
--- Name: store_group_history store_group_history_price_group_id_price_groups_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_group_history
-    ADD CONSTRAINT store_group_history_price_group_id_price_groups_id_fk FOREIGN KEY (price_group_id) REFERENCES public.price_groups(id) ON DELETE CASCADE;
 
 
 --
--- Name: store_group_history store_group_history_store_id_stores_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_group_history
-    ADD CONSTRAINT store_group_history_store_id_stores_id_fk FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -2439,51 +2351,57 @@ ALTER TABLE ONLY public.store_identifiers
 
 
 --
--- Name: store_item_price_periods store_item_price_periods_store_item_state_id_store_item_state_i; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_item_price_periods
-    ADD CONSTRAINT store_item_price_periods_store_item_state_id_store_item_state_i FOREIGN KEY (store_item_state_id) REFERENCES public.store_item_state(id) ON DELETE CASCADE;
 
 
 --
--- Name: store_item_state store_item_state_retailer_item_id_retailer_items_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_item_state
-    ADD CONSTRAINT store_item_state_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
 
 
 --
--- Name: store_item_state store_item_state_store_id_stores_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_item_state
-    ADD CONSTRAINT store_item_state_store_id_stores_id_fk FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
--- Name: store_price_exceptions store_price_exceptions_created_by_user_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_price_exceptions
-    ADD CONSTRAINT store_price_exceptions_created_by_user_id_fk FOREIGN KEY (created_by) REFERENCES public."user"(id) ON DELETE SET NULL;
 
 
 --
--- Name: store_price_exceptions store_price_exceptions_retailer_item_id_retailer_items_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_price_exceptions
-    ADD CONSTRAINT store_price_exceptions_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
 
 
 --
--- Name: store_price_exceptions store_price_exceptions_store_id_stores_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
 --
 
-ALTER TABLE ONLY public.store_price_exceptions
-    ADD CONSTRAINT store_price_exceptions_store_id_stores_id_fk FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: store_price_refs store_price_refs_price_tier_id_price_tiers_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.store_price_refs
+    ADD CONSTRAINT store_price_refs_price_tier_id_price_tiers_id_fk FOREIGN KEY (price_tier_id) REFERENCES public.price_tiers(id) ON DELETE CASCADE;
+
+
+--
+-- Name: store_price_refs store_price_refs_retailer_item_id_retailer_items_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.store_price_refs
+    ADD CONSTRAINT store_price_refs_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
+
+
+--
+-- Name: store_price_refs store_price_refs_store_id_stores_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: kosarica
+--
+
+ALTER TABLE ONLY public.store_price_refs
+    ADD CONSTRAINT store_price_refs_store_id_stores_id_fk FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -2520,145 +2438,5 @@ REVOKE USAGE ON SCHEMA public FROM PUBLIC;
 --
 -- PostgreSQL database dump complete
 --
-
--- ============================================================================
--- Phase 1: Item-Level Price Clustering (price_tiers, store_price_refs)
--- ============================================================================
-
---
--- Name: price_tiers; Type: TABLE; Schema: public; Owner: kosarica
--- Item-level price groups: unique (item, price, discount) combinations
---
-
-CREATE TABLE public.price_tiers (
-    id text PRIMARY KEY DEFAULT 'pt_' || gen_random_uuid()::text,
-    chain_slug text NOT NULL,
-    retailer_item_id text NOT NULL,
-    price integer NOT NULL,
-    discount_price integer,
-    unit_price integer,
-    anchor_price integer,
-    first_seen_at timestamp with time zone DEFAULT NOW() NOT NULL,
-    last_seen_at timestamp with time zone DEFAULT NOW() NOT NULL,
-    store_count integer DEFAULT 0 NOT NULL,
-    created_at timestamp with time zone DEFAULT NOW() NOT NULL
-);
-
-ALTER TABLE public.price_tiers OWNER TO kosarica;
-
---
--- Name: store_price_refs; Type: TABLE; Schema: public; Owner: kosarica
--- Lightweight join table: store references to price tiers
---
-
-CREATE TABLE public.store_price_refs (
-    store_id text NOT NULL,
-    retailer_item_id text NOT NULL,
-    price_tier_id text NOT NULL,
-    in_stock boolean DEFAULT true,
-    last_seen_at timestamp with time zone DEFAULT NOW() NOT NULL,
-    PRIMARY KEY (store_id, retailer_item_id)
-);
-
-ALTER TABLE public.store_price_refs OWNER TO kosarica;
-
---
--- Name: price_tiers indexes
---
-
-CREATE INDEX idx_price_tiers_item ON public.price_tiers(retailer_item_id);
-CREATE INDEX idx_price_tiers_chain ON public.price_tiers(chain_slug);
-CREATE INDEX idx_price_tiers_last_seen ON public.price_tiers(last_seen_at);
-CREATE UNIQUE INDEX idx_price_tiers_unique ON public.price_tiers(chain_slug, retailer_item_id, price, COALESCE(discount_price, -1));
-
---
--- Name: store_price_refs indexes
---
-
-CREATE INDEX idx_store_price_refs_tier ON public.store_price_refs(price_tier_id);
-CREATE INDEX idx_store_price_refs_store ON public.store_price_refs(store_id);
-
---
--- Name: price_tiers foreign keys
---
-
-ALTER TABLE ONLY public.price_tiers
-    ADD CONSTRAINT price_tiers_chain_slug_chains_slug_fk FOREIGN KEY (chain_slug) REFERENCES public.chains(slug) ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.price_tiers
-    ADD CONSTRAINT price_tiers_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
-
---
--- Name: store_price_refs foreign keys
---
-
-ALTER TABLE ONLY public.store_price_refs
-    ADD CONSTRAINT store_price_refs_store_id_stores_id_fk FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.store_price_refs
-    ADD CONSTRAINT store_price_refs_retailer_item_id_retailer_items_id_fk FOREIGN KEY (retailer_item_id) REFERENCES public.retailer_items(id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.store_price_refs
-    ADD CONSTRAINT store_price_refs_price_tier_id_price_tiers_id_fk FOREIGN KEY (price_tier_id) REFERENCES public.price_tiers(id) ON DELETE CASCADE;
-
--- ============================================================================
--- Phase 1: Parent-Child Task Support
--- ============================================================================
-
---
--- Name: task_queue parent-child columns
---
-
-ALTER TABLE public.task_queue ADD COLUMN IF NOT EXISTS parent_task_id text REFERENCES public.task_queue(id);
-ALTER TABLE public.task_queue ADD COLUMN IF NOT EXISTS expected_children integer DEFAULT 0;
-ALTER TABLE public.task_queue ADD COLUMN IF NOT EXISTS completed_children integer DEFAULT 0;
-
-CREATE INDEX IF NOT EXISTS idx_task_queue_parent ON public.task_queue(parent_task_id) WHERE parent_task_id IS NOT NULL;
-
---
--- Name: task_queue_status_check; Type: CONSTRAINT; Update to include 'waiting_for_children'
---
-
-ALTER TABLE public.task_queue DROP CONSTRAINT IF EXISTS task_queue_status_check;
-ALTER TABLE public.task_queue ADD CONSTRAINT task_queue_status_check
-  CHECK (status = ANY (ARRAY['pending'::text, 'claimed'::text, 'processing'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'waiting_for_children'::text]));
-
---
--- Name: on_subtask_complete(); Type: FUNCTION; Schema: public
--- Trigger function to handle subtask completion and wake parent tasks
---
-
-CREATE OR REPLACE FUNCTION public.on_subtask_complete() RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.status = 'completed' AND NEW.parent_task_id IS NOT NULL THEN
-    -- Increment parent's completed_children counter
-    UPDATE task_queue
-    SET completed_children = completed_children + 1,
-        updated_at = NOW()
-    WHERE id = NEW.parent_task_id;
-
-    -- Check if parent can proceed (all children completed)
-    UPDATE task_queue
-    SET status = 'pending', scheduled_for = NOW()
-    WHERE id = NEW.parent_task_id
-      AND status = 'waiting_for_children'
-      AND completed_children >= expected_children;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-ALTER FUNCTION public.on_subtask_complete() OWNER TO kosarica;
-
---
--- Name: subtask_completion_trigger; Type: TRIGGER
---
-
-DROP TRIGGER IF EXISTS subtask_completion_trigger ON public.task_queue;
-CREATE TRIGGER subtask_completion_trigger
-  AFTER UPDATE OF status ON public.task_queue
-  FOR EACH ROW
-  WHEN (NEW.status = 'completed')
-  EXECUTE FUNCTION public.on_subtask_complete();
 
 

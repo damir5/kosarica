@@ -256,6 +256,7 @@ type PriceTier struct {
 	LastSeenAt     pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
 	StoreCount     int32              `db:"store_count" json:"store_count"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	TargetDate     pgtype.Date        `db:"target_date" json:"target_date"`
 }
 
 type Product struct {
@@ -495,6 +496,7 @@ type StorePriceRef struct {
 	PriceTierID    string             `db:"price_tier_id" json:"price_tier_id"`
 	InStock        pgtype.Bool        `db:"in_stock" json:"in_stock"`
 	LastSeenAt     pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	TargetDate     pgtype.Date        `db:"target_date" json:"target_date"`
 }
 
 type TaskQueue struct {

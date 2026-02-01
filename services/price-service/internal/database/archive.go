@@ -135,6 +135,17 @@ func GetArchivesByRunId(ctx context.Context, runID string) ([]Archive, error) {
 	return archives, nil
 }
 
+// UpdateArchiveRunId updates the run_id of an existing archive
+// This is used to link duplicate archives to the current run
+func UpdateArchiveRunId(ctx context.Context, archiveID string, runID string) error {
+	queries := sqlcgen.New(Pool())
+
+	return queries.UpdateArchiveRunId(ctx, sqlcgen.UpdateArchiveRunIdParams{
+		ID:    archiveID,
+		RunID: pgtype.Text{String: runID, Valid: true},
+	})
+}
+
 // GetArchiveByChecksum looks up an archive by its checksum for deduplication
 func GetArchiveByChecksum(ctx context.Context, checksum string) (*Archive, error) {
 	queries := sqlcgen.New(Pool())

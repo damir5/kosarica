@@ -34,10 +34,10 @@ func (q *Queries) CountSearchItems(ctx context.Context, arg CountSearchItemsPara
 
 const countStorePrices = `-- name: CountStorePrices :one
 SELECT COUNT(*)
-FROM store_item_state sis
-JOIN retailer_items ri ON sis.retailer_item_id = ri.id
-JOIN stores s ON sis.store_id = s.id
+FROM store_price_refs spr
+JOIN stores s ON spr.store_id = s.id
 WHERE s.id = $1 AND s.chain_slug = $2
+  AND spr.target_date = (SELECT MAX(target_date) FROM price_tiers WHERE chain_slug = $2)
 `
 
 type CountStorePricesParams struct {
@@ -45,6 +45,7 @@ type CountStorePricesParams struct {
 	ChainSlug string `db:"chain_slug" json:"chain_slug"`
 }
 
+// Count prices for a store using price_tiers system (uses latest target_date)
 func (q *Queries) CountStorePrices(ctx context.Context, arg CountStorePricesParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countStorePrices, arg.ID, arg.ChainSlug)
 	var count int64
@@ -110,23 +111,25 @@ SELECT
     ri.brand,
     ri.unit,
     ri.unit_quantity,
-    sis.current_price,
-    sis.previous_price,
-    sis.discount_price,
-    TO_CHAR(sis.discount_start, 'YYYY-MM-DD HH24:MI:SS') as discount_start,
-    TO_CHAR(sis.discount_end, 'YYYY-MM-DD HH24:MI:SS') as discount_end,
-    sis.in_stock,
-    sis.unit_price,
-    sis.unit_price_base_quantity,
-    sis.unit_price_base_unit,
-    sis.lowest_price_30d,
-    sis.anchor_price,
-    sis.price_signature,
-    TO_CHAR(sis.last_seen_at, 'YYYY-MM-DD HH24:MI:SS') as last_seen_at
-FROM store_item_state sis
-JOIN retailer_items ri ON sis.retailer_item_id = ri.id
-JOIN stores s ON sis.store_id = s.id
+    pt.price as current_price,
+    NULL::int4 as previous_price,
+    pt.discount_price,
+    ''::text as discount_start,
+    ''::text as discount_end,
+    spr.in_stock,
+    pt.unit_price,
+    NULL::text as unit_price_base_quantity,
+    NULL::text as unit_price_base_unit,
+    NULL::int4 as lowest_price_30d,
+    pt.anchor_price,
+    NULL::text as price_signature,
+    TO_CHAR(spr.last_seen_at, 'YYYY-MM-DD HH24:MI:SS') as last_seen_at
+FROM store_price_refs spr
+JOIN price_tiers pt ON pt.id = spr.price_tier_id
+JOIN retailer_items ri ON spr.retailer_item_id = ri.id
+JOIN stores s ON spr.store_id = s.id
 WHERE s.id = $1 AND s.chain_slug = $2
+  AND spr.target_date = (SELECT MAX(target_date) FROM price_tiers WHERE chain_slug = $2)
 ORDER BY ri.name
 LIMIT $3 OFFSET $4
 `
@@ -145,7 +148,7 @@ type ListStorePricesWithDetailsRow struct {
 	Brand                 pgtype.Text `db:"brand" json:"brand"`
 	Unit                  pgtype.Text `db:"unit" json:"unit"`
 	UnitQuantity          pgtype.Text `db:"unit_quantity" json:"unit_quantity"`
-	CurrentPrice          pgtype.Int4 `db:"current_price" json:"current_price"`
+	CurrentPrice          int32       `db:"current_price" json:"current_price"`
 	PreviousPrice         pgtype.Int4 `db:"previous_price" json:"previous_price"`
 	DiscountPrice         pgtype.Int4 `db:"discount_price" json:"discount_price"`
 	DiscountStart         string      `db:"discount_start" json:"discount_start"`
@@ -160,6 +163,7 @@ type ListStorePricesWithDetailsRow struct {
 	LastSeenAt            string      `db:"last_seen_at" json:"last_seen_at"`
 }
 
+// List prices for a store with item details using price_tiers system
 func (q *Queries) ListStorePricesWithDetails(ctx context.Context, arg ListStorePricesWithDetailsParams) ([]ListStorePricesWithDetailsRow, error) {
 	rows, err := q.db.Query(ctx, listStorePricesWithDetails,
 		arg.ID,
@@ -218,10 +222,11 @@ SELECT DISTINCT
     ri.unit,
     ri.unit_quantity,
     ri.image_url,
-    COALESCE(AVG(sis.current_price), 0)::int as avg_price,
-    COUNT(DISTINCT sis.store_id)::int as store_count
+    COALESCE(AVG(pt.price), 0)::int as avg_price,
+    COUNT(DISTINCT spr.store_id)::int as store_count
 FROM retailer_items ri
-LEFT JOIN store_item_state sis ON ri.id = sis.retailer_item_id
+LEFT JOIN store_price_refs spr ON ri.id = spr.retailer_item_id
+LEFT JOIN price_tiers pt ON pt.id = spr.price_tier_id
 WHERE ri.name ILIKE '%' || $1::text || '%'
   AND ($2::text = '' OR ri.chain_slug = $2::text)
 GROUP BY ri.id, ri.chain_slug, ri.external_id, ri.name, ri.description,
@@ -254,6 +259,7 @@ type SearchItemsWithStatsRow struct {
 
 // Search items by name with aggregated stats, optional chain filter
 // Pass empty string for chain_slug to search all chains
+// Uses price_tiers for aggregation
 func (q *Queries) SearchItemsWithStats(ctx context.Context, arg SearchItemsWithStatsParams) ([]SearchItemsWithStatsRow, error) {
 	rows, err := q.db.Query(ctx, searchItemsWithStats, arg.SearchQuery, arg.ChainFilter, arg.ResultLimit)
 	if err != nil {

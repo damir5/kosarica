@@ -65,29 +65,6 @@ type RetailerItemBarcode struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-// StoreItemState tracks the current state of an item at a store
-type StoreItemState struct {
-	ID             int64      `json:"id"`               // CUID2
-	StoreID        string     `json:"store_id"`         // FK to stores.id
-	RetailerItemID string     `json:"retailer_item_id"` // FK to retailer_items.id
-	CurrentPrice   *int       `json:"current_price"`    // Price in cents/lipa
-	PreviousPrice  *int       `json:"previous_price"`   // Previous price for comparison
-	DiscountPrice  *int       `json:"discount_price"`   // Promotional price
-	DiscountStart  *time.Time `json:"discount_start"`   // Discount start date
-	DiscountEnd    *time.Time `json:"discount_end"`     // Discount end date
-	InStock        bool       `json:"in_stock"`         // Whether item is in stock
-	// Price transparency fields (Croatian regulation)
-	UnitPrice             *int       `json:"unit_price"`               // Price per unit in cents (e.g., per kg/l)
-	UnitPriceBaseQuantity *string    `json:"unit_price_base_quantity"` // Base quantity for unit price (e.g., "1", "100")
-	UnitPriceBaseUnit     *string    `json:"unit_price_base_unit"`     // Unit for unit price (e.g., "kg", "l", "kom")
-	LowestPrice30d        *int       `json:"lowest_price_30d"`         // Lowest price in last 30 days, in cents
-	AnchorPrice           *int       `json:"anchor_price"`             // "sidrena cijena" anchor/reference price in cents
-	AnchorPriceAsOf       *time.Time `json:"anchor_price_as_of"`       // Date anchor price was set
-	PriceSignature        *string    `json:"price_signature"`          // Hash for deduplication
-	LastSeenAt            time.Time  `json:"last_seen_at"`             // Last time this price was seen
-	UpdatedAt             time.Time  `json:"updated_at"`
-}
-
 // IngestionRun represents a single ingestion run for a chain
 type IngestionRun struct {
 	ID               string     `json:"id"`         // CUID2 format: run_xxx
