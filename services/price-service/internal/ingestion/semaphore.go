@@ -2,64 +2,94 @@ package ingestion
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog/log"
+	"github.com/shirou/gopsutil/v3/mem"
 	"golang.org/x/sync/semaphore"
 )
 
 var (
-	clusterSemaphore *semaphore.Weighted
-	semaphoreOnce    sync.Once
-	semaphoreSlots   int64
+	importSemaphore *semaphore.Weighted
+	semaphoreOnce   sync.Once
+	semaphoreSlots  int64
 )
 
-// InitClusterSemaphore initializes the cluster semaphore based on heap size.
-// It allows 1 concurrent cluster task per 1GB of configured heap.
-// This should be called once during server startup.
-func InitClusterSemaphore(heapMB int) {
+// InitSemaphore initializes the import semaphore with the given concurrency.
+// It validates that available system memory is sufficient for the requested concurrency.
+// Returns an error if memory is insufficient - caller should exit.
+func InitSemaphore(concurrency int, memoryPerJobMB int) error {
+	var initErr error
+
 	semaphoreOnce.Do(func() {
-		slots := int64(heapMB / 1024) // 1 slot per 1GB
-		if slots < 1 {
-			slots = 1
+		if concurrency < 1 {
+			concurrency = 1
 		}
-		semaphoreSlots = slots
-		clusterSemaphore = semaphore.NewWeighted(slots)
+
+		requiredMB := int64(concurrency * memoryPerJobMB)
+
+		// Check available system memory
+		vmStat, err := mem.VirtualMemory()
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to check system memory, proceeding anyway")
+		} else {
+			availableMB := int64(vmStat.Available / 1024 / 1024)
+
+			if availableMB < requiredMB {
+				initErr = fmt.Errorf(
+					"insufficient memory: need %dMB (%d jobs × %dMB), available %dMB. "+
+						"Reduce INGESTION_CONCURRENCY or add more memory",
+					requiredMB, concurrency, memoryPerJobMB, availableMB,
+				)
+				return
+			}
+
+			log.Info().
+				Int64("availableMB", availableMB).
+				Int64("requiredMB", requiredMB).
+				Int("concurrency", concurrency).
+				Int("memoryPerJobMB", memoryPerJobMB).
+				Msg("Memory check passed")
+		}
+
+		semaphoreSlots = int64(concurrency)
+		importSemaphore = semaphore.NewWeighted(semaphoreSlots)
 
 		log.Info().
-			Int("heapMB", heapMB).
-			Int64("clusterSlots", slots).
-			Msg("Initialized cluster semaphore")
+			Int64("slots", semaphoreSlots).
+			Msg("Initialized import semaphore")
 	})
+
+	return initErr
 }
 
-// AcquireClusterSlot acquires a slot for cluster task execution.
+// AcquireSlot acquires a slot for import task execution.
 // It blocks until a slot is available or the context is cancelled.
-func AcquireClusterSlot(ctx context.Context) error {
-	if clusterSemaphore == nil {
-		// Semaphore not initialized - allow all (for backwards compatibility)
-		log.Warn().Msg("Cluster semaphore not initialized, allowing unlimited concurrency")
+func AcquireSlot(ctx context.Context) error {
+	if importSemaphore == nil {
+		log.Warn().Msg("Import semaphore not initialized, allowing unlimited concurrency")
 		return nil
 	}
 
-	log.Debug().Msg("Waiting to acquire cluster slot")
-	if err := clusterSemaphore.Acquire(ctx, 1); err != nil {
+	log.Debug().Msg("Waiting to acquire import slot")
+	if err := importSemaphore.Acquire(ctx, 1); err != nil {
 		return err
 	}
-	log.Debug().Msg("Acquired cluster slot")
+	log.Debug().Msg("Acquired import slot")
 	return nil
 }
 
-// ReleaseClusterSlot releases a cluster slot after task completion.
-func ReleaseClusterSlot() {
-	if clusterSemaphore == nil {
+// ReleaseSlot releases an import slot after task completion.
+func ReleaseSlot() {
+	if importSemaphore == nil {
 		return
 	}
-	clusterSemaphore.Release(1)
-	log.Debug().Msg("Released cluster slot")
+	importSemaphore.Release(1)
+	log.Debug().Msg("Released import slot")
 }
 
-// GetClusterSlots returns the number of available cluster slots.
-func GetClusterSlots() int64 {
+// GetSlots returns the number of configured import slots.
+func GetSlots() int64 {
 	return semaphoreSlots
 }

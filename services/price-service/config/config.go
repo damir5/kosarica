@@ -23,7 +23,8 @@ type Config struct {
 
 // IngestionConfig holds ingestion pipeline configuration
 type IngestionConfig struct {
-	HeapMB int `mapstructure:"heap_mb"` // Heap size for cluster semaphore (1 slot per 1GB)
+	Concurrency    int `mapstructure:"concurrency"`      // Max concurrent import operations (default 4)
+	MemoryPerJobMB int `mapstructure:"memory_per_job_mb"` // Required memory per concurrent job in MB (default 512)
 }
 
 // ServerConfig holds HTTP server configuration
@@ -205,7 +206,8 @@ func bindEnvVars(v *viper.Viper) {
 	v.BindEnv("storage.s3.force_path_style", "STORAGE_S3_FORCE_PATH_STYLE")
 
 	// Ingestion
-	v.BindEnv("ingestion.heap_mb", "INGESTION_HEAP_MB")
+	v.BindEnv("ingestion.concurrency", "INGESTION_CONCURRENCY")
+	v.BindEnv("ingestion.memory_per_job_mb", "INGESTION_MEMORY_PER_JOB_MB")
 }
 
 // setDefaults sets default configuration values
@@ -238,7 +240,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("logging.no_color", false)
 
 	// Ingestion defaults
-	v.SetDefault("ingestion.heap_mb", 2048) // 2GB default = 2 concurrent cluster slots
+	v.SetDefault("ingestion.concurrency", 4)        // 4 concurrent import operations
+	v.SetDefault("ingestion.memory_per_job_mb", 512) // 512MB per job, so 4 jobs = 2GB minimum
 }
 
 // Get returns the global configuration

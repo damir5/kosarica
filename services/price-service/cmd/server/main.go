@@ -39,13 +39,15 @@ import (
 
 // startIngestionWorkers creates and starts dedicated ingestion worker pools
 // Returns all worker instances for proper shutdown
-func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config, logger *zerolog.Logger) []*workers.Worker {
+func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config, logger *zerolog.Logger) ([]*workers.Worker, error) {
 	tq := taskqueue.New(pool)
 	workersList := make([]*workers.Worker, 0, 5)
 
-	// Initialize cluster semaphore based on configured heap size
-	ingestion.InitClusterSemaphore(cfg.Ingestion.HeapMB)
-	clusterSlots := ingestion.GetClusterSlots()
+	// Initialize import semaphore with memory validation
+	if err := ingestion.InitSemaphore(cfg.Ingestion.Concurrency, cfg.Ingestion.MemoryPerJobMB); err != nil {
+		return nil, err
+	}
+	importSlots := ingestion.GetSlots()
 
 	// Discovery workers (light DB usage - creates run, discovers files)
 	discoverWorker := workers.New(tq, workers.WorkerConfig{
@@ -89,7 +91,7 @@ func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, cfg *config.
 		WorkerID:   "cluster-worker",
 		TaskTypes:  []string{"ingestion_cluster"},
 		MaxTasks:   1,
-		NumWorkers: int(clusterSlots) + 1, // Semaphore controls actual concurrency
+		NumWorkers: int(importSlots) + 1, // Semaphore controls actual concurrency
 		PollDelay:  5 * time.Second,
 	})
 	clusterWorker.RegisterExtendedHandler("ingestion_cluster", handlers.HandleClusterTask)
@@ -113,11 +115,11 @@ func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, cfg *config.
 		Int("discover_workers", 2).
 		Int("fetch_parse_workers", 10).
 		Int("store_prep_workers", 2).
-		Int64("cluster_slots", clusterSlots).
+		Int64("import_slots", importSlots).
 		Int("finalize_workers", 2).
 		Msg("Ingestion worker pools started")
 
-	return workersList
+	return workersList, nil
 }
 
 func main() {
@@ -174,7 +176,10 @@ func main() {
 	go taskSweeper.Start(ctx)
 
 	// Start dedicated ingestion workers
-	ingestionWorkers := startIngestionWorkers(ctx, database.Pool(), cfg, logger)
+	ingestionWorkers, err := startIngestionWorkers(ctx, database.Pool(), cfg, logger)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to start ingestion workers")
+	}
 	defer func() {
 		for _, w := range ingestionWorkers {
 			w.Stop()

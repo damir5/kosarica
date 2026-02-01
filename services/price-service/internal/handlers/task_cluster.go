@@ -107,15 +107,15 @@ func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *
 		return nil
 	}
 
-	// Acquire semaphore slot for heap-based concurrency control
-	if err := ingestion.AcquireClusterSlot(ctx); err != nil {
-		return fmt.Errorf("failed to acquire cluster slot: %w", err)
+	// Acquire semaphore slot for concurrency control
+	if err := ingestion.AcquireSlot(ctx); err != nil {
+		return fmt.Errorf("failed to acquire import slot: %w", err)
 	}
-	defer ingestion.ReleaseClusterSlot()
+	defer ingestion.ReleaseSlot()
 
 	log.Info().
 		Str("runId", runID).
-		Msg("Acquired cluster slot")
+		Msg("Acquired import slot")
 
 	startTime := time.Now()
 
