@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
@@ -9,6 +9,12 @@ export function LoginForm() {
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [passkeyAvailable, setPasskeyAvailable] = useState(false);
+	const location = useRouterState({ select: (s) => s.location });
+	const redirectParam = new URLSearchParams(location.search).get("redirect");
+	const redirectTo =
+		redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+			? redirectParam
+			: "/";
 
 	useEffect(() => {
 		if (window?.PublicKeyCredential) {
@@ -39,7 +45,7 @@ export function LoginForm() {
 				throw new Error(result.error.message);
 			}
 
-			navigate({ to: "/" });
+			navigate({ to: redirectTo });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Login failed");
 		} finally {
@@ -55,7 +61,7 @@ export function LoginForm() {
 			if (result?.error) {
 				throw new Error(result.error.message);
 			}
-			navigate({ to: "/" });
+			navigate({ to: redirectTo });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Passkey login failed");
 		} finally {
