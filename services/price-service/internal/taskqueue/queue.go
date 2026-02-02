@@ -146,17 +146,23 @@ func (q *TaskQueue) ScheduleChildTask(ctx context.Context, input ScheduleChildTa
 		priority = input.Priority
 	}
 
+	// Convert the typed payload to TaskQueuePayload via JSON round-trip
 	payloadBytes, err := json.Marshal(input.Payload)
 	if err != nil {
 		return ScheduleTaskResult{Err: err}
 	}
+	var payload jsonb.TaskQueuePayload
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		return ScheduleTaskResult{Err: err}
+	}
 
-	var taskID string
-	err = q.pool.QueryRow(ctx, `
-		INSERT INTO task_queue (task_type, payload, priority, parent_task_id, max_retries)
-		VALUES ($1, $2, $3, $4, 3)
-		RETURNING id
-	`, input.TaskType, payloadBytes, priority, input.ParentTaskID).Scan(&taskID)
+	queries := sqlcgen.New(q.pool)
+	taskID, err := queries.ScheduleChildTask(ctx, sqlcgen.ScheduleChildTaskParams{
+		TaskType:     input.TaskType,
+		Payload:      payload,
+		Priority:     pgtype.Int4{Int32: int32(priority), Valid: true},
+		ParentTaskID: pgtype.Text{String: input.ParentTaskID, Valid: true},
+	})
 
 	if err != nil {
 		return ScheduleTaskResult{Err: err}
@@ -168,14 +174,11 @@ func (q *TaskQueue) ScheduleChildTask(ctx context.Context, input ScheduleChildTa
 // TransitionToWaiting transitions a task to waiting_for_children status.
 // Call this after spawning all child tasks, with expectedChildren set to the count.
 func (q *TaskQueue) TransitionToWaiting(ctx context.Context, taskID string, expectedChildren int) error {
-	_, err := q.pool.Exec(ctx, `
-		UPDATE task_queue
-		SET status = 'waiting_for_children',
-		    expected_children = $2,
-		    updated_at = NOW()
-		WHERE id = $1 AND status = 'processing'
-	`, taskID, expectedChildren)
-	return err
+	queries := sqlcgen.New(q.pool)
+	return queries.TransitionToWaiting(ctx, sqlcgen.TransitionToWaitingParams{
+		ID:               taskID,
+		ExpectedChildren: pgtype.Int4{Int32: int32(expectedChildren), Valid: true},
+	})
 }
 
 // ScheduleBatchChildTasks schedules multiple child tasks in a single transaction.
@@ -191,17 +194,25 @@ func (q *TaskQueue) ScheduleBatchChildTasks(ctx context.Context, parentTaskID st
 	}
 	defer tx.Rollback(ctx)
 
+	queries := sqlcgen.New(tx)
 	count := 0
 	for _, payload := range payloads {
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
 			return 0, err
 		}
+		var taskPayload jsonb.TaskQueuePayload
+		if err := json.Unmarshal(payloadBytes, &taskPayload); err != nil {
+			return 0, err
+		}
 
-		_, err = tx.Exec(ctx, `
-			INSERT INTO task_queue (task_type, payload, priority, parent_task_id, max_retries)
-			VALUES ($1, $2, $3, $4, 3)
-		`, taskType, payloadBytes, priority, parentTaskID)
+		err = queries.InsertChildTask(ctx, sqlcgen.InsertChildTaskParams{
+			TaskType:     taskType,
+			Payload:      taskPayload,
+			Priority:     pgtype.Int4{Int32: int32(priority), Valid: true},
+			ParentTaskID: pgtype.Text{String: parentTaskID, Valid: true},
+			MaxRetries:   pgtype.Int4{Int32: 3, Valid: true},
+		})
 		if err != nil {
 			return 0, err
 		}
@@ -209,13 +220,10 @@ func (q *TaskQueue) ScheduleBatchChildTasks(ctx context.Context, parentTaskID st
 	}
 
 	// Transition parent to waiting and set expected children count
-	_, err = tx.Exec(ctx, `
-		UPDATE task_queue
-		SET status = 'waiting_for_children',
-		    expected_children = $2,
-		    updated_at = NOW()
-		WHERE id = $1
-	`, parentTaskID, count)
+	err = queries.TransitionToWaiting(ctx, sqlcgen.TransitionToWaitingParams{
+		ID:               parentTaskID,
+		ExpectedChildren: pgtype.Int4{Int32: int32(count), Valid: true},
+	})
 	if err != nil {
 		return 0, err
 	}

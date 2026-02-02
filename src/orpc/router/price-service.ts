@@ -32,7 +32,7 @@ import {
 	type HandlersSearchItemsResponse,
 	postInternalIngestionRunsByRunIdRerun,
 } from "@/lib/go-api";
-import { unwrapSdkResponse } from "@/lib/go-api/utils";
+import { unwrapSdkResponse } from "@/lib/go-api-utils";
 import { goFetchWithRetry, unwrapResponse } from "@/lib/go-service-client";
 import { procedure } from "../base";
 

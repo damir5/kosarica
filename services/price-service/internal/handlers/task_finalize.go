@@ -38,27 +38,23 @@ func HandleFinalizeTask(ctx context.Context, payload jsonb.TaskQueuePayload) err
 		Str("runId", runID).
 		Msg("Processing finalize task")
 
+	// Update run status to completed
+	queries := sqlcgen.New(database.Pool())
+
 	// Get run statistics from database (archives and price tiers)
-	processedFiles, processedEntries := calculateRunStatsFromDB(ctx, runID)
+	processedFiles, processedEntries := calculateRunStatsFromDB(ctx, queries, runID)
 
 	// Check for failed tasks for this run
-	var failedCount int
-	err = database.Pool().QueryRow(ctx, `
-		SELECT COUNT(*) FROM task_queue
-		WHERE status = 'failed' AND payload::text LIKE '%' || $1 || '%'
-	`, runID).Scan(&failedCount)
+	failedCount, err := queries.CountFailedTasksByRunID(ctx, pgtype.Text{String: runID, Valid: true})
 	if err != nil {
 		log.Warn().Err(err).Str("runId", runID).Msg("Failed to check for failed tasks")
 		failedCount = 0
 	}
 
 	if failedCount > 0 {
-		log.Warn().Str("runId", runID).Int("failedTasks", failedCount).
+		log.Warn().Str("runId", runID).Int64("failedTasks", failedCount).
 			Msg("Run completed with failed tasks")
 	}
-
-	// Update run status to completed
-	queries := sqlcgen.New(database.Pool())
 	now := time.Now()
 
 	err = queries.UpdateRunCompleted(ctx, sqlcgen.UpdateRunCompletedParams{
@@ -93,14 +89,9 @@ func HandleFinalizeTask(ctx context.Context, payload jsonb.TaskQueuePayload) err
 }
 
 // calculateRunStatsFromDB calculates statistics from database tables
-func calculateRunStatsFromDB(ctx context.Context, runID string) (processedFiles, processedEntries int) {
-	pool := database.Pool()
-
+func calculateRunStatsFromDB(ctx context.Context, queries *sqlcgen.Queries, runID string) (processedFiles, processedEntries int) {
 	// Count archives for this run
-	var archiveCount int
-	err := pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM archives WHERE run_id = $1
-	`, runID).Scan(&archiveCount)
+	archiveCount, err := queries.CountArchivesByRunID(ctx, pgtype.Text{String: runID, Valid: true})
 	if err != nil {
 		log.Warn().Err(err).Str("runId", runID).Msg("Failed to count archives")
 		archiveCount = 0
@@ -108,39 +99,19 @@ func calculateRunStatsFromDB(ctx context.Context, runID string) (processedFiles,
 
 	// Count price entries created (store_price_refs) for stores in this run
 	// This is an approximation based on archives linked to the run
-	var entryCount int
-	err = pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM store_price_refs spr
-		WHERE EXISTS (
-			SELECT 1 FROM stores s
-			WHERE s.id = spr.store_id
-			AND s.updated_at >= (SELECT MIN(created_at) FROM archives WHERE run_id = $1)
-		)
-	`, runID).Scan(&entryCount)
+	entryCount, err := queries.CountStorePriceRefsByRunID(ctx, pgtype.Text{String: runID, Valid: true})
 	if err != nil {
 		log.Warn().Err(err).Str("runId", runID).Msg("Failed to count price entries")
 		entryCount = 0
 	}
 
-	return archiveCount, entryCount
+	return int(archiveCount), int(entryCount)
 }
 
 // updatePriceTierStoreCounts updates the store_count field on price_tiers
 func updatePriceTierStoreCounts(ctx context.Context, chainSlug string) error {
-	pool := database.Pool()
-
-	// Update store counts for all tiers in this chain
-	_, err := pool.Exec(ctx, `
-		UPDATE price_tiers pt
-		SET store_count = (
-			SELECT COUNT(DISTINCT spr.store_id)
-			FROM store_price_refs spr
-			WHERE spr.price_tier_id = pt.id
-		)
-		WHERE pt.chain_slug = $1
-	`, chainSlug)
-
-	if err != nil {
+	queries := sqlcgen.New(database.Pool())
+	if err := queries.UpdatePriceTierStoreCounts(ctx, chainSlug); err != nil {
 		return fmt.Errorf("failed to update store counts: %w", err)
 	}
 

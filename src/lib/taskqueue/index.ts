@@ -1,5 +1,5 @@
-import { sql } from "drizzle-orm";
-import { getDatabase } from "@/db";
+import { eq, sql } from "drizzle-orm";
+import { getDatabase, taskQueue } from "@/db";
 
 export type TaskStatus =
 	| "pending"
@@ -27,14 +27,17 @@ export async function scheduleTask(
 	options: ScheduleTaskOptions,
 ): Promise<{ id: string }> {
 	const db = getDatabase();
-	const result = await db.execute(sql`
-    INSERT INTO task_queue (task_type, payload, priority, scheduled_for, max_retries)
-    VALUES (${options.taskType}, ${JSON.stringify(options.payload)},
-            ${options.priority ?? 0}, ${options.scheduledFor?.toISOString() ?? sql`NOW()`},
-            ${options.maxRetries ?? 3})
-    RETURNING id
-  `);
-	const row = result[0] as { id: string };
+	const result = await db
+		.insert(taskQueue)
+		.values({
+			taskType: options.taskType,
+			payload: options.payload as any, // JSONB typed column
+			priority: options.priority ?? 0,
+			scheduledFor: options.scheduledFor ?? sql`NOW()`,
+			maxRetries: options.maxRetries ?? 3,
+		})
+		.returning({ id: taskQueue.id });
+	const row = result[0];
 	return { id: row.id };
 }
 
@@ -61,11 +64,13 @@ export async function completeTask(taskId: string): Promise<boolean> {
 
 export async function startProcessing(taskId: string): Promise<void> {
 	const db = getDatabase();
-	await db.execute(sql`
-    UPDATE task_queue
-    SET status = 'processing', updated_at = NOW()
-    WHERE id = ${taskId}
-  `);
+	await db
+		.update(taskQueue)
+		.set({
+			status: "processing" as const,
+			updatedAt: sql`NOW()`,
+		})
+		.where(eq(taskQueue.id, taskId));
 }
 
 export async function failTask(
@@ -82,13 +87,25 @@ export async function failTask(
 
 export async function getTask(taskId: string): Promise<ClaimedTask | null> {
 	const db = getDatabase();
-	const result = await db.execute(sql`
-    SELECT id, task_type, payload, status,
-           scheduled_for, started_at, completed_at, failed_at,
-           worker_id, retry_count, max_retries, error_message,
-           created_at, updated_at
-    FROM task_queue
-    WHERE id = ${taskId}
-  `);
+	const result = await db
+		.select({
+			id: taskQueue.id,
+			task_type: taskQueue.taskType,
+			payload: taskQueue.payload,
+			status: taskQueue.status,
+			scheduled_for: taskQueue.scheduledFor,
+			started_at: taskQueue.startedAt,
+			completed_at: taskQueue.completedAt,
+			failed_at: taskQueue.failedAt,
+			worker_id: taskQueue.workerId,
+			retry_count: taskQueue.retryCount,
+			max_retries: taskQueue.maxRetries,
+			error_message: taskQueue.errorMessage,
+			created_at: taskQueue.createdAt,
+			updated_at: taskQueue.updatedAt,
+		})
+		.from(taskQueue)
+		.where(eq(taskQueue.id, taskId))
+		.limit(1);
 	return result[0] as unknown as ClaimedTask | null;
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,29 @@ import (
 )
 
 var log = zerolog.New(os.Stdout).With().Timestamp().Str("component", "worker").Logger()
+
+// isRetryableError checks if an error should be retried.
+// Returns false for data constraint violations that won't be fixed by retry.
+func isRetryableError(errMsg string) bool {
+	// List of non-retryable database errors
+	nonRetryablePatterns := []string{
+		"duplicate key value violates unique constraint",
+		"violates unique constraint",
+		"violates check constraint",
+		"violates not-null constraint",
+		"violates foreign key constraint",
+		"violates exclusion constraint",
+	}
+
+	errLower := strings.ToLower(errMsg)
+	for _, pattern := range nonRetryablePatterns {
+		if strings.Contains(errLower, strings.ToLower(pattern)) {
+			return false
+		}
+	}
+
+	return true
+}
 
 type WorkerConfig struct {
 	WorkerID   string
@@ -190,12 +214,20 @@ func (w *Worker) processTask(ctx context.Context, workerID string, task taskqueu
 	}
 
 	if handlerErr != nil {
-		w.queue.FailTask(ctx, task.ID, handlerErr.Error(), true)
-		log.Error().
+		shouldRetry := isRetryableError(handlerErr.Error())
+		w.queue.FailTask(ctx, task.ID, handlerErr.Error(), shouldRetry)
+
+		logEvent := log.Error().
 			Str("task_id", task.ID).
 			Str("run_id", runID).
 			Err(handlerErr).
-			Msg("Task failed")
+			Bool("will_retry", shouldRetry)
+
+		if !shouldRetry {
+			logEvent.Msg("Task failed with non-retryable error (constraint violation)")
+		} else {
+			logEvent.Msg("Task failed and will retry")
+		}
 		return
 	}
 

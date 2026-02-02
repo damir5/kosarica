@@ -238,12 +238,8 @@ func spawnStorePrepTask(ctx context.Context, tq *taskqueue.TaskQueue, parentTask
 
 // recoverRunIDFromDatabase finds the most recent active run for a chain
 func recoverRunIDFromDatabase(ctx context.Context, chainSlug string) (string, error) {
-	var runID string
-	err := database.Pool().QueryRow(ctx, `
-		SELECT id FROM ingestion_runs
-		WHERE chain_slug = $1 AND status IN ('pending', 'running')
-		ORDER BY created_at DESC LIMIT 1
-	`, chainSlug).Scan(&runID)
+	queries := sqlcgen.New(database.Pool())
+	runID, err := queries.RecoverRunIDFromDatabase(ctx, chainSlug)
 	if err != nil {
 		return "", fmt.Errorf("no active run found for chain %s: %w", chainSlug, err)
 	}

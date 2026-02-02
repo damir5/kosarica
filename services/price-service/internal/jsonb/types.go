@@ -2,6 +2,8 @@
 // These types are designed to match the Zod schemas in src/db/jsonb-schemas.ts
 package jsonb
 
+import "encoding/json"
+
 // TaskQueuePayload represents a discriminated union of task payloads.
 // The Type field determines which fields are valid.
 type TaskQueuePayload struct {
@@ -28,6 +30,9 @@ type TaskQueuePayload struct {
 
 	// Cleanup task fields
 	DaysToKeep *int `json:"daysToKeep,omitempty"`
+
+	// Extra allows additional properties
+	Extra map[string]interface{} `json:"-"`
 }
 
 // IsRerun returns true if this is a rerun task payload.
@@ -38,6 +43,104 @@ func (p TaskQueuePayload) IsRerun() bool {
 // IsCleanup returns true if this is a cleanup task payload.
 func (p TaskQueuePayload) IsCleanup() bool {
 	return p.Type == "cleanup"
+}
+
+// UnmarshalJSON captures extra fields on TaskQueuePayload.
+func (p *TaskQueuePayload) UnmarshalJSON(data []byte) error {
+	type payloadAlias TaskQueuePayload
+	var alias payloadAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+
+	*p = TaskQueuePayload(alias)
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	for _, key := range []string{
+		"type",
+		"chainSlug",
+		"runId",
+		"targetDate",
+		"sourceUrl",
+		"archiveId",
+		"fileUrl",
+		"filename",
+		"fileType",
+		"fileIndex",
+		"totalFiles",
+		"originalRunId",
+		"rerunType",
+		"targetId",
+		"daysToKeep",
+	} {
+		delete(raw, key)
+	}
+
+	if len(raw) > 0 {
+		p.Extra = raw
+	}
+
+	return nil
+}
+
+// MarshalJSON merges extra fields back into the payload.
+func (p TaskQueuePayload) MarshalJSON() ([]byte, error) {
+	result := make(map[string]interface{})
+	for key, value := range p.Extra {
+		result[key] = value
+	}
+
+	if p.Type != "" {
+		result["type"] = p.Type
+	}
+	if p.ChainSlug != "" {
+		result["chainSlug"] = p.ChainSlug
+	}
+	if p.RunID != nil {
+		result["runId"] = *p.RunID
+	}
+	if p.TargetDate != nil {
+		result["targetDate"] = *p.TargetDate
+	}
+	if p.SourceURL != nil {
+		result["sourceUrl"] = *p.SourceURL
+	}
+	if p.ArchiveID != nil {
+		result["archiveId"] = *p.ArchiveID
+	}
+	if p.FileURL != nil {
+		result["fileUrl"] = *p.FileURL
+	}
+	if p.Filename != nil {
+		result["filename"] = *p.Filename
+	}
+	if p.FileType != nil {
+		result["fileType"] = *p.FileType
+	}
+	if p.FileIndex != nil {
+		result["fileIndex"] = *p.FileIndex
+	}
+	if p.TotalFiles != nil {
+		result["totalFiles"] = *p.TotalFiles
+	}
+	if p.OriginalRunID != nil {
+		result["originalRunId"] = *p.OriginalRunID
+	}
+	if p.RerunType != nil {
+		result["rerunType"] = *p.RerunType
+	}
+	if p.TargetID != nil {
+		result["targetId"] = *p.TargetID
+	}
+	if p.DaysToKeep != nil {
+		result["daysToKeep"] = *p.DaysToKeep
+	}
+
+	return json.Marshal(result)
 }
 
 // ValidationError represents a single validation error.
@@ -147,4 +250,3 @@ type FinalizePayload struct {
 func (p FinalizePayload) IsFinalize() bool {
 	return p.Type == "ingestion_finalize"
 }
-

@@ -13,4 +13,12 @@ import type { ClientOptions as ClientOptions2 } from './types.gen';
  */
 export type CreateClientConfig<T extends ClientOptions = ClientOptions2> = (override?: Config<ClientOptions & T>) => Config<Required<ClientOptions> & T>;
 
-export const client = createClient(createConfig<ClientOptions2>({ baseUrl: '/internal' }));
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'dev-internal-api-key-change-in-development';
+
+export const client = createClient(createConfig<ClientOptions2>({
+  baseUrl: process.env.GO_SERVICE_URL || 'http://localhost:3003',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Internal-API-Key': INTERNAL_API_KEY,
+  },
+}));

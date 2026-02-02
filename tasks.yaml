@@ -1,266 +1,542 @@
 tasks:
-  # ============================================================================
-  # TypeScript (Drizzle) Migrations
-  # ============================================================================
-
-  - title: "Create PL/pgSQL function: get_pending_matches()"
+  # TypeScript Migrations - src/orpc/router/products.ts
+  - title: "Migrate getPendingMatches in products.ts (lines 97-159)"
     description: |
-      In `drizzle/0001_manual_functions.sql`, add:
-      ```sql
-      CREATE OR REPLACE FUNCTION get_pending_matches(
-        p_status_filter text[],
-        p_chain_filter text[],
-        p_limit integer DEFAULT 100
-      ) RETURNS TABLE (
-        -- TODO: define return columns based on query in src/orpc/router/products.ts:97-159
-      ) AS $$
-        -- CTE with JSON aggregation from lines 97-159
-      $$ LANGUAGE plpgsql STABLE;
-      ```
+      Replace CTE with JSON aggregation using Drizzle `sql` template tag.
 
-      Migrate `src/orpc/router/products.ts` lines 97-159 (`getPendingMatches` function)
+      File: src/orpc/router/products.ts
+      Current: CTE with JSON aggregation pattern
+      Target: Drizzle with `sql` template tag
+      Status: Already uses Drizzle sql template tag
+    completed: true
+
+  - title: "Migrate bulkApprove in products.ts (lines 367-403)"
+    description: |
+      Replace CTE with INSERT/UPDATE/ON CONFLICT using Drizzle `sql` template tag.
+
+      File: src/orpc/router/products.ts
+      Current: CTE with INSERT/UPDATE/ON CONFLICT
+      Target: Drizzle with `sql` template tag
+      Status: Already uses Drizzle sql template tag
+    completed: true
+
+  - title: "Migrate searchProducts in products.ts (lines 480-494)"
+    description: |
+      Replace pg_trgm similarity query using Drizzle `sql` fragment.
+
+      File: src/orpc/router/products.ts
+      Current: pg_trgm similarity
+      Target: Drizzle with `sql` fragment
+      Status: Already uses Drizzle sql template tag
+    completed: true
+
+  - title: "Migrate getStats in products.ts (lines 512-545)"
+    description: |
+      Replace 3x aggregate queries using Drizzle aggregations.
+
+      File: src/orpc/router/products.ts
+      Current: 3x aggregate queries using COUNT(*) FILTER
+      Target: Drizzle aggregations
+      Status: Already uses Drizzle sql template tag with optimized FILTER syntax
+    completed: true
+
+  # TypeScript Migrations - src/lib/taskqueue/index.ts
+  - title: "Migrate scheduleTask in taskqueue/index.ts (lines 30-36)"
+    description: |
+      Replace INSERT with RETURNING using Drizzle `.insert().returning()`.
+
+      File: src/lib/taskqueue/index.ts
+      Current: INSERT with RETURNING
+      Target: Drizzle `.insert().returning()`
+      Status: Already uses Drizzle .insert().returning()
+    completed: true
+
+  - title: "Keep claim_tasks() PL/pgSQL call in taskqueue/index.ts (lines 50-52)"
+    description: |
+      Keep as-is - shared with Go.
+
+      File: src/lib/taskqueue/index.ts
+      Current: Calls `claim_tasks()` PL/pgSQL
+      Action: Keep as-is (shared with Go, sqlc can't infer return type)
     completed: false
 
-  - title: "Create PL/pgSQL function: bulk_approve_matches()"
+  - title: "Keep complete_task() PL/pgSQL call in taskqueue/index.ts (line 58)"
     description: |
-      In `drizzle/0001_manual_functions.sql`, add:
-      ```sql
-      CREATE OR REPLACE FUNCTION bulk_approve_matches(
-        p_queue_ids text[],
-        p_user_id text
-      ) RETURNS TABLE (
-        -- TODO: define return columns
-      ) AS $$
-        -- CTE with INSERT/UPDATE/ON CONFLICT from lines 367-403
-      $$ LANGUAGE plpgsql;
-      ```
+      Keep as-is - shared with Go.
 
-      Migrate `src/orpc/router/products.ts` lines 367-403 (`bulkApprove` function)
+      File: src/lib/taskqueue/index.ts
+      Current: Calls `complete_task()` PL/pgSQL
+      Action: Keep as-is (shared with Go, sqlc can't infer return type)
     completed: false
 
-  - title: "Migrate searchProducts pg_trgm to Drizzle"
+  - title: "Migrate startProcessing in taskqueue/index.ts (lines 64-68)"
     description: |
-      `src/orpc/router/products.ts` lines 480-494 (`searchProducts` function)
-      - Current: pg_trgm similarity raw SQL
-      - Migration: Drizzle with `sql` fragment
+      Replace UPDATE statement using Drizzle `.update().set()`.
+
+      File: src/lib/taskqueue/index.ts
+      Current: UPDATE statement
+      Target: Drizzle `.update().set()`
+      Status: Already uses Drizzle .update().set()
+    completed: true
+
+  - title: "Keep fail_task() PL/pgSQL call in taskqueue/index.ts (lines 77-79)"
+    description: |
+      Keep as-is - shared with Go.
+
+      File: src/lib/taskqueue/index.ts
+      Current: Calls `fail_task()` PL/pgSQL
+      Action: Keep as-is (shared with Go, sqlc can't infer return type)
     completed: false
 
-  - title: "Migrate getStats aggregations to Drizzle"
+  - title: "Migrate getTask in taskqueue/index.ts (lines 85-92)"
     description: |
-      `src/orpc/router/products.ts` lines 512-545 (`getStats` function)
-      - Current: 3x aggregate queries
-      - Migration: Drizzle aggregations
+      Replace SELECT statement using Drizzle `.select().where()`.
+
+      File: src/lib/taskqueue/index.ts
+      Current: SELECT statement
+      Target: Drizzle `.select().where()`
+      Status: Already uses Drizzle .select().where()
+    completed: true
+
+  # TypeScript Migrations - src/jobs/cron/executor.ts
+  - title: "Migrate claimDueJobs in executor.ts (lines 46-70)"
+    description: |
+      Replace UPDATE with FOR UPDATE SKIP LOCKED using Drizzle `sql` template tag.
+
+      File: src/jobs/cron/executor.ts
+      Current: UPDATE with FOR UPDATE SKIP LOCKED
+      Target: Drizzle with `sql` template tag (skip locked syntax)
+      Status: Already uses Drizzle sql template tag
+      Note: FOR UPDATE SKIP LOCKED is Postgres-specific, sql template tag is correct approach
+    completed: true
+
+  # Go Migrations - services/price-service/internal/taskqueue/queue.go
+  - title: "Keep claim_tasks() PL/pgSQL call in queue.go (lines 82-84)"
+    description: |
+      Keep as-is - sqlc can't infer PL/pgSQL return type.
+
+      File: services/price-service/internal/taskqueue/queue.go
+      Current: Calls `claim_tasks()`
+      Action: Keep as-is (sqlc can't infer PL/pgSQL return type)
     completed: false
 
-  - title: "Migrate scheduleTask INSERT to Drizzle"
+  - title: "Keep complete_task() PL/pgSQL call in queue.go (line 113)"
     description: |
-      `src/lib/taskqueue/index.ts` lines 30-36 (`scheduleTask` function)
-      - Current: INSERT with RETURNING raw SQL
-      - Migration: Drizzle `.insert().returning()`
+      Keep as-is - sqlc can't infer PL/pgSQL return type.
+
+      File: services/price-service/internal/taskqueue/queue.go
+      Current: Calls `complete_task()`
+      Action: Keep as-is (sqlc can't infer PL/pgSQL return type)
     completed: false
 
-  - title: "Migrate startProcessing UPDATE to Drizzle"
+  - title: "Keep fail_task() PL/pgSQL call in queue.go (line 118)"
     description: |
-      `src/lib/taskqueue/index.ts` lines 64-68 (`startProcessing` function)
-      - Current: UPDATE statement raw SQL
-      - Migration: Drizzle `.update().set()`
+      Keep as-is - sqlc can't infer PL/pgSQL return type.
+
+      File: services/price-service/internal/taskqueue/queue.go
+      Current: Calls `fail_task()`
+      Action: Keep as-is (sqlc can't infer PL/pgSQL return type)
     completed: false
 
-  - title: "Migrate getTask SELECT to Drizzle"
+  - title: "Keep cleanup_old_tasks() PL/pgSQL call in queue.go (line 124)"
     description: |
-      `src/lib/taskqueue/index.ts` lines 85-92 (`getTask` function)
-      - Current: SELECT statement raw SQL
-      - Migration: Drizzle `.select().where()`
+      Keep as-is - sqlc can't infer PL/pgSQL return type.
+
+      File: services/price-service/internal/taskqueue/queue.go
+      Current: Calls `cleanup_old_tasks()`
+      Action: Keep as-is (sqlc can't infer PL/pgSQL return type)
     completed: false
 
-  - title: "Create PL/pgSQL function: claim_due_cron_jobs()"
+  - title: "Create sqlc query for ScheduleChildTask in queue.go (lines 155-159)"
     description: |
-      In `drizzle/0001_manual_functions.sql`, add:
-      ```sql
-      CREATE OR REPLACE FUNCTION claim_due_cron_jobs(
-        p_cutoff timestamptz
-      ) RETURNS TABLE (
-        -- TODO: define return columns
-      ) AS $$
-        -- UPDATE with FOR UPDATE SKIP LOCKED from lines 46-70
-      $$ LANGUAGE plpgsql;
-      ```
+      Create sqlc query for INSERT with RETURNING.
 
-      Migrate `src/jobs/cron/executor.ts` lines 46-70 (`claimDueJobs` function)
-      - Exception: Drizzle doesn't support SKIP LOCKED, hence PL/pgSQL function
+      File: services/price-service/internal/taskqueue/queue.go
+      Current: INSERT with RETURNING
+      Target: sqlc query
     completed: false
 
-  # ============================================================================
-  # Go sqlc Query Files to Create
-  # ============================================================================
-
-  - title: "Create internal/database/queries/matching.sql"
+  - title: "Create sqlc query for TransitionToWaiting in queue.go (lines 171-178)"
     description: |
-      Barcode matching queries for `services/price-service/internal/matching/barcode.go`:
-      - Lines 42-62: `AutoMatchByBarcode` - Streaming SELECT
-      - Lines 149-155: barcode mapping INSERT
-      - Lines 168-176: product links INSERT with ON CONFLICT
-      - Lines 281-285: create product INSERT with RETURNING
-      - Lines 298-314: queue for review INSERT with ON CONFLICT
+      Create sqlc query for UPDATE statement.
 
-      Note: Lines 117 advisory lock `pg_advisory_xact_lock()` - keep as-is (Postgres-specific)
+      File: services/price-service/internal/taskqueue/queue.go
+      Current: UPDATE statement
+      Target: sqlc query
     completed: false
 
-  - title: "Create internal/database/queries/ai_matching.sql"
+  - title: "Create sqlc query for ScheduleBatchChildTasks in queue.go (lines 201-204)"
     description: |
-      AI matching queries for `services/price-service/internal/matching/ai.go`:
-      - Lines 276-277: similarity search with pg_trgm
-      - Lines 340-345: rejection check EXISTS subquery
-      - Lines 390-408: insert candidate INSERT with ON CONFLICT UPDATE
-      - Lines 422-426: create link INSERT with ON CONFLICT
+      Create sqlc query for Batch INSERT.
+
+      File: services/price-service/internal/taskqueue/queue.go
+      Current: Batch INSERT
+      Target: sqlc query
     completed: false
 
-  - title: "Create internal/database/queries/cleanup.sql"
+  # Go Migrations - services/price-service/internal/matching/barcode.go
+  - title: "Create internal/database/queries/matching.sql for barcode matching"
     description: |
-      Cleanup job queries for `services/price-service/internal/jobs/cleanup_audit.go`:
-      - Lines 31-44: DELETE candidates with date filter
-      - Lines 72-88: UPDATE queue with status + date
-      - Lines 166-195: 3x COUNT queries
+      New sqlc query file for barcode matching operations.
+
+      Queries to include:
+      - AutoMatchByBarcode: Streaming SELECT (lines 42-62)
+      - barcode mapping INSERT: INSERT statement (lines 149-155)
+      - product links INSERT: INSERT with ON CONFLICT (lines 168-176)
+      - create product INSERT: INSERT with RETURNING (lines 281-285)
+      - queue for review INSERT: INSERT with ON CONFLICT (lines 298-314)
+
+      Keep exception:
+      - advisory lock (line 117): `pg_advisory_xact_lock()` - Postgres-specific, keep as-is
     completed: false
 
-  - title: "Create internal/database/queries/embeddings.sql"
+  - title: "Migrate AutoMatchByBarcode in barcode.go (lines 42-62) to sqlc"
     description: |
-      Embedding cache queries for `services/price-service/internal/matching/embedding.go`:
-      - Lines 63-71: `getCachedEmbeddings` - SELECT with ANY()
-      - Lines 120-124: `getCachedProductEmbeddings` - SELECT with ANY()
-      - Lines 170-179: `storeEmbeddingCache` - INSERT with ON CONFLICT UPDATE
-      - Lines 265-273: `EnsureProductEmbeddings` - SELECT with NOT EXISTS
+      Replace Streaming SELECT with sqlc query from matching.sql.
+
+      File: services/price-service/internal/matching/barcode.go
+      Current: Streaming SELECT
+      Target: sqlc query from matching.sql
     completed: false
 
-  - title: "Create internal/database/queries/optimizer.sql"
+  - title: "Keep pg_advisory_xact_lock() in barcode.go (line 117)"
     description: |
-      Price cache queries for `services/price-service/internal/optimizer/cache.go`:
-      - Lines 273-278: load stores SELECT with filter
-      - Lines 314-318: load price tiers SELECT with filter
-      - Lines 358-363: load store refs SELECT with JOIN
-      - Lines 612-616: `getActiveChains` - SELECT DISTINCT
+      Keep as-is - Postgres-specific advisory lock.
+
+      File: services/price-service/internal/matching/barcode.go
+      Current: `pg_advisory_xact_lock()`
+      Action: Keep as-is (Postgres-specific, no sqlc equivalent)
     completed: false
 
-  - title: "Create internal/database/queries/taskqueue_extended.sql"
+  - title: "Migrate barcode mapping INSERT in barcode.go (lines 149-155) to sqlc"
     description: |
-      Extended task queue operations for `services/price-service/internal/taskqueue/queue.go`:
-      - Lines 155-159: `ScheduleChildTask` - INSERT with RETURNING
-      - Lines 171-178: `TransitionToWaiting` - UPDATE statement
-      - Lines 201-204: `ScheduleBatchChildTasks` - Batch INSERT
+      Replace INSERT statement with sqlc query from matching.sql.
+
+      File: services/price-service/internal/matching/barcode.go
+      Current: INSERT statement
+      Target: sqlc query from matching.sql
     completed: false
 
-  # ============================================================================
-  # Go Handler Migrations to sqlc
-  # ============================================================================
-
-  - title: "Migrate barcode.go to use sqlc"
+  - title: "Migrate product links INSERT in barcode.go (lines 168-176) to sqlc"
     description: |
-      `services/price-service/internal/matching/barcode.go`
-      - Use queries from matching.sql
-      - Keep lines 117 advisory lock as-is
+      Replace INSERT with ON CONFLICT with sqlc query from matching.sql.
+
+      File: services/price-service/internal/matching/barcode.go
+      Current: INSERT with ON CONFLICT
+      Target: sqlc query from matching.sql
     completed: false
 
-  - title: "Migrate ai.go to use sqlc"
+  - title: "Migrate create product INSERT in barcode.go (lines 281-285) to sqlc"
     description: |
-      `services/price-service/internal/matching/ai.go`
-      - Use queries from ai_matching.sql
+      Replace INSERT with RETURNING with sqlc query from matching.sql.
+
+      File: services/price-service/internal/matching/barcode.go
+      Current: INSERT with RETURNING
+      Target: sqlc query from matching.sql
     completed: false
 
-  - title: "Migrate embedding.go to use sqlc"
+  - title: "Migrate queue for review INSERT in barcode.go (lines 298-314) to sqlc"
     description: |
-      `services/price-service/internal/matching/embedding.go`
-      - Use queries from embeddings.sql
+      Replace INSERT with ON CONFLICT with sqlc query from matching.sql.
+
+      File: services/price-service/internal/matching/barcode.go
+      Current: INSERT with ON CONFLICT
+      Target: sqlc query from matching.sql
     completed: false
 
-  - title: "Migrate cleanup_audit.go to use sqlc"
+  # Go Migrations - services/price-service/internal/matching/ai.go
+  - title: "Create internal/database/queries/ai_matching.sql for AI matching"
     description: |
-      `services/price-service/internal/jobs/cleanup_audit.go`
-      - Use queries from cleanup.sql
+      New sqlc query file for AI matching operations.
+
+      Queries to include:
+      - similarity search: SELECT with pg_trgm (lines 276-277)
+      - rejection check: EXISTS subquery (lines 340-345)
+      - insert candidate: INSERT with ON CONFLICT UPDATE (lines 390-408)
+      - create link: INSERT with ON CONFLICT (lines 422-426)
     completed: false
 
-  - title: "Migrate cache.go (optimizer) to use sqlc"
+  - title: "Migrate similarity search in ai.go (lines 276-277) to sqlc"
     description: |
-      `services/price-service/internal/optimizer/cache.go`
-      - Use queries from optimizer.sql
+      Replace SELECT with pg_trgm with sqlc query from ai_matching.sql.
+
+      File: services/price-service/internal/matching/ai.go
+      Current: SELECT with pg_trgm
+      Target: sqlc query from ai_matching.sql
     completed: false
 
-  - title: "Create internal/database/queries/task_finalize.sql"
+  - title: "Migrate rejection check in ai.go (lines 340-345) to sqlc"
     description: |
-      Task finalize queries for `services/price-service/internal/handlers/task_finalize.go`:
-      - Lines 46-49: check failed tasks - SELECT COUNT with LIKE
-      - Lines 100-115: `calculateRunStatsFromDB` - 2x COUNT queries
-      - Lines 120-130: `updatePriceTierStoreCounts` - UPDATE with subquery
+      Replace EXISTS subquery with sqlc query from ai_matching.sql.
+
+      File: services/price-service/internal/matching/ai.go
+      Current: EXISTS subquery
+      Target: sqlc query from ai_matching.sql
     completed: false
 
-  - title: "Migrate task_finalize.go to use sqlc"
+  - title: "Migrate insert candidate in ai.go (lines 390-408) to sqlc"
     description: |
-      `services/price-service/internal/handlers/task_finalize.go`
-      - Use queries from task_finalize.sql
+      Replace INSERT with ON CONFLICT UPDATE with sqlc query from ai_matching.sql.
+
+      File: services/price-service/internal/matching/ai.go
+      Current: INSERT with ON CONFLICT UPDATE
+      Target: sqlc query from ai_matching.sql
     completed: false
 
-  - title: "Create internal/database/queries/task_discover.sql"
+  - title: "Migrate create link in ai.go (lines 422-426) to sqlc"
     description: |
-      Task discover queries for `services/price-service/internal/handlers/task_discover.go`:
-      - Lines 67-70: `recoverRunIDFromDatabase` - SELECT ORDER BY
-      - Lines 87-91: `createIngestionRunForDiscover` - INSERT with RETURNING (already sqlc)
+      Replace INSERT with ON CONFLICT with sqlc query from ai_matching.sql.
 
-      Note: Lines 87-91 already using sqlc, skip if already implemented
+      File: services/price-service/internal/matching/ai.go
+      Current: INSERT with ON CONFLICT
+      Target: sqlc query from ai_matching.sql
     completed: false
 
-  - title: "Migrate task_discover.go to use sqlc"
+  # Go Migrations - services/price-service/internal/matching/embedding.go
+  - title: "Create internal/database/queries/embeddings.sql for embedding cache"
     description: |
-      `services/price-service/internal/handlers/task_discover.go`
-      - Use queries from task_discover.sql
+      New sqlc query file for embedding cache operations.
+
+      Queries to include:
+      - getCachedEmbeddings: SELECT with ANY() (lines 63-71)
+      - getCachedProductEmbeddings: SELECT with ANY() (lines 120-124)
+      - storeEmbeddingCache: INSERT with ON CONFLICT UPDATE (lines 170-179)
+      - EnsureProductEmbeddings: SELECT with NOT EXISTS (lines 265-273)
     completed: false
 
-  - title: "Add sqlc queries for queue.go child task operations"
+  - title: "Migrate getCachedEmbeddings in embedding.go (lines 63-71) to sqlc"
     description: |
-      `services/price-service/internal/taskqueue/queue.go`
-      - Add queries from taskqueue_extended.sql for child task operations
+      Replace SELECT with ANY() with sqlc query from embeddings.sql.
 
-      Note: Keep lines 82-84, 113, 118, 124 as-is (PL/pgSQL function calls that sqlc can't infer)
+      File: services/price-service/internal/matching/embedding.go
+      Current: SELECT with ANY()
+      Target: sqlc query from embeddings.sql
     completed: false
 
-  # ============================================================================
-  # Exceptions (Keep as-is - reference only)
-  # ============================================================================
-
-  - title: "Verify exceptions are kept as-is"
+  - title: "Migrate getCachedProductEmbeddings in embedding.go (lines 120-124) to sqlc"
     description: |
-      Verify the following are NOT migrated (already correct):
+      Replace SELECT with ANY() with sqlc query from embeddings.sql.
 
-      **Existing PL/pgSQL function calls** (sqlc cannot infer complex return types):
-      - `src/lib/taskqueue/index.ts` line 50: `claim_tasks()` - Keep as-is
-      - `src/lib/taskqueue/index.ts` line 58: `complete_task()` - Keep as-is
-      - `src/lib/taskqueue/index.ts` line 77: `fail_task()` - Keep as-is
-      - `services/price-service/internal/taskqueue/queue.go` line 82-84: `ClaimTasks` calling `claim_tasks()` - Keep as-is
-      - `services/price-service/internal/taskqueue/queue.go` line 113: `CompleteTask` calling `complete_task()` - Keep as-is
-      - `services/price-service/internal/taskqueue/queue.go` line 118: `FailTask` calling `fail_task()` - Keep as-is
-      - `services/price-service/internal/taskqueue/queue.go` line 124: `CleanupOldTasks` calling `cleanup_old_tasks()` - Keep as-is
-      - `services/price-service/internal/sweepers/taskqueue.go` line 69-71: `RecoverOrphanedTasks` calling `recover_orphaned_tasks()` - Keep as-is
-
-      **Advisory locks** (Postgres-specific, no ORM equivalent):
-      - `services/price-service/internal/matching/barcode.go` line 117: `pg_advisory_xact_lock()` - Keep as-is
-      - `services/price-service/internal/handlers/task_cluster.go` line 1142: `pg_advisory_xact_lock()` - Keep as-is
-
-      **SET LOCAL** (Session configuration):
-      - `services/price-service/internal/handlers/task_cluster.go` lines 1131-1139 - Keep as-is
-
-      **Complex temp tables** (Multi-step bulk operations):
-      - `services/price-service/internal/handlers/task_cluster.go` lines 928-975 - Keep as-is
-      - `services/price-service/internal/handlers/task_cluster.go` lines 1146-1303 - Keep as-is
+      File: services/price-service/internal/matching/embedding.go
+      Current: SELECT with ANY()
+      Target: sqlc query from embeddings.sql
     completed: false
 
-  # ============================================================================
+  - title: "Migrate storeEmbeddingCache in embedding.go (lines 170-179) to sqlc"
+    description: |
+      Replace INSERT with ON CONFLICT UPDATE with sqlc query from embeddings.sql.
+
+      File: services/price-service/internal/matching/embedding.go
+      Current: INSERT with ON CONFLICT UPDATE
+      Target: sqlc query from embeddings.sql
+    completed: false
+
+  - title: "Migrate EnsureProductEmbeddings in embedding.go (lines 265-273) to sqlc"
+    description: |
+      Replace SELECT with NOT EXISTS with sqlc query from embeddings.sql.
+
+      File: services/price-service/internal/matching/embedding.go
+      Current: SELECT with NOT EXISTS
+      Target: sqlc query from embeddings.sql
+    completed: false
+
+  # Go Migrations - services/price-service/internal/jobs/cleanup_audit.go
+  - title: "Create internal/database/queries/cleanup.sql for cleanup jobs"
+    description: |
+      New sqlc query file for cleanup job operations.
+
+      Queries to include:
+      - DELETE candidates: DELETE with date filter (lines 31-44)
+      - UPDATE queue: UPDATE with status + date (lines 72-88)
+      - 3x COUNT queries: SELECT COUNT(*) (lines 166-195)
+    completed: false
+
+  - title: "Migrate DELETE candidates in cleanup_audit.go (lines 31-44) to sqlc"
+    description: |
+      Replace DELETE with date filter with sqlc query from cleanup.sql.
+
+      File: services/price-service/internal/jobs/cleanup_audit.go
+      Current: DELETE with date filter
+      Target: sqlc query from cleanup.sql
+    completed: false
+
+  - title: "Migrate UPDATE queue in cleanup_audit.go (lines 72-88) to sqlc"
+    description: |
+      Replace UPDATE with status + date with sqlc query from cleanup.sql.
+
+      File: services/price-service/internal/jobs/cleanup_audit.go
+      Current: UPDATE with status + date
+      Target: sqlc query from cleanup.sql
+    completed: false
+
+  - title: "Migrate 3x COUNT queries in cleanup_audit.go (lines 166-195) to sqlc"
+    description: |
+      Replace SELECT COUNT(*) queries with sqlc queries from cleanup.sql.
+
+      File: services/price-service/internal/jobs/cleanup_audit.go
+      Current: 3x SELECT COUNT(*)
+      Target: sqlc query from cleanup.sql
+    completed: false
+
+  # Go Migrations - services/price-service/internal/handlers/task_cluster.go (Keep exceptions)
+  - title: "Keep temp table operations in task_cluster.go (lines 928-975)"
+    description: |
+      Keep as-is - complex bulk operations with temp tables.
+
+      File: services/price-service/internal/handlers/task_cluster.go
+      Current: CREATE TEMP, COPY, UPDATE
+      Action: Keep as-is (complex bulk ops, temp tables)
+    completed: false
+
+  - title: "Keep SET LOCAL statements in task_cluster.go (lines 1131-1139)"
+    description: |
+      Keep as-is - session configuration.
+
+      File: services/price-service/internal/handlers/task_cluster.go
+      Current: SET LOCAL statements
+      Action: Keep as-is (Postgres session settings)
+    completed: false
+
+  - title: "Keep pg_advisory_xact_lock() in task_cluster.go (line 1142)"
+    description: |
+      Keep as-is - Postgres-specific advisory lock.
+
+      File: services/price-service/internal/handlers/task_cluster.go
+      Current: `pg_advisory_xact_lock()`
+      Action: Keep as-is (Postgres-specific)
+    completed: false
+
+  - title: "Keep snapshot swap operations in task_cluster.go (lines 1146-1303)"
+    description: |
+      Keep as-is - complex atomic swap with temp tables.
+
+      File: services/price-service/internal/handlers/task_cluster.go
+      Current: Temp tables, DELETE, INSERT
+      Action: Keep as-is (complex atomic swap)
+    completed: false
+
+  # Go Migrations - services/price-service/internal/optimizer/cache.go
+  - title: "Create internal/database/queries/optimizer.sql for price cache"
+    description: |
+      New sqlc query file for price cache operations.
+
+      Queries to include:
+      - load stores: SELECT with filter (lines 273-278)
+      - load price tiers: SELECT with filter (lines 314-318)
+      - load store refs: SELECT with JOIN (lines 358-363)
+      - getActiveChains: SELECT DISTINCT (lines 612-616)
+    completed: false
+
+  - title: "Migrate load stores in cache.go (lines 273-278) to sqlc"
+    description: |
+      Replace SELECT with filter with sqlc query from optimizer.sql.
+
+      File: services/price-service/internal/optimizer/cache.go
+      Current: SELECT with filter
+      Target: sqlc query from optimizer.sql
+    completed: false
+
+  - title: "Migrate load price tiers in cache.go (lines 314-318) to sqlc"
+    description: |
+      Replace SELECT with filter with sqlc query from optimizer.sql.
+
+      File: services/price-service/internal/optimizer/cache.go
+      Current: SELECT with filter
+      Target: sqlc query from optimizer.sql
+    completed: false
+
+  - title: "Migrate load store refs in cache.go (lines 358-363) to sqlc"
+    description: |
+      Replace SELECT with JOIN with sqlc query from optimizer.sql.
+
+      File: services/price-service/internal/optimizer/cache.go
+      Current: SELECT with JOIN
+      Target: sqlc query from optimizer.sql
+    completed: false
+
+  - title: "Migrate getActiveChains in cache.go (lines 612-616) to sqlc"
+    description: |
+      Replace SELECT DISTINCT with sqlc query from optimizer.sql.
+
+      File: services/price-service/internal/optimizer/cache.go
+      Current: SELECT DISTINCT
+      Target: sqlc query from optimizer.sql
+    completed: false
+
+  # Go Migrations - services/price-service/internal/sweepers/taskqueue.go
+  - title: "Keep recover_orphaned_tasks() PL/pgSQL call in taskqueue.go (lines 69-71)"
+    description: |
+      Keep as-is - sqlc can't infer TABLE return type.
+
+      File: services/price-service/internal/sweepers/taskqueue.go
+      Current: Calls `recover_orphaned_tasks()`
+      Action: Keep as-is (sqlc can't infer TABLE return type)
+    completed: false
+
+  # Go Migrations - services/price-service/internal/handlers/task_finalize.go
+  - title: "Migrate check failed tasks in task_finalize.go (lines 46-49) to sqlc"
+    description: |
+      Replace SELECT COUNT with LIKE with sqlc query.
+
+      File: services/price-service/internal/handlers/task_finalize.go
+      Current: SELECT COUNT with LIKE
+      Target: sqlc query (add to appropriate queries file)
+    completed: false
+
+  - title: "Migrate calculateRunStatsFromDB in task_finalize.go (lines 100-115) to sqlc"
+    description: |
+      Replace 2x COUNT queries with sqlc queries.
+
+      File: services/price-service/internal/handlers/task_finalize.go
+      Current: 2x COUNT queries
+      Target: sqlc queries (add to appropriate queries file)
+    completed: false
+
+  - title: "Migrate updatePriceTierStoreCounts in task_finalize.go (lines 120-130) to sqlc"
+    description: |
+      Replace UPDATE with subquery with sqlc query.
+
+      File: services/price-service/internal/handlers/task_finalize.go
+      Current: UPDATE with subquery
+      Target: sqlc query (add to appropriate queries file)
+    completed: false
+
+  # Go Migrations - services/price-service/internal/handlers/task_discover.go
+  - title: "Migrate recoverRunIDFromDatabase in task_discover.go (lines 67-70) to sqlc"
+    description: |
+      Replace SELECT ORDER BY with sqlc query.
+
+      File: services/price-service/internal/handlers/task_discover.go
+      Current: SELECT ORDER BY
+      Target: sqlc query (add to appropriate queries file)
+    completed: false
+
+  - title: "Verify createIngestionRunForDiscover already uses sqlc in task_discover.go (lines 87-91)"
+    description: |
+      Verify this function already uses sqlc query (no migration needed).
+
+      File: services/price-service/internal/handlers/task_discover.go
+      Current: Already using sqlc
+      Action: Verify, no migration needed
+    completed: false
+
+  # Go - Create extended taskqueue sqlc file
+  - title: "Create internal/database/queries/taskqueue_extended.sql for extended task queue operations"
+    description: |
+      New sqlc query file for extended task queue operations not in the main taskqueue.sql.
+
+      Include queries for:
+      - task_finalize.go operations (failed tasks check, run stats, price tier counts)
+      - task_discover.go operations (recover run ID)
+    completed: false
+
   # Collaborative Review
-  # ============================================================================
-
   - title: "Collaborative Review: SQL Migration Tracking List"
     description: |
       Multi-model collaborative review with weighted consensus.
 
       ## Review Process
-      Use `/dev:collab reviewer consensus` to review implementation:
+      Use `/dev:collab reviewer consensus` to review implementation.
 
       Models (from ~/claude-collab/collaboration.yaml):
       1. github-copilot/gpt-5.2 (weight: 3) - Implementation review
@@ -276,10 +552,18 @@ tasks:
       - Document consensus and any dissenting opinions
 
       ## Review Focus Areas
-      - PL/pgSQL function correctness and return types
-      - Drizzle query builder patterns
-      - sqlc query file syntax and type inference
-      - Advisory lock usage is preserved where needed
-      - All exceptions are properly documented
-      - No raw SQL remains in TypeScript/Go except documented exceptions
+      - All TypeScript migrations properly use Drizzle `sql` template tags
+      - All Go migrations have proper sqlc query definitions
+      - PL/pgSQL exceptions are properly justified (shared code, sqlc limitations, Postgres-specific features)
+      - Type safety is maintained (no type assertions on query results)
+      - SQL injection vulnerabilities are prevented
+      - ON CONFLICT handling is preserved
+      - RETURNING clauses are properly handled
+      - Transaction boundaries are respected
+      - Complex operations (temp tables, advisory locks, SET LOCAL) are kept as raw SQL with comments
+
+      ## Migration Summary
+      - **TypeScript (3 files)**: 8 migrations to Drizzle
+      - **Go (10 files)**: 22 migrations to sqlc, 8 exceptions kept
+      - **New sqlc files**: 6 (matching.sql, ai_matching.sql, cleanup.sql, embeddings.sql, optimizer.sql, taskqueue_extended.sql)
     completed: false

@@ -22,6 +22,13 @@
       "when": 1769941301565,
       "tag": "0002_seed_data",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769970042657,
+      "tag": "0003_daffy_owl",
+      "breakpoints": true
     }
   ]
 }

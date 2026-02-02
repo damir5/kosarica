@@ -877,3 +877,33 @@ export const storePriceRefs = pgTable(
 		dateIdx: index("idx_store_price_refs_date").on(table.targetDate),
 	}),
 );
+
+// ============================================================================
+// Active Ingestion Operations: Prevents concurrent cluster tasks for same chain/date
+// Uses UNIQUE constraint for atomic lock acquisition instead of advisory locks
+// ============================================================================
+
+export const activeIngestionOperations = pgTable(
+	"active_ingestion_operations",
+	{
+		id: text("id").primaryKey().default(sql`gen_random_uuid()::TEXT`),
+		chainSlug: text("chain_slug").notNull(),
+		targetDate: date("target_date").notNull(),
+		taskId: text("task_id").notNull(),
+		startedAt: timestamp("started_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		// Unique constraint ensures only one operation per chain/date
+		uniqueActiveOp: uniqueIndex("unique_active_op").on(
+			table.chainSlug,
+			table.targetDate,
+		),
+		chainDateIdx: index("idx_active_ops_chain_date").on(
+			table.chainSlug,
+			table.targetDate,
+		),
+		taskIdIdx: index("idx_active_ops_task_id").on(table.taskId),
+	}),
+);

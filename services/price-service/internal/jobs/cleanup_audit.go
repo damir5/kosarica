@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kosarica/price-service/internal/database/sqlcgen"
 )
 
 // CleanupConfig configures retention policies for cleanup jobs
@@ -28,16 +30,12 @@ func DefaultCleanupConfig() CleanupConfig {
 func CleanupOldCandidates(ctx context.Context, db *pgxpool.Pool, cfg CleanupConfig) error {
 	cutoffDate := time.Now().AddDate(0, 0, -cfg.CandidateRetentionDays)
 
-	result, err := db.Exec(ctx, `
-		DELETE FROM product_match_candidates
-		WHERE created_at < $1
-	`, cutoffDate)
-
+	queries := sqlcgen.New(db)
+	rowsAffected, err := queries.DeleteOldCandidates(ctx, pgtype.Timestamptz{Time: cutoffDate, Valid: true})
 	if err != nil {
 		return fmt.Errorf("cleanup old candidates: %w", err)
 	}
 
-	rowsAffected := result.RowsAffected()
 	slog.Info("cleaned up old product match candidates", "rows_deleted", rowsAffected, "cutoff", cutoffDate)
 
 	return nil
@@ -48,16 +46,12 @@ func CleanupOldCandidates(ctx context.Context, db *pgxpool.Pool, cfg CleanupConf
 func CleanupAuditLogs(ctx context.Context, db *pgxpool.Pool, cfg CleanupConfig) error {
 	cutoffDate := time.Now().AddDate(0, 0, -cfg.AuditRetentionDays)
 
-	result, err := db.Exec(ctx, `
-		DELETE FROM product_match_audit
-		WHERE created_at < $1
-	`, cutoffDate)
-
+	queries := sqlcgen.New(db)
+	rowsAffected, err := queries.DeleteOldAuditLogs(ctx, pgtype.Timestamptz{Time: cutoffDate, Valid: true})
 	if err != nil {
 		return fmt.Errorf("cleanup audit logs: %w", err)
 	}
 
-	rowsAffected := result.RowsAffected()
 	slog.Info("cleaned up old audit logs", "rows_deleted", rowsAffected, "cutoff", cutoffDate)
 
 	return nil
@@ -68,20 +62,12 @@ func CleanupAuditLogs(ctx context.Context, db *pgxpool.Pool, cfg CleanupConfig) 
 func CleanupStaleQueueItems(ctx context.Context, db *pgxpool.Pool, staleDays int) error {
 	cutoffDate := time.Now().AddDate(0, 0, -staleDays)
 
-	// Mark stale items as skipped so they can be reprocessed
-	result, err := db.Exec(ctx, `
-		UPDATE product_match_queue
-		SET status = 'skipped',
-		    reviewed_at = now()
-		WHERE status = 'pending'
-		AND created_at < $1
-	`, cutoffDate)
-
+	queries := sqlcgen.New(db)
+	rowsAffected, err := queries.MarkStaleQueueItemsSkipped(ctx, pgtype.Timestamptz{Time: cutoffDate, Valid: true})
 	if err != nil {
 		return fmt.Errorf("cleanup stale queue items: %w", err)
 	}
 
-	rowsAffected := result.RowsAffected()
 	slog.Info("marked stale queue items as skipped", "rows_updated", rowsAffected, "cutoff", cutoffDate)
 
 	return nil
@@ -159,13 +145,11 @@ func (s *CleanupScheduler) RunDailyCleanup(ctx context.Context) error {
 // GetCleanupStats returns statistics about what would be cleaned up
 func GetCleanupStats(ctx context.Context, db *pgxpool.Pool, cfg CleanupConfig) (map[string]int64, error) {
 	stats := make(map[string]int64)
+	queries := sqlcgen.New(db)
 
 	// Count old candidates
 	candidateCutoff := time.Now().AddDate(0, 0, -cfg.CandidateRetentionDays)
-	var candidateCount int64
-	err := db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_match_candidates WHERE created_at < $1
-	`, candidateCutoff).Scan(&candidateCount)
+	candidateCount, err := queries.CountOldCandidates(ctx, pgtype.Timestamptz{Time: candidateCutoff, Valid: true})
 	if err != nil {
 		return nil, fmt.Errorf("count candidates: %w", err)
 	}
@@ -173,10 +157,7 @@ func GetCleanupStats(ctx context.Context, db *pgxpool.Pool, cfg CleanupConfig) (
 
 	// Count old audit logs
 	auditCutoff := time.Now().AddDate(0, 0, -cfg.AuditRetentionDays)
-	var auditCount int64
-	err = db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_match_audit WHERE created_at < $1
-	`, auditCutoff).Scan(&auditCount)
+	auditCount, err := queries.CountOldAuditLogs(ctx, pgtype.Timestamptz{Time: auditCutoff, Valid: true})
 	if err != nil {
 		return nil, fmt.Errorf("count audit logs: %w", err)
 	}
@@ -184,10 +165,7 @@ func GetCleanupStats(ctx context.Context, db *pgxpool.Pool, cfg CleanupConfig) (
 
 	// Count stale queue items
 	staleCutoff := time.Now().AddDate(0, 0, -30)
-	var staleCount int64
-	err = db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM product_match_queue WHERE status = 'pending' AND created_at < $1
-	`, staleCutoff).Scan(&staleCount)
+	staleCount, err := queries.CountStaleQueueItems(ctx, pgtype.Timestamptz{Time: staleCutoff, Valid: true})
 	if err != nil {
 		return nil, fmt.Errorf("count stale items: %w", err)
 	}

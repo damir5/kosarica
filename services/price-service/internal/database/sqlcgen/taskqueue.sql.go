@@ -80,6 +80,45 @@ func (q *Queries) CompleteTaskFunc(ctx context.Context, arg CompleteTaskFuncPara
 	return complete_task, err
 }
 
+const countArchivesByRunID = `-- name: CountArchivesByRunID :one
+SELECT COUNT(*) FROM archives WHERE run_id = $1
+`
+
+func (q *Queries) CountArchivesByRunID(ctx context.Context, runID pgtype.Text) (int64, error) {
+	row := q.db.QueryRow(ctx, countArchivesByRunID, runID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countFailedTasksByRunID = `-- name: CountFailedTasksByRunID :one
+SELECT COUNT(*) FROM task_queue
+WHERE status = 'failed' AND payload::text LIKE '%' || $1 || '%'
+`
+
+func (q *Queries) CountFailedTasksByRunID(ctx context.Context, dollar_1 pgtype.Text) (int64, error) {
+	row := q.db.QueryRow(ctx, countFailedTasksByRunID, dollar_1)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countStorePriceRefsByRunID = `-- name: CountStorePriceRefsByRunID :one
+SELECT COUNT(*) FROM store_price_refs spr
+WHERE EXISTS (
+    SELECT 1 FROM stores s
+    WHERE s.id = spr.store_id
+    AND s.updated_at >= (SELECT MIN(created_at) FROM archives WHERE run_id = $1)
+)
+`
+
+func (q *Queries) CountStorePriceRefsByRunID(ctx context.Context, runID pgtype.Text) (int64, error) {
+	row := q.db.QueryRow(ctx, countStorePriceRefsByRunID, runID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countTasksByStatus = `-- name: CountTasksByStatus :one
 SELECT COUNT(*) FROM task_queue WHERE status = $1
 `
@@ -136,6 +175,30 @@ func (q *Queries) GetTask(ctx context.Context, id string) (TaskQueue, error) {
 		&i.CompletedChildren,
 	)
 	return i, err
+}
+
+const insertChildTask = `-- name: InsertChildTask :exec
+INSERT INTO task_queue (task_type, payload, priority, parent_task_id, max_retries)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertChildTaskParams struct {
+	TaskType     string                 `db:"task_type" json:"task_type"`
+	Payload      jsonb.TaskQueuePayload `db:"payload" json:"payload"`
+	Priority     pgtype.Int4            `db:"priority" json:"priority"`
+	ParentTaskID pgtype.Text            `db:"parent_task_id" json:"parent_task_id"`
+	MaxRetries   pgtype.Int4            `db:"max_retries" json:"max_retries"`
+}
+
+func (q *Queries) InsertChildTask(ctx context.Context, arg InsertChildTaskParams) error {
+	_, err := q.db.Exec(ctx, insertChildTask,
+		arg.TaskType,
+		arg.Payload,
+		arg.Priority,
+		arg.ParentTaskID,
+		arg.MaxRetries,
+	)
+	return err
 }
 
 const listPendingTasks = `-- name: ListPendingTasks :many
@@ -237,6 +300,47 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusPa
 	return items, nil
 }
 
+const recoverRunIDFromDatabase = `-- name: RecoverRunIDFromDatabase :one
+SELECT id FROM ingestion_runs
+WHERE chain_slug = $1 AND status IN ('pending', 'running')
+ORDER BY created_at DESC LIMIT 1
+`
+
+func (q *Queries) RecoverRunIDFromDatabase(ctx context.Context, chainSlug string) (string, error) {
+	row := q.db.QueryRow(ctx, recoverRunIDFromDatabase, chainSlug)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const scheduleChildTask = `-- name: ScheduleChildTask :one
+
+INSERT INTO task_queue (task_type, payload, priority, parent_task_id, max_retries)
+VALUES ($1, $2, $3, $4, 3)
+RETURNING id
+`
+
+type ScheduleChildTaskParams struct {
+	TaskType     string                 `db:"task_type" json:"task_type"`
+	Payload      jsonb.TaskQueuePayload `db:"payload" json:"payload"`
+	Priority     pgtype.Int4            `db:"priority" json:"priority"`
+	ParentTaskID pgtype.Text            `db:"parent_task_id" json:"parent_task_id"`
+}
+
+// Note: recover_orphaned_tasks() is a stored procedure that returns TABLE(recovered_count, failed_count)
+// sqlc cannot infer the return type, so it must be called directly via pool.QueryRow
+func (q *Queries) ScheduleChildTask(ctx context.Context, arg ScheduleChildTaskParams) (string, error) {
+	row := q.db.QueryRow(ctx, scheduleChildTask,
+		arg.TaskType,
+		arg.Payload,
+		arg.Priority,
+		arg.ParentTaskID,
+	)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const scheduleTask = `-- name: ScheduleTask :one
 INSERT INTO task_queue (task_type, payload, priority, scheduled_for, max_retries)
 VALUES ($1, $2, $3, COALESCE($4, NOW()), $5)
@@ -283,6 +387,39 @@ WHERE id = $1
 
 func (q *Queries) SetTaskProcessingAny(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, setTaskProcessingAny, id)
+	return err
+}
+
+const transitionToWaiting = `-- name: TransitionToWaiting :exec
+UPDATE task_queue
+SET status = 'waiting_for_children',
+    expected_children = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type TransitionToWaitingParams struct {
+	ID               string      `db:"id" json:"id"`
+	ExpectedChildren pgtype.Int4 `db:"expected_children" json:"expected_children"`
+}
+
+func (q *Queries) TransitionToWaiting(ctx context.Context, arg TransitionToWaitingParams) error {
+	_, err := q.db.Exec(ctx, transitionToWaiting, arg.ID, arg.ExpectedChildren)
+	return err
+}
+
+const updatePriceTierStoreCounts = `-- name: UpdatePriceTierStoreCounts :exec
+UPDATE price_tiers pt
+SET store_count = (
+    SELECT COUNT(DISTINCT spr.store_id)
+    FROM store_price_refs spr
+    WHERE spr.price_tier_id = pt.id
+)
+WHERE pt.chain_slug = $1
+`
+
+func (q *Queries) UpdatePriceTierStoreCounts(ctx context.Context, chainSlug string) error {
+	_, err := q.db.Exec(ctx, updatePriceTierStoreCounts, chainSlug)
 	return err
 }
 

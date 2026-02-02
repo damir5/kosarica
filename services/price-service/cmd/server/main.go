@@ -74,11 +74,13 @@ func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, cfg *config.
 	workersList = append(workersList, fetchParseWorker)
 
 	// Store Prep workers (short DB transactions - upserts stores)
+	// Increased from 2 to 5 workers to reduce pipeline starvation
+	// (99.4% of fetch-parse tasks were blocked waiting for store-prep)
 	storePrepWorker := workers.New(tq, workers.WorkerConfig{
 		WorkerID:   "store-prep-worker",
 		TaskTypes:  []string{"ingestion_store_prep"},
 		MaxTasks:   1,
-		NumWorkers: 2,
+		NumWorkers: 5,
 		PollDelay:  5 * time.Second,
 	})
 	storePrepWorker.RegisterExtendedHandler("ingestion_store_prep", handlers.HandleStorePrepTask)
@@ -114,7 +116,7 @@ func startIngestionWorkers(ctx context.Context, pool *pgxpool.Pool, cfg *config.
 		Str("component", "workers").
 		Int("discover_workers", 2).
 		Int("fetch_parse_workers", 10).
-		Int("store_prep_workers", 2).
+		Int("store_prep_workers", 5).
 		Int64("import_slots", importSlots).
 		Int("finalize_workers", 2).
 		Msg("Ingestion worker pools started")

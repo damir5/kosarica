@@ -137,6 +137,45 @@ func HandleClusterTask(ctx context.Context, payload jsonb.TaskQueuePayload, tq *
 		Time("targetDate", targetDate).
 		Msg("Using target date for ingestion")
 
+	// Acquire cluster lock to prevent concurrent cluster tasks for same chain/date
+	lockAcquired, err := acquireClusterLock(ctx, database.Pool(), chainSlug, targetDate, taskID)
+	if err != nil {
+		return fmt.Errorf("failed to check cluster lock: %w", err)
+	}
+
+	if !lockAcquired {
+		// Another task is already processing this chain/date
+		// Re-queue this task after a delay
+		log.Warn().
+			Str("chain", chainSlug).
+			Time("targetDate", targetDate).
+			Str("taskId", taskID).
+			Msg("Another cluster task already processing this chain/date; re-queueing")
+
+		if err := requeueClusterTask(ctx, database.Pool(), taskID, 30*time.Second); err != nil {
+			return fmt.Errorf("failed to requeue cluster task: %w", err)
+		}
+		// Return nil to signal the worker that this task is handled (re-queued)
+		return nil
+	}
+
+	// Ensure lock is released when done
+	defer func() {
+		if err := releaseClusterLock(ctx, database.Pool(), chainSlug, targetDate, taskID); err != nil {
+			log.Error().Err(err).
+				Str("chain", chainSlug).
+				Time("targetDate", targetDate).
+				Str("taskId", taskID).
+				Msg("Failed to release cluster lock")
+		}
+	}()
+
+	log.Info().
+		Str("chain", chainSlug).
+		Time("targetDate", targetDate).
+		Str("taskId", taskID).
+		Msg("Acquired cluster operation lock")
+
 	// Initialize chain registry
 	if err := registry.InitializeDefaultAdapters(); err != nil {
 		return fmt.Errorf("failed to initialize chain registry: %w", err)
@@ -244,6 +283,15 @@ type loadStats struct {
 	archivesSkipped int
 }
 
+// archiveTiming tracks timing info for a single archive
+type archiveTiming struct {
+	ID            string
+	TotalDur      time.Duration
+	ParseDur      time.Duration
+	SizeBytes     int
+	RowsExtracted int
+}
+
 // loadAndParseArchives loads archives for this run and parses them directly from storage
 func loadAndParseArchives(
 	ctx context.Context,
@@ -266,7 +314,12 @@ func loadAndParseArchives(
 	var allData []storeRowData
 	storeIdentifierSet := make(map[string]struct{})
 
+	// Track per-archive timing for slow archive detection
+	archiveTimings := make([]archiveTiming, 0, len(archives))
+
 	for i, archive := range archives {
+		archiveStartTime := time.Now()
+
 		// Load archive content from storage
 		content, err := storageBackend.Get(ctx, archive.ArchivePath)
 		if err != nil {
@@ -282,16 +335,19 @@ func loadAndParseArchives(
 		fileType := types.FileType(archive.OriginalFormat)
 		var parseResult *types.ParseResult
 
+		parseStartTime := time.Now()
 		if fileType == types.FileTypeZIP {
 			parseResult, err = parseZipArchive(ctx, adapter, content, archive.Filename)
 		} else {
 			parseResult, err = parseSingleFile(adapter, content, archive.Filename)
 		}
+		parseDuration := time.Since(parseStartTime)
 
 		if err != nil {
 			log.Warn().Err(err).
 				Str("archiveId", archive.ID).
 				Str("filename", archive.Filename).
+				Dur("parse_duration", parseDuration).
 				Msg("Failed to parse archive, skipping")
 			stats.archivesSkipped++
 			continue
@@ -311,6 +367,15 @@ func loadAndParseArchives(
 
 		stats.archivesLoaded++
 
+		// Track timing for this archive
+		archiveTimings = append(archiveTimings, archiveTiming{
+			ID:            archive.ID,
+			TotalDur:      time.Since(archiveStartTime),
+			ParseDur:      parseDuration,
+			SizeBytes:     len(content),
+			RowsExtracted: len(parseResult.Rows),
+		})
+
 		if (i+1)%10 == 0 {
 			log.Info().
 				Str("runId", runID).
@@ -319,6 +384,29 @@ func loadAndParseArchives(
 				Int("rowsLoaded", len(allData)).
 				Msg("Archive loading progress")
 		}
+	}
+
+	// Log slow archives (>5s)
+	var slowArchiveCount int
+	for _, at := range archiveTimings {
+		if at.TotalDur > 5*time.Second {
+			slowArchiveCount++
+			log.Warn().
+				Str("runId", runID).
+				Str("archiveId", at.ID).
+				Dur("total_duration", at.TotalDur).
+				Dur("parse_duration", at.ParseDur).
+				Int("size_bytes", at.SizeBytes).
+				Int("rows_extracted", at.RowsExtracted).
+				Msg("Slow archive detected (>5s)")
+		}
+	}
+	if slowArchiveCount > 0 {
+		log.Warn().
+			Str("runId", runID).
+			Int("slow_archive_count", slowArchiveCount).
+			Int("total_archives", len(archives)).
+			Msg("Some archives took >5s to process")
 	}
 
 	// Convert store identifier set to slice
@@ -398,6 +486,7 @@ func parseZipArchive(ctx context.Context, adapter interface{}, content []byte, f
 
 // deduplicateItems groups rows by item identity (externalId or barcode)
 func deduplicateItems(allData []storeRowData) map[itemKey]itemData {
+	startTime := time.Now()
 	items := make(map[itemKey]itemData)
 
 	for _, sd := range allData {
@@ -429,11 +518,24 @@ func deduplicateItems(allData []storeRowData) map[itemKey]itemData {
 		}
 	}
 
+	duration := time.Since(startTime)
+	var avgDuplicationRatio float64
+	if len(items) > 0 {
+		avgDuplicationRatio = float64(len(allData)) / float64(len(items))
+	}
+	log.Info().
+		Dur("dedup_duration", duration).
+		Int("input_rows", len(allData)).
+		Int("unique_items", len(items)).
+		Float64("avg_duplication_ratio", avgDuplicationRatio).
+		Msg("Item deduplication complete")
+
 	return items
 }
 
 // groupByPriceTier groups rows by (item, price, discountPrice) to create tiers
 func groupByPriceTier(allData []storeRowData) (map[priceTierKey]struct{}, []storePriceRef) {
+	startTime := time.Now()
 	tiers := make(map[priceTierKey]struct{})
 	var refs []storePriceRef
 
@@ -478,6 +580,19 @@ func groupByPriceTier(allData []storeRowData) (map[priceTierKey]struct{}, []stor
 			InStock:         true,
 		})
 	}
+
+	duration := time.Since(startTime)
+	var avgRefsPerTier float64
+	if len(tiers) > 0 {
+		avgRefsPerTier = float64(len(refs)) / float64(len(tiers))
+	}
+	log.Info().
+		Dur("grouping_duration", duration).
+		Int("input_rows", len(allData)).
+		Int("unique_tiers", len(tiers)).
+		Int("store_refs", len(refs)).
+		Float64("avg_refs_per_tier", avgRefsPerTier).
+		Msg("Price tier grouping complete")
 
 	return tiers, refs
 }
@@ -711,15 +826,19 @@ func upsertRetailerItemsBatch(ctx context.Context, pool *pgxpool.Pool, chainSlug
 		return result, nil
 	}
 
-	externalIDToKey := make(map[string]itemKey, len(uniqueItems))
+	// Use slice to handle multiple itemKeys with same external_id (different barcodes)
+	// This prevents FK violations when ON CONFLICT DO NOTHING skips inserts
+	externalIDToKeys := make(map[string][]itemKey, len(uniqueItems))
 	barcodeToKey := make(map[string]itemKey, len(uniqueItems))
 
 	var externalIDs []string
 	var barcodes []string
 	for key := range uniqueItems {
 		if key.ExternalID != "" {
-			externalIDToKey[key.ExternalID] = key
-			externalIDs = append(externalIDs, key.ExternalID)
+			if _, exists := externalIDToKeys[key.ExternalID]; !exists {
+				externalIDs = append(externalIDs, key.ExternalID)
+			}
+			externalIDToKeys[key.ExternalID] = append(externalIDToKeys[key.ExternalID], key)
 		}
 		if key.Barcode != "" {
 			barcodeToKey[key.Barcode] = key
@@ -811,6 +930,8 @@ func upsertRetailerItemsBatch(ctx context.Context, pool *pgxpool.Pool, chainSlug
 	}
 
 	// Resolve IDs for items with external_id (covers existing + newly inserted)
+	// Map ALL itemKeys with the same external_id to the same database ID
+	// This prevents FK violations when the same external_id appears with different barcodes
 	if len(externalIDs) > 0 {
 		existingQuery := `
 			SELECT external_id, id FROM retailer_items
@@ -826,8 +947,11 @@ func upsertRetailerItemsBatch(ctx context.Context, pool *pgxpool.Pool, chainSlug
 				rows.Close()
 				return nil, fmt.Errorf("failed to scan item row: %w", err)
 			}
-			if key, ok := externalIDToKey[extID]; ok {
-				result[key] = itemID
+			// Map ALL itemKeys with this external_id to the resolved database ID
+			if keys, ok := externalIDToKeys[extID]; ok {
+				for _, key := range keys {
+					result[key] = itemID
+				}
 			}
 		}
 		if err := rows.Err(); err != nil {
@@ -1122,6 +1246,8 @@ func swapPriceSnapshot(
 	tierRows []tierCopyRow,
 	refRows []refCopyRow,
 ) (*swapStats, error) {
+	txStartTime := time.Now()
+
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -1131,17 +1257,24 @@ func swapPriceSnapshot(
 	if _, err := tx.Exec(ctx, `SET LOCAL synchronous_commit = off`); err != nil {
 		return nil, fmt.Errorf("failed to set synchronous_commit: %w", err)
 	}
-	if _, err := tx.Exec(ctx, `SET LOCAL lock_timeout = '30s'`); err != nil {
+	if _, err := tx.Exec(ctx, `SET LOCAL lock_timeout = '5min'`); err != nil {
 		return nil, fmt.Errorf("failed to set lock_timeout: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `SET LOCAL statement_timeout = '30min'`); err != nil {
 		return nil, fmt.Errorf("failed to set statement_timeout: %w", err)
 	}
 
+	// LOCK ACQUISITION TIMING
+	lockStartTime := time.Now()
 	lockKey := fmt.Sprintf("%s:%s", chainSlug, targetDate.Format("2006-01-02"))
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, lockKey); err != nil {
 		return nil, fmt.Errorf("failed to acquire advisory lock: %w", err)
 	}
+	lockDuration := time.Since(lockStartTime)
+	log.Info().
+		Dur("lock_duration", lockDuration).
+		Str("lock_key", lockKey).
+		Msg("Advisory lock acquired")
 
 	_, err = tx.Exec(ctx, `
 		CREATE TEMP TABLE staging_price_tiers (
@@ -1175,7 +1308,10 @@ func swapPriceSnapshot(
 		return nil, fmt.Errorf("failed to create staging_store_price_refs: %w", err)
 	}
 
+	// TIER COPY TIMING
+	var tierCopyDuration time.Duration
 	if len(tierRows) > 0 {
+		tierCopyStartTime := time.Now()
 		copyCount, err := tx.CopyFrom(
 			ctx,
 			pgx.Identifier{"staging_price_tiers"},
@@ -1207,13 +1343,21 @@ func swapPriceSnapshot(
 				}, nil
 			}),
 		)
+		tierCopyDuration = time.Since(tierCopyStartTime)
 		if err != nil {
 			return nil, fmt.Errorf("failed to COPY staging_price_tiers: %w", err)
 		}
-		log.Info().Int64("copied", copyCount).Msg("COPY to staging_price_tiers complete")
+		log.Info().
+			Int64("copied", copyCount).
+			Dur("copy_duration", tierCopyDuration).
+			Float64("rows_per_sec", float64(copyCount)/tierCopyDuration.Seconds()).
+			Msg("COPY to staging_price_tiers complete")
 	}
 
+	// REF COPY TIMING
+	var refCopyDuration time.Duration
 	if len(refRows) > 0 {
+		refCopyStartTime := time.Now()
 		copyCount, err := tx.CopyFrom(
 			ctx,
 			pgx.Identifier{"staging_store_price_refs"},
@@ -1223,12 +1367,19 @@ func swapPriceSnapshot(
 				return []any{r.storeID, r.retailerItemID, r.priceTierID, r.inStock, r.targetDate, r.lastSeenAt}, nil
 			}),
 		)
+		refCopyDuration = time.Since(refCopyStartTime)
 		if err != nil {
 			return nil, fmt.Errorf("failed to COPY staging_store_price_refs: %w", err)
 		}
-		log.Info().Int64("copied", copyCount).Msg("COPY to staging_store_price_refs complete")
+		log.Info().
+			Int64("copied", copyCount).
+			Dur("copy_duration", refCopyDuration).
+			Float64("rows_per_sec", float64(copyCount)/refCopyDuration.Seconds()).
+			Msg("COPY to staging_store_price_refs complete")
 	}
 
+	// DELETE REF TIMING
+	deleteRefStartTime := time.Now()
 	_, err = tx.Exec(ctx, `
 		DELETE FROM store_price_refs spr
 		USING stores s
@@ -1236,18 +1387,30 @@ func swapPriceSnapshot(
 		  AND s.chain_slug = $1
 		  AND spr.target_date = $2
 	`, chainSlug, targetDate)
+	deleteRefDuration := time.Since(deleteRefStartTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete store_price_refs: %w", err)
 	}
+	log.Info().
+		Dur("delete_ref_duration", deleteRefDuration).
+		Msg("DELETE store_price_refs complete")
 
+	// DELETE TIER TIMING
+	deleteTierStartTime := time.Now()
 	_, err = tx.Exec(ctx, `
 		DELETE FROM price_tiers
 		WHERE chain_slug = $1 AND target_date = $2
 	`, chainSlug, targetDate)
+	deleteTierDuration := time.Since(deleteTierStartTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete price_tiers: %w", err)
 	}
+	log.Info().
+		Dur("delete_tier_duration", deleteTierDuration).
+		Msg("DELETE price_tiers complete")
 
+	// INSERT TIER TIMING
+	insertTierStartTime := time.Now()
 	tag, err := tx.Exec(ctx, `
 		INSERT INTO price_tiers (
 			id,
@@ -1274,11 +1437,19 @@ func swapPriceSnapshot(
 			last_seen_at
 		FROM staging_price_tiers
 	`)
+	insertTierDuration := time.Since(insertTierStartTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert price_tiers: %w", err)
 	}
 	tiersInserted := int(tag.RowsAffected())
+	log.Info().
+		Int("tiers_inserted", tiersInserted).
+		Dur("insert_tier_duration", insertTierDuration).
+		Float64("rows_per_sec", float64(tiersInserted)/insertTierDuration.Seconds()).
+		Msg("INSERT price_tiers complete")
 
+	// INSERT REF TIMING
+	insertRefStartTime := time.Now()
 	tag, err = tx.Exec(ctx, `
 		INSERT INTO store_price_refs (
 			store_id,
@@ -1297,21 +1468,120 @@ func swapPriceSnapshot(
 			last_seen_at
 		FROM staging_store_price_refs
 	`)
+	insertRefDuration := time.Since(insertRefStartTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert store_price_refs: %w", err)
 	}
 	refsInserted := int(tag.RowsAffected())
+	log.Info().
+		Int("refs_inserted", refsInserted).
+		Dur("insert_ref_duration", insertRefDuration).
+		Float64("rows_per_sec", float64(refsInserted)/insertRefDuration.Seconds()).
+		Msg("INSERT store_price_refs complete")
 
+	// COMMIT TIMING
+	commitStartTime := time.Now()
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit snapshot swap: %w", err)
 	}
+	commitDuration := time.Since(commitStartTime)
 
+	totalDuration := time.Since(txStartTime)
 	log.Info().
+		Dur("lock_duration", lockDuration).
+		Dur("tier_copy_duration", tierCopyDuration).
+		Dur("ref_copy_duration", refCopyDuration).
+		Dur("delete_ref_duration", deleteRefDuration).
+		Dur("delete_tier_duration", deleteTierDuration).
+		Dur("insert_tier_duration", insertTierDuration).
+		Dur("insert_ref_duration", insertRefDuration).
+		Dur("commit_duration", commitDuration).
+		Dur("total_transaction_duration", totalDuration).
 		Int("tiersInserted", tiersInserted).
 		Int("refsInserted", refsInserted).
 		Msg("COPY + atomic swap complete")
 
 	return &swapStats{tiersInserted: tiersInserted, refsInserted: refsInserted}, nil
+}
+
+// ============================================================================
+// Cluster Lock Management: Application-level concurrency control
+// Prevents concurrent cluster tasks for same (chain_slug, target_date) pair
+// ============================================================================
+
+// acquireClusterLock attempts to acquire an operation lock for this chain/date.
+// Returns true if lock was acquired, false if another task holds it.
+func acquireClusterLock(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	chainSlug string,
+	targetDate time.Time,
+	taskID string,
+) (bool, error) {
+	// Try to insert; if unique constraint violation, another task has it
+	_, err := pool.Exec(ctx, `
+		INSERT INTO active_ingestion_operations (chain_slug, target_date, task_id)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (chain_slug, target_date) DO NOTHING
+	`, chainSlug, targetDate.Format("2006-01-02"), taskID)
+	if err != nil {
+		return false, fmt.Errorf("failed to attempt lock acquisition: %w", err)
+	}
+
+	// Check if we got the lock
+	var acquired bool
+	err = pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM active_ingestion_operations
+			WHERE chain_slug = $1
+			  AND target_date = $2
+			  AND task_id = $3
+		)
+	`, chainSlug, targetDate.Format("2006-01-02"), taskID).Scan(&acquired)
+	if err != nil {
+		return false, fmt.Errorf("failed to verify lock acquisition: %w", err)
+	}
+
+	return acquired, nil
+}
+
+// releaseClusterLock releases the operation lock for this chain/date.
+func releaseClusterLock(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	chainSlug string,
+	targetDate time.Time,
+	taskID string,
+) error {
+	_, err := pool.Exec(ctx, `
+		DELETE FROM active_ingestion_operations
+		WHERE chain_slug = $1
+		  AND target_date = $2
+		  AND task_id = $3
+	`, chainSlug, targetDate.Format("2006-01-02"), taskID)
+	return err
+}
+
+// requeueClusterTask re-schedules a cluster task after a delay.
+// Returns a special error that signals the worker to not retry.
+func requeueClusterTask(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	taskID string,
+	delay time.Duration,
+) error {
+	scheduledFor := time.Now().Add(delay)
+	_, err := pool.Exec(ctx, `
+		UPDATE task_queue
+		SET status = 'pending',
+		    scheduled_for = $1,
+		    updated_at = NOW()
+		WHERE id = $2
+	`, scheduledFor, taskID)
+	if err != nil {
+		return fmt.Errorf("failed to requeue task: %w", err)
+	}
+	return nil
 }
 
 // spawnFinalizeTask schedules a finalize task after clustering
