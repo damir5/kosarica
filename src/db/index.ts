@@ -23,7 +23,9 @@ export function getDatabase(): DatabaseType {
 
 	// Configure connection pool to prevent connection exhaustion
 	// See: https://github.com/porsager/postgres#connection-pool
-	const poolMax = process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 10;
+	const poolMax = process.env.DB_POOL_MAX
+		? parseInt(process.env.DB_POOL_MAX, 10)
+		: 10;
 	sqlInstance = postgres(connectionString, {
 		max: poolMax, // Maximum connections in the pool
 		idle_timeout: 20, // Close idle connections after 20 seconds

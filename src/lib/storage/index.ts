@@ -1,3 +1,4 @@
+import path from "node:path";
 import { LocalStorage } from "./local";
 
 /**
@@ -132,6 +133,30 @@ export function buildParquetKey(chainSlug: string, date: Date): string {
 }
 
 /**
+ * Resolve a storage key to a local filesystem path.
+ * Only supported for LocalStorage.
+ *
+ * @throws {Error} If key contains path traversal sequences
+ * @throws {Error} If storage is not LocalStorage
+ */
+export function resolveStoragePath(key: string): string {
+	const storage = getStorage();
+	if (!(storage instanceof LocalStorage)) {
+		throw new Error("resolveStoragePath is only supported for LocalStorage");
+	}
+
+	// Check for path traversal BEFORE normalization
+	if (key.includes("..")) {
+		throw new Error(`invalid key: path traversal detected in "${key}"`);
+	}
+
+	let cleanKey = path.normalize(key);
+	cleanKey = cleanKey.replace(/^[/\\]+/, "");
+
+	return path.join(storage.getBasePath(), cleanKey);
+}
+
+/**
  * Format a date as YYYY-MM-DD.
  */
 function formatDate(date: Date): string {
@@ -141,12 +166,12 @@ function formatDate(date: Date): string {
 	return `${year}-${month}-${day}`;
 }
 
-// Re-export components
-export { LocalStorage, computeChecksum, MIN_COMPRESSION_SIZE } from "./local";
 export {
 	compressGzip,
-	decompressGzip,
 	compressGzipStream,
+	decompressGzip,
 	decompressGzipStream,
 	shouldCompress,
 } from "./compression";
+// Re-export components
+export { computeChecksum, LocalStorage, MIN_COMPRESSION_SIZE } from "./local";

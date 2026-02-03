@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import { Readable } from "node:stream";
+import { describe, expect, it } from "vitest";
 import {
 	compressGzip,
-	decompressGzip,
 	compressGzipStream,
+	decompressGzip,
 	decompressGzipStream,
 	shouldCompress,
 } from "./compression";
@@ -58,7 +58,9 @@ describe("compression", () => {
 			const original = Buffer.from("Compare streaming vs buffer");
 
 			const compressedBuffer = await compressGzip(original);
-			const compressedStream = await compressGzipStream(Readable.from(original));
+			const compressedStream = await compressGzipStream(
+				Readable.from(original),
+			);
 
 			// Note: gzip output may have minor differences in headers/timestamps
 			// so we compare by decompressing both

@@ -55,9 +55,7 @@ export const listCatalogPrices = procedure
 			conditions.push(lte(priceTiers.price, input.maxPrice));
 		}
 		if (input.dateFrom) {
-			conditions.push(
-				gte(storePriceRefs.lastSeenAt, new Date(input.dateFrom)),
-			);
+			conditions.push(gte(storePriceRefs.lastSeenAt, new Date(input.dateFrom)));
 		}
 		if (input.dateTo) {
 			conditions.push(lte(storePriceRefs.lastSeenAt, new Date(input.dateTo)));

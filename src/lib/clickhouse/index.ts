@@ -1,8 +1,8 @@
-import {
-	createClient,
-	type ClickHouseClient as CHClient,
-} from "@clickhouse/client";
 import { createReadStream } from "node:fs";
+import {
+	type ClickHouseClient as CHClient,
+	createClient,
+} from "@clickhouse/client";
 
 /**
  * Row structure for price data in ClickHouse.
@@ -114,7 +114,9 @@ export class ClickHouseClient {
 	/**
 	 * Get the count of prices matching optional filters.
 	 */
-	async countPrices(options?: Omit<QueryPricesOptions, "limit" | "offset">): Promise<number> {
+	async countPrices(
+		options?: Omit<QueryPricesOptions, "limit" | "offset">,
+	): Promise<number> {
 		const conditions: string[] = [];
 		const params: Record<string, string> = {};
 

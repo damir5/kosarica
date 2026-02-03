@@ -1,6 +1,6 @@
 import { customType, text } from "drizzle-orm/pg-core";
-import { generatePrefixedId } from "@/utils/id";
 import type { z } from "zod";
+import { generatePrefixedId } from "@/utils/id";
 
 /**
  * Creates a typed JSONB column with runtime validation.

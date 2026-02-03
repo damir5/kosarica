@@ -168,7 +168,13 @@ function useDebounce<T>(value: T, delay: number = 300) {
 function usePlaceSearch({
 	debounceMs,
 	query,
-	...props
+	lang,
+	limit,
+	bbox,
+	lat,
+	lon,
+	zoom,
+	locationBiasScale,
 }: {
 	debounceMs: number;
 } & PlaceSearchOptions) {
@@ -195,7 +201,16 @@ function usePlaceSearch({
 			setHasSearched(true);
 
 			try {
-				const url = buildSearchUrl({ query: debouncedQuery, ...props });
+				const url = buildSearchUrl({
+					query: debouncedQuery,
+					lang,
+					limit,
+					bbox,
+					lat,
+					lon,
+					zoom,
+					locationBiasScale,
+				});
 				const response = await fetch(url, {
 					signal: abortController.signal,
 				});
@@ -228,17 +243,7 @@ function usePlaceSearch({
 		fetchResults();
 
 		return () => abortController.abort();
-	}, [
-		debouncedQuery,
-		props.lang,
-		props.limit,
-		props.bbox,
-		props.lat,
-		props.lon,
-		props.zoom,
-		props.locationBiasScale,
-		props,
-	]);
+	}, [debouncedQuery, lang, limit, bbox, lat, lon, zoom, locationBiasScale]);
 
 	return { results, isLoading, error, hasSearched };
 }

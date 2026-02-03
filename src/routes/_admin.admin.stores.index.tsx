@@ -49,7 +49,7 @@ import {
 } from "@/components/ui/table";
 import { orpc } from "@/orpc/client";
 
-export const Route = createFileRoute("/_admin/admin/stores/" as any)({
+export const Route = createFileRoute("/_admin/admin/stores/")({
 	component: StoresPage,
 });
 

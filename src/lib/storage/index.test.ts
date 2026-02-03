@@ -1,14 +1,14 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-	createStorage,
-	getStorage,
-	closeStorage,
 	buildArchiveKey,
 	buildExpandedKey,
 	buildParquetKey,
+	closeStorage,
+	createStorage,
+	getStorage,
 	type Storage,
 } from "./index";
 

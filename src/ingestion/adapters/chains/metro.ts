@@ -1,7 +1,12 @@
-import type { DiscoveredFile, ParseOptions, ParseResult, StoreIdentifier } from "../../types";
+import type { CsvColumnMapping } from "../../parsers/csv";
+import type {
+	DiscoveredFile,
+	ParseOptions,
+	ParseResult,
+	StoreIdentifier,
+} from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
-import type { CsvColumnMapping } from "../../parsers/csv";
 
 const metroColumnMapping: CsvColumnMapping = {
 	externalId: "SIFRA",
@@ -51,7 +56,11 @@ export class MetroAdapter extends BaseCsvAdapter {
 		});
 	}
 
-	async parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult> {
 		const preprocessed = this.preprocessCsvContent(content);
 		return super.parse(preprocessed, filename, options);
 	}
@@ -82,7 +91,9 @@ export class MetroAdapter extends BaseCsvAdapter {
 	}
 
 	private preprocessCsvContent(content: Buffer): Buffer {
-		const text = content.toString("utf-8").replace(/SIDRENA_\d{2}_\d{2}/g, "SIDRENA");
+		const text = content
+			.toString("utf-8")
+			.replace(/SIDRENA_\d{2}_\d{2}/g, "SIDRENA");
 		return Buffer.from(text);
 	}
 

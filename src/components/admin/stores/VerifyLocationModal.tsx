@@ -105,9 +105,9 @@ export function VerifyLocationModal({
 							{/* Matched Address */}
 							{outputData.displayName && (
 								<div>
-									<label className="text-sm font-medium text-muted-foreground">
+									<span className="text-sm font-medium text-muted-foreground">
 										Matched Address
-									</label>
+									</span>
 									<p className="mt-1 text-sm">{outputData.displayName}</p>
 								</div>
 							)}
@@ -115,11 +115,15 @@ export function VerifyLocationModal({
 							{/* Coordinates */}
 							<div className="grid gap-4 sm:grid-cols-2">
 								<div>
-									<label className="text-sm font-medium text-muted-foreground">
+									<label
+										htmlFor="latitude-geocode"
+										className="text-sm font-medium text-muted-foreground"
+									>
 										Latitude
 									</label>
 									{isEditing ? (
 										<Input
+											id="latitude-geocode"
 											value={latitude}
 											onChange={(e) => setLatitude(e.target.value)}
 											placeholder="45.8150"
@@ -130,11 +134,15 @@ export function VerifyLocationModal({
 									)}
 								</div>
 								<div>
-									<label className="text-sm font-medium text-muted-foreground">
+									<label
+										htmlFor="longitude-geocode"
+										className="text-sm font-medium text-muted-foreground"
+									>
 										Longitude
 									</label>
 									{isEditing ? (
 										<Input
+											id="longitude-geocode"
 											value={longitude}
 											onChange={(e) => setLongitude(e.target.value)}
 											placeholder="15.9819"
@@ -178,10 +186,14 @@ export function VerifyLocationModal({
 							</p>
 							<div className="mt-4 grid gap-4 sm:grid-cols-2">
 								<div>
-									<label className="text-sm font-medium text-muted-foreground">
+									<label
+										htmlFor="latitude-manual"
+										className="text-sm font-medium text-muted-foreground"
+									>
 										Latitude
 									</label>
 									<Input
+										id="latitude-manual"
 										value={latitude}
 										onChange={(e) => setLatitude(e.target.value)}
 										placeholder="45.8150"
@@ -189,10 +201,14 @@ export function VerifyLocationModal({
 									/>
 								</div>
 								<div>
-									<label className="text-sm font-medium text-muted-foreground">
+									<label
+										htmlFor="longitude-manual"
+										className="text-sm font-medium text-muted-foreground"
+									>
 										Longitude
 									</label>
 									<Input
+										id="longitude-manual"
 										value={longitude}
 										onChange={(e) => setLongitude(e.target.value)}
 										placeholder="15.9819"
@@ -207,24 +223,24 @@ export function VerifyLocationModal({
 					{task.type === "verify_address" && outputData && (
 						<div className="space-y-4">
 							<div>
-								<label className="text-sm font-medium text-muted-foreground">
+								<span className="text-sm font-medium text-muted-foreground">
 									Original Address
-								</label>
+								</span>
 								<p className="mt-1 text-sm">
 									{outputData.originalAddress || "Not set"}
 								</p>
 							</div>
 							<div className="grid gap-4 sm:grid-cols-2">
 								<div>
-									<label className="text-sm font-medium text-muted-foreground">
+									<span className="text-sm font-medium text-muted-foreground">
 										City
-									</label>
+									</span>
 									<p className="mt-1 text-sm">{outputData.city || "Not set"}</p>
 								</div>
 								<div>
-									<label className="text-sm font-medium text-muted-foreground">
+									<span className="text-sm font-medium text-muted-foreground">
 										Postal Code
-									</label>
+									</span>
 									<p className="mt-1 text-sm">
 										{outputData.postalCode || "Not set"}
 									</p>

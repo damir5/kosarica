@@ -87,8 +87,7 @@ export class BaseChainAdapter {
 		this.supportedTypes = cfg.supportedTypes;
 		this.config = cfg.chainConfig;
 
-		this.fileExtensionPattern =
-			cfg.fileExtensionPattern ?? /\.(csv|CSV)$/;
+		this.fileExtensionPattern = cfg.fileExtensionPattern ?? /\.(csv|CSV)$/;
 
 		const prefixPatterns = cfg.filenamePrefixPatterns ?? [];
 		this.filenamePrefixPatterns = prefixPatterns
@@ -96,9 +95,9 @@ export class BaseChainAdapter {
 			.concat(
 				prefixPatterns.length === 0
 					? [
-						new RegExp(`^${escapeRegex(this.name)}[_-]?`, "i"),
-						/^cjenik[_-]?/i,
-					]
+							new RegExp(`^${escapeRegex(this.name)}[_-]?`, "i"),
+							/^cjenik[_-]?/i,
+						]
 					: [],
 			);
 
@@ -171,7 +170,11 @@ export class BaseChainAdapter {
 		};
 	}
 
-	async parse(_content: Buffer, _filename: string, _options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		_content: Buffer,
+		_filename: string,
+		_options?: ParseOptions,
+	): Promise<ParseResult> {
 		throw new Error("Parse method must be implemented by subclass");
 	}
 
@@ -235,7 +238,9 @@ export class BaseChainAdapter {
 			const pathname = parsed.pathname;
 			const parts = pathname.split("/");
 			const filename = parts[parts.length - 1];
-			return filename ? filename.split("?")[0] : `unknown.${this.supportedTypes[0]}`;
+			return filename
+				? filename.split("?")[0]
+				: `unknown.${this.supportedTypes[0]}`;
 		} catch {
 			return `unknown.${this.supportedTypes[0]}`;
 		}
@@ -288,7 +293,11 @@ export class BaseChainAdapter {
 		let lastError: Error | undefined;
 		let lastStatus = 0;
 
-		for (let attempt = 0; attempt <= this.rateLimitConfig.maxRetries; attempt += 1) {
+		for (
+			let attempt = 0;
+			attempt <= this.rateLimitConfig.maxRetries;
+			attempt += 1
+		) {
 			await this.rateLimiter.throttle();
 
 			try {
@@ -305,14 +314,22 @@ export class BaseChainAdapter {
 					return response;
 				}
 
-				if (!isRetryableStatus(response.status) || attempt === this.rateLimitConfig.maxRetries) {
+				if (
+					!isRetryableStatus(response.status) ||
+					attempt === this.rateLimitConfig.maxRetries
+				) {
 					return response;
 				}
 
 				const retryAfter = response.headers.get("Retry-After") ?? undefined;
-				const delay = response.status === 429
-					? calculateRateLimitBackoff(attempt, this.rateLimitConfig, retryAfter)
-					: calculateBackoff(attempt, this.rateLimitConfig);
+				const delay =
+					response.status === 429
+						? calculateRateLimitBackoff(
+								attempt,
+								this.rateLimitConfig,
+								retryAfter,
+							)
+						: calculateBackoff(attempt, this.rateLimitConfig);
 				await sleep(delay);
 			} catch (error) {
 				lastError = error instanceof Error ? error : new Error(String(error));
@@ -392,7 +409,9 @@ function resolveUrl(baseUrl: string, href: string): string {
 			return `${base.protocol}//${base.host}${href}`;
 		}
 		const basePath = base.pathname;
-		const prefix = basePath.includes("/") ? basePath.slice(0, basePath.lastIndexOf("/") + 1) : "/";
+		const prefix = basePath.includes("/")
+			? basePath.slice(0, basePath.lastIndexOf("/") + 1)
+			: "/";
 		return `${base.protocol}//${base.host}${prefix}${href}`;
 	} catch {
 		return href;

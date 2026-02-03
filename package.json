@@ -16,6 +16,9 @@
     "db:migrate": "bash scripts/db-migrate.sh",
     "db:studio": "drizzle-kit studio",
     "analyze:price-variation": "node scripts/analyze-price-variation.mjs",
+    "clickhouse:load-all": "tsx scripts/clickhouse-sync.ts all",
+    "clickhouse:load-missing": "tsx scripts/clickhouse-sync.ts missing",
+    "clickhouse:status": "tsx scripts/clickhouse-sync.ts status",
     "test:integration": "vitest run --run",
     "test:unit": "vitest run --run src/orpc/router/__tests__/stores*.test.ts src/db/queries/*.test.ts",
     "test:price-service": "vitest run --run src/orpc/router/__tests__/price-service.integration.test.ts",
@@ -28,6 +31,7 @@
   "dependencies": {
     "@better-auth/passkey": "^1.4.13",
     "@clickhouse/client": "^1.16.0",
+    "@dsnp/parquetjs": "^1.7.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-metrics-otlp-grpc": "^0.57.2",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.57.2",

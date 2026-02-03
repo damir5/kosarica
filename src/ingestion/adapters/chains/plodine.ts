@@ -1,8 +1,13 @@
-import type { DiscoveredFile, ExpandedFile, ParseOptions, ParseResult } from "../../types";
-import { BaseCsvAdapter } from "../base/csv";
-import { chainConfigs } from "../config";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
+import type {
+	DiscoveredFile,
+	ExpandedFile,
+	ParseOptions,
+	ParseResult,
+} from "../../types";
+import { BaseCsvAdapter } from "../base/csv";
+import { chainConfigs } from "../config";
 
 const plodineColumnMapping: CsvColumnMapping = {
 	externalId: "Sifra proizvoda",
@@ -83,7 +88,9 @@ export class PlodineAdapter extends BaseCsvAdapter {
 
 		const response = await this.fetchWithRetry(this.baseUrl());
 		if (!response.ok) {
-			throw new Error(`Failed to fetch Plodine portal: status ${response.status}`);
+			throw new Error(
+				`Failed to fetch Plodine portal: status ${response.status}`,
+			);
 		}
 		const html = await response.text();
 
@@ -101,7 +108,9 @@ export class PlodineAdapter extends BaseCsvAdapter {
 				if (fileDatePattern !== targetPattern) {
 					continue;
 				}
-				const fileUrl = rawUrl.startsWith("http") ? rawUrl : `https://www.plodine.hr${rawUrl}`;
+				const fileUrl = rawUrl.startsWith("http")
+					? rawUrl
+					: `https://www.plodine.hr${rawUrl}`;
 				if (seen.has(fileUrl)) {
 					continue;
 				}
@@ -138,7 +147,11 @@ export class PlodineAdapter extends BaseCsvAdapter {
 		return processed.filter((file) => file.type === "csv");
 	}
 
-	async parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult> {
 		const preprocessed = this.preprocessCsvContent(content);
 		return super.parse(preprocessed, filename, options);
 	}

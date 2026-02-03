@@ -4,7 +4,13 @@
  * Types for the distributed cron scheduler with Postgres coordination.
  */
 
+import type {
+	CleanupTaskPayload,
+	IngestionTaskPayload,
+	RerunTaskPayload,
+} from "@/db/jsonb-schemas";
 import type { cronJobs, cronRuns } from "@/db/schema";
+import type { TaskType } from "@/lib/taskqueue";
 
 /**
  * Status values for cron runs
@@ -19,11 +25,28 @@ export type CronRunStatus =
 /**
  * Task to be enqueued by a cron job handler
  */
-export interface TaskToEnqueue {
-	type: string;
-	payload?: Record<string, unknown>;
-	idempotencyKey?: string;
-}
+type TaskPayloadByType = {
+	ingestion: Omit<IngestionTaskPayload, "type">;
+	rerun: Omit<RerunTaskPayload, "type">;
+	cleanup: Omit<CleanupTaskPayload, "type">;
+};
+
+export type TaskToEnqueue =
+	| {
+			type: "ingestion";
+			payload: TaskPayloadByType["ingestion"];
+			idempotencyKey?: string;
+	  }
+	| {
+			type: "rerun";
+			payload: TaskPayloadByType["rerun"];
+			idempotencyKey?: string;
+	  }
+	| {
+			type: "cleanup";
+			payload?: TaskPayloadByType["cleanup"];
+			idempotencyKey?: string;
+	  };
 
 /**
  * Context provided to cron job handlers during execution
@@ -52,7 +75,7 @@ export interface CronJobConfig {
 	name: string;
 	cronExpression: string;
 	timezone?: string;
-	taskType: string;
+	taskType: TaskType;
 	taskPayload?: Record<string, unknown>;
 	handler?: CronJobHandler;
 }

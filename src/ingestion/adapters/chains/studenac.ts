@@ -1,7 +1,7 @@
+import type { XmlFieldMapping } from "../../parsers/xml";
 import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
 import { BaseXmlAdapter } from "../base/xml";
 import { chainConfigs } from "../config";
-import type { XmlFieldMapping } from "../../parsers/xml";
 
 const studenacFieldMapping: XmlFieldMapping = {
 	externalId: "code",
@@ -94,7 +94,9 @@ export class StudenacAdapter extends BaseXmlAdapter {
 
 		const response = await this.fetchWithRetry(this.baseUrl());
 		if (!response.ok) {
-			throw new Error(`Failed to fetch Studenac portal: status ${response.status}`);
+			throw new Error(
+				`Failed to fetch Studenac portal: status ${response.status}`,
+			);
 		}
 		const html = await response.text();
 		const pattern = /href=["']([^"']*\.xml(?:\?[^"']*)?)["']/gi;
@@ -128,7 +130,11 @@ export class StudenacAdapter extends BaseXmlAdapter {
 		return discovered;
 	}
 
-	async parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult> {
 		const result = await super.parse(content, filename, options);
 		const storeId = this.extractStoreIdentifierFromFilename(filename);
 		for (const row of result.rows) {

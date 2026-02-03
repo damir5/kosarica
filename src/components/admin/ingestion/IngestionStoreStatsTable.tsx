@@ -1,4 +1,5 @@
 import { Store } from "lucide-react";
+import { useMemo } from "react";
 import {
 	Table,
 	TableBody,
@@ -7,10 +8,22 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import type { HandlersIngestionStoreStats } from "@/lib/go-api";
+
+export interface IngestionStoreStats {
+	storeId?: string;
+	storeIdentifier?: string;
+	storeName?: string | null;
+	storeCity?: string | null;
+	rowCount?: number | null;
+	persistedCount?: number | null;
+	priceChanges?: number | null;
+	failedRows?: number | null;
+	warningRows?: number | null;
+	fileCount?: number | null;
+}
 
 interface IngestionStoreStatsTableProps {
-	stores: HandlersIngestionStoreStats[];
+	stores: IngestionStoreStats[];
 	isLoading?: boolean;
 	showFileCount?: boolean;
 	emptyLabel?: string;
@@ -27,6 +40,11 @@ export function IngestionStoreStatsTable({
 	showFileCount,
 	emptyLabel = "No store stats available",
 }: IngestionStoreStatsTableProps) {
+	const skeletonKeys = useMemo(
+		() => Array.from({ length: 6 }, () => crypto.randomUUID()),
+		[],
+	);
+
 	if (isLoading) {
 		return (
 			<div className="rounded-md border">
@@ -46,8 +64,8 @@ export function IngestionStoreStatsTable({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{[...Array(6)].map((_, i) => (
-							<TableRow key={`skeleton-${i}`}>
+						{skeletonKeys.map((key) => (
+							<TableRow key={key}>
 								<TableCell colSpan={showFileCount ? 8 : 7}>
 									<div className="h-8 bg-muted animate-pulse rounded" />
 								</TableCell>

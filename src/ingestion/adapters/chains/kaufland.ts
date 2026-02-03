@@ -1,7 +1,7 @@
+import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
-import type { CsvColumnMapping } from "../../parsers/csv";
 
 interface KauflandAsset {
 	label: string;
@@ -89,7 +89,9 @@ export class KauflandAdapter extends BaseCsvAdapter {
 
 		const response = await this.fetchWithRetry(kauflandAssetAPIURL);
 		if (!response.ok) {
-			throw new Error(`Failed to fetch Kaufland asset API: status ${response.status}`);
+			throw new Error(
+				`Failed to fetch Kaufland asset API: status ${response.status}`,
+			);
 		}
 		const assets = (await response.json()) as KauflandAsset[];
 

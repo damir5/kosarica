@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
 import {
 	Activity,
 	AlertTriangle,
@@ -13,12 +12,12 @@ import {
 	Loader2,
 	XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { IngestionFile } from "@/components/admin/ingestion";
 import {
 	IngestionFileList,
 	IngestionStoreStatsTable,
 } from "@/components/admin/ingestion";
-import type { IngestionFile } from "@/components/admin/ingestion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,12 +54,14 @@ const STATUS_COLORS = {
 	failed: "destructive",
 } as const;
 
-const SUMMARY_VARIANTS: Record<string, "secondary" | "destructive" | "outline"> =
-	{
-		warning: "secondary",
-		error: "destructive",
-		critical: "destructive",
-	};
+const SUMMARY_VARIANTS: Record<
+	string,
+	"secondary" | "destructive" | "outline"
+> = {
+	warning: "secondary",
+	error: "destructive",
+	critical: "destructive",
+};
 
 interface IngestionFileResponse {
 	id: string;
@@ -257,21 +258,24 @@ function RunDetailPage() {
 				warningRows: 0,
 			};
 		}
-		return stats.reduce((acc, stat) => ({
-			storeCount: acc.storeCount + 1,
-			rowCount: acc.rowCount + (stat.rowCount ?? 0),
-			persistedCount: acc.persistedCount + (stat.persistedCount ?? 0),
-			priceChanges: acc.priceChanges + (stat.priceChanges ?? 0),
-			failedRows: acc.failedRows + (stat.failedRows ?? 0),
-			warningRows: acc.warningRows + (stat.warningRows ?? 0),
-		}), {
-			storeCount: 0,
-			rowCount: 0,
-			persistedCount: 0,
-			priceChanges: 0,
-			failedRows: 0,
-			warningRows: 0,
-		});
+		return stats.reduce(
+			(acc, stat) => ({
+				storeCount: acc.storeCount + 1,
+				rowCount: acc.rowCount + (stat.rowCount ?? 0),
+				persistedCount: acc.persistedCount + (stat.persistedCount ?? 0),
+				priceChanges: acc.priceChanges + (stat.priceChanges ?? 0),
+				failedRows: acc.failedRows + (stat.failedRows ?? 0),
+				warningRows: acc.warningRows + (stat.warningRows ?? 0),
+			}),
+			{
+				storeCount: 0,
+				rowCount: 0,
+				persistedCount: 0,
+				priceChanges: 0,
+				failedRows: 0,
+				warningRows: 0,
+			},
+		);
 	}, [storeStatsResponse]);
 
 	if (runLoading) {
@@ -355,9 +359,7 @@ function RunDetailPage() {
 							{run.statusReason && (
 								<div className="flex items-center gap-2 text-xs text-muted-foreground">
 									<Badge
-										variant={
-											SUMMARY_VARIANTS[summarySeverity] || "outline"
-										}
+										variant={SUMMARY_VARIANTS[summarySeverity] || "outline"}
 										className="text-xs"
 									>
 										{summaryLabel}
@@ -553,7 +555,7 @@ function RunDetailPage() {
 								<p className="mt-1">
 									{run.statusSeverity === "warning"
 										? "info"
-										: run.statusSeverity ?? "—"}
+										: (run.statusSeverity ?? "—")}
 								</p>
 							</div>
 							<div>

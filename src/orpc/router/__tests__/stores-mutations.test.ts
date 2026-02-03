@@ -50,8 +50,15 @@ const mockRegularUserContext = {
 
 describe("Store Mutations Unit Tests", () => {
 	// Setup the mock with proper chaining
-	let capturedUpdateData: any = null;
-	const mockSet = vi.fn().mockImplementation((data: any) => {
+	type UpdateData = Record<string, unknown>;
+	type MockDb = {
+		select: ReturnType<typeof vi.fn>;
+		insert: ReturnType<typeof vi.fn>;
+		update: ReturnType<typeof vi.fn>;
+		delete: ReturnType<typeof vi.fn>;
+	};
+	let capturedUpdateData: UpdateData | null = null;
+	const mockSet = vi.fn().mockImplementation((data: UpdateData) => {
 		capturedUpdateData = data;
 		return {
 			where: vi.fn().mockResolvedValue(undefined),
@@ -63,7 +70,7 @@ describe("Store Mutations Unit Tests", () => {
 	const mockDelete = vi.fn().mockReturnValue({
 		where: vi.fn().mockResolvedValue(undefined),
 	});
-	const mockDb = {
+	const mockDb: MockDb = {
 		select: vi.fn(),
 		insert: vi.fn(),
 		update: mockUpdate,
@@ -71,7 +78,9 @@ describe("Store Mutations Unit Tests", () => {
 	};
 
 	beforeEach(() => {
-		vi.mocked(getDb).mockReturnValue(mockDb as any);
+		vi.mocked(getDb).mockReturnValue(
+			mockDb as unknown as ReturnType<typeof getDb>,
+		);
 		capturedUpdateData = null;
 		vi.clearAllMocks();
 	});
@@ -185,6 +194,10 @@ describe("Store Mutations Unit Tests", () => {
 				approvedBy: mockSuperadminContext.user.id,
 				approvedAt: new Date(),
 			});
+
+			if (!capturedUpdateData) {
+				throw new Error("Expected update data to be captured");
+			}
 
 			expect(capturedUpdateData.approvedBy).toBe("test-superadmin-id");
 		});
@@ -342,9 +355,12 @@ describe("Store Mutations Unit Tests", () => {
 				storeIds: ["sto_1", "sto_2"],
 			};
 
-			const existingStores = await mockDb.select();
+			const existingStores = (await mockDb.select()) as Array<{
+				id: string;
+				status: string;
+			}>;
 			const nonPendingStores = existingStores.filter(
-				(s: any) => s.status !== "pending",
+				(store) => store.status !== "pending",
 			);
 
 			expect(existingStores.length).toBe(input.storeIds.length);
@@ -359,9 +375,12 @@ describe("Store Mutations Unit Tests", () => {
 
 			mockDb.select.mockResolvedValue(stores);
 
-			const existingStores = await mockDb.select();
+			const existingStores = (await mockDb.select()) as Array<{
+				id: string;
+				status: string;
+			}>;
 			const nonPendingStores = existingStores.filter(
-				(s: any) => s.status !== "pending",
+				(store) => store.status !== "pending",
 			);
 
 			expect(nonPendingStores.length).toBeGreaterThan(0);
@@ -510,6 +529,10 @@ describe("Store Mutations Unit Tests", () => {
 				approvedAt: new Date(),
 			});
 
+			if (!capturedUpdateData) {
+				throw new Error("Expected update data to be captured");
+			}
+
 			expect(capturedUpdateData.approvalNotes).toBe(
 				"Store verified via field visit on 2024-01-15",
 			);
@@ -537,7 +560,10 @@ describe("Store Mutations Unit Tests", () => {
 			});
 
 			// Verify approvalNotes is not in the set data
-			expect(capturedUpdateData).toBeDefined();
+			if (!capturedUpdateData) {
+				throw new Error("Expected update data to be captured");
+			}
+
 			expect(capturedUpdateData.approvalNotes).toBeUndefined();
 		});
 	});

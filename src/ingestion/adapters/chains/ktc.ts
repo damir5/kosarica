@@ -1,7 +1,7 @@
+import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
-import type { CsvColumnMapping } from "../../parsers/csv";
 
 const ktcColumnMapping: CsvColumnMapping = {
 	externalId: "Šifra proizvoda",
@@ -93,7 +93,9 @@ export class KtcAdapter extends BaseCsvAdapter {
 			let csvMatch: RegExpExecArray | null;
 			while ((csvMatch = csvPattern.exec(storeHtml)) !== null) {
 				const href = csvMatch[1];
-				const fileUrl = href.startsWith("http") ? href : `${this.baseUrl()}/${href.replace(/^\//, "")}`;
+				const fileUrl = href.startsWith("http")
+					? href
+					: `${this.baseUrl()}/${href.replace(/^\//, "")}`;
 				if (seenUrls.has(fileUrl)) {
 					continue;
 				}

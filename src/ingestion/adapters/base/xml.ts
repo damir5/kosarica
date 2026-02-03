@@ -1,6 +1,11 @@
-import type { DiscoveredFile, ParseOptions, ParseResult, StoreIdentifier } from "../../types";
-import { XmlParser, type XmlFieldMapping } from "../../parsers/xml";
-import { BaseChainAdapter, type BaseAdapterConfig } from "./chain";
+import { type XmlFieldMapping, XmlParser } from "../../parsers/xml";
+import type {
+	DiscoveredFile,
+	ParseOptions,
+	ParseResult,
+	StoreIdentifier,
+} from "../../types";
+import { type BaseAdapterConfig, BaseChainAdapter } from "./chain";
 
 export interface XmlAdapterConfig {
 	baseConfig: BaseAdapterConfig;
@@ -35,12 +40,19 @@ export class BaseXmlAdapter extends BaseChainAdapter {
 			"cjenik.proizvod",
 		];
 
-		if (cfg.defaultItemsPath && !this.itemPaths.includes(cfg.defaultItemsPath)) {
+		if (
+			cfg.defaultItemsPath &&
+			!this.itemPaths.includes(cfg.defaultItemsPath)
+		) {
 			this.itemPaths.unshift(cfg.defaultItemsPath);
 		}
 	}
 
-	async parse(content: Buffer, filename: string, _options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		_options?: ParseOptions,
+	): Promise<ParseResult> {
 		const storeIdentifier = this.extractStoreIdentifierFromFilename(filename);
 		let lastResult: ParseResult | null = null;
 
@@ -52,7 +64,12 @@ export class BaseXmlAdapter extends BaseChainAdapter {
 				attributePrefix: "@_",
 				encoding: "auto",
 			});
-			const result = parser.parseWithItemsPath(content, itemsPath, this.fieldMapping, storeIdentifier);
+			const result = parser.parseWithItemsPath(
+				content,
+				itemsPath,
+				this.fieldMapping,
+				storeIdentifier,
+			);
 			lastResult = result;
 			if (result.validRows > 0) {
 				return result;
@@ -68,7 +85,12 @@ export class BaseXmlAdapter extends BaseChainAdapter {
 					attributePrefix: "@_",
 					encoding: "auto",
 				});
-				const result = parser.parseWithItemsPath(content, itemsPath, this.altMapping, storeIdentifier);
+				const result = parser.parseWithItemsPath(
+					content,
+					itemsPath,
+					this.altMapping,
+					storeIdentifier,
+				);
 				lastResult = result;
 				if (result.validRows > 0) {
 					return result;
@@ -107,7 +129,10 @@ export class BaseXmlAdapter extends BaseChainAdapter {
 		}
 		cleanName = cleanName.trim();
 
-		const patterns = [/(?:store|poslovnica|trgovina)[_-]?(\d+)/i, /(?:store|poslovnica|trgovina)[_-]?([A-Za-z0-9]+)/i];
+		const patterns = [
+			/(?:store|poslovnica|trgovina)[_-]?(\d+)/i,
+			/(?:store|poslovnica|trgovina)[_-]?([A-Za-z0-9]+)/i,
+		];
 		for (const pattern of patterns) {
 			const match = cleanName.match(pattern);
 			if (match?.[1]) {

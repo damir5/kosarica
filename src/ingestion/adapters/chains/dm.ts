@@ -1,6 +1,7 @@
-import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
+import fs from "node:fs/promises";
 import * as XLSX from "xlsx";
+import type { XlsxColumnMapping } from "../../parsers/xlsx";
 import type {
 	DiscoveredFile,
 	FetchedFile,
@@ -11,7 +12,6 @@ import type {
 } from "../../types";
 import { BaseXlsxAdapter, newHeaderIndex, newNumericIndex } from "../base/xlsx";
 import { chainConfigs } from "../config";
-import type { XlsxColumnMapping } from "../../parsers/xlsx";
 
 const dmPortalURL =
 	"https://www.dm.hr/novo/promocije/nove-oznake-cijena-i-vazeci-cjenik-u-dm-u-2906632";
@@ -177,9 +177,14 @@ export class DmAdapter extends BaseXlsxAdapter {
 		return super.fetch(file);
 	}
 
-	async parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult> {
 		const storeIdentifier = dmNationalStoreIdentifier;
-		const isWebFormat = filename.includes("vlada-oznacavanje") || filename.includes("cijenik-");
+		const isWebFormat =
+			filename.includes("vlada-oznacavanje") || filename.includes("cijenik-");
 
 		if (isWebFormat) {
 			this.setParserOptions({
@@ -222,7 +227,6 @@ export class DmAdapter extends BaseXlsxAdapter {
 	extractStoreMetadata(_file: DiscoveredFile): StoreMetadata | null {
 		return { name: "DM National", storeType: "national" };
 	}
-
 }
 
 function inferDateFromXlsxContent(content: Buffer): string {
@@ -233,7 +237,11 @@ function inferDateFromXlsxContent(content: Buffer): string {
 			return "";
 		}
 		const sheet = workbook.Sheets[sheetName];
-		const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false }) as string[][];
+		const rows = XLSX.utils.sheet_to_json(sheet, {
+			header: 1,
+			defval: "",
+			raw: false,
+		}) as string[][];
 		const maxRows = Math.min(rows.length, 10);
 		for (let i = 0; i < maxRows; i += 1) {
 			const row = rows[i] ?? [];

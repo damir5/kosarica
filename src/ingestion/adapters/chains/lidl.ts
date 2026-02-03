@@ -1,8 +1,13 @@
-import type { DiscoveredFile, ExpandedFile, ParseOptions, ParseResult } from "../../types";
-import { BaseCsvAdapter } from "../base/csv";
-import { chainConfigs } from "../config";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
+import type {
+	DiscoveredFile,
+	ExpandedFile,
+	ParseOptions,
+	ParseResult,
+} from "../../types";
+import { BaseCsvAdapter } from "../base/csv";
+import { chainConfigs } from "../config";
 
 const lidlColumnMapping: CsvColumnMapping = {
 	externalId: "ŠIFRA",
@@ -85,7 +90,9 @@ export class LidlAdapter extends BaseCsvAdapter {
 			while ((match = pattern.exec(html)) !== null) {
 				const rawUrl = match[1];
 				const filename = match[2];
-				const fileUrl = rawUrl.startsWith("http") ? rawUrl : `https://tvrtka.lidl.hr${rawUrl}`;
+				const fileUrl = rawUrl.startsWith("http")
+					? rawUrl
+					: `https://tvrtka.lidl.hr${rawUrl}`;
 				if (seen.has(fileUrl)) {
 					continue;
 				}
@@ -117,14 +124,20 @@ export class LidlAdapter extends BaseCsvAdapter {
 		return expanded.filter((file) => file.type === "csv");
 	}
 
-	async parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult> {
 		const result = await super.parse(content, filename, options);
 		return this.postprocessMultipleGtins(result);
 	}
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {
 		const baseName = filename.replace(/\.(csv|CSV)$/i, "");
-		const dateStoreMatch = baseName.match(/^Lidl[_-]?\d{4}[_-]\d{2}[_-]\d{2}[_-](.+)$/i);
+		const dateStoreMatch = baseName.match(
+			/^Lidl[_-]?\d{4}[_-]\d{2}[_-]\d{2}[_-](.+)$/i,
+		);
 		if (dateStoreMatch?.[1]) {
 			return dateStoreMatch[1];
 		}

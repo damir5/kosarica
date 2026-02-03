@@ -1,5 +1,5 @@
-import yauzl from "yauzl";
 import { createHash } from "node:crypto";
+import yauzl from "yauzl";
 import type { DiscoveredFile, ExpandedFile, FileType } from "../types";
 
 export interface ExpandZipOptions {
@@ -11,7 +11,7 @@ export async function expandZip(
 	content: Buffer,
 	filename: string,
 	parent?: DiscoveredFile,
-	options?: ExpandZipOptions
+	options?: ExpandZipOptions,
 ): Promise<ExpandedFile[]> {
 	const maxFileSize = options?.maxFileSize ?? 100 * 1024 * 1024; // 100MB default
 	const maxFiles = options?.maxFiles ?? 1000;
@@ -35,18 +35,27 @@ export async function expandZip(
 				// Enforce limits
 				if (fileCount >= maxFiles) {
 					zipfile.close();
-					return reject(new Error(`ZIP contains too many files (max: ${maxFiles})`));
+					return reject(
+						new Error(`ZIP contains too many files (max: ${maxFiles})`),
+					);
 				}
 				if (entry.uncompressedSize > maxFileSize) {
 					zipfile.close();
-					return reject(new Error(`File ${entry.fileName} exceeds max size (${maxFileSize} bytes)`));
+					return reject(
+						new Error(
+							`File ${entry.fileName} exceeds max size (${maxFileSize} bytes)`,
+						),
+					);
 				}
 
 				fileCount++;
 
 				zipfile.openReadStream(entry, (err, readStream) => {
 					if (err) return reject(err);
-					if (!readStream) return reject(new Error(`Failed to open stream for ${entry.fileName}`));
+					if (!readStream)
+						return reject(
+							new Error(`Failed to open stream for ${entry.fileName}`),
+						);
 
 					const chunks: Buffer[] = [];
 					readStream.on("data", (chunk: Buffer) => chunks.push(chunk));

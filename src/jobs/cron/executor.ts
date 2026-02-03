@@ -6,7 +6,9 @@
  */
 
 import { and, eq, lt, sql } from "drizzle-orm";
+import type { TaskQueuePayload } from "@/db/jsonb-schemas";
 import { cronJobs, cronRuns } from "@/db/schema";
+import { scheduleTask, type TaskType } from "@/lib/taskqueue";
 import { getDb } from "@/utils/bindings";
 import { createLogger, errorToObject } from "@/utils/logger";
 import { getRegisteredJob } from "./registry";
@@ -15,6 +17,7 @@ import type {
 	CronExecutionContext,
 	CronJobRow,
 	CronRunStatus,
+	TaskToEnqueue,
 } from "./types";
 import { generateIdempotencyKey, getNextRun } from "./utils";
 
@@ -24,6 +27,78 @@ const log = createLogger("scheduler");
  * Timeout for runs in "running" status before marking as failed (30 minutes)
  */
 const STUCK_RUN_TIMEOUT_MS = 30 * 60 * 1000;
+
+/**
+ * Enqueue tasks to the task queue with error handling.
+ *
+ * @param tasks - Array of tasks to enqueue
+ * @returns Object containing success and failure counts
+ * @throws {Error} If no tasks could be enqueued
+ */
+async function enqueueTasks(
+	tasks: TaskToEnqueue[],
+): Promise<{ enqueued: number; failed: number }> {
+	let enqueued = 0;
+	let failed = 0;
+	const errors: Array<{ task: TaskToEnqueue; error: string }> = [];
+
+	for (const task of tasks) {
+		let payload: TaskQueuePayload;
+
+		switch (task.type) {
+			case "ingestion":
+				payload = { type: "ingestion", ...task.payload };
+				break;
+			case "rerun":
+				payload = { type: "rerun", ...task.payload };
+				break;
+			case "cleanup":
+				payload = { type: "cleanup", ...(task.payload ?? {}) };
+				break;
+			default: {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const _exhaustiveCheck: never = task;
+				failed += 1;
+				errors.push({
+					task,
+					error: `Unknown task type: ${(_exhaustiveCheck as any).type}`,
+				});
+				continue;
+			}
+		}
+
+		try {
+			await scheduleTask({
+				taskType: task.type as TaskType,
+				payload,
+			});
+			enqueued += 1;
+		} catch (error) {
+			failed += 1;
+			const message = error instanceof Error ? error.message : String(error);
+			errors.push({ task, error: message });
+		}
+	}
+
+	// Log partial failures
+	if (failed > 0) {
+		log.error("Some tasks failed to enqueue", {
+			total: tasks.length,
+			enqueued,
+			failed,
+			errors,
+		});
+	}
+
+	// If all tasks failed, throw an error
+	if (enqueued === 0 && tasks.length > 0) {
+		throw new Error(
+			`Failed to enqueue any tasks. Errors: ${errors.map((e) => e.error).join(", ")}`,
+		);
+	}
+
+	return { enqueued, failed };
+}
 
 /**
  * Claim due jobs atomically using FOR UPDATE SKIP LOCKED
@@ -186,12 +261,14 @@ export async function executeJob(claimed: ClaimedJob): Promise<void> {
 		} else {
 			// Execute the handler
 			const tasks = await registeredJob.handler.execute(context);
-			tasksEnqueued = tasks.length;
+			const result = await enqueueTasks(tasks);
+			tasksEnqueued = result.enqueued;
 
 			log.info("Job handler completed", {
 				jobId: job.id,
 				runId,
 				tasksEnqueued,
+				failed: result.failed,
 			});
 		}
 	} catch (error) {
@@ -372,12 +449,14 @@ export async function executeJobManually(
 			status = "skipped";
 		} else {
 			const tasks = await registeredJob.handler.execute(context);
-			tasksEnqueued = tasks.length;
+			const result = await enqueueTasks(tasks);
+			tasksEnqueued = result.enqueued;
 
 			log.info("Manual job handler completed", {
 				jobId: job.id,
 				runId,
 				tasksEnqueued,
+				failed: result.failed,
 			});
 		}
 	} catch (error) {

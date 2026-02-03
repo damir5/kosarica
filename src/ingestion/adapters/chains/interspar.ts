@@ -1,7 +1,7 @@
+import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
-import type { CsvColumnMapping } from "../../parsers/csv";
 
 interface IntersparJsonFile {
 	name: string;
@@ -84,7 +84,9 @@ export class IntersparAdapter extends BaseCsvAdapter {
 
 		const response = await this.fetchWithRetry(apiUrl);
 		if (!response.ok) {
-			throw new Error(`Failed to fetch Interspar JSON API: status ${response.status}`);
+			throw new Error(
+				`Failed to fetch Interspar JSON API: status ${response.status}`,
+			);
 		}
 		const data = (await response.json()) as IntersparJsonResponse;
 		if (!data.files || data.files.length === 0) {
@@ -111,7 +113,9 @@ export class IntersparAdapter extends BaseCsvAdapter {
 		if (match?.[1]) {
 			return match[1];
 		}
-		const locationMatch = baseName.match(/^(?:Interspar|Spar)[_-]?(.+?)(?:[_-]\d{4}[_-]\d{2}[_-]\d{2})?$/i);
+		const locationMatch = baseName.match(
+			/^(?:Interspar|Spar)[_-]?(.+?)(?:[_-]\d{4}[_-]\d{2}[_-]\d{2})?$/i,
+		);
 		if (locationMatch?.[1]) {
 			return locationMatch[1];
 		}

@@ -304,7 +304,6 @@ export const productRelations = pgTable("product_relations", {
 	createdAt: timestamp("created_at").defaultNow(),
 });
 
-
 // ============================================================================
 // Archives: track all downloaded files
 // ============================================================================
@@ -343,6 +342,45 @@ export const archives = pgTable(
 			table.downloadedAt,
 		),
 		runIdIdx: index("idx_archives_run_id").on(table.runId),
+	}),
+);
+
+// ============================================================================
+// Parquet Files: track generated Parquet files and ClickHouse import status
+// ============================================================================
+
+export const parquetFiles = pgTable(
+	"parquet_files",
+	{
+		id: cuid2("pqf").primaryKey(),
+		chainSlug: text("chain_slug")
+			.notNull()
+			.references(() => chains.slug, { onDelete: "cascade" }),
+		targetDate: date("target_date").notNull(),
+		storageKey: text("storage_key").notNull(),
+		fileSize: bigint("file_size", { mode: "number" }),
+		checksum: text("checksum"),
+		importedAt: timestamp("imported_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		chainDateIdx: index("idx_parquet_files_chain_date").on(
+			table.chainSlug,
+			table.targetDate,
+		),
+		storageKeyIdx: uniqueIndex("parquet_files_storage_key_unique").on(
+			table.storageKey,
+		),
+		chainDateUnique: uniqueIndex("parquet_files_chain_date_unique").on(
+			table.chainSlug,
+			table.targetDate,
+		),
+		importedAtIdx: index("idx_parquet_files_imported_at").on(table.importedAt),
 	}),
 );
 
@@ -449,7 +487,6 @@ export const ingestionChunks = pgTable(
 		statusIdx: index("ingestion_chunks_status_idx").on(table.status),
 	}),
 );
-
 
 export const ingestionErrors = pgTable("ingestion_errors", {
 	id: bigserial({ mode: "bigint" }).primaryKey(),
@@ -558,7 +595,6 @@ export const storeEnrichmentTasks = pgTable(
 		statusIdx: index("store_enrichment_tasks_status_idx").on(table.status),
 	}),
 );
-
 
 // ============================================================================
 // Product Matching: Match candidates, review queue, rejections, audit

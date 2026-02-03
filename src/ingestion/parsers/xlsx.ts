@@ -77,13 +77,24 @@ export class XlsxParser {
 	}
 
 	parse(content: Buffer): ParseResult {
-		return this.parseWithStoreId(content, this.options.defaultStoreIdentifier ?? "");
+		return this.parseWithStoreId(
+			content,
+			this.options.defaultStoreIdentifier ?? "",
+		);
 	}
 
 	parseWithStoreId(content: Buffer, defaultStoreId: string): ParseResult {
-		const primary = this.parseWithMapping(content, this.options.columnMapping, defaultStoreId);
+		const primary = this.parseWithMapping(
+			content,
+			this.options.columnMapping,
+			defaultStoreId,
+		);
 		if (primary.validRows === 0 && this.altMapping) {
-			const alt = this.parseWithMapping(content, this.altMapping, defaultStoreId);
+			const alt = this.parseWithMapping(
+				content,
+				this.altMapping,
+				defaultStoreId,
+			);
 			if (alt.validRows > 0) {
 				return alt;
 			}
@@ -108,7 +119,9 @@ export class XlsxParser {
 		try {
 			workbook = XLSX.read(content, { type: "buffer", cellDates: true });
 		} catch (error) {
-			result.errors.push({ message: `Failed to parse Excel file: ${String(error)}` });
+			result.errors.push({
+				message: `Failed to parse Excel file: ${String(error)}`,
+			});
 			return result;
 		}
 
@@ -143,7 +156,8 @@ export class XlsxParser {
 
 		if (!mapping) {
 			result.errors.push({
-				message: "No column mapping provided. Cannot map Excel columns to normalized fields.",
+				message:
+					"No column mapping provided. Cannot map Excel columns to normalized fields.",
 			});
 			return result;
 		}
@@ -162,7 +176,12 @@ export class XlsxParser {
 				continue;
 			}
 
-			const mapped = mapRowToNormalized(rawRow, rowNumber, indices, defaultStoreId);
+			const mapped = mapRowToNormalized(
+				rawRow,
+				rowNumber,
+				indices,
+				defaultStoreId,
+			);
 			result.errors.push(...mapped.errors);
 			result.warnings.push(...mapped.warnings);
 			if (mapped.row) {
@@ -186,7 +205,10 @@ export class XlsxParser {
 	}
 }
 
-function selectSheet(workbook: XLSX.WorkBook, sheetNameOrIndex?: string | number): string | null {
+function selectSheet(
+	workbook: XLSX.WorkBook,
+	sheetNameOrIndex?: string | number,
+): string | null {
 	const sheetList = workbook.SheetNames;
 	if (sheetList.length === 0) {
 		return null;
@@ -200,7 +222,10 @@ function selectSheet(workbook: XLSX.WorkBook, sheetNameOrIndex?: string | number
 	return sheetList.find((name) => name === sheetNameOrIndex) ?? null;
 }
 
-function buildColumnIndices(headers: string[], mapping: XlsxColumnMapping): ResolvedColumnIndices | string {
+function buildColumnIndices(
+	headers: string[],
+	mapping: XlsxColumnMapping,
+): ResolvedColumnIndices | string {
 	const resolveIndex = (col?: XlsxColumnIndex): number => {
 		if (!col) {
 			return invalidIndex;
@@ -210,7 +235,9 @@ function buildColumnIndices(headers: string[], mapping: XlsxColumnMapping): Reso
 		}
 		if (col.header) {
 			const headerLower = col.header.trim().toLowerCase();
-			const idx = headers.findIndex((header) => header.trim().toLowerCase() === headerLower);
+			const idx = headers.findIndex(
+				(header) => header.trim().toLowerCase() === headerLower,
+			);
 			return idx === -1 ? invalidIndex : idx;
 		}
 		return invalidIndex;
@@ -290,7 +317,8 @@ function mapRowToNormalized(
 		return rawRow[index];
 	};
 
-	const getString = (index: number): string => cellToString(getRawValue(index)).trim();
+	const getString = (index: number): string =>
+		cellToString(getRawValue(index)).trim();
 	const getOptionalString = (index: number): string | undefined => {
 		const value = getString(index);
 		return value ? value : undefined;
@@ -370,7 +398,8 @@ function mapRowToNormalized(
 
 	const anchorPriceAsOf = parseDate(getRawValue(indices.anchorPriceAsOf));
 
-	const storeIdentifier = getOptionalString(indices.storeIdentifier) ?? defaultStoreId;
+	const storeIdentifier =
+		getOptionalString(indices.storeIdentifier) ?? defaultStoreId;
 	const name = getString(indices.name);
 	if (!name) {
 		errors.push({ rowNumber, field: "name", message: "Name is required" });
@@ -466,17 +495,35 @@ function parseDate(value: unknown): Date | undefined {
 
 	const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
 	if (isoMatch) {
-		return new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+		return new Date(
+			Date.UTC(
+				Number(isoMatch[1]),
+				Number(isoMatch[2]) - 1,
+				Number(isoMatch[3]),
+			),
+		);
 	}
 
 	const dotMatch = trimmed.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
 	if (dotMatch) {
-		return new Date(Date.UTC(Number(dotMatch[3]), Number(dotMatch[2]) - 1, Number(dotMatch[1])));
+		return new Date(
+			Date.UTC(
+				Number(dotMatch[3]),
+				Number(dotMatch[2]) - 1,
+				Number(dotMatch[1]),
+			),
+		);
 	}
 
 	const slashMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
 	if (slashMatch) {
-		return new Date(Date.UTC(Number(slashMatch[3]), Number(slashMatch[2]) - 1, Number(slashMatch[1])));
+		return new Date(
+			Date.UTC(
+				Number(slashMatch[3]),
+				Number(slashMatch[2]) - 1,
+				Number(slashMatch[1]),
+			),
+		);
 	}
 
 	const parsed = Date.parse(trimmed);

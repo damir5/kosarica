@@ -36,7 +36,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { orpc } from "@/orpc/client";
 
-export const Route = createFileRoute("/_admin/admin/ingestion/" as any)({
+export const Route = createFileRoute("/_admin/admin/ingestion/")({
 	component: IngestionDashboard,
 });
 
@@ -44,8 +44,6 @@ type TimeRange = "24h" | "7d" | "30d";
 type RunStatus = "pending" | "running" | "completed" | "failed";
 
 import type { IngestionRun } from "@/components/admin/ingestion";
-// Import types from Go service SDK
-import type { HandlersIngestionRun } from "@/lib/go-api";
 
 interface TriggerResponse {
 	runId?: string;
@@ -65,8 +63,28 @@ type TriggerBatchResult = {
 	failures: Array<{ date: string; error: string }>;
 };
 
-// Map SDK response to component's expected interface
-function mapToIngestionRun(run: HandlersIngestionRun): IngestionRun {
+interface IngestionRunResponse {
+	id?: string;
+	chainSlug?: string;
+	source?: string;
+	status?: string;
+	statusReason?: string | null;
+	statusSeverity?: string | null;
+	statusType?: string | null;
+	startedAt?: string | null;
+	completedAt?: string | null;
+	targetDate?: string | null;
+	totalFiles?: number | null;
+	processedFiles?: number | null;
+	totalEntries?: number | null;
+	processedEntries?: number | null;
+	errorCount?: number | null;
+	metadata?: string | null;
+	createdAt?: string | null;
+}
+
+// Map API response to component's expected interface
+function mapToIngestionRun(run: IngestionRunResponse): IngestionRun {
 	return {
 		id: run.id ?? "",
 		chainSlug: run.chainSlug ?? "",
@@ -122,10 +140,16 @@ function buildDateRange(startValue: string, endValue: string) {
 	const startDate = parseIsoDate(startValue);
 	const endDate = parseIsoDate(endValue);
 	if (!startDate || !endDate) {
-		return { dates: [] as string[], error: "Select a valid start and end date." };
+		return {
+			dates: [] as string[],
+			error: "Select a valid start and end date.",
+		};
 	}
 	if (endDate < startDate) {
-		return { dates: [] as string[], error: "End date must be after start date." };
+		return {
+			dates: [] as string[],
+			error: "End date must be after start date.",
+		};
 	}
 	const dates: string[] = [];
 	const cursor = new Date(startDate.getTime());
@@ -506,8 +530,8 @@ function IngestionDashboard() {
 							) : (
 								<p className="text-xs text-muted-foreground">
 									{scheduleDates.length} task
-									{scheduleDates.length === 1 ? "" : "s"} will be scheduled
-									for {scheduleLabel}.
+									{scheduleDates.length === 1 ? "" : "s"} will be scheduled for{" "}
+									{scheduleLabel}.
 								</p>
 							)}
 						</div>
@@ -538,10 +562,7 @@ function IngestionDashboard() {
 							<div className="mt-3 p-3 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm space-y-2">
 								<div>
 									Scheduled {triggerResult.successes.length} ingestion{" "}
-									{triggerResult.successes.length === 1
-										? "task"
-										: "tasks"}{" "}
-									for{" "}
+									{triggerResult.successes.length === 1 ? "task" : "tasks"} for{" "}
 									{CHAINS.find(
 										(chain) => chain.slug === triggerResult.chainSlug,
 									)?.name ?? triggerResult.chainSlug}{" "}
@@ -566,9 +587,7 @@ function IngestionDashboard() {
 											))}
 										{triggerResult.successes.filter(
 											(item) => item.response.runId,
-										).length > 3 && (
-											<Badge variant="outline">+more</Badge>
-										)}
+										).length > 3 && <Badge variant="outline">+more</Badge>}
 									</div>
 								)}
 							</div>
@@ -577,10 +596,8 @@ function IngestionDashboard() {
 							<div className="mt-3 p-3 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-sm space-y-2">
 								<div>
 									Failed to schedule {triggerResult.failures.length}{" "}
-									{triggerResult.failures.length === 1
-										? "task"
-										: "tasks"}
-									. Please retry the affected dates.
+									{triggerResult.failures.length === 1 ? "task" : "tasks"}.
+									Please retry the affected dates.
 								</div>
 								<div className="space-y-1">
 									{triggerResult.failures.slice(0, 3).map((failure) => (

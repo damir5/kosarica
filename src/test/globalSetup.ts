@@ -1,3 +1,4 @@
+import type { ExecException } from "node:child_process";
 import { exec } from "node:child_process";
 import postgres from "postgres";
 
@@ -72,7 +73,7 @@ async function applyMigrations(): Promise<void> {
 		exec(
 			"pnpm db:migrate",
 			{ cwd: process.cwd(), env: process.env },
-			(err: any, stdout: string, stderr: string) => {
+			(err: ExecException | null, stdout: string, stderr: string) => {
 				if (stdout) process.stdout.write(stdout);
 				if (stderr) process.stderr.write(stderr);
 				if (err) return reject(err);

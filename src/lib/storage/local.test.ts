@@ -1,9 +1,9 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
 import * as path from "node:path";
-import { LocalStorage, MIN_COMPRESSION_SIZE, computeChecksum } from "./local";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { computeChecksum, LocalStorage, MIN_COMPRESSION_SIZE } from "./local";
 
 const TEST_STORAGE_PATH = join(tmpdir(), "storage-test");
 

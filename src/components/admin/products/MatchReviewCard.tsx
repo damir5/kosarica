@@ -213,9 +213,10 @@ export function MatchReviewCard({
 						{/* Candidates List */}
 						<div className="space-y-3">
 							{item.candidates.map((candidate) => (
-								<div
+								<button
+									type="button"
 									key={candidate.candidateProductId}
-									className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+									className={`border rounded-lg p-4 cursor-pointer transition-colors text-left w-full ${
 										selectedProductId === candidate.candidateProductId
 											? "border-primary bg-primary/5"
 											: "border-border hover:border-primary/50"
@@ -223,13 +224,6 @@ export function MatchReviewCard({
 									onClick={() =>
 										setSelectedProductId(candidate.candidateProductId)
 									}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" || e.key === " ") {
-											setSelectedProductId(candidate.candidateProductId);
-										}
-									}}
-									role="button"
-									tabIndex={0}
 								>
 									<div className="flex items-start gap-4">
 										{/* Product Image */}
@@ -300,7 +294,7 @@ export function MatchReviewCard({
 											<X className="h-4 w-4" />
 										</Button>
 									</div>
-								</div>
+								</button>
 							))}
 						</div>
 
@@ -430,24 +424,18 @@ function ProductSearchModal({
 						</div>
 					) : (
 						results.map((product) => (
-							<div
+							<button
+								type="button"
 								key={product.id}
-								className="border rounded-lg p-3 hover:border-primary cursor-pointer"
+								className="border rounded-lg p-3 hover:border-primary cursor-pointer text-left w-full"
 								onClick={() => onSelect(product.id)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										onSelect(product.id);
-									}
-								}}
-								role="button"
-								tabIndex={0}
 							>
 								<div className="font-medium">{product.name}</div>
 								<div className="text-sm text-muted-foreground">
 									{product.brand && <span>{product.brand}</span>}
 									{product.category && <span> • {product.category}</span>}
 								</div>
-							</div>
+							</button>
 						))
 					)}
 				</div>

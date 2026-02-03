@@ -14,6 +14,14 @@ CREATE TABLE "account" (
 	"updatedAt" timestamp NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "active_ingestion_operations" (
+	"id" text PRIMARY KEY DEFAULT gen_random_uuid()::TEXT NOT NULL,
+	"chain_slug" text NOT NULL,
+	"target_date" date NOT NULL,
+	"task_id" text NOT NULL,
+	"started_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "app_settings" (
 	"id" text PRIMARY KEY NOT NULL,
 	"appName" text DEFAULT 'Kosarica',
@@ -174,6 +182,18 @@ CREATE TABLE "ingestion_store_stats" (
 	"failed_rows" integer DEFAULT 0 NOT NULL,
 	"warning_rows" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "parquet_files" (
+	"id" text PRIMARY KEY NOT NULL,
+	"chain_slug" text NOT NULL,
+	"target_date" date NOT NULL,
+	"storage_key" text NOT NULL,
+	"file_size" bigint,
+	"checksum" text,
+	"imported_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "passkey" (
@@ -459,6 +479,7 @@ ALTER TABLE "ingestion_runs" ADD CONSTRAINT "ingestion_runs_archive_id_archives_
 ALTER TABLE "ingestion_store_stats" ADD CONSTRAINT "ingestion_store_stats_run_id_ingestion_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."ingestion_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ingestion_store_stats" ADD CONSTRAINT "ingestion_store_stats_file_id_ingestion_files_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."ingestion_files"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ingestion_store_stats" ADD CONSTRAINT "ingestion_store_stats_store_id_stores_id_fk" FOREIGN KEY ("store_id") REFERENCES "public"."stores"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "parquet_files" ADD CONSTRAINT "parquet_files_chain_slug_chains_slug_fk" FOREIGN KEY ("chain_slug") REFERENCES "public"."chains"("slug") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "passkey" ADD CONSTRAINT "passkey_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "price_tiers" ADD CONSTRAINT "price_tiers_chain_slug_chains_slug_fk" FOREIGN KEY ("chain_slug") REFERENCES "public"."chains"("slug") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "price_tiers" ADD CONSTRAINT "price_tiers_retailer_item_id_retailer_items_id_fk" FOREIGN KEY ("retailer_item_id") REFERENCES "public"."retailer_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -491,6 +512,9 @@ ALTER TABLE "store_price_refs" ADD CONSTRAINT "store_price_refs_price_tier_id_pr
 ALTER TABLE "stores" ADD CONSTRAINT "stores_chain_slug_chains_slug_fk" FOREIGN KEY ("chain_slug") REFERENCES "public"."chains"("slug") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "stores" ADD CONSTRAINT "stores_price_source_store_id_stores_id_fk" FOREIGN KEY ("price_source_store_id") REFERENCES "public"."stores"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "stores" ADD CONSTRAINT "stores_approved_by_user_id_fk" FOREIGN KEY ("approved_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "unique_active_op" ON "active_ingestion_operations" USING btree ("chain_slug","target_date");--> statement-breakpoint
+CREATE INDEX "idx_active_ops_chain_date" ON "active_ingestion_operations" USING btree ("chain_slug","target_date");--> statement-breakpoint
+CREATE INDEX "idx_active_ops_task_id" ON "active_ingestion_operations" USING btree ("task_id");--> statement-breakpoint
 CREATE INDEX "idx_archives_chain_slug" ON "archives" USING btree ("chain_slug");--> statement-breakpoint
 CREATE INDEX "idx_archives_downloaded_at" ON "archives" USING btree ("downloaded_at");--> statement-breakpoint
 CREATE INDEX "idx_archives_checksum" ON "archives" USING btree ("checksum");--> statement-breakpoint
@@ -511,6 +535,10 @@ CREATE INDEX "idx_ingestion_runs_active" ON "ingestion_runs" USING btree ("chain
 CREATE INDEX "ingestion_store_stats_run_idx" ON "ingestion_store_stats" USING btree ("run_id");--> statement-breakpoint
 CREATE INDEX "ingestion_store_stats_file_idx" ON "ingestion_store_stats" USING btree ("file_id");--> statement-breakpoint
 CREATE INDEX "ingestion_store_stats_store_idx" ON "ingestion_store_stats" USING btree ("store_id");--> statement-breakpoint
+CREATE INDEX "idx_parquet_files_chain_date" ON "parquet_files" USING btree ("chain_slug","target_date");--> statement-breakpoint
+CREATE UNIQUE INDEX "parquet_files_storage_key_unique" ON "parquet_files" USING btree ("storage_key");--> statement-breakpoint
+CREATE UNIQUE INDEX "parquet_files_chain_date_unique" ON "parquet_files" USING btree ("chain_slug","target_date");--> statement-breakpoint
+CREATE INDEX "idx_parquet_files_imported_at" ON "parquet_files" USING btree ("imported_at");--> statement-breakpoint
 CREATE INDEX "idx_price_tiers_item" ON "price_tiers" USING btree ("retailer_item_id");--> statement-breakpoint
 CREATE INDEX "idx_price_tiers_chain" ON "price_tiers" USING btree ("chain_slug");--> statement-breakpoint
 CREATE INDEX "idx_price_tiers_last_seen" ON "price_tiers" USING btree ("last_seen_at");--> statement-breakpoint
@@ -551,3 +579,20 @@ CREATE INDEX "idx_task_queue_scheduled" ON "task_queue" USING btree ("scheduled_
 CREATE INDEX "idx_task_queue_worker" ON "task_queue" USING btree ("worker_id");--> statement-breakpoint
 CREATE INDEX "idx_task_queue_type_priority" ON "task_queue" USING btree ("task_type","priority","scheduled_for");--> statement-breakpoint
 CREATE INDEX "idx_task_queue_parent" ON "task_queue" USING btree ("parent_task_id") WHERE parent_task_id IS NOT NULL;
+--> statement-breakpoint
+-- Seed essential reference data
+-- These are required for the application to function
+INSERT INTO chains (slug, name, website, logo_url, created_at)
+VALUES
+  ('konzum', 'Konzum', 'https://www.konzum.hr', NULL, NOW()),
+  ('lidl', 'Lidl', 'https://www.lidl.hr', NULL, NOW()),
+  ('plodine', 'Plodine', 'https://www.plodine.hr', NULL, NOW()),
+  ('interspar', 'Interspar', 'https://www.interspar.hr', NULL, NOW()),
+  ('studenac', 'Studenac', 'https://www.studenac.hr', NULL, NOW()),
+  ('kaufland', 'Kaufland', 'https://www.kaufland.hr', NULL, NOW()),
+  ('eurospin', 'Eurospin', 'https://www.eurospin.hr', NULL, NOW()),
+  ('dm', 'dm', 'https://www.dm.hr', NULL, NOW()),
+  ('ktc', 'KTC', 'https://www.ktc.hr', NULL, NOW()),
+  ('metro', 'Metro', 'https://www.metro.hr', NULL, NOW()),
+  ('trgocentar', 'Trgocentar', 'https://www.trgocentar.hr', NULL, NOW())
+ON CONFLICT (slug) DO NOTHING;

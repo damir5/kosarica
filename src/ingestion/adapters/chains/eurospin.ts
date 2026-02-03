@@ -1,8 +1,13 @@
-import type { DiscoveredFile, ExpandedFile, ParseOptions, ParseResult } from "../../types";
-import { BaseCsvAdapter } from "../base/csv";
-import { chainConfigs } from "../config";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
+import type {
+	DiscoveredFile,
+	ExpandedFile,
+	ParseOptions,
+	ParseResult,
+} from "../../types";
+import { BaseCsvAdapter } from "../base/csv";
+import { chainConfigs } from "../config";
 
 const eurospinColumnMapping: CsvColumnMapping = {
 	externalId: "ŠIFRA_PROIZVODA",
@@ -81,10 +86,13 @@ export class EurospinAdapter extends BaseCsvAdapter {
 
 		const response = await this.fetchWithRetry(this.baseUrl());
 		if (!response.ok) {
-			throw new Error(`Failed to fetch Eurospin portal: status ${response.status}`);
+			throw new Error(
+				`Failed to fetch Eurospin portal: status ${response.status}`,
+			);
 		}
 		const html = await response.text();
-		const optionPattern = /<option[^>]*value=["']([^"']*cjenik_[^"']*\.zip)["'][^>]*>([^<]*)<\/option>/gi;
+		const optionPattern =
+			/<option[^>]*value=["']([^"']*cjenik_[^"']*\.zip)["'][^>]*>([^<]*)<\/option>/gi;
 		let match: RegExpExecArray | null;
 		while ((match = optionPattern.exec(html)) !== null) {
 			const rawUrl = match[1];
@@ -123,7 +131,11 @@ export class EurospinAdapter extends BaseCsvAdapter {
 		return expanded.filter((file) => file.type === "csv");
 	}
 
-	async parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult> {
 		return super.parse(content, filename, options);
 	}
 

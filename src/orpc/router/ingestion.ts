@@ -1,14 +1,5 @@
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import * as z from "zod";
-import {
-	and,
-	asc,
-	desc,
-	eq,
-	gte,
-	inArray,
-	lte,
-	sql,
-} from "drizzle-orm";
 import { getDatabase } from "@/db";
 import {
 	ingestionChunks,
@@ -50,7 +41,15 @@ const TIME_RANGE_MS = {
 	"30d": 30 * 24 * 60 * 60 * 1000,
 } as const;
 
-const ChainSlugSchema = z.string();
+// Validation schemas for IDs
+// CUID2 pattern: starts with a letter, followed by alphanumeric characters, typically 25 chars total
+// See: https://github.com/paralleldrive/cuid2#specification
+const Cuid2Schema = z
+	.string()
+	.min(1)
+	.regex(/^[a-z0-9]+$/, "Invalid CUID2 format");
+
+const ChainSlugSchema = z.string().min(1);
 const IngestionStatusSchema = z.enum([
 	"pending",
 	"running",
@@ -173,7 +172,7 @@ export const listRuns = procedure
 	});
 
 export const getRun = procedure
-	.input(z.object({ runId: z.string() }))
+	.input(z.object({ runId: Cuid2Schema }))
 	.handler(async ({ input }) => {
 		const db = getDatabase();
 		const [run] = await db
@@ -192,7 +191,7 @@ export const getRun = procedure
 export const listFiles = procedure
 	.input(
 		z.object({
-			runId: z.string(),
+			runId: Cuid2Schema,
 			limit: z.number().int().min(1).max(100).default(50),
 			offset: z.number().int().min(0).default(0),
 		}),
@@ -260,7 +259,7 @@ export const listFiles = procedure
 export const listErrors = procedure
 	.input(
 		z.object({
-			runId: z.string(),
+			runId: Cuid2Schema,
 			limit: z.number().int().min(1).max(100).default(50),
 			offset: z.number().int().min(0).default(0),
 		}),
@@ -300,7 +299,7 @@ export const listErrors = procedure
 export const listRunStoreStats = procedure
 	.input(
 		z.object({
-			runId: z.string(),
+			runId: Cuid2Schema,
 			limit: z.number().int().min(1).max(100).default(50),
 			offset: z.number().int().min(0).default(0),
 		}),
@@ -345,7 +344,8 @@ export const listRunStoreStats = procedure
 			FROM ingestion_store_stats
 			WHERE run_id = ${input.runId}
 		`);
-		const countRows = ((countResult as { rows?: unknown[] }).rows ?? []) as Array<{
+		const countRows = ((countResult as { rows?: unknown[] }).rows ??
+			[]) as Array<{
 			count: number;
 		}>;
 		const total = Number(countRows[0]?.count ?? 0);
@@ -489,9 +489,9 @@ export const triggerChain = procedure
 export const rerunRun = procedure
 	.input(
 		z.object({
-			runId: z.string(),
+			runId: Cuid2Schema,
 			rerunType: z.enum(["file", "chunk", "entry"]).default("file"),
-			targetId: z.string(),
+			targetId: z.string().min(1), // Can be fileId or chunkId
 		}),
 	)
 	.handler(async ({ input }) => {
@@ -511,7 +511,7 @@ export const rerunRun = procedure
 	});
 
 export const deleteRun = procedure
-	.input(z.object({ runId: z.string() }))
+	.input(z.object({ runId: Cuid2Schema }))
 	.handler(async ({ input }) => {
 		const db = getDatabase();
 		await db.delete(ingestionRuns).where(eq(ingestionRuns.id, input.runId));
@@ -519,10 +519,17 @@ export const deleteRun = procedure
 	});
 
 export const getFile = procedure
-	.input(z.object({ fileId: z.string() }))
+	.input(
+		z.object({
+			fileId: z
+				.string()
+				.regex(/^\d+$/, "File ID must be a numeric string")
+				.transform((v) => BigInt(v)),
+		}),
+	)
 	.handler(async ({ input }) => {
 		const db = getDatabase();
-		const fileId = BigInt(input.fileId);
+		const fileId = input.fileId;
 		const [file] = await db
 			.select()
 			.from(ingestionFiles)
@@ -564,7 +571,10 @@ export const getFile = procedure
 export const listChunks = procedure
 	.input(
 		z.object({
-			fileId: z.string(),
+			fileId: z
+				.string()
+				.regex(/^\d+$/, "File ID must be a numeric string")
+				.transform((v) => BigInt(v)),
 			status: z
 				.enum(["pending", "processing", "completed", "failed"])
 				.optional(),
@@ -574,7 +584,7 @@ export const listChunks = procedure
 	)
 	.handler(async ({ input }) => {
 		const db = getDatabase();
-		const fileId = BigInt(input.fileId);
+		const fileId = input.fileId;
 		const offset = (input.page - 1) * input.pageSize;
 		const conditions = [eq(ingestionChunks.fileId, fileId)];
 
@@ -619,10 +629,17 @@ export const listChunks = procedure
 	});
 
 export const rerunFile = procedure
-	.input(z.object({ fileId: z.string() }))
+	.input(
+		z.object({
+			fileId: z
+				.string()
+				.regex(/^\d+$/, "File ID must be a numeric string")
+				.transform((v) => BigInt(v)),
+		}),
+	)
 	.handler(async ({ input }) => {
 		const db = getDatabase();
-		const fileId = BigInt(input.fileId);
+		const fileId = input.fileId;
 		const [file] = await db
 			.select({ runId: ingestionFiles.runId })
 			.from(ingestionFiles)
@@ -639,7 +656,7 @@ export const rerunFile = procedure
 				type: "rerun",
 				originalRunId: file.runId,
 				rerunType: "file",
-				targetId: input.fileId,
+				targetId: input.fileId.toString(),
 			},
 		});
 
@@ -647,7 +664,7 @@ export const rerunFile = procedure
 	});
 
 export const rerunChunk = procedure
-	.input(z.object({ chunkId: z.string() }))
+	.input(z.object({ chunkId: Cuid2Schema }))
 	.handler(async ({ input }) => {
 		const db = getDatabase();
 		const [chunk] = await db
@@ -688,14 +705,17 @@ export const rerunChunk = procedure
 export const listFileErrors = procedure
 	.input(
 		z.object({
-			fileId: z.string(),
+			fileId: z
+				.string()
+				.regex(/^\d+$/, "File ID must be a numeric string")
+				.transform((v) => BigInt(v)),
 			page: z.number().int().min(1).default(1),
 			pageSize: z.number().int().min(1).max(100).default(10),
 		}),
 	)
 	.handler(async ({ input }) => {
 		const db = getDatabase();
-		const fileId = BigInt(input.fileId);
+		const fileId = input.fileId;
 		const offset = (input.page - 1) * input.pageSize;
 
 		const errors = await db
@@ -728,14 +748,17 @@ export const listFileErrors = procedure
 export const listFileStoreStats = procedure
 	.input(
 		z.object({
-			fileId: z.string(),
+			fileId: z
+				.string()
+				.regex(/^\d+$/, "File ID must be a numeric string")
+				.transform((v) => BigInt(v)),
 			limit: z.number().int().min(1).max(100).default(50),
 			offset: z.number().int().min(0).default(0),
 		}),
 	)
 	.handler(async ({ input }) => {
 		const db = getDatabase();
-		const fileId = BigInt(input.fileId);
+		const fileId = input.fileId;
 		const result = await db.execute(sql`
 			SELECT
 				stats.store_id AS "storeId",
@@ -773,7 +796,8 @@ export const listFileStoreStats = procedure
 			FROM ingestion_store_stats
 			WHERE file_id = ${fileId}
 		`);
-		const countRows = ((countResult as { rows?: unknown[] }).rows ?? []) as Array<{
+		const countRows = ((countResult as { rows?: unknown[] }).rows ??
+			[]) as Array<{
 			count: number;
 		}>;
 		const total = Number(countRows[0]?.count ?? 0);

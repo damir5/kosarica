@@ -7,7 +7,7 @@ export const Route = createFileRoute("/login")({
 		const redirect =
 			typeof search.redirect === "string" ? search.redirect : undefined;
 		const safeRedirect =
-			redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+			redirect?.startsWith("/") && !redirect.startsWith("//")
 				? redirect
 				: undefined;
 		return {

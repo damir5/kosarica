@@ -1,8 +1,4 @@
-import {
-	and,
-	eq,
-	inArray,
-} from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "@/db";
 import {
 	activeIngestionOperations,
@@ -18,8 +14,9 @@ import {
 	storeIdentifiers,
 	stores,
 } from "@/db/schema";
-import { getAdapter } from "@/ingestion/adapters/registry";
 import { getChainConfig } from "@/ingestion/adapters/config";
+import { getAdapter } from "@/ingestion/adapters/registry";
+import { type ParquetPriceRow, writePricesParquet } from "@/ingestion/parquet";
 import type {
 	DiscoveredFile,
 	NormalizedRow,
@@ -31,7 +28,6 @@ import {
 	buildParquetKey,
 	getStorage,
 } from "@/lib/storage";
-import { writePricesParquet, type ParquetPriceRow } from "@/ingestion/parquet";
 import { generatePrefixedId } from "@/utils/id";
 import { createLogger, errorToObject } from "@/utils/logger";
 
@@ -98,7 +94,12 @@ async function resolveStoreId(
 	chainSlug: string,
 	storeIdentifier: string,
 	storeIdentifierType: string,
-	metadata: { name?: string; address?: string; city?: string; postalCode?: string } | null,
+	metadata: {
+		name?: string;
+		address?: string;
+		city?: string;
+		postalCode?: string;
+	} | null,
 	cache: Map<string, string>,
 ): Promise<string> {
 	const cached = cache.get(storeIdentifier);
@@ -170,7 +171,10 @@ async function findRetailerItemByExternalId(
 		.select({ id: retailerItems.id })
 		.from(retailerItems)
 		.where(
-			and(eq(retailerItems.chainSlug, chainSlug), eq(retailerItems.externalId, externalId)),
+			and(
+				eq(retailerItems.chainSlug, chainSlug),
+				eq(retailerItems.externalId, externalId),
+			),
 		)
 		.limit(1);
 
@@ -319,7 +323,10 @@ async function upsertRetailerItem(
 			isPrimary: barcode === primaryBarcode,
 			createdAt: new Date(),
 		}));
-		await db.insert(retailerItemBarcodes).values(barcodeRows).onConflictDoNothing();
+		await db
+			.insert(retailerItemBarcodes)
+			.values(barcodeRows)
+			.onConflictDoNothing();
 		for (const barcode of row.barcodes) {
 			cacheByBarcode.set(`${chainSlug}:barcode:${barcode}`, itemId);
 		}
@@ -364,28 +371,30 @@ async function createArchiveRecord(
 		? Number(info.metadata?.custom?.original_size ?? content.length)
 		: content.length;
 
-	await getDatabase().insert(archives).values({
-		id: archiveId,
-		chainSlug,
-		sourceUrl: file.url,
-		filename: file.filename,
-		originalFormat: file.type,
-		archivePath: storageKey,
-		archiveType: "local",
-		contentType: info.metadata?.contentType,
-		fileSize: originalSize,
-		compressedSize: compressed ? info.size : null,
-		isCompressed: compressed,
-		checksum: info.checksum,
-		downloadedAt,
-		metadata: {
-			originalFilename: file.filename,
-			fileType: file.type,
-		},
-		createdAt: new Date(),
-		updatedAt: new Date(),
-		runId,
-	});
+	await getDatabase()
+		.insert(archives)
+		.values({
+			id: archiveId,
+			chainSlug,
+			sourceUrl: file.url,
+			filename: file.filename,
+			originalFormat: file.type,
+			archivePath: storageKey,
+			archiveType: "local",
+			contentType: info.metadata?.contentType,
+			fileSize: originalSize,
+			compressedSize: compressed ? info.size : null,
+			isCompressed: compressed,
+			checksum: info.checksum,
+			downloadedAt,
+			metadata: {
+				originalFilename: file.filename,
+				fileType: file.type,
+			},
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			runId,
+		});
 
 	return archiveId;
 }
@@ -399,7 +408,7 @@ async function recordParquetFile(
 	const info = await storage.getInfo(storageKey);
 	const db = getDatabase();
 
-	const targetDateStr = targetDate.toISOString().split('T')[0];
+	const targetDateStr = targetDate.toISOString().split("T")[0];
 	await db
 		.insert(parquetFiles)
 		.values({
@@ -437,18 +446,20 @@ async function insertErrors(
 	if (errors.length === 0) {
 		return;
 	}
-	await getDatabase().insert(ingestionErrors).values(
-		errors.map((err) => ({
-			runId: err.runId,
-			fileId: err.fileId,
-			errorType: err.errorType,
-			errorMessage: err.errorMessage,
-			errorDetails: err.errorDetails ?? null,
-			severity: err.severity ?? "error",
-			entryId: err.entryId ?? null,
-			createdAt: new Date(),
-		})),
-	);
+	await getDatabase()
+		.insert(ingestionErrors)
+		.values(
+			errors.map((err) => ({
+				runId: err.runId,
+				fileId: err.fileId,
+				errorType: err.errorType,
+				errorMessage: err.errorMessage,
+				errorDetails: err.errorDetails ?? null,
+				severity: err.severity ?? "error",
+				entryId: err.entryId ?? null,
+				createdAt: new Date(),
+			})),
+		);
 }
 
 async function insertFailedRows(
@@ -465,18 +476,20 @@ async function insertFailedRows(
 		return;
 	}
 
-	await getDatabase().insert(retailerItemsFailed).values(
-		rows.map((entry) => ({
-			id: generatePrefixedId("id"),
-			chainSlug: entry.chainSlug,
-			runId: entry.runId,
-			fileId: entry.fileId,
-			storeIdentifier: entry.storeIdentifier,
-			rowNumber: entry.row.rowNumber,
-			rawData: entry.row.rawData,
-			validationErrors: buildValidationErrors(entry.row, entry.errors),
-		})),
-	);
+	await getDatabase()
+		.insert(retailerItemsFailed)
+		.values(
+			rows.map((entry) => ({
+				id: generatePrefixedId("id"),
+				chainSlug: entry.chainSlug,
+				runId: entry.runId,
+				fileId: entry.fileId,
+				storeIdentifier: entry.storeIdentifier,
+				rowNumber: entry.row.rowNumber,
+				rawData: entry.row.rawData,
+				validationErrors: buildValidationErrors(entry.row, entry.errors),
+			})),
+		);
 }
 
 function mapParseErrors(
@@ -484,14 +497,14 @@ function mapParseErrors(
 	fileId: bigint,
 	parseResult: ParseResult,
 ): Array<{
-		runId: string;
-		fileId: bigint;
-		errorType: string;
-		errorMessage: string;
-		errorDetails?: string | null;
-		severity?: string;
-		entryId?: string | null;
-	}> {
+	runId: string;
+	fileId: bigint;
+	errorType: string;
+	errorMessage: string;
+	errorDetails?: string | null;
+	severity?: string;
+	entryId?: string | null;
+}> {
 	return parseResult.errors.map((err) => ({
 		runId,
 		fileId,
@@ -630,7 +643,10 @@ export async function runIngestion(
 			);
 
 			if (file.type === "zip" && adapter.expandZip) {
-				const expanded = await adapter.expandZip(fetched.content, file.filename);
+				const expanded = await adapter.expandZip(
+					fetched.content,
+					file.filename,
+				);
 				for (const inner of expanded) {
 					const expandedKey = buildExpandedKey(
 						chainSlug,
@@ -706,7 +722,9 @@ export async function runIngestion(
 				.returning({ id: ingestionFiles.id });
 
 			if (!fileRow) {
-				throw new Error(`Failed to create ingestion file record for ${fileEntry.filename}`);
+				throw new Error(
+					`Failed to create ingestion file record for ${fileEntry.filename}`,
+				);
 			}
 
 			const fileId = fileRow.id;
@@ -822,8 +840,7 @@ export async function runIngestion(
 					itemCacheByBarcode,
 				);
 
-				const primaryBarcode =
-					row.barcodes.length > 0 ? row.barcodes[0] : null;
+				const primaryBarcode = row.barcodes.length > 0 ? row.barcodes[0] : null;
 
 				parquetRows.push({
 					target_date: targetDate,
@@ -947,7 +964,11 @@ export async function runIngestion(
 
 		return { runId, status: "completed" };
 	} catch (error) {
-		log.error("Ingestion failed", { chainSlug, runId, error: errorToObject(error) });
+		log.error("Ingestion failed", {
+			chainSlug,
+			runId,
+			error: errorToObject(error),
+		});
 		await db
 			.update(ingestionRuns)
 			.set({
@@ -988,8 +1009,7 @@ export async function rerunIngestionRun(
 		throw new Error(`Run not found: ${originalRunId}`);
 	}
 
-	const targetDate =
-		run.targetDate?.toISOString().split("T")[0] ?? undefined;
+	const targetDate = run.targetDate?.toISOString().split("T")[0] ?? undefined;
 
 	return runIngestion({
 		chainSlug: run.chainSlug,

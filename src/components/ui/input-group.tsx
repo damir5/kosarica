@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
 	return (
+		/* biome-ignore lint/a11y/useSemanticElements: Using role="group" for visual grouping, not a form fieldset */
 		<div
 			data-slot="input-group"
 			role="group"
@@ -60,6 +61,8 @@ function InputGroupAddon({
 	...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
 	return (
+		/* biome-ignore lint/a11y/useSemanticElements: Using role="group" for visual grouping, not a form fieldset */
+		/* biome-ignore lint/a11y/useKeyWithClickEvents: Click focuses parent input, keyboard users can tab directly to input */
 		<div
 			role="group"
 			data-slot="input-group-addon"

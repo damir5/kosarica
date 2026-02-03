@@ -1,6 +1,6 @@
-import { ParquetSchema, ParquetWriter } from "@dsnp/parquetjs/dist/parquet";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { ParquetSchema, ParquetWriter } from "@dsnp/parquetjs/dist/parquet";
 import { resolveStoragePath } from "@/lib/storage";
 
 export interface ParquetPriceRow {
@@ -28,7 +28,11 @@ const PRICE_SCHEMA = new ParquetSchema({
 	name: { type: "UTF8", compression: "SNAPPY" },
 	barcode: { type: "UTF8", optional: true, compression: "SNAPPY" },
 	price_cents: { type: "INT32", compression: "SNAPPY" },
-	discount_price_cents: { type: "INT32", optional: true, compression: "SNAPPY" },
+	discount_price_cents: {
+		type: "INT32",
+		optional: true,
+		compression: "SNAPPY",
+	},
 	unit_price_cents: { type: "INT32", optional: true, compression: "SNAPPY" },
 	category: { type: "UTF8", optional: true, compression: "SNAPPY" },
 	brand: { type: "UTF8", optional: true, compression: "SNAPPY" },

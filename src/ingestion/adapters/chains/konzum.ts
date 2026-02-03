@@ -1,7 +1,7 @@
+import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
-import type { CsvColumnMapping } from "../../parsers/csv";
 
 const konzumColumnMapping: CsvColumnMapping = {
 	externalId: "ŠIFRA PROIZVODA",
@@ -61,7 +61,8 @@ export class KonzumAdapter extends BaseCsvAdapter {
 				break;
 			}
 			const html = await response.text();
-			const pattern = /href=["'](\/cjenici\/download\?title=([^"'&]+)[^"']*)["']/g;
+			const pattern =
+				/href=["'](\/cjenici\/download\?title=([^"'&]+)[^"']*)["']/g;
 			let match: RegExpExecArray | null;
 			let found = false;
 			while ((match = pattern.exec(html)) !== null) {
@@ -72,7 +73,9 @@ export class KonzumAdapter extends BaseCsvAdapter {
 					continue;
 				}
 				seen.add(fileUrl);
-				const filename = this.ensureCsvExtension(this.decodeFilename(encodedFilename));
+				const filename = this.ensureCsvExtension(
+					this.decodeFilename(encodedFilename),
+				);
 				const fileDate = this.extractDateFromFilename(filename);
 				if (date && fileDate && fileDate !== date) {
 					continue;
@@ -99,7 +102,11 @@ export class KonzumAdapter extends BaseCsvAdapter {
 		return discovered;
 	}
 
-	async parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult> {
 		return super.parse(content, filename, options);
 	}
 
@@ -132,7 +139,9 @@ export class KonzumAdapter extends BaseCsvAdapter {
 	}
 
 	private ensureCsvExtension(filename: string): string {
-		return filename.toLowerCase().endsWith(".csv") ? filename : `${filename}.csv`;
+		return filename.toLowerCase().endsWith(".csv")
+			? filename
+			: `${filename}.csv`;
 	}
 
 	private extractDateFromFilename(filename: string): string {

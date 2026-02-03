@@ -35,7 +35,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { orpc } from "@/orpc/client";
-import type { HandlersIngestionFile } from "@/lib/go-api";
 
 export const Route = createFileRoute("/_admin/admin/ingestion/$runId/$fileId")({
 	component: FileDetailPage,
@@ -43,7 +42,31 @@ export const Route = createFileRoute("/_admin/admin/ingestion/$runId/$fileId")({
 
 type ChunkStatus = "pending" | "processing" | "completed" | "failed";
 
-type FileData = HandlersIngestionFile;
+interface FileData {
+	id?: string;
+	runId?: string;
+	filename?: string;
+	fileType?: string;
+	fileSize?: number | null;
+	fileHash?: string | null;
+	status?: string;
+	statusReason?: string | null;
+	statusSeverity?: string | null;
+	statusType?: string | null;
+	entryCount?: number | null;
+	rowCount?: number | null;
+	persistedCount?: number | null;
+	priceChanges?: number | null;
+	failedRows?: number | null;
+	warningRows?: number | null;
+	storeCount?: number | null;
+	processedAt?: string | null;
+	metadata?: string | null;
+	totalChunks?: number | null;
+	processedChunks?: number | null;
+	chunkSize?: number | null;
+	createdAt?: string | null;
+}
 
 interface ChunkData {
 	id?: string;
@@ -103,12 +126,31 @@ const FILE_TYPE_COLORS: Record<string, string> = {
 	json: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
 };
 
-const SUMMARY_VARIANTS: Record<string, "secondary" | "destructive" | "outline"> =
-	{
-		warning: "secondary",
-		error: "destructive",
-		critical: "destructive",
+const SUMMARY_VARIANTS: Record<
+	string,
+	"secondary" | "destructive" | "outline"
+> = {
+	warning: "secondary",
+	error: "destructive",
+	critical: "destructive",
+};
+
+function mapChunk(chunk: ChunkData) {
+	return {
+		id: chunk.id ?? "",
+		fileId: chunk.fileId ?? "",
+		chunkIndex: chunk.chunkIndex ?? 0,
+		startRow: chunk.startRow ?? 0,
+		endRow: chunk.endRow ?? 0,
+		rowCount: chunk.rowCount ?? 0,
+		status: chunk.status ?? "pending",
+		r2Key: chunk.r2Key ?? null,
+		persistedCount: chunk.persistedCount ?? null,
+		errorCount: chunk.errorCount ?? null,
+		processedAt: chunk.processedAt ? new Date(chunk.processedAt) : null,
+		createdAt: chunk.createdAt ? new Date(chunk.createdAt) : null,
 	};
+}
 
 type ParsedErrorDetails = {
 	url?: string;
@@ -334,9 +376,7 @@ function FileDetailPage() {
 							{file.statusReason && (
 								<div className="flex items-center gap-2 text-xs text-muted-foreground">
 									<Badge
-										variant={
-											SUMMARY_VARIANTS[summarySeverity] || "outline"
-										}
+										variant={SUMMARY_VARIANTS[summarySeverity] || "outline"}
 										className="text-xs"
 									>
 										{summaryLabel}
@@ -406,9 +446,7 @@ function FileDetailPage() {
 							<CardTitle className="text-sm font-medium">Rows</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<div className="text-2xl font-bold">
-								{formatCount(rowCount)}
-							</div>
+							<div className="text-2xl font-bold">{formatCount(rowCount)}</div>
 							<p className="text-xs text-muted-foreground">
 								rows parsed from this file
 							</p>
@@ -545,7 +583,7 @@ function FileDetailPage() {
 								<p className="mt-1">
 									{file.statusSeverity === "warning"
 										? "info"
-										: file.statusSeverity ?? "—"}
+										: (file.statusSeverity ?? "—")}
 								</p>
 							</div>
 							<div>
@@ -733,8 +771,7 @@ function FileDetailPage() {
 											size="sm"
 											onClick={() => setErrorPage((p) => p + 1)}
 											disabled={
-												errorPage >=
-												Math.ceil(errorsData.total / errorPageSize)
+												errorPage >= Math.ceil(errorsData.total / errorPageSize)
 											}
 										>
 											Next
@@ -782,20 +819,7 @@ function FileDetailPage() {
 					</CardHeader>
 					<CardContent>
 						<IngestionChunkList
-							chunks={(chunksData?.chunks ?? []).map((c) => ({
-								id: c.id ?? "",
-								fileId: c.fileId ?? "",
-								chunkIndex: c.chunkIndex ?? 0,
-								startRow: c.startRow ?? 0,
-								endRow: c.endRow ?? 0,
-								rowCount: c.rowCount ?? 0,
-								status: c.status ?? "pending",
-								r2Key: c.r2Key ?? null,
-								persistedCount: c.persistedCount ?? null,
-								errorCount: c.errorCount ?? null,
-								processedAt: c.processedAt ? new Date(c.processedAt) : null,
-								createdAt: c.createdAt ? new Date(c.createdAt) : null,
-							}))}
+							chunks={(chunksData?.chunks ?? []).map(mapChunk)}
 							isLoading={chunksLoading}
 							onRerunChunk={(chunkId) => rerunChunkMutation.mutate(chunkId)}
 							isRerunning={rerunChunkMutation.isPending}

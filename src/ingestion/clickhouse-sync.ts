@@ -43,7 +43,7 @@ async function upsertParquetRecord(
 	const info = await storage.getInfo(storageKey);
 	const { chainSlug, targetDate } = parseParquetKey(storageKey);
 
-	const targetDateStr = targetDate.toISOString().split('T')[0];
+	const targetDateStr = targetDate.toISOString().split("T")[0];
 	await db
 		.insert(parquetFiles)
 		.values({
@@ -118,14 +118,18 @@ export async function getClickHouseSyncStatus(): Promise<ClickHouseSyncStatus> {
 	const db = getDatabase();
 	const keys = await listParquetKeys();
 
-	const [{ importedCount, lastImportedAt } = { importedCount: 0, lastImportedAt: null }] =
-		await db
-			.select({
-				importedCount: sql<number>`count(${parquetFiles.id})`,
-				lastImportedAt: sql<Date | null>`max(${parquetFiles.importedAt})`,
-			})
-			.from(parquetFiles)
-			.where(isNotNull(parquetFiles.importedAt));
+	const [
+		{ importedCount, lastImportedAt } = {
+			importedCount: 0,
+			lastImportedAt: null,
+		},
+	] = await db
+		.select({
+			importedCount: sql<number>`count(${parquetFiles.id})`,
+			lastImportedAt: sql<Date | null>`max(${parquetFiles.importedAt})`,
+		})
+		.from(parquetFiles)
+		.where(isNotNull(parquetFiles.importedAt));
 
 	const importedFiles = Number(importedCount ?? 0);
 	const totalFiles = keys.length;

@@ -32,13 +32,29 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { orpc } from "@/orpc/client";
 
-export const Route = createFileRoute("/_admin/admin/cron" as any)({
+export const Route = createFileRoute("/_admin/admin/cron")({
 	component: CronDashboard,
 });
 
+type StatusFilter =
+	| "all"
+	| "pending"
+	| "running"
+	| "completed"
+	| "failed"
+	| "skipped";
+
+const isStatusFilter = (value: string): value is StatusFilter =>
+	value === "all" ||
+	value === "pending" ||
+	value === "running" ||
+	value === "completed" ||
+	value === "failed" ||
+	value === "skipped";
+
 function CronDashboard() {
 	const queryClient = useQueryClient();
-	const [statusFilter, setStatusFilter] = useState<string>("all");
+	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 	const [page, setPage] = useState(1);
 	const pageSize = 20;
 
@@ -56,7 +72,7 @@ function CronDashboard() {
 	const { data: runsData, isLoading: runsLoading } = useQuery({
 		...orpc.admin.cron.listRuns.queryOptions({
 			input: {
-				status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+				status: statusFilter === "all" ? undefined : statusFilter,
 				limit: pageSize,
 				offset: (page - 1) * pageSize,
 			},
@@ -360,7 +376,7 @@ function CronDashboard() {
 							<Select
 								value={statusFilter}
 								onValueChange={(value) => {
-									setStatusFilter(value);
+									setStatusFilter(isStatusFilter(value) ? value : "all");
 									setPage(1);
 								}}
 							>

@@ -1,9 +1,17 @@
-import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+} from "vitest";
+import {
+	type ClickHouseClient,
+	closeClickHouse,
 	createClickHouse,
 	getClickHouse,
-	closeClickHouse,
-	type ClickHouseClient,
 } from "./index";
 
 /**

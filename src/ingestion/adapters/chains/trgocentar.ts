@@ -1,8 +1,8 @@
+import { parsePrice } from "../../parsers/price";
+import type { XmlFieldMapping } from "../../parsers/xml";
 import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
 import { BaseXmlAdapter } from "../base/xml";
 import { chainConfigs } from "../config";
-import type { XmlFieldMapping } from "../../parsers/xml";
-import { parsePrice } from "../../parsers/price";
 
 const trgocentarFieldMapping: XmlFieldMapping = {
 	externalId: "sif_art",
@@ -63,14 +63,18 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 
 		const response = await this.fetchWithRetry(this.baseUrl());
 		if (!response.ok) {
-			throw new Error(`Failed to fetch Trgocentar portal: status ${response.status}`);
+			throw new Error(
+				`Failed to fetch Trgocentar portal: status ${response.status}`,
+			);
 		}
 		const html = await response.text();
 		const xmlPattern = /href=["']([^"']*\.xml(?:\?[^"']*)?)["']/gi;
 		let match: RegExpExecArray | null;
 		while ((match = xmlPattern.exec(html)) !== null) {
 			const href = match[1];
-			const fileUrl = href.startsWith("http") ? href : `${this.baseUrl()}/${href.replace(/^\//, "")}`;
+			const fileUrl = href.startsWith("http")
+				? href
+				: `${this.baseUrl()}/${href.replace(/^\//, "")}`;
 			if (seen.has(fileUrl)) {
 				continue;
 			}
@@ -97,7 +101,11 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 		return discovered;
 	}
 
-	async parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult> {
 		const result = await super.parse(content, filename, options);
 		for (const row of result.rows) {
 			const anchorPrice = this.extractDynamicAnchorPrice(row.rawData);

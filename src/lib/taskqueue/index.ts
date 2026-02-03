@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { getDatabase, taskQueue } from "@/db";
+import type { TaskQueuePayload } from "@/db/jsonb-schemas";
 
 export type TaskStatus =
 	| "pending"
@@ -19,7 +20,7 @@ export interface ClaimedTask {
 
 export interface ScheduleTaskOptions {
 	taskType: TaskType;
-	payload: Record<string, unknown>;
+	payload: TaskQueuePayload;
 	priority?: number;
 	scheduledFor?: Date;
 	maxRetries?: number;
@@ -33,7 +34,7 @@ export async function scheduleTask(
 		.insert(taskQueue)
 		.values({
 			taskType: options.taskType,
-			payload: options.payload as any, // JSONB typed column
+			payload: options.payload,
 			priority: options.priority ?? 0,
 			scheduledFor: options.scheduledFor ?? sql`NOW()`,
 			maxRetries: options.maxRetries ?? 3,
@@ -51,7 +52,7 @@ export async function claimTasks(
 	const db = getDatabase();
 	const taskTypeFilter =
 		taskTypes && taskTypes.length > 0
-			? sql`AND tq.task_type = ANY(${sql.raw(`ARRAY[${taskTypes.map(t => `'${t}'`).join(',')}]`)})`
+			? sql`AND tq.task_type = ANY(${sql.raw(`ARRAY[${taskTypes.map((t) => `'${t}'`).join(",")}]`)})`
 			: sql``;
 	const result = await db.execute(sql`
 		WITH claimed AS (

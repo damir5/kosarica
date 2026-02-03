@@ -1,22 +1,25 @@
+import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
 	mkdir,
+	readdir,
 	readFile,
 	rm,
 	stat,
 	writeFile,
-	readdir,
 } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createGzip, createGunzip } from "node:zlib";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
 import * as path from "node:path";
-import type { FileInfo, Storage, StorageMetadata } from "./index";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { createGunzip, createGzip } from "node:zlib";
 import { compressGzip, decompressGzip, shouldCompress } from "./compression";
+import type { FileInfo, Storage, StorageMetadata } from "./index";
 
 /** Minimum size in bytes before compression is attempted */
 export const MIN_COMPRESSION_SIZE = 1024; // 1KB
+
+/** Maximum decompressed file size (500MB) to prevent memory exhaustion */
+const MAX_DECOMPRESSED_SIZE = 500 * 1024 * 1024;
 
 /**
  * LocalStorage implements the Storage interface using local filesystem.
@@ -163,10 +166,25 @@ export class LocalStorage implements Storage {
 		try {
 			const stats = await stat(gzPath);
 			if (stats.isFile()) {
+				// Safety check: don't decompress if compressed size is unreasonably large
+				// A 500MB compressed file could decompress to several GB
+				if (stats.size > MAX_DECOMPRESSED_SIZE) {
+					throw new Error(
+						`Compressed file too large to decompress: ${stats.size} bytes (max ${MAX_DECOMPRESSED_SIZE})`,
+					);
+				}
+
+				let totalSize = 0;
 				const chunks: Buffer[] = [];
 				const readStream = createReadStream(gzPath);
-				await pipeline(readStream, createGunzip(), async function* (source) {
+				await pipeline(readStream, createGunzip(), async (source) => {
 					for await (const chunk of source) {
+						totalSize += (chunk as Buffer).length;
+						if (totalSize > MAX_DECOMPRESSED_SIZE) {
+							throw new Error(
+								`Decompressed file exceeds maximum size: ${totalSize} bytes (max ${MAX_DECOMPRESSED_SIZE})`,
+							);
+						}
 						chunks.push(chunk as Buffer);
 					}
 				});

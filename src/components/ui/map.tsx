@@ -50,12 +50,12 @@ function MapSkeleton({ className }: { className?: string }) {
 	);
 }
 
-export interface MapProps extends Omit<MapContainerProps, "children"> {
+export interface MapViewProps extends Omit<MapContainerProps, "children"> {
 	children?: React.ReactNode;
 	className?: string;
 }
 
-export function Map({ children, className, ...props }: MapProps) {
+export function MapView({ children, className, ...props }: MapViewProps) {
 	return (
 		<MapContainer
 			className={`rounded-md ${className ?? ""}`}

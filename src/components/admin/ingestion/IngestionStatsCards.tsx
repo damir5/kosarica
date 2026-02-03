@@ -6,6 +6,7 @@ import {
 	Database,
 	FileText,
 } from "lucide-react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface IngestionStats {
@@ -41,11 +42,16 @@ export function IngestionStatsCards({
 	stats,
 	isLoading,
 }: IngestionStatsCardsProps) {
+	const skeletonKeys = useMemo(
+		() => Array.from({ length: 4 }, () => crypto.randomUUID()),
+		[],
+	);
+
 	if (isLoading) {
 		return (
 			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-				{[...Array(4)].map((_, i) => (
-					<Card key={i}>
+				{skeletonKeys.map((key) => (
+					<Card key={key}>
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 							<CardTitle className="font-medium text-sm">Loading...</CardTitle>
 						</CardHeader>

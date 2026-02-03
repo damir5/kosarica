@@ -402,8 +402,10 @@ export const bulkApprove = superadminProcedure
 			`,
 		);
 
-		const rows: any[] = (bulkResult as any).rows ?? [];
-		return { approved: rows[0]?.approved ?? 0 };
+		type ApprovedRow = { approved: number | string | null };
+		const rows = (bulkResult as { rows?: ApprovedRow[] }).rows ?? [];
+		const approved = Number(rows[0]?.approved ?? 0);
+		return { approved };
 	});
 
 // Resolve suspicious barcode items by linking to correct product
@@ -544,9 +546,29 @@ export const getStats = superadminProcedure.handler(async () => {
 		`,
 	);
 
+	type QueueStatsRow = {
+		total?: number | string | null;
+		pending?: number | string | null;
+		approved?: number | string | null;
+		rejected?: number | string | null;
+		processing?: number | string | null;
+	};
+	type CandidateStatsRow = {
+		total?: number | string | null;
+		ai?: number | string | null;
+		barcode?: number | string | null;
+		trgm?: number | string | null;
+	};
+	type LinkStatsRow = {
+		total?: number | string | null;
+		barcode?: number | string | null;
+		ai?: number | string | null;
+		manual?: number | string | null;
+	};
+
 	return {
-		queue: (queueResult as any).rows?.[0],
-		candidates: (candidateResult as any).rows?.[0],
-		links: (linkResult as any).rows?.[0],
+		queue: (queueResult as { rows?: QueueStatsRow[] }).rows?.[0],
+		candidates: (candidateResult as { rows?: CandidateStatsRow[] }).rows?.[0],
+		links: (linkResult as { rows?: LinkStatsRow[] }).rows?.[0],
 	};
 });

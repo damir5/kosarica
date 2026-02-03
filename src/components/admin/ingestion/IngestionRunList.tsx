@@ -6,6 +6,7 @@ import {
 	Trash2,
 	XCircle,
 } from "lucide-react";
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +72,11 @@ export function IngestionRunList({
 	onDelete,
 	deletingRunId,
 }: IngestionRunListProps) {
+	const skeletonKeys = useMemo(
+		() => Array.from({ length: 5 }, () => crypto.randomUUID()),
+		[],
+	);
+
 	const formatTimeAgo = (date: Date | null) => {
 		if (!date) return "Never";
 		const now = new Date();
@@ -120,8 +126,8 @@ export function IngestionRunList({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{[...Array(5)].map((_, i) => (
-							<TableRow key={`skeleton-${i}`}>
+						{skeletonKeys.map((key) => (
+							<TableRow key={key}>
 								<TableCell colSpan={8}>
 									<div className="h-8 bg-muted animate-pulse rounded" />
 								</TableCell>
@@ -218,9 +224,7 @@ export function IngestionRunList({
 									{run.statusReason && (
 										<div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
 											<Badge
-												variant={
-													SUMMARY_VARIANTS[summarySeverity] || "outline"
-												}
+												variant={SUMMARY_VARIANTS[summarySeverity] || "outline"}
 												className="text-xs"
 											>
 												{summaryLabel || "info"}

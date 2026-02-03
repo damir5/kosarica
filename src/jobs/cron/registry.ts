@@ -31,7 +31,7 @@ export function registerCronJob(config: CronJobConfig): void {
 	// Validate cron expression early to fail fast at registration time
 	try {
 		parseCronExpression(config.cronExpression, config.timezone ?? "UTC");
-	} catch (e) {
+	} catch (_e) {
 		throw new Error(
 			`Invalid cron expression for job ${config.id}: ${config.cronExpression}`,
 		);

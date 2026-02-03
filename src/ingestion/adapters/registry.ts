@@ -1,16 +1,16 @@
-import type { ChainAdapter } from "./types";
-import type { ChainID } from "./config";
-import { KonzumAdapter } from "./chains/konzum";
-import { LidlAdapter } from "./chains/lidl";
-import { KauflandAdapter } from "./chains/kaufland";
-import { StudenacAdapter } from "./chains/studenac";
-import { PlodineAdapter } from "./chains/plodine";
-import { IntersparAdapter } from "./chains/interspar";
 import { DmAdapter } from "./chains/dm";
 import { EurospinAdapter } from "./chains/eurospin";
+import { IntersparAdapter } from "./chains/interspar";
+import { KauflandAdapter } from "./chains/kaufland";
+import { KonzumAdapter } from "./chains/konzum";
 import { KtcAdapter } from "./chains/ktc";
+import { LidlAdapter } from "./chains/lidl";
 import { MetroAdapter } from "./chains/metro";
+import { PlodineAdapter } from "./chains/plodine";
+import { StudenacAdapter } from "./chains/studenac";
 import { TrgocentarAdapter } from "./chains/trgocentar";
+import type { ChainID } from "./config";
+import type { ChainAdapter } from "./types";
 
 const registry = new Map<ChainID, ChainAdapter>();
 

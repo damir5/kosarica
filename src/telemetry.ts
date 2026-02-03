@@ -9,6 +9,10 @@
  * before other app imports.
  */
 
+import type { Span } from "@opentelemetry/api";
+
+type NodeSDKType = import("@opentelemetry/sdk-node").NodeSDK;
+
 // Dynamic imports for Node.js-only packages to avoid Vite SSR bundling issues
 async function loadNodeSDK() {
 	const [
@@ -98,7 +102,7 @@ export function getTelemetryConfig(): TelemetryConfig {
  */
 export async function initTelemetry(
 	config: Partial<TelemetryConfig> = {},
-): Promise<any> {
+): Promise<NodeSDKType | null> {
 	const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
 	// Return null if telemetry is not enabled
@@ -153,7 +157,7 @@ export async function initTelemetry(
 		metricReader,
 		instrumentations: [
 			new HttpInstrumentation({
-				applyCustomAttributesOnSpan: (span: any) => {
+				applyCustomAttributesOnSpan: (span: Span) => {
 					// Add custom attributes to HTTP spans
 					span.setAttribute("service.name", finalConfig.serviceName);
 				},

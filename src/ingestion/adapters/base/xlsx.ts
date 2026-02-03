@@ -1,12 +1,12 @@
-import type { ParseOptions, ParseResult } from "../../types";
 import {
-	XlsxParser,
 	newHeaderIndex,
 	newNumericIndex,
 	type XlsxColumnMapping,
+	XlsxParser,
 	type XlsxParserOptions,
 } from "../../parsers/xlsx";
-import { BaseChainAdapter, type BaseAdapterConfig } from "./chain";
+import type { ParseOptions, ParseResult } from "../../types";
+import { type BaseAdapterConfig, BaseChainAdapter } from "./chain";
 
 export interface XlsxAdapterConfig {
 	baseConfig: BaseAdapterConfig;
@@ -48,10 +48,15 @@ export class BaseXlsxAdapter extends BaseChainAdapter {
 		this.xlsxParser.setAlternativeMapping(cfg.alternativeColumnMapping);
 	}
 
-	async parse(content: Buffer, filename: string, _options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		_options?: ParseOptions,
+	): Promise<ParseResult> {
 		const processed = this.preprocessContent(content);
 		const storeIdentifier =
-			this.defaultStoreIdentifier || this.extractStoreIdentifierFromFilename(filename);
+			this.defaultStoreIdentifier ||
+			this.extractStoreIdentifierFromFilename(filename);
 		const result = this.xlsxParser.parseWithStoreId(processed, storeIdentifier);
 		return this.postprocessResult(result);
 	}

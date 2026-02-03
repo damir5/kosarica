@@ -7,6 +7,9 @@ import { z } from "zod";
 export const ingestionTaskPayload = z.object({
 	type: z.literal("ingestion"),
 	chainSlug: z.string(),
+	targetDate: z.string().optional(),
+	force: z.boolean().optional(),
+	source: z.string().optional(),
 	sourceUrl: z.string().optional(),
 	archiveId: z.string().optional(),
 });

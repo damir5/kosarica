@@ -26,6 +26,7 @@ function ButtonGroup({
 	...props
 }: React.ComponentProps<"div"> & VariantProps<typeof buttonGroupVariants>) {
 	return (
+		/* biome-ignore lint/a11y/useSemanticElements: Using role="group" for visual grouping, not a form fieldset */
 		<div
 			role="group"
 			data-slot="button-group"

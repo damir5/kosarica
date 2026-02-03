@@ -1,8 +1,8 @@
 import {
-	Map as MapComponent,
 	MapMarker,
 	MapPopup,
 	MapTileLayer,
+	MapView,
 } from "@/components/ui/map";
 
 export interface StoreLocationMapClientProps {
@@ -23,7 +23,7 @@ export function StoreLocationMapClient({
 	const position: [number, number] = [latitude, longitude];
 
 	return (
-		<MapComponent
+		<MapView
 			center={position}
 			zoom={DEFAULT_ZOOM}
 			scrollWheelZoom={false}
@@ -40,6 +40,6 @@ export function StoreLocationMapClient({
 					</MapPopup>
 				)}
 			</MapMarker>
-		</MapComponent>
+		</MapView>
 	);
 }

@@ -1,6 +1,6 @@
-import { createGzip, createGunzip } from "node:zlib";
 import { Readable, type Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { createGunzip, createGzip } from "node:zlib";
 
 /**
  * Compress data using gzip with streaming to avoid loading all data in memory.

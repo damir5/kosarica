@@ -2,13 +2,13 @@ import type {
 	DiscoveredFile,
 	ExpandedFile,
 	FetchedFile,
+	FileType,
 	NormalizedRow,
 	NormalizedRowValidation,
 	ParseOptions,
 	ParseResult,
 	StoreIdentifier,
 	StoreMetadata,
-	FileType,
 } from "../types";
 
 export interface ChainAdapter {
@@ -17,7 +17,11 @@ export interface ChainAdapter {
 	supportedTypes: FileType[];
 	discover(targetDate?: string): Promise<DiscoveredFile[]>;
 	fetch(file: DiscoveredFile): Promise<FetchedFile>;
-	parse(content: Buffer, filename: string, options?: ParseOptions): Promise<ParseResult>;
+	parse(
+		content: Buffer,
+		filename: string,
+		options?: ParseOptions,
+	): Promise<ParseResult>;
 	extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null;
 	validateRow(row: NormalizedRow): NormalizedRowValidation;
 	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null;

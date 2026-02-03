@@ -1,4 +1,8 @@
-import { rerunIngestion, scheduleIngestion } from "@/lib/go-service-client";
+import type {
+	IngestionTaskPayload,
+	RerunTaskPayload,
+} from "@/db/jsonb-schemas";
+import { rerunIngestionRun, runIngestion } from "@/ingestion/pipeline";
 import {
 	type ClaimedTask,
 	claimTasks,
@@ -97,25 +101,31 @@ export function createIngestionWorker(): TaskQueueWorker {
 	});
 
 	worker.registerHandler("ingestion" as TaskType, async (task: ClaimedTask) => {
-		const payload = task.payload as { chainId: string; targetDate?: string };
+		const payload = task.payload as IngestionTaskPayload;
 
-		console.log(`[INGESTION] Starting ingestion for chain: ${payload.chainId}`);
-
-		const { id } = await scheduleIngestion(payload.chainId, payload.targetDate);
-
-		if (id) {
-			console.log(`[INGESTION] Scheduled ingestion task: ${id}`);
-		} else {
-			throw new Error("Failed to schedule ingestion task");
-		}
+		console.log(
+			`[INGESTION] Starting ingestion for chain: ${payload.chainSlug}`,
+		);
+		await runIngestion({
+			chainSlug: payload.chainSlug,
+			targetDate: payload.targetDate,
+			force: payload.force,
+			source: payload.source ?? "worker",
+			taskId: task.id,
+		});
 	});
 
 	worker.registerHandler("rerun" as TaskType, async (task: ClaimedTask) => {
-		const payload = task.payload as { runId: string };
+		const payload = task.payload as RerunTaskPayload;
 
-		console.log(`[INGESTION] Rerunning ingestion: ${payload.runId}`);
+		console.log(`[INGESTION] Rerunning ingestion: ${payload.originalRunId}`);
 
-		await rerunIngestion(payload.runId);
+		await rerunIngestionRun(
+			payload.originalRunId,
+			payload.rerunType,
+			payload.targetId,
+			task.id,
+		);
 	});
 
 	return worker;

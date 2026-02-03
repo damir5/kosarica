@@ -669,10 +669,14 @@ export function StoreDetailDrawer({
 
 											{/* Approve Action */}
 											<div className="space-y-2">
-												<label className="text-sm font-medium text-foreground">
+												<label
+													htmlFor="approval-notes"
+													className="text-sm font-medium text-foreground"
+												>
 													Approve Store
 												</label>
 												<Textarea
+													id="approval-notes"
 													value={approvalNotes}
 													onChange={(e) => setApprovalNotes(e.target.value)}
 													placeholder="Add optional approval notes (e.g., why this store was approved, any special handling needed)..."
@@ -776,10 +780,14 @@ export function StoreDetailDrawer({
 
 											{/* Reject Action */}
 											<div className="space-y-2">
-												<label className="text-sm font-medium text-foreground">
+												<label
+													htmlFor="reject-reason"
+													className="text-sm font-medium text-foreground"
+												>
 													Reject Store
 												</label>
 												<Textarea
+													id="reject-reason"
 													value={rejectReason}
 													onChange={(e) => setRejectReason(e.target.value)}
 													placeholder="Please provide a reason for rejection..."

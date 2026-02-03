@@ -5,7 +5,9 @@ import {
 	getStoresByChain,
 	listCatalogPrices,
 } from "./catalog-prices";
+import * as clickhouse from "./clickhouse";
 import * as cron from "./cron";
+import * as ingestion from "./ingestion";
 import * as priceService from "./price-service";
 import {
 	approveMatch,
@@ -77,22 +79,27 @@ export default {
 			get: getSettings,
 			update: updateSettings,
 		},
+		clickhouse: {
+			loadAll: clickhouse.loadAll,
+			loadMissing: clickhouse.loadMissing,
+			status: clickhouse.status,
+		},
 		ingestion: {
-			listRuns: priceService.listRuns,
-			getRun: priceService.getRun,
-			listFiles: priceService.listFiles,
-			listErrors: priceService.listErrors,
-			listRunStoreStats: priceService.listRunStoreStats,
-			getStats: priceService.getStats,
-			triggerChain: priceService.triggerChain,
-			rerunRun: priceService.rerunRun,
-			deleteRun: priceService.deleteRun,
-			getFile: priceService.getFile,
-			listChunks: priceService.listChunks,
-			rerunFile: priceService.rerunFile,
-			rerunChunk: priceService.rerunChunk,
-			listFileErrors: priceService.listFileErrors,
-			listFileStoreStats: priceService.listFileStoreStats,
+			listRuns: ingestion.listRuns,
+			getRun: ingestion.getRun,
+			listFiles: ingestion.listFiles,
+			listErrors: ingestion.listErrors,
+			listRunStoreStats: ingestion.listRunStoreStats,
+			getStats: ingestion.getStats,
+			triggerChain: ingestion.triggerChain,
+			rerunRun: ingestion.rerunRun,
+			deleteRun: ingestion.deleteRun,
+			getFile: ingestion.getFile,
+			listChunks: ingestion.listChunks,
+			rerunFile: ingestion.rerunFile,
+			rerunChunk: ingestion.rerunChunk,
+			listFileErrors: ingestion.listFileErrors,
+			listFileStoreStats: ingestion.listFileStoreStats,
 		},
 		stores: {
 			list: listStores,

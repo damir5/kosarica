@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/_admin/admin/ingestion" as any)({
+export const Route = createFileRoute("/_admin/admin/ingestion")({
 	component: IngestionLayout,
 });
 

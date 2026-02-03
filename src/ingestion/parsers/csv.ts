@@ -1,10 +1,6 @@
-import type {
-	NormalizedRow,
-	ParseError,
-	ParseResult,
-} from "../types";
-import { parsePrice } from "./price";
+import type { NormalizedRow, ParseError, ParseResult } from "../types";
 import { decode, detectEncoding, type Encoding } from "./charset";
+import { parsePrice } from "./price";
 
 export type CsvDelimiter = "," | ";" | "\t";
 export type CsvEncoding = Encoding;
@@ -160,7 +156,11 @@ export class CsvParser {
 	}
 }
 
-function parseCsvRows(content: string, delimiter: CsvDelimiter, quoteChar: string): string[][] {
+function parseCsvRows(
+	content: string,
+	delimiter: CsvDelimiter,
+	quoteChar: string,
+): string[][] {
 	const lines = splitLines(content);
 	const rows: string[][] = [];
 	const delimChar = delimiter;
@@ -181,7 +181,11 @@ function splitLines(content: string): string[] {
 	return content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
 }
 
-function splitCsvLine(line: string, delimiter: string, quoteChar: string): string[] {
+function splitCsvLine(
+	line: string,
+	delimiter: string,
+	quoteChar: string,
+): string[] {
 	const fields: string[] = [];
 	let current = "";
 	let inQuotes = false;
@@ -251,10 +255,17 @@ function parseColumnIndex(value: string): number | null {
 	return parsed;
 }
 
-function buildColumnIndices(headers: string[], mapping: CsvColumnMapping): { indices: Record<string, number>; error?: string } {
+function buildColumnIndices(
+	headers: string[],
+	mapping: CsvColumnMapping,
+): { indices: Record<string, number>; error?: string } {
 	const indices: Record<string, number> = {};
 
-	const resolveIndex = (field: string, value: string | undefined, required: boolean): string | null => {
+	const resolveIndex = (
+		field: string,
+		value: string | undefined,
+		required: boolean,
+	): string | null => {
 		if (!value) {
 			if (required) {
 				return `required field ${field} not in mapping`;
@@ -268,10 +279,14 @@ function buildColumnIndices(headers: string[], mapping: CsvColumnMapping): { ind
 			return null;
 		}
 
-		let idx = headers.findIndex((header) => header.trim().toLowerCase() === value.trim().toLowerCase());
+		let idx = headers.findIndex(
+			(header) => header.trim().toLowerCase() === value.trim().toLowerCase(),
+		);
 		if (idx === -1) {
 			const normalizedMapping = normalizeHeader(value);
-			idx = headers.findIndex((header) => normalizeHeader(header) === normalizedMapping);
+			idx = headers.findIndex(
+				(header) => normalizeHeader(header) === normalizedMapping,
+			);
 		}
 
 		if (idx === -1) {
@@ -285,7 +300,9 @@ function buildColumnIndices(headers: string[], mapping: CsvColumnMapping): { ind
 		return null;
 	};
 
-	const requiredError = resolveIndex("name", mapping.name, true) ?? resolveIndex("price", mapping.price, true);
+	const requiredError =
+		resolveIndex("name", mapping.name, true) ??
+		resolveIndex("price", mapping.price, true);
 	if (requiredError) {
 		return { indices, error: requiredError };
 	}
@@ -523,23 +540,28 @@ function parseDate(value?: string): Date | undefined {
 	}> = [
 		{
 			regex: /^(\d{4})-(\d{2})-(\d{2})$/, // YYYY-MM-DD
-			builder: (m) => new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))),
+			builder: (m) =>
+				new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))),
 		},
 		{
 			regex: /^(\d{4})\/(\d{2})\/(\d{2})$/,
-			builder: (m) => new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))),
+			builder: (m) =>
+				new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))),
 		},
 		{
 			regex: /^(\d{2})\.(\d{2})\.(\d{4})$/,
-			builder: (m) => new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))),
+			builder: (m) =>
+				new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))),
 		},
 		{
 			regex: /^(\d{2})\/(\d{2})\/(\d{4})$/,
-			builder: (m) => new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))),
+			builder: (m) =>
+				new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))),
 		},
 		{
 			regex: /^(\d{2})-(\d{2})-(\d{4})$/,
-			builder: (m) => new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))),
+			builder: (m) =>
+				new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))),
 		},
 		{
 			regex: /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/,
@@ -553,7 +575,7 @@ function parseDate(value?: string): Date | undefined {
 						Number(m[5]),
 						Number(m[6]),
 					),
-					),
+				),
 		},
 		{
 			regex: /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/,
@@ -567,7 +589,7 @@ function parseDate(value?: string): Date | undefined {
 						Number(m[5]),
 						Number(m[6]),
 					),
-					),
+				),
 		},
 	];
 

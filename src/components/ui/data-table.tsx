@@ -365,8 +365,9 @@ export function DataTable<TData>({
 													<div className="flex items-center gap-1">
 														{/* Drag Handle for Column Reordering */}
 														{enableColumnOrdering && (
-															<span
-																className="flex cursor-grab items-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
+															<button
+																type="button"
+																className="flex cursor-grab items-center text-muted-foreground hover:text-foreground active:cursor-grabbing bg-transparent border-0 p-0"
 																draggable
 																onDragStart={(e) => {
 																	e.dataTransfer.effectAllowed = "move";
@@ -382,7 +383,7 @@ export function DataTable<TData>({
 																}}
 															>
 																<GripVertical className="size-4" />
-															</span>
+															</button>
 														)}
 
 														{/* Column Header with Sort */}
@@ -440,11 +441,14 @@ export function DataTable<TData>({
 
 											{/* Column Resize Handle */}
 											{enableColumnResizing && header.column.getCanResize() && (
-												<div
+												<button
+													type="button"
+													aria-label="Resize column"
 													onMouseDown={header.getResizeHandler()}
 													onTouchStart={header.getResizeHandler()}
 													className={cn(
 														"absolute right-0 top-0 h-full w-0.5 cursor-col-resize touch-none select-none bg-border transition-all",
+														"border-0 p-0",
 														"hover:w-1 hover:bg-primary",
 														header.column.getIsResizing() && "w-1 bg-primary",
 													)}

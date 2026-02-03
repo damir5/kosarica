@@ -1,5 +1,5 @@
-import type { FileType } from "../types";
 import type { CsvDelimiter, CsvEncoding } from "../parsers/csv";
+import type { FileType } from "../types";
 
 export type ChainID =
 	| "konzum"

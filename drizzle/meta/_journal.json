@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1769941301563,
-      "tag": "0000_base_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1769941301564,
-      "tag": "0001_manual_functions",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1769941301565,
-      "tag": "0002_seed_data",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1769970042657,
-      "tag": "0003_daffy_owl",
+      "when": 1770105852471,
+      "tag": "0000_nice_tempest",
       "breakpoints": true
     }
   ]

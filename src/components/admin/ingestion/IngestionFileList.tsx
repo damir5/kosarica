@@ -246,9 +246,7 @@ export function IngestionFileList({
 									{file.statusReason && (
 										<div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
 											<Badge
-												variant={
-													SUMMARY_VARIANTS[summarySeverity] || "outline"
-												}
+												variant={SUMMARY_VARIANTS[summarySeverity] || "outline"}
 												className="text-xs"
 											>
 												{summaryLabel || "info"}

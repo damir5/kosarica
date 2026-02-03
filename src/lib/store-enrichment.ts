@@ -95,12 +95,16 @@ export async function processEnrichStore(
 
 				const isHighConfidence = geocodeResult.confidence === "high";
 
-				if (isHighConfidence) {
+				if (
+					isHighConfidence &&
+					geocodeResult.latitude &&
+					geocodeResult.longitude
+				) {
 					await ctx.db
 						.update(stores)
 						.set({
-							latitude: geocodeResult.latitude!,
-							longitude: geocodeResult.longitude!,
+							latitude: geocodeResult.latitude,
+							longitude: geocodeResult.longitude,
 							updatedAt: new Date(),
 						})
 						.where(eq(stores.id, storeId));

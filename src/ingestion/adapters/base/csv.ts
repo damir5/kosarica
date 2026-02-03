@@ -1,6 +1,6 @@
+import { type CsvColumnMapping, CsvParser } from "../../parsers/csv";
 import type { ParseOptions, ParseResult } from "../../types";
-import { CsvParser, type CsvColumnMapping } from "../../parsers/csv";
-import { BaseChainAdapter, type BaseAdapterConfig } from "./chain";
+import { type BaseAdapterConfig, BaseChainAdapter } from "./chain";
 
 export interface CsvAdapterConfig {
 	baseConfig: BaseAdapterConfig;
@@ -21,7 +21,9 @@ export class BaseCsvAdapter extends BaseChainAdapter {
 		});
 
 		if (!cfg.baseConfig.chainConfig.csv) {
-			throw new Error(`${cfg.baseConfig.name}: CSV adapter requires CSV configuration`);
+			throw new Error(
+				`${cfg.baseConfig.name}: CSV adapter requires CSV configuration`,
+			);
 		}
 
 		this.columnMapping = cfg.columnMapping;
@@ -38,7 +40,11 @@ export class BaseCsvAdapter extends BaseChainAdapter {
 		this.csvParser.setAlternativeMapping(cfg.alternativeColumnMapping);
 	}
 
-	async parse(content: Buffer, filename: string, _options?: ParseOptions): Promise<ParseResult> {
+	async parse(
+		content: Buffer,
+		filename: string,
+		_options?: ParseOptions,
+	): Promise<ParseResult> {
 		const processed = this.preprocessContent(content);
 		const storeIdentifier = this.extractStoreIdentifierFromFilename(filename);
 		const result = this.csvParser.parseWithStoreId(processed, storeIdentifier);

@@ -1,11 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
-import type {
-	NormalizedRow,
-	ParseError,
-	ParseResult,
-} from "../types";
-import { parsePrice } from "./price";
+import type { NormalizedRow, ParseError, ParseResult } from "../types";
 import { decode, detectEncoding, type Encoding } from "./charset";
+import { parsePrice } from "./price";
 
 export type FieldExtractor = (item: Record<string, unknown>) => string;
 export type BarcodeExtractor = (item: Record<string, unknown>) => string[];
@@ -67,7 +63,10 @@ export class XmlParser {
 
 	parseWithStoreId(content: Buffer, storeId: string): ParseResult {
 		const decoded = this.decodeContent(content);
-		const data = parseXmlToObject(decoded, this.options.attributePrefix ?? "@_");
+		const data = parseXmlToObject(
+			decoded,
+			this.options.attributePrefix ?? "@_",
+		);
 
 		const itemsPath = this.options.itemsPath;
 		let items: unknown[] | null = null;
@@ -116,7 +115,10 @@ export class XmlParser {
 		storeId: string,
 	): ParseResult {
 		const decoded = this.decodeContent(content);
-		const data = parseXmlToObject(decoded, this.options.attributePrefix ?? "@_");
+		const data = parseXmlToObject(
+			decoded,
+			this.options.attributePrefix ?? "@_",
+		);
 		const items = getItemsAtPath(data, itemsPath);
 		if (!items) {
 			return {
@@ -132,7 +134,12 @@ export class XmlParser {
 	}
 
 	private decodeContent(content: Buffer): string {
-		if (content.length >= 3 && content[0] === 0xef && content[1] === 0xbb && content[2] === 0xbf) {
+		if (
+			content.length >= 3 &&
+			content[0] === 0xef &&
+			content[1] === 0xbb &&
+			content[2] === 0xbf
+		) {
 			return content.slice(3).toString("utf-8");
 		}
 
@@ -150,7 +157,10 @@ export class XmlParser {
 	}
 }
 
-function parseXmlToObject(content: string, attributePrefix: string): Record<string, unknown> {
+function parseXmlToObject(
+	content: string,
+	attributePrefix: string,
+): Record<string, unknown> {
 	const parser = new XMLParser({
 		ignoreAttributes: false,
 		attributeNamePrefix: attributePrefix,
@@ -161,11 +171,15 @@ function parseXmlToObject(content: string, attributePrefix: string): Record<stri
 	});
 
 	const parsed = parser.parse(content);
-	return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+	return typeof parsed === "object" && parsed !== null
+		? (parsed as Record<string, unknown>)
+		: {};
 }
 
 function detectEncodingFromDeclaration(content: Buffer): Encoding | "" {
-	const slice = content.slice(0, Math.min(content.length, 200)).toString("ascii");
+	const slice = content
+		.slice(0, Math.min(content.length, 200))
+		.toString("ascii");
 	const match = slice.match(/<\?xml[^?]*encoding=["']([^"']+)["'][^?]*\?>/i);
 	if (!match) {
 		return "";
@@ -183,7 +197,10 @@ function detectEncodingFromDeclaration(content: Buffer): Encoding | "" {
 	return "";
 }
 
-function getItemsAtPath(data: Record<string, unknown>, path: string): unknown[] | null {
+function getItemsAtPath(
+	data: Record<string, unknown>,
+	path: string,
+): unknown[] | null {
 	const parts = path.split(".");
 	let current: unknown = data;
 	for (const part of parts) {
@@ -193,7 +210,9 @@ function getItemsAtPath(data: Record<string, unknown>, path: string): unknown[] 
 		const record = current as Record<string, unknown>;
 		let next = record[part];
 		if (next === undefined) {
-			const matchKey = Object.keys(record).find((key) => key.toLowerCase() === part.toLowerCase());
+			const matchKey = Object.keys(record).find(
+				(key) => key.toLowerCase() === part.toLowerCase(),
+			);
 			if (matchKey) {
 				next = record[matchKey];
 			}
@@ -213,7 +232,11 @@ function getItemsAtPath(data: Record<string, unknown>, path: string): unknown[] 
 	return null;
 }
 
-function parseItems(items: unknown[], mapping: XmlFieldMapping, storeId: string): ParseResult {
+function parseItems(
+	items: unknown[],
+	mapping: XmlFieldMapping,
+	storeId: string,
+): ParseResult {
 	const result: ParseResult = {
 		rows: [],
 		errors: [],
@@ -246,7 +269,10 @@ function mapItemToRow(
 	const errors: ParseError[] = [];
 	const record = (item ?? {}) as Record<string, unknown>;
 
-	const extractString = (path?: string, extractor?: FieldExtractor): string | undefined => {
+	const extractString = (
+		path?: string,
+		extractor?: FieldExtractor,
+	): string | undefined => {
 		if (extractor) {
 			const val = extractor(record);
 			return val.trim() ? val : undefined;
@@ -257,7 +283,9 @@ function mapItemToRow(
 		return valueToString(getValueAtPath(record, path));
 	};
 
-	const name = mapping.nameExtractor ? mapping.nameExtractor(record) : extractString(mapping.name);
+	const name = mapping.nameExtractor
+		? mapping.nameExtractor(record)
+		: extractString(mapping.name);
 	if (!name) {
 		errors.push({ rowNumber, field: "name", message: "Name is required" });
 	}
@@ -289,7 +317,8 @@ function mapItemToRow(
 		return { errors };
 	}
 
-	const storeIdentifier = extractString(mapping.storeIdentifier) ?? defaultStoreId;
+	const storeIdentifier =
+		extractString(mapping.storeIdentifier) ?? defaultStoreId;
 
 	let barcodes: string[] = [];
 	if (mapping.barcodesExtractor) {
@@ -298,9 +327,13 @@ function mapItemToRow(
 		barcodes = extractBarcodes(record, mapping.barcodes);
 	}
 
-	const discountPrice = parseOptionalPrice(extractString(mapping.discountPrice));
+	const discountPrice = parseOptionalPrice(
+		extractString(mapping.discountPrice),
+	);
 	const unitPrice = parseOptionalPrice(extractString(mapping.unitPrice));
-	const lowestPrice30d = parseOptionalPrice(extractString(mapping.lowestPrice30d));
+	const lowestPrice30d = parseOptionalPrice(
+		extractString(mapping.lowestPrice30d),
+	);
 	const anchorPrice = parseOptionalPrice(extractString(mapping.anchorPrice));
 
 	const discountStart = parseDate(extractString(mapping.discountStart));
@@ -346,7 +379,9 @@ function getValueAtPath(item: Record<string, unknown>, path: string): unknown {
 		const record = current as Record<string, unknown>;
 		let next = record[part];
 		if (next === undefined) {
-			const key = Object.keys(record).find((k) => k.toLowerCase() === part.toLowerCase());
+			const key = Object.keys(record).find(
+				(k) => k.toLowerCase() === part.toLowerCase(),
+			);
 			if (key) {
 				next = record[key];
 			}
@@ -400,7 +435,10 @@ function valueToString(value: unknown): string | undefined {
 	return String(value);
 }
 
-function extractBarcodes(item: Record<string, unknown>, path: string): string[] {
+function extractBarcodes(
+	item: Record<string, unknown>,
+	path: string,
+): string[] {
 	const value = getValueAtPath(item, path);
 	if (!value) {
 		return [];
@@ -454,11 +492,13 @@ function parseDate(value?: string): Date | undefined {
 	}> = [
 		{
 			regex: /^(\d{4})-(\d{2})-(\d{2})$/, // YYYY-MM-DD
-			builder: (m) => new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))),
+			builder: (m) =>
+				new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))),
 		},
 		{
 			regex: /^(\d{2})\.(\d{2})\.(\d{4})$/,
-			builder: (m) => new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))),
+			builder: (m) =>
+				new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))),
 		},
 		{
 			regex: /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/,
@@ -472,7 +512,7 @@ function parseDate(value?: string): Date | undefined {
 						Number(m[5]),
 						Number(m[6]),
 					),
-					),
+				),
 		},
 		{
 			regex: /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/,
@@ -486,7 +526,7 @@ function parseDate(value?: string): Date | undefined {
 						Number(m[5]),
 						Number(m[6]),
 					),
-					),
+				),
 		},
 	];
 
