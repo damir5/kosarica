@@ -19,6 +19,10 @@ export interface AppEnv {
 	LOG_LEVEL: string;
 	/** Comma-separated chain IDs for scheduled ingestion */
 	INGESTION_CHAINS: string;
+	/** Base path for local file storage */
+	STORAGE_PATH: string;
+	/** ClickHouse database URL */
+	CLICKHOUSE_URL: string;
 }
 
 /**
@@ -30,6 +34,10 @@ export function getEnv(): AppEnv {
 	if (!DATABASE_URL) {
 		throw new Error("DATABASE_URL environment variable is required");
 	}
+	const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL;
+	if (!CLICKHOUSE_URL) {
+		throw new Error("CLICKHOUSE_URL environment variable is required");
+	}
 	return {
 		DATABASE_URL,
 		BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || "",
@@ -38,6 +46,8 @@ export function getEnv(): AppEnv {
 		PASSKEY_RP_NAME: process.env.PASSKEY_RP_NAME || "Kosarica App",
 		LOG_LEVEL: process.env.LOG_LEVEL || "info",
 		INGESTION_CHAINS: process.env.INGESTION_CHAINS || "",
+		STORAGE_PATH: process.env.STORAGE_PATH || "./data/storage",
+		CLICKHOUSE_URL,
 	};
 }
 
