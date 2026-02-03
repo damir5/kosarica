@@ -1,20 +1,16 @@
 /**
  * Basket Optimization Router
  *
- * Provides basket optimization endpoints using the Go price-service.
- * Uses generated SDK for type-safe API communication.
+ * Provides basket optimization endpoints using ClickHouse-backed queries.
  */
 
 import * as z from "zod";
 import {
-	getInternalBasketCacheHealth,
-	type HandlersMultiStoreResult,
-	postInternalBasketCacheRefreshByChainSlug,
-	postInternalBasketCacheWarmup,
-	postInternalBasketOptimizeMulti,
-	postInternalBasketOptimizeSingle,
-} from "@/lib/go-api";
-import { unwrapSdkResponse } from "@/lib/go-api-utils";
+	getCacheHealth,
+	optimizeMultiStore,
+	optimizeSingleStore,
+} from "@/lib/basket/optimizer";
+import { getClickHouse } from "@/lib/clickhouse";
 import { procedure } from "../base";
 
 // ============================================================================
@@ -109,16 +105,13 @@ const CacheFreshnessSchema = z.object({
 export const optimizeSingle = procedure
 	.input(OptimizeRequestSchema)
 	.handler(async ({ input }) => {
-		const result = await postInternalBasketOptimizeSingle({
-			body: {
-				chainSlug: input.chainSlug,
-				basketItems: input.basketItems,
-				location: input.location,
-				maxDistance: input.maxDistance,
-				maxStores: input.maxStores,
-			},
+		return await optimizeSingleStore({
+			chainSlug: input.chainSlug,
+			basketItems: input.basketItems,
+			location: input.location,
+			maxDistance: input.maxDistance,
+			maxStores: input.maxStores,
 		});
-		return unwrapSdkResponse(result);
 	});
 
 // ============================================================================
@@ -135,16 +128,13 @@ export const optimizeSingle = procedure
 export const optimizeMulti = procedure
 	.input(OptimizeRequestSchema)
 	.handler(async ({ input }) => {
-		const result = await postInternalBasketOptimizeMulti({
-			body: {
-				chainSlug: input.chainSlug,
-				basketItems: input.basketItems,
-				location: input.location,
-				maxDistance: input.maxDistance,
-				maxStores: input.maxStores,
-			},
+		return await optimizeMultiStore({
+			chainSlug: input.chainSlug,
+			basketItems: input.basketItems,
+			location: input.location,
+			maxDistance: input.maxDistance,
+			maxStores: input.maxStores,
 		});
-		return unwrapSdkResponse<HandlersMultiStoreResult>(result);
 	});
 
 // ============================================================================
@@ -159,8 +149,17 @@ export const optimizeMulti = procedure
  * or when cache data is stale.
  */
 export const cacheWarmup = procedure.handler(async () => {
-	const result = await postInternalBasketCacheWarmup();
-	return unwrapSdkResponse(result);
+	const clickhouse = getClickHouse();
+	const exists = await clickhouse.tableExists();
+	if (!exists) {
+		throw new Error(
+			"ClickHouse prices table does not exist. Run: clickhouse-client < scripts/clickhouse-schema.sql",
+		);
+	}
+	return {
+		status: "ok",
+		message: "ClickHouse is available",
+	};
 });
 
 /**
@@ -176,10 +175,18 @@ export const cacheRefresh = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
-		const result = await postInternalBasketCacheRefreshByChainSlug({
-			path: { chainSlug: input.chainSlug },
-		});
-		return unwrapSdkResponse(result);
+		const clickhouse = getClickHouse();
+		const exists = await clickhouse.tableExists();
+		if (!exists) {
+			throw new Error(
+				"ClickHouse prices table does not exist. Run: clickhouse-client < scripts/clickhouse-schema.sql",
+			);
+		}
+		return {
+			status: "ok",
+			message: "ClickHouse uses live data; no cache refresh needed",
+			chainSlug: input.chainSlug,
+		};
 	});
 
 /**
@@ -190,8 +197,7 @@ export const cacheRefresh = procedure
  * freshness information for each chain.
  */
 export const cacheHealth = procedure.handler(async () => {
-	const result = await getInternalBasketCacheHealth();
-	return unwrapSdkResponse(result);
+	return await getCacheHealth();
 });
 
 // ============================================================================

@@ -50,6 +50,22 @@ export class ClickHouseClient {
 	constructor(private client: CHClient) {}
 
 	/**
+	 * Run a raw query and return JSONEachRow results.
+	 */
+	async query<T>(
+		query: string,
+		params?: Record<string, string | number | string[]>,
+	): Promise<T[]> {
+		const result = await this.client.query({
+			query,
+			query_params: params,
+			format: "JSONEachRow",
+		});
+
+		return (await result.json()) as T[];
+	}
+
+	/**
 	 * Import a Parquet file into the prices table.
 	 * Uses ClickHouse's native Parquet import capability.
 	 */

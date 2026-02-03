@@ -18,6 +18,8 @@ import {
 	rejectMatch,
 	resolveSuspicious,
 	searchProducts,
+	triggerBarcodeMatching,
+	triggerTrigramMatching,
 } from "./products";
 import { getSettings, updateSettings } from "./settings";
 import {
@@ -138,6 +140,8 @@ export default {
 			resolveSuspicious,
 			searchProducts,
 			getStats,
+			triggerBarcodeMatching,
+			triggerTrigramMatching,
 		},
 		cron: {
 			list: cron.list,

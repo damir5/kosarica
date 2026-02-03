@@ -7,6 +7,10 @@ import {
 	productMatchQueue,
 	productMatchRejections,
 } from "@/db/schema";
+import {
+	runBarcodeMatching,
+	runTrigramMatching,
+} from "@/lib/matching";
 import { getDb } from "@/utils/bindings";
 import { superadminProcedure } from "../base";
 
@@ -34,6 +38,18 @@ const resolveSuspiciousSchema = z.object({
 	productId: z.string(),
 	version: z.number(),
 	notes: z.string().optional(),
+});
+
+const barcodeMatchingSchema = z.object({
+	batchSize: z.number().int().min(1).max(1000).optional(),
+});
+
+const trigramMatchingSchema = z.object({
+	autoLinkThreshold: z.number().min(0).max(1).optional(),
+	reviewThreshold: z.number().min(0).max(1).optional(),
+	batchSize: z.number().int().min(1).max(1000).optional(),
+	maxCandidates: z.number().int().min(1).max(20).optional(),
+	minSimilarity: z.number().min(0).max(1).optional(),
 });
 
 // Types for getPendingMatches response
@@ -572,3 +588,21 @@ export const getStats = superadminProcedure.handler(async () => {
 		links: (linkResult as { rows?: LinkStatsRow[] }).rows?.[0],
 	};
 });
+
+export const triggerBarcodeMatching = superadminProcedure
+	.input(barcodeMatchingSchema.optional())
+	.handler(async ({ input }) => {
+		return await runBarcodeMatching({ batchSize: input?.batchSize });
+	});
+
+export const triggerTrigramMatching = superadminProcedure
+	.input(trigramMatchingSchema.optional())
+	.handler(async ({ input }) => {
+		return await runTrigramMatching({
+			autoLinkThreshold: input?.autoLinkThreshold,
+			reviewThreshold: input?.reviewThreshold,
+			batchSize: input?.batchSize,
+			maxCandidates: input?.maxCandidates,
+			minSimilarity: input?.minSimilarity,
+		});
+	});
