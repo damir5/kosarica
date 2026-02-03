@@ -3,13 +3,7 @@ import postgres from "postgres";
 import { afterAll, vi } from "vitest";
 import * as schema from "@/db/schema";
 
-// Note: For integration tests requiring the Go price service,
-// use `mise run test-service` to start the Go service natively.
-// The Go service runs via `go run` for development and testing.
-
-export function isGoServiceRunning(): boolean {
-	return process.env.GO_SERVICE_FOR_TESTS === "1";
-}
+// Note: Integration tests require Postgres (and ClickHouse where applicable).
 
 // Global test database instance
 let testDb: ReturnType<typeof drizzle<typeof schema>> | null = null;

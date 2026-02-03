@@ -21,11 +21,8 @@
     "clickhouse:status": "tsx scripts/clickhouse-sync.ts status",
     "test:integration": "vitest run --run",
     "test:unit": "vitest run --run src/orpc/router/__tests__/stores*.test.ts src/db/queries/*.test.ts",
-    "test:price-service": "vitest run --run src/orpc/router/__tests__/price-service.integration.test.ts",
-    "generate:go-api": "openapi-ts",
     "generate:json-schemas": "tsx scripts/generate-jsonb-types.ts",
-    "generate:go-jsonb": "cd services/price-service && go-jsonschema -p jsonb ../../shared/schemas/jsonb/*.json -o internal/jsonb/types.generated.go",
-    "generate:jsonb": "pnpm generate:json-schemas && pnpm generate:go-jsonb",
+    "generate:jsonb": "pnpm generate:json-schemas",
     "validate:schema": "tsx scripts/validate-schema.ts"
   },
   "dependencies": {
@@ -97,7 +94,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.11",
-    "@hey-api/openapi-ts": "^0.90.10",
     "@tanstack/devtools-vite": "^0.4.1",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^25.0.9",

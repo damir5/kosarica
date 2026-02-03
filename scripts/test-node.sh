@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: test-node.sh [all|unit|integration|price-service]
+# Usage: test-node.sh [all|unit|integration]
 set -euo pipefail
 
 case "${1:-all}" in
@@ -8,9 +8,6 @@ case "${1:-all}" in
     ;;
   integration|int)
     pnpm test:integration
-    ;;
-  price-service|ps)
-    pnpm test:price-service
     ;;
   all|*)
     pnpm test

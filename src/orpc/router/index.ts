@@ -8,7 +8,7 @@ import {
 import * as clickhouse from "./clickhouse";
 import * as cron from "./cron";
 import * as ingestion from "./ingestion";
-import * as priceService from "./price-service";
+import * as prices from "./prices";
 import {
 	approveMatch,
 	bulkApprove,
@@ -65,8 +65,8 @@ export default {
 		cacheHealth: basket.cacheHealth,
 	},
 	prices: {
-		getStorePrices: priceService.getStorePrices,
-		searchItems: priceService.searchItems,
+		getStorePrices: prices.getStorePrices,
+		searchItems: prices.searchItems,
 	},
 	admin: {
 		getConfigInfo,

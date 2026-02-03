@@ -4,6 +4,8 @@ import {
 	createClient,
 } from "@clickhouse/client";
 
+export { parseNumber } from "./utils";
+
 /**
  * Row structure for price data in ClickHouse.
  */

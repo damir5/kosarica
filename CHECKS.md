@@ -2,37 +2,28 @@
 
 ## Invariants to Preserve
 
-### 1. Schema Sync (TypeScript ↔ Go)
+### 1. Schema Authority
 
-**Rule:** Database schema must be identical in both services.
+**Rule:** `src/db/schema.ts` is the source of truth for Postgres.
 
-- `src/db/schema.ts` (Drizzle) is the source of truth
-- `services/price-service/internal/database/sqlcgen/` must match
-- Breaking sync causes runtime errors in Go service
+- Drizzle migrations must reflect the schema file
+- Breaking sync causes runtime errors and failed queries
 
 ### 2. JSONB Type Safety
 
-**Rule:** JSONB column types must match across TypeScript and Go.
+**Rule:** JSONB schemas must match the Zod definitions.
 
 - `src/db/jsonb-schemas.ts` (Zod) is the source of truth
-- `services/price-service/internal/jsonb/` must match
-- Breaking sync causes JSON marshal/unmarshal failures
-
-### 3. API Contract
-
-**Rule:** TypeScript SDK must match Go API responses.
-
-- Go handlers with swag annotations are the source of truth
-- `src/lib/go-api/` must match `services/price-service/docs/swagger.json`
-- Breaking sync causes type errors in frontend
+- Generated JSON schemas in `shared/schemas/jsonb/` must match
+- Breaking sync causes runtime validation failures
 
 ---
 
 ## Verification
 
 ```bash
-pnpm validate:schema   # Check JSONB types and migrations
-mise run generate-all  # Regenerate everything
+pnpm validate:schema   # Check JSON schemas + migrations
+mise run generate-all  # Regenerate JSON schemas
 pnpm test              # Run tests
 ```
 
@@ -42,12 +33,10 @@ pnpm test              # Run tests
 
 | Changed | Run |
 |---------|-----|
-| `src/db/schema.ts` | `pnpm db:generate && pnpm db:migrate && mise run generate-all` |
+| `src/db/schema.ts` | `pnpm db:generate && pnpm db:migrate` |
 | `src/db/jsonb-schemas.ts` | `mise run generate-all` |
-| Go handler responses | `mise run generate-all` |
-
 
 ## more
 
-- NEVER use RAW sql queries - use SQLC in go and drizzle in ts
-- NEVER use any or go equivalent types especially on system boundaries
+- Prefer Drizzle for Postgres queries; use `sql` only when necessary.
+- NEVER use `any` or equivalent types especially on system boundaries.

@@ -63,61 +63,10 @@ function validateJsonSchemas(): boolean {
 	return true;
 }
 
-// Validate Go types exist
-function validateGoTypes(): boolean {
-	console.log("\nChecking Go JSONB types...");
-	const goTypesDir = "services/price-service/internal/jsonb";
-	const requiredFiles = ["types.go", "scanner.go"];
-
-	if (!existsSync(goTypesDir)) {
-		console.error(`Go types directory ${goTypesDir} does not exist`);
-		return false;
-	}
-
-	const files = readdirSync(goTypesDir);
-	const missing = requiredFiles.filter((f) => !files.includes(f));
-
-	if (missing.length > 0) {
-		console.error("Missing Go type files:", missing.join(", "));
-		return false;
-	}
-
-	for (const file of requiredFiles) {
-		console.log(`  ✓ ${file}`);
-	}
-
-	return true;
-}
-
-// Validate schema.sql exists for Go service
-function validateGoSchema(): boolean {
-	console.log("\nChecking Go service schema.sql...");
-	const schemaPath = "services/price-service/schema.sql";
-
-	if (!existsSync(schemaPath)) {
-		console.error(`Schema file ${schemaPath} does not exist`);
-		console.error("Run: mise run db-sync in services/price-service/");
-		return false;
-	}
-
-	// Check it's valid SQL (no pg_dump-specific commands that sqlc can't parse)
-	const content = readFileSync(schemaPath, "utf-8");
-	if (content.includes("\\restrict") || content.includes("\\connect")) {
-		console.error(`  ✗ ${schemaPath} contains pg_dump commands that sqlc cannot parse`);
-		console.error("  The schema.sql needs to be sqlc-compatible DDL");
-		return false;
-	}
-
-	console.log(`  ✓ ${schemaPath} exists and is sqlc-compatible`);
-	return true;
-}
-
 // Main validation
 let success = true;
 
 success = validateJsonSchemas() && success;
-success = validateGoTypes() && success;
-success = validateGoSchema() && success;
 success = validateMigrations() && success;
 
 if (success) {

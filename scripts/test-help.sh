@@ -1,23 +1,17 @@
 #!/usr/bin/env bash
-cat << 'EOF'
+cat << 'EOH'
 Test Commands (mise run test-*)
 ================================
 Node.js Tests:
   test-node          All Node tests (vitest)
   test-node-unit     Unit tests only (no services needed)
 
-Go Tests:
-  test-go            Go non-integration tests
-  test-go-int        Go integration tests
-  test-go-e2e        Go e2e tests (starts containers)
-  test-go-coverage   Tests with coverage report
-
 Combined:
-  test-all           Full suite (builds Go, migrates, runs everything)
+  test-all           Full suite (migrate DB, run JS tests)
   test               Show this help
 
 Dependencies:
-  test-node-unit, test-go       → No external services
-  test-node                     → Database only
-  test-go-e2e, test-all         → Database + Docker
-EOF
+  test-node-unit     → No external services
+  test-node          → Database + ClickHouse
+  test-all           → Database + ClickHouse
+EOH

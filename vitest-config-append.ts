@@ -22,9 +22,7 @@ export default defineConfig({
     },
     env: {
       SAMPLE_DATA_DIR: path.join(process.cwd(), "sample-data"),
-      TEST_MOCK_GO_SERVICE: process.env.TEST_MOCK_GO_SERVICE || "0",
       PORT: process.env.PORT || "3002",
-      GO_SERVICE_URL: process.env.GO_SERVICE_URL || "http://localhost:3003",
     },
     coverage: {
       provider: "v8",

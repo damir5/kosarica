@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains how to run the full backend test suite with the option to test Go service integration using a real running instance.
+This guide explains how to run the backend test suite. Integration tests require Postgres and ClickHouse.
 
 ## Test Profiles
 
@@ -16,10 +16,10 @@ pnpm test:unit
 **When to use:**
 - Testing code logic and query functions
 - Iterating on specific features
-- Don't need integration testing
+- Don’t need integration testing
 
 ### Profile 2: Full Test Suite
-Complete test suite with all services running including Go price service.
+Complete test suite with all services running.
 
 ```bash
 pnpm test
@@ -27,7 +27,7 @@ pnpm test
 
 **When to use:**
 - End-to-end testing
-- Validating cross-service communication
+- Validating database + ClickHouse integration
 - Pre-production validation
 
 ## Service Control
@@ -41,156 +41,87 @@ No external services needed. Just run:
 pnpm test:unit
 ```
 
-#### Full Suite with Go Service
+#### Full Suite (Postgres + ClickHouse)
 
-**Using Native Development**
+**Start ClickHouse (Docker example)**
 ```bash
-# Start Go service
-cd services/price-service
-go build -o price-service ./cmd/server/main.go
-./price-service &
-
-# Run full test suite
-pnpm test
-
-# Stop Go service
-kill $(pgrep -f price-service)
+docker run -d --name clickhouse-local -p 8123:8123 -p 9000:9000 clickhouse/clickhouse-server:latest
+clickhouse-client < scripts/clickhouse-schema.sql
 ```
 
-### Stopping Services
-
-```bash
-# Stop Go service (running natively)
-kill $(pgrep -f price-service)
-```
+**Ensure Postgres is running** (dev setup or local container)
 
 ### Checking Service Status
 
 ```bash
-# Go service health
-curl http://localhost:8080/health
-
-# Database connection
-curl http://localhost:8080/internal/health
+# ClickHouse health
+curl http://localhost:8123/ping
 
 # PostgreSQL
 docker ps | grep postgres
-
-# See logs
-docker logs kosarica-postgres-dev
 ```
 
 ## Environment Variables
 
 | Variable | Description | Default | When to Set |
 |-----------|-------------|---------|-------------|
-| `GO_SERVICE_FOR_TESTS` / `START_GO_SERVICE_FOR_TESTS` | (removed) | - | Do not use; orchestration handles Go service startup — use `GO_SERVICE_URL` and `mise run test-all` |
-| `TEST_MOCK_GO_SERVICE` | Mock Go service (legacy, unused) | 0 | Legacy variable, no longer used |
+| `DATABASE_URL` | Postgres connection string | - | Always (tests require it) |
+| `CLICKHOUSE_URL` | ClickHouse HTTP URL | `http://localhost:8123` | When running ClickHouse locally |
+| `STORAGE_PATH` | Local storage path | `./data/storage-test` | Optional for tests |
 
 ## Test Scripts
 
 | Script | Description |
 |--------|-------------|
-| `pnpm test` | Run all backend tests (63 tests) |
-| `pnpm test:unit` | Run only unit tests (40 tests) |
-| `pnpm test:integration` | Run full suite with Go service (63 tests) |
-
-## Test Results
-
-### Expected Results
-
-**With an explicitly set `GO_SERVICE_URL`:**
-- All 63 tests pass (unit + integration + price service)
-- Go service is expected to be running at `GO_SERVICE_URL` (orchestrated via `mise run test-all`)
-- Tests exercise real integration endpoints
-- Full coverage of codebase
-- Tests complete in ~2-3 seconds
-
-**When GO service orchestration is external (default):**
-- Unit tests pass (40 tests)
-- Store integration tests pass (12 tests)
-- Price service tests require a running Go service at `GO_SERVICE_URL` and will run when it is available
-- Developer can iterate quickly on unit tests
-- No automatic Go service startup within tests; use `mise run test-all` to run full suite
+| `pnpm test` | Run all backend tests |
+| `pnpm test:unit` | Run only unit tests |
+| `pnpm test:integration` | Run full test suite (alias) |
 
 ## Troubleshooting
 
-### Tests Failing with "Go service not reachable"
+### Tests Failing with "ClickHouse not reachable"
 
-**Problem:** Price service tests skip even though you started Go service
+**Problem:** ClickHouse integration tests fail.
 
 **Solutions:**
 
-1. **Check if Go service is running:**
+1. **Check ClickHouse is running:**
    ```bash
-   ps aux | grep price-service
+   curl http://localhost:8123/ping
    ```
 
-2. **Check Go service logs:** (if running via mise)
+2. **Ensure schema is applied:**
    ```bash
-   # Check the terminal where the service is running for any errors
-   ```
-
-3. **Verify health endpoint:**
-   ```bash
-   curl http://localhost:8080/health
-   curl http://localhost:8080/internal/health
-   ```
-   Both should return 200 OK
-
-4. **Start Go service natively:**
-   ```bash
-   cd services/price-service
-   go run ./cmd/server/main.go
+   clickhouse-client < scripts/clickhouse-schema.sql
    ```
 
 ### Tests Failing with Database Errors
 
-**Problem:** Tests fail with connection errors
+**Problem:** Tests fail with connection errors.
 
 **Solutions:**
 
 1. **Check test database is running:**
    ```bash
-   docker ps | grep postgres-test
+   docker ps | grep postgres
    ```
 
-2. **Verify database is clean before tests:**
-   Tests run `cleanupTestDatabase()` in `beforeAll` hook
-
-3. **Check for port conflicts:**
-   ```bash
-   lsof -i :15432
-   ```
-   Test database should use port 15432, not 5432
-
-### Test Database vs Development Database
-
-**Important:** Tests use separate database (`kosarica_test`) to avoid conflicts with development data.
-
-- Test database: `kosarica_test` on port 15432
-- Development database: `kosarica` on port 5432
-- Never mix them!
+2. **Verify database URL:**
+   Ensure `DATABASE_URL` points to the test database.
 
 ## Best Practices
 
-### 1. Development Workflow
+### Development Workflow
 ```bash
-# 1. Start Go service (in separate terminal, if needed)
-cd services/price-service
-go run ./cmd/server/main.go
-
-# 2. Run full test suite (in another terminal)
+# 1. Start services (Postgres + ClickHouse)
+# 2. Run full test suite
 pnpm test
 
-# 3. Make changes
-# Edit code...
-
-# 4. Re-run tests (fast!)
+# 3. Iterate quickly with unit tests
 pnpm test:unit
 ```
 
-### 2. CI/CD Workflow
+### CI/CD Workflow
 ```yaml
 # GitLab CI example
 test:
@@ -200,17 +131,9 @@ test:
   services:
     - postgres:latest
       alias: test-db
+    - clickhouse/clickhouse-server:latest
+      alias: clickhouse
   variables:
     DATABASE_URL: postgresql://test:password@test-db:5432/testdb
+    CLICKHOUSE_URL: http://clickhouse:8123
 ```
-
-## Migration from Old Mock Mode
-
-The previous mock implementation (`TEST_MOCK_GO_SERVICE=1`) is now **legacy**.
-
-To migrate:
-1. Remove references to `TEST_MOCK_GO_SERVICE` from code
-2. Delete `/workspace/src/test/go-service-mocks.ts` if no longer needed
-3. Use `GO_SERVICE_URL` environment variable to point tests at a running Go service
-
-The new approach uses real Go service instances controlled via orchestration (`mise run test-all`), providing true integration testing.

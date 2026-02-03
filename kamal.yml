@@ -30,8 +30,6 @@ env:
     - POSTGRES_PASSWORD
     - POSTGRES_DB
     - DATABASE_URL
-    - INTERNAL_API_KEY
-    - INTERNAL_API_URL
     - BETTER_AUTH_SECRET
     - BETTER_AUTH_URL
     - PASSKEY_RP_ID
@@ -91,32 +89,6 @@ accessories:
         interval: 10s
         timeout: 5s
         retries: 5
-
-  # Go Price Service
-  price-service:
-    image: kosarica/price-service:latest
-    host: ${KAMAL_HOST}
-    port: 8080
-    env:
-      clear:
-        PORT: 8080
-        LOG_LEVEL: info
-        LOG_FORMAT: json
-        STORAGE_PATH: /app/data/archives
-        OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector:4317
-        OTEL_SERVICE_NAME: price-service
-      secret:
-        - DATABASE_URL
-        - INTERNAL_API_KEY
-    volumes:
-      - /var/lib/kosarica/price-service:/app/data/archives
-    options:
-      restart: unless-stopped
-      healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-        interval: 30s
-        timeout: 5s
-        retries: 3
 
   # OpenTelemetry Collector
   opentelemetry-collector:

@@ -25,26 +25,26 @@ Kosarica aggregates pricing data from 11 major Croatian retail chains, normalize
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      Go Price Service                        │
+│                    Node.js Service (unified)                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   11 Chain  │  │   Basket    │  │  Product            │  │
-│  │  Adapters   │  │  Optimizer  │  │  Matching           │  │
+│  │ Ingestion   │  │  Basket     │  │  Product            │  │
+│  │ Pipeline    │  │ Optimizer   │  │  Matching           │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-                    ┌──────────┐
-                    │PostgreSQL│
-                    └──────────┘
+               │                          │
+               ▼                          ▼
+        ┌──────────┐                ┌──────────┐
+        │PostgreSQL│                │ClickHouse│
+        └──────────┘                └──────────┘
 ```
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.21+
 - Node.js 20+
 - PostgreSQL 15+
+- ClickHouse (local install or Docker)
 - pnpm
 
 ### Setup
@@ -57,9 +57,11 @@ pnpm install
 # Setup database
 pnpm db:migrate
 
-# Run services (two terminals)
-pnpm dev                                    # Terminal 1: Node.js
-cd services/price-service && go run cmd/server/main.go  # Terminal 2: Go
+# Apply ClickHouse schema (local ClickHouse required)
+clickhouse-client < scripts/clickhouse-schema.sql
+
+# Run service
+pnpm dev
 ```
 
 Visit `http://localhost:3000` to access the application.

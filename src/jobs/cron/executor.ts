@@ -56,12 +56,13 @@ async function enqueueTasks(
 				payload = { type: "cleanup", ...(task.payload ?? {}) };
 				break;
 			default: {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// @ts-expect-error - exhaustive check for unreachable code
 				const _exhaustiveCheck: never = task;
 				failed += 1;
 				errors.push({
 					task,
-					error: `Unknown task type: ${(_exhaustiveCheck as any).type}`,
+					// biome-ignore lint/suspicious/noExplicitAny: exhaustive check for unreachable code
+					error: `Unknown task type: ${(task as any).type}`,
 				});
 				continue;
 			}

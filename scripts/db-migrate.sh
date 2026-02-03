@@ -3,7 +3,7 @@ set -euo pipefail
 
 CONFIG_PATH="${DRIZZLE_CONFIG:-drizzle.config.ts}"
 MIGRATIONS_DIR="${DRIZZLE_MIGRATIONS_DIR:-drizzle}"
-LOG_PATH="${DRIZZLE_MIGRATE_LOG:-/tmp/price-service-migrate.log}"
+LOG_PATH="${DRIZZLE_MIGRATE_LOG:-/tmp/kosarica-migrate.log}"
 
 echo "==> Running Drizzle migrations"
 echo "Config: ${CONFIG_PATH}"

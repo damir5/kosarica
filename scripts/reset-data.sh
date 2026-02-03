@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Defaults
-STORAGE_PATHS=("./data/storage" "./services/price-service/data")
+STORAGE_PATHS=("./data/storage")
 CONFIRM=true
 KEEP_DB=false
 KEEP_STORAGE=false
