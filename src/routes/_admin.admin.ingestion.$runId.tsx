@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
 import {
 	Activity,
 	AlertTriangle,
@@ -17,6 +18,7 @@ import {
 	IngestionFileList,
 	IngestionStoreStatsTable,
 } from "@/components/admin/ingestion";
+import type { IngestionFile } from "@/components/admin/ingestion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,6 +61,60 @@ const SUMMARY_VARIANTS: Record<string, "secondary" | "destructive" | "outline"> 
 		error: "destructive",
 		critical: "destructive",
 	};
+
+interface IngestionFileResponse {
+	id: string;
+	runId: string;
+	filename: string;
+	fileType: string;
+	fileSize?: number | null;
+	fileHash?: string | null;
+	status: string;
+	statusReason?: string | null;
+	statusSeverity?: string | null;
+	statusType?: string | null;
+	entryCount?: number | null;
+	rowCount?: number | null;
+	persistedCount?: number | null;
+	priceChanges?: number | null;
+	failedRows?: number | null;
+	warningRows?: number | null;
+	storeCount?: number | null;
+	processedAt?: string | null;
+	metadata?: string | null;
+	totalChunks?: number | null;
+	processedChunks?: number | null;
+	chunkSize?: number | null;
+	createdAt?: string | null;
+}
+
+function mapToIngestionFile(file: IngestionFileResponse): IngestionFile {
+	return {
+		id: file.id,
+		runId: file.runId,
+		filename: file.filename,
+		fileType: file.fileType,
+		fileSize: file.fileSize ?? null,
+		fileHash: file.fileHash ?? null,
+		status: file.status,
+		statusReason: file.statusReason ?? null,
+		statusSeverity: file.statusSeverity ?? null,
+		statusType: file.statusType ?? null,
+		entryCount: file.entryCount ?? null,
+		rowCount: file.rowCount ?? null,
+		persistedCount: file.persistedCount ?? null,
+		priceChanges: file.priceChanges ?? null,
+		failedRows: file.failedRows ?? null,
+		warningRows: file.warningRows ?? null,
+		storeCount: file.storeCount ?? null,
+		processedAt: file.processedAt ? new Date(file.processedAt) : null,
+		metadata: file.metadata ?? null,
+		totalChunks: file.totalChunks ?? null,
+		processedChunks: file.processedChunks ?? null,
+		chunkSize: file.chunkSize ?? null,
+		createdAt: file.createdAt ? new Date(file.createdAt) : null,
+	};
+}
 
 type ParsedErrorDetails = {
 	url?: string;
@@ -187,6 +243,36 @@ function RunDetailPage() {
 		if (value === null || value === undefined) return "-";
 		return value.toLocaleString();
 	};
+
+	// Calculate aggregated run stats from store stats (must be before early returns for React hooks)
+	const runStats = useMemo(() => {
+		const stats = storeStatsResponse?.stores ?? [];
+		if (stats.length === 0) {
+			return {
+				storeCount: 0,
+				rowCount: 0,
+				persistedCount: 0,
+				priceChanges: 0,
+				failedRows: 0,
+				warningRows: 0,
+			};
+		}
+		return stats.reduce((acc, stat) => ({
+			storeCount: acc.storeCount + 1,
+			rowCount: acc.rowCount + (stat.rowCount ?? 0),
+			persistedCount: acc.persistedCount + (stat.persistedCount ?? 0),
+			priceChanges: acc.priceChanges + (stat.priceChanges ?? 0),
+			failedRows: acc.failedRows + (stat.failedRows ?? 0),
+			warningRows: acc.warningRows + (stat.warningRows ?? 0),
+		}), {
+			storeCount: 0,
+			rowCount: 0,
+			persistedCount: 0,
+			priceChanges: 0,
+			failedRows: 0,
+			warningRows: 0,
+		});
+	}, [storeStatsResponse]);
 
 	if (runLoading) {
 		return (
@@ -370,19 +456,19 @@ function RunDetailPage() {
 							<div>
 								<div className="text-xs text-muted-foreground">Stores</div>
 								<div className="text-2xl font-bold">
-									{formatCount(run.storeCount)}
+									{formatCount(runStats.storeCount)}
 								</div>
 							</div>
 							<div>
 								<div className="text-xs text-muted-foreground">Rows</div>
 								<div className="text-2xl font-bold">
-									{formatCount(run.rowCount)}
+									{formatCount(runStats.rowCount)}
 								</div>
 							</div>
 							<div>
 								<div className="text-xs text-muted-foreground">Persisted</div>
 								<div className="text-2xl font-bold">
-									{formatCount(run.persistedCount)}
+									{formatCount(runStats.persistedCount)}
 								</div>
 							</div>
 							<div>
@@ -390,23 +476,23 @@ function RunDetailPage() {
 									Price Changes
 								</div>
 								<div className="text-2xl font-bold">
-									{formatCount(run.priceChanges)}
+									{formatCount(runStats.priceChanges)}
 								</div>
 							</div>
 							<div>
 								<div className="text-xs text-muted-foreground">Failed Rows</div>
 								<div
-									className={`text-2xl font-bold ${(run.failedRows ?? 0) > 0 ? "text-destructive" : ""}`}
+									className={`text-2xl font-bold ${(runStats.failedRows ?? 0) > 0 ? "text-destructive" : ""}`}
 								>
-									{formatCount(run.failedRows)}
+									{formatCount(runStats.failedRows)}
 								</div>
 							</div>
 							<div>
 								<div className="text-xs text-muted-foreground">Warnings</div>
 								<div
-									className={`text-2xl font-bold ${(run.warningRows ?? 0) > 0 ? "text-amber-600" : ""}`}
+									className={`text-2xl font-bold ${(runStats.warningRows ?? 0) > 0 ? "text-amber-600" : ""}`}
 								>
-									{formatCount(run.warningRows)}
+									{formatCount(runStats.warningRows)}
 								</div>
 							</div>
 						</div>
@@ -655,31 +741,7 @@ function RunDetailPage() {
 					</CardHeader>
 					<CardContent>
 						<IngestionFileList
-							files={(filesData?.files ?? []).map((f) => ({
-								id: f.id ?? "",
-								runId: f.runId ?? "",
-								filename: f.filename ?? "",
-								fileType: f.fileType ?? "",
-								fileSize: f.fileSize ?? null,
-								fileHash: f.fileHash ?? null,
-								status: f.status ?? "pending",
-								statusReason: f.statusReason ?? null,
-								statusSeverity: f.statusSeverity ?? null,
-								statusType: f.statusType ?? null,
-								entryCount: f.entryCount ?? null,
-								rowCount: f.rowCount ?? null,
-								persistedCount: f.persistedCount ?? null,
-								priceChanges: f.priceChanges ?? null,
-								failedRows: f.failedRows ?? null,
-								warningRows: f.warningRows ?? null,
-								storeCount: f.storeCount ?? null,
-								processedAt: f.processedAt ? new Date(f.processedAt) : null,
-								metadata: f.metadata ?? null,
-								totalChunks: f.totalChunks ?? null,
-								processedChunks: f.processedChunks ?? null,
-								chunkSize: f.chunkSize ?? null,
-								createdAt: f.createdAt ? new Date(f.createdAt) : null,
-							}))}
+							files={(filesData?.files ?? []).map(mapToIngestionFile)}
 							runId={runId}
 							isLoading={filesLoading}
 							onRerunFile={(fileId) => rerunFileMutation.mutate(fileId)}

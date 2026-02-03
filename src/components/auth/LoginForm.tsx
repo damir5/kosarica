@@ -12,7 +12,7 @@ export function LoginForm() {
 	const location = useRouterState({ select: (s) => s.location });
 	const redirectParam = new URLSearchParams(location.search).get("redirect");
 	const redirectTo =
-		redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+		redirectParam?.startsWith("/") && !redirectParam.startsWith("//")
 			? redirectParam
 			: "/";
 

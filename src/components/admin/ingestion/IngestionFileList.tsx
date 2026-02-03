@@ -146,7 +146,10 @@ export function IngestionFileList({
 					</TableHeader>
 					<TableBody>
 						{[...Array(5)].map((_, i) => (
-							<TableRow key={`skeleton-${i}`}>
+							<TableRow
+								// biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton loader items
+								key={`file-skeleton-${i}`}
+							>
 								<TableCell colSpan={8}>
 									<div className="h-8 bg-muted animate-pulse rounded" />
 								</TableCell>

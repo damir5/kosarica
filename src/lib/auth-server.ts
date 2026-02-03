@@ -79,7 +79,7 @@ export const requireAuth = createServerFn({ method: "GET" }).handler(
 	async () => {
 		const session = await getSession();
 		if (!session) {
-			throw redirect({ to: "/login" as const });
+			throw redirect({ to: "/login" as const, search: { redirect: "/" } });
 		}
 		return session;
 	},
@@ -92,7 +92,7 @@ export const requireSuperadmin = createServerFn({ method: "GET" }).handler(
 			!session ||
 			(session.user as Record<string, unknown>).role !== "superadmin"
 		) {
-			throw redirect({ to: "/login" as const });
+			throw redirect({ to: "/login" as const, search: { redirect: "/" } });
 		}
 		return session;
 	},

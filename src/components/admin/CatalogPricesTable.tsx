@@ -14,7 +14,7 @@ const currencyFormatter = new Intl.NumberFormat("hr-HR", {
 });
 
 export type CatalogPriceRow = {
-	id: bigint;
+	id: string;
 	productName: string;
 	brand: string | null;
 	category: string | null;
