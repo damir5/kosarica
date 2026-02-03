@@ -1,0 +1,73 @@
+services:
+  # Dev PostgreSQL (persistent)
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["dev"]
+    container_name: ade-postgres
+    environment:
+      POSTGRES_USER: kosarica
+      POSTGRES_PASSWORD: kosarica
+      POSTGRES_DB: kosarica
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kosarica"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Test PostgreSQL (ephemeral)
+  postgres-test:
+    image: postgres:16-alpine
+    profiles: ["test"]
+    container_name: ade-postgres-test
+    environment:
+      POSTGRES_USER: kosarica_test
+      POSTGRES_PASSWORD: kosarica_test
+      POSTGRES_DB: kosarica_test
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kosarica_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Dev ClickHouse (persistent)
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    profiles: ["dev"]
+    container_name: ade-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./scripts/clickhouse-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Test ClickHouse (ephemeral)
+  clickhouse-test:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    profiles: ["test"]
+    container_name: ade-clickhouse-test
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    volumes:
+      - ./scripts/clickhouse-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  clickhouse_data:

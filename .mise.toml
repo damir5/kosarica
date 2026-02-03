@@ -17,22 +17,10 @@ run = "./scripts/test-node.sh all"
 description = "Run Node.js unit tests (no services needed)"
 run = "./scripts/test-node.sh unit"
 
-[tasks.test-go]
-description = "Run Go non-integration tests"
-run = "./scripts/test-go.sh unit"
-
-[tasks.test-go-int]
-description = "Run Go integration tests"
-run = "./scripts/test-go.sh integration"
-
-[tasks.test-go-e2e]
-description = "Run Go e2e tests (starts containers)"
-run = "./scripts/test-go.sh e2e"
-
-[tasks.test-go-coverage]
-description = "Run Go tests with coverage"
-run = "./scripts/test-go.sh coverage"
-
 [tasks.test-all]
 description = "Run full test suite (orchestrated)"
 run = "./scripts/test-all.sh"
+
+[tasks.test-ci]
+description = "Run tests in CI (auto-starts services, runs tests, cleans up)"
+run = "./scripts/test-ci.sh"

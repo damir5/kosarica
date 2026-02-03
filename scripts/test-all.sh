@@ -11,6 +11,33 @@ set -o allexport
 [ -f .env.test ] && . .env.test || true
 set +o allexport
 
+# Check if services are available (warning only, not failure)
+check_service() {
+  local name="$1"
+  local url="$2"
+  if command -v curl &>/dev/null; then
+    if ! curl -sf --max-time 2 "$url" &>/dev/null; then
+      echo "WARNING: $name may not be available at $url"
+      echo "  Run 'mise run services-up' to start dev services"
+      echo "  Or run 'mise run test-ci' for isolated test environment"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+SERVICES_AVAILABLE=true
+if ! check_service "ClickHouse" "${CLICKHOUSE_URL:-http://localhost:8123}/ping"; then
+  SERVICES_AVAILABLE=false
+fi
+
+if [ "$SERVICES_AVAILABLE" = false ]; then
+  echo ""
+  echo "Some services may be unavailable. Continuing anyway..."
+  echo "(Unit tests will still run; integration tests may fail)"
+  echo ""
+fi
+
 # Apply migrations to the test database before running tests.
 echo "Applying DB migrations to test database..."
 pnpm db:migrate || {

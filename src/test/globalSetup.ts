@@ -3,6 +3,35 @@ import { exec } from "node:child_process";
 import postgres from "postgres";
 
 /**
+ * Verify ClickHouse is available (warning only, don't fail for unit tests).
+ */
+async function verifyClickHouse(): Promise<void> {
+	const clickhouseUrl =
+		process.env.CLICKHOUSE_URL || "http://ade-clickhouse-test.orb.local:8123";
+
+	try {
+		const response = await fetch(`${clickhouseUrl}/ping`, {
+			signal: AbortSignal.timeout(2000),
+		});
+		if (response.ok) {
+			console.log(`ClickHouse available at ${clickhouseUrl}`);
+		} else {
+			console.warn(
+				`WARNING: ClickHouse ping returned ${response.status} at ${clickhouseUrl}`,
+			);
+			console.warn(
+				"  ClickHouse integration tests may fail. Run 'mise run services-up' to start services.",
+			);
+		}
+	} catch {
+		console.warn(`WARNING: ClickHouse not available at ${clickhouseUrl}`);
+		console.warn(
+			"  ClickHouse integration tests may fail. Run 'mise run services-up' to start services.",
+		);
+	}
+}
+
+/**
  * Clean up the test database by dropping all tables, types, enums, and the drizzle schema.
  */
 async function cleanupTestDatabase(): Promise<void> {
@@ -89,10 +118,14 @@ export default async function globalSetup() {
 	// Ensure DATABASE_URL is set for both cleanup and migrations
 	const testUrl =
 		process.env.DATABASE_URL ||
-		"postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test";
+		"postgresql://kosarica_test:kosarica_test@ade-postgres-test.orb.local:5432/kosarica_test";
 	process.env.DATABASE_URL = testUrl;
 
 	await cleanupTestDatabase();
 	await applyMigrations();
+
+	// Verify ClickHouse availability (warning only, don't fail)
+	await verifyClickHouse();
+
 	console.log("Global test setup complete.");
 }

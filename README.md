@@ -43,9 +43,9 @@ Kosarica aggregates pricing data from 11 major Croatian retail chains, normalize
 ### Prerequisites
 
 - Node.js 20+
-- PostgreSQL 15+
-- ClickHouse (local install or Docker)
+- Docker & Docker Compose (for services)
 - pnpm
+- [mise](https://mise.jdx.dev/) (recommended, for task runners)
 
 ### Setup
 
@@ -54,17 +54,57 @@ Kosarica aggregates pricing data from 11 major Croatian retail chains, normalize
 cp .env.example .env
 pnpm install
 
+# Start dev services (PostgreSQL + ClickHouse)
+mise run services-up
+
 # Setup database
 pnpm db:migrate
-
-# Apply ClickHouse schema (local ClickHouse required)
-clickhouse-client < scripts/clickhouse-schema.sql
 
 # Run service
 pnpm dev
 ```
 
 Visit `http://localhost:3000` to access the application.
+
+### Service Management
+
+```bash
+mise run services-up      # Start dev services
+mise run services-down    # Stop dev services
+mise run services-status  # Check status
+mise run services-logs    # View logs
+mise run services-reset   # Reset with fresh data
+```
+
+## Testing
+
+### Run All Tests (CI Mode)
+
+```bash
+mise run test-ci
+```
+
+Automatically starts test containers, runs migrations, executes tests, and cleans up.
+
+### Run Tests with Dev Services
+
+```bash
+# Ensure dev services are running
+mise run services-up
+
+# Run tests
+mise run test-all
+```
+
+### Test Commands
+
+| Command | Description |
+|---------|-------------|
+| `mise run test-ci` | Full CI mode (auto-manages containers) |
+| `mise run test-all` | All tests (requires services running) |
+| `mise run test-node-unit` | Unit tests only (no services needed) |
+
+Run `mise run test` for all available test commands.
 
 ## Documentation
 

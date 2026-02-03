@@ -43,9 +43,65 @@ depends = ["generate-jsonb"]
 run = "echo '==> All codegen complete!'"
 
 [tasks.generate-jsonb]
-description = "Generate JSONB types (Zod -> JSON Schema -> Go)"
+description = "Generate JSONB types (Zod -> JSON Schema)"
 run = "pnpm generate:jsonb"
 
 [tasks.reset-data]
 description = "Reset database and storage (preserves admin users). Add --yes or --dry-run flags as needed"
 run = "bash -c 'set -a; source .env.development; set +a; exec ./scripts/reset-data.sh \"$@\"' bash"
+
+# ==============================================================================
+# SERVICE MANAGEMENT TASKS
+# ==============================================================================
+
+[tasks.services-up]
+description = "Start dev services (Postgres + ClickHouse)"
+run = "docker compose --profile dev up -d"
+
+[tasks.services-down]
+description = "Stop dev services"
+run = "docker compose --profile dev down"
+
+[tasks.services-logs]
+description = "Follow dev services logs"
+run = "docker compose --profile dev logs -f"
+
+[tasks.services-status]
+description = "Show dev services status"
+run = "docker compose --profile dev ps"
+
+[tasks.services-reset]
+description = "Reset dev services (stop, remove volumes, restart)"
+run = "docker compose --profile dev down -v && docker compose --profile dev up -d"
+
+[tasks.test-services-up]
+description = "Start test services (ephemeral Postgres + ClickHouse)"
+run = "docker compose --profile test up -d --wait"
+
+[tasks.test-services-down]
+description = "Stop and remove test services"
+run = "docker compose --profile test down -v"
+
+# ==============================================================================
+# CLICKHOUSE MANAGEMENT TASKS
+# ==============================================================================
+
+[tasks.clickhouse-status]
+description = "Check ClickHouse sync status"
+run = "pnpm clickhouse:status"
+
+[tasks.clickhouse-load-all]
+description = "Full rebuild of ClickHouse data"
+run = "pnpm clickhouse:load-all"
+
+[tasks.clickhouse-load-missing]
+description = "Incremental sync to ClickHouse"
+run = "pnpm clickhouse:load-missing"
+
+# ==============================================================================
+# CI TASKS
+# ==============================================================================
+
+[tasks.test-ci]
+description = "Run tests in CI (auto-starts services, runs tests, cleans up)"
+run = "./scripts/test-ci.sh"
