@@ -1,43 +1,30 @@
 import { Readable, type Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { createGunzip, createGzip } from "node:zlib";
+import { promisify } from "node:util";
+import {
+	createGunzip,
+	createGzip,
+	gzip as gzipCallback,
+	gunzip as gunzipCallback,
+} from "node:zlib";
+
+const gzipAsync = promisify(gzipCallback);
+const gunzipAsync = promisify(gunzipCallback);
 
 /**
- * Compress data using gzip with streaming to avoid loading all data in memory.
+ * Compress data using gzip.
+ * Uses the simple callback-based API which is reliable and efficient.
  */
 export async function compressGzip(data: Buffer): Promise<Buffer> {
-	const chunks: Buffer[] = [];
-	const gzip = createGzip();
-
-	await pipeline(Readable.from(data), gzip, async function* (
-		source: AsyncIterable<Buffer>,
-	) {
-		for await (const chunk of source) {
-			chunks.push(chunk);
-			yield chunk;
-		}
-	} as unknown as Transform);
-
-	return Buffer.concat(chunks);
+	return gzipAsync(data);
 }
 
 /**
- * Decompress gzip data with streaming to avoid loading all data in memory.
+ * Decompress gzip data.
+ * Uses the simple callback-based API which is reliable and efficient.
  */
 export async function decompressGzip(data: Buffer): Promise<Buffer> {
-	const chunks: Buffer[] = [];
-	const gunzip = createGunzip();
-
-	await pipeline(Readable.from(data), gunzip, async function* (
-		source: AsyncIterable<Buffer>,
-	) {
-		for await (const chunk of source) {
-			chunks.push(chunk);
-			yield chunk;
-		}
-	} as unknown as Transform);
-
-	return Buffer.concat(chunks);
+	return gunzipAsync(data);
 }
 
 /**

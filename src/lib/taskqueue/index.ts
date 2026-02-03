@@ -74,8 +74,10 @@ export async function claimTasks(
 		WHERE tq.id = c.id
 		RETURNING tq.id, tq.task_type, tq.payload
 	`);
-	const rows = ((result as { rows?: unknown[] }).rows ?? []) as ClaimedTask[];
-	return rows;
+	const resultRows = Array.isArray(result)
+		? (result as unknown[])
+		: ((result as { rows?: unknown[] }).rows ?? []);
+	return resultRows as ClaimedTask[];
 }
 
 export async function completeTask(taskId: string): Promise<boolean> {

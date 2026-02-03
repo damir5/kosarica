@@ -24,3 +24,15 @@ run = "./scripts/test-all.sh"
 [tasks.test-ci]
 description = "Run tests in CI (auto-starts services, runs tests, cleans up)"
 run = "./scripts/test-ci.sh"
+
+# ==============================================================================
+# DATABASE TASKS
+# ==============================================================================
+
+[tasks.db-reset]
+description = "Reset database (drop schema, migrate, create admin user)"
+run = "./scripts/db-reset.sh"
+
+[tasks.db-migrate]
+description = "Run database migrations"
+run = "./scripts/db-migrate.sh"

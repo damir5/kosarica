@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Load environment variables based on NODE_ENV
+ENV_FILE="${NODE_ENV:+.env.$NODE_ENV}"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
+elif [ -f ".env" ]; then
+  set -a
+  source .env
+  set +a
+fi
+
 CONFIG_PATH="${DRIZZLE_CONFIG:-drizzle.config.ts}"
 MIGRATIONS_DIR="${DRIZZLE_MIGRATIONS_DIR:-drizzle}"
 LOG_PATH="${DRIZZLE_MIGRATE_LOG:-/tmp/kosarica-migrate.log}"
