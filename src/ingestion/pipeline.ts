@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { getChainConfig } from "@/ingestion/adapters/config";
 import { getAdapter } from "@/ingestion/adapters/registry";
+import type { ChainAdapter } from "@/ingestion/adapters/types";
 import { type ParquetPriceRow, writePricesParquet } from "@/ingestion/parquet";
 import type {
 	DiscoveredFile,
@@ -54,6 +55,178 @@ export interface IngestionResult {
 }
 
 const log = createLogger("ingestion");
+
+interface IngestionPerformanceConfig {
+	fileConcurrency: number;
+	dbBatchSize: number;
+	progressUpdateIntervalMs: number;
+}
+
+interface ValidRowForPersistence {
+	row: NormalizedRow;
+	storeId: string;
+	storeIdentifier: string;
+	hasWarning: boolean;
+}
+
+interface ProcessedFileResult {
+	totalRows: number;
+	processedRows: number;
+	warningRows: number;
+	failedRows: number;
+	errorCount: number;
+	parquetRows: ParquetPriceRow[];
+}
+
+interface FileToProcess {
+	file: DiscoveredFile;
+	content: Buffer;
+	type: string;
+	filename: string;
+	hash: string;
+	archiveId: string;
+	expandedFrom?: string;
+	tempStorageKey?: string;
+}
+
+interface ItemPersistenceState {
+	cacheByExternalId: Map<string, string>;
+	cacheByBarcode: Map<string, string>;
+	updatedItemIds: Set<string>;
+	knownItemBarcodePairs: Set<string>;
+	batchSize: number;
+}
+
+type SerializeFn = <T>(operation: () => Promise<T>) => Promise<T>;
+
+function parsePositiveIntEnv(name: string, fallback: number): number {
+	const raw = process.env[name];
+	if (!raw) {
+		return fallback;
+	}
+	const parsed = Number.parseInt(raw, 10);
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		log.warn("Invalid ingestion performance setting, using fallback", {
+			name,
+			value: raw,
+			fallback,
+		});
+		return fallback;
+	}
+	return parsed;
+}
+
+function getIngestionPerformanceConfig(): IngestionPerformanceConfig {
+	return {
+		fileConcurrency: parsePositiveIntEnv("INGESTION_FILE_CONCURRENCY", 3),
+		dbBatchSize: parsePositiveIntEnv("INGESTION_DB_BATCH_SIZE", 1000),
+		progressUpdateIntervalMs: parsePositiveIntEnv(
+			"INGESTION_PROGRESS_UPDATE_INTERVAL_MS",
+			5000,
+		),
+	};
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+	const chunks: T[][] = [];
+	for (let i = 0; i < items.length; i += size) {
+		chunks.push(items.slice(i, i + size));
+	}
+	return chunks;
+}
+
+async function runWithConcurrency<T>(
+	items: T[],
+	concurrency: number,
+	handler: (item: T, index: number) => Promise<void>,
+): Promise<void> {
+	if (items.length === 0) {
+		return;
+	}
+
+	const maxWorkers = Math.max(1, Math.min(concurrency, items.length));
+	let nextIndex = 0;
+	let firstError: unknown = null;
+
+	const workers = Array.from({ length: maxWorkers }, async () => {
+		while (true) {
+			if (firstError) {
+				return;
+			}
+			const currentIndex = nextIndex;
+			nextIndex += 1;
+			if (currentIndex >= items.length) {
+				return;
+			}
+
+			try {
+				await handler(items[currentIndex], currentIndex);
+			} catch (error) {
+				if (!firstError) {
+					firstError = error;
+				}
+				return;
+			}
+		}
+	});
+
+	await Promise.allSettled(workers);
+
+	if (firstError) {
+		throw firstError;
+	}
+}
+
+function isDeadlockError(error: unknown): boolean {
+	if (!error || typeof error !== "object") {
+		return false;
+	}
+
+	const directCode =
+		"code" in error && typeof error.code === "string" ? error.code : undefined;
+	if (directCode === "40P01") {
+		return true;
+	}
+
+	if (!("cause" in error) || !error.cause || typeof error.cause !== "object") {
+		return false;
+	}
+
+	const causeCode =
+		"code" in error.cause && typeof error.cause.code === "string"
+			? error.cause.code
+			: undefined;
+	return causeCode === "40P01";
+}
+
+async function withDeadlockRetry<T>(
+	operationName: string,
+	operation: () => Promise<T>,
+	maxAttempts = 3,
+): Promise<T> {
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+		try {
+			return await operation();
+		} catch (error) {
+			lastError = error;
+			if (!isDeadlockError(error) || attempt === maxAttempts) {
+				throw error;
+			}
+
+			const backoffMs = 100 * 2 ** (attempt - 1);
+			log.warn("Deadlock detected, retrying operation", {
+				operation: operationName,
+				attempt,
+				maxAttempts,
+				backoffMs,
+			});
+			await new Promise((resolve) => setTimeout(resolve, backoffMs));
+		}
+	}
+
+	throw lastError;
+}
 
 function formatDateLocal(date: Date): string {
 	const year = date.getFullYear();
@@ -106,203 +279,173 @@ async function resolveStoreId(
 		postalCode?: string;
 	} | null,
 	cache: Map<string, string>,
+	inFlightResolutions?: Map<string, Promise<string>>,
 ): Promise<string> {
-	const cached = cache.get(storeIdentifier);
+	const cacheKey = `${chainSlug}:${storeIdentifier}`;
+	const cached = cache.get(cacheKey);
 	if (cached) {
 		return cached;
 	}
 
-	const db = getDatabase();
-	const existing = await db
-		.select({ id: stores.id })
-		.from(storeIdentifiers)
-		.innerJoin(stores, eq(stores.id, storeIdentifiers.storeId))
-		.where(
-			and(
-				eq(storeIdentifiers.value, storeIdentifier),
-				eq(stores.chainSlug, chainSlug),
-			),
-		)
-		.limit(1);
-
-	if (existing[0]) {
-		cache.set(storeIdentifier, existing[0].id);
-		return existing[0].id;
+	if (inFlightResolutions) {
+		const inFlight = inFlightResolutions.get(cacheKey);
+		if (inFlight) {
+			return inFlight;
+		}
 	}
 
-	const storeId = generatePrefixedId("sto");
-	const storeName =
-		metadata?.name ||
-		`${chainSlug.toUpperCase()} ${storeIdentifier}`.slice(0, 255);
+	const resolver = (async () => {
+		const db = getDatabase();
+		const existing = await db
+			.select({ id: stores.id })
+			.from(storeIdentifiers)
+			.innerJoin(stores, eq(stores.id, storeIdentifiers.storeId))
+			.where(
+				and(
+					eq(storeIdentifiers.value, storeIdentifier),
+					eq(stores.chainSlug, chainSlug),
+				),
+			)
+			.limit(1);
 
-	await db.insert(stores).values({
-		id: storeId,
-		chainSlug,
-		name: storeName,
-		address: metadata?.address,
-		city: metadata?.city,
-		postalCode: metadata?.postalCode,
-		isVirtual: true,
-		status: "pending",
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	});
+		if (existing[0]) {
+			cache.set(cacheKey, existing[0].id);
+			return existing[0].id;
+		}
 
-	await db.insert(storeIdentifiers).values({
-		id: generatePrefixedId("sid"),
-		storeId,
-		type: storeIdentifierType,
-		value: storeIdentifier,
-		createdAt: new Date(),
-	});
+		const storeId = generatePrefixedId("sto");
+		const storeName =
+			metadata?.name ||
+			`${chainSlug.toUpperCase()} ${storeIdentifier}`.slice(0, 255);
 
-	cache.set(storeIdentifier, storeId);
-	return storeId;
+		await db.insert(stores).values({
+			id: storeId,
+			chainSlug,
+			name: storeName,
+			address: metadata?.address,
+			city: metadata?.city,
+			postalCode: metadata?.postalCode,
+			isVirtual: true,
+			status: "pending",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		await db.insert(storeIdentifiers).values({
+			id: generatePrefixedId("sid"),
+			storeId,
+			type: storeIdentifierType,
+			value: storeIdentifier,
+			createdAt: new Date(),
+		});
+
+		cache.set(cacheKey, storeId);
+		return storeId;
+	})();
+
+	if (inFlightResolutions) {
+		inFlightResolutions.set(cacheKey, resolver);
+	}
+
+	try {
+		return await resolver;
+	} finally {
+		inFlightResolutions?.delete(cacheKey);
+	}
 }
 
-async function findRetailerItemByExternalId(
+function externalIdCacheKey(chainSlug: string, externalId: string): string {
+	return `${chainSlug}:external:${externalId}`;
+}
+
+function barcodeCacheKey(chainSlug: string, barcode: string): string {
+	return `${chainSlug}:barcode:${barcode}`;
+}
+
+function normalizeExternalId(externalId?: string): string | null {
+	if (!externalId) {
+		return null;
+	}
+	const normalized = externalId.trim();
+	return normalized.length > 0 ? normalized : null;
+}
+
+async function loadItemsByExternalIds(
 	chainSlug: string,
-	externalId: string,
-	cache: Map<string, string>,
-): Promise<string | null> {
-	const key = `${chainSlug}:${externalId}`;
-	const cached = cache.get(key);
-	if (cached) {
-		return cached;
+	externalIds: string[],
+	batchSize: number,
+): Promise<Map<string, string>> {
+	const matches = new Map<string, string>();
+	if (externalIds.length === 0) {
+		return matches;
 	}
 
 	const db = getDatabase();
-	const existing = await db
-		.select({ id: retailerItems.id })
-		.from(retailerItems)
-		.where(
-			and(
-				eq(retailerItems.chainSlug, chainSlug),
-				eq(retailerItems.externalId, externalId),
-			),
-		)
-		.limit(1);
-
-	if (existing[0]) {
-		cache.set(key, existing[0].id);
-		return existing[0].id;
+	for (const chunk of chunkArray(externalIds, batchSize)) {
+		const rows = await db
+			.select({ id: retailerItems.id, externalId: retailerItems.externalId })
+			.from(retailerItems)
+			.where(
+				and(
+					eq(retailerItems.chainSlug, chainSlug),
+					inArray(retailerItems.externalId, chunk),
+				),
+			);
+		for (const row of rows) {
+			if (row.externalId) {
+				matches.set(row.externalId, row.id);
+			}
+		}
 	}
 
-	return null;
+	return matches;
 }
 
-async function findRetailerItemByBarcode(
+async function loadItemsByBarcodes(
 	chainSlug: string,
-	barcode: string,
-	cache: Map<string, string>,
-): Promise<string | null> {
-	const key = `${chainSlug}:barcode:${barcode}`;
-	const cached = cache.get(key);
-	if (cached) {
-		return cached;
+	barcodes: string[],
+	batchSize: number,
+): Promise<Map<string, string>> {
+	const matches = new Map<string, string>();
+	if (barcodes.length === 0) {
+		return matches;
 	}
 
 	const db = getDatabase();
-	const existing = await db
-		.select({ id: retailerItems.id })
-		.from(retailerItemBarcodes)
-		.innerJoin(
-			retailerItems,
-			eq(retailerItems.id, retailerItemBarcodes.retailerItemId),
-		)
-		.where(
-			and(
-				eq(retailerItemBarcodes.barcode, barcode),
-				eq(retailerItems.chainSlug, chainSlug),
-			),
-		)
-		.limit(1);
-
-	if (existing[0]) {
-		cache.set(key, existing[0].id);
-		return existing[0].id;
+	for (const chunk of chunkArray(barcodes, batchSize)) {
+		const rows = await db
+			.select({
+				barcode: retailerItemBarcodes.barcode,
+				itemId: retailerItems.id,
+			})
+			.from(retailerItemBarcodes)
+			.innerJoin(
+				retailerItems,
+				eq(retailerItems.id, retailerItemBarcodes.retailerItemId),
+			)
+			.where(
+				and(
+					eq(retailerItems.chainSlug, chainSlug),
+					inArray(retailerItemBarcodes.barcode, chunk),
+				),
+			);
+		for (const row of rows) {
+			if (!matches.has(row.barcode)) {
+				matches.set(row.barcode, row.itemId);
+			}
+		}
 	}
 
-	return null;
+	return matches;
 }
 
-async function upsertRetailerItem(
-	chainSlug: string,
+async function updateRetailerItemMetadata(
+	itemId: string,
 	row: NormalizedRow,
 	archiveId: string | null,
-	cacheByExternalId: Map<string, string>,
-	cacheByBarcode: Map<string, string>,
-): Promise<string> {
-	const db = getDatabase();
-	const externalId = row.externalId?.trim();
-
-	if (externalId) {
-		const existingId = await findRetailerItemByExternalId(
-			chainSlug,
-			externalId,
-			cacheByExternalId,
-		);
-		if (existingId) {
-			const updateData: Partial<typeof retailerItems.$inferInsert> = {
-				name: row.name,
-				description: row.description,
-				category: row.category,
-				subcategory: row.subcategory,
-				brand: row.brand,
-				unit: row.unit,
-				unitQuantity: row.unitQuantity,
-				imageUrl: row.imageUrl,
-			};
-			if (archiveId) {
-				updateData.archiveId = archiveId;
-			}
-
-			await db
-				.update(retailerItems)
-				.set(updateData)
-				.where(eq(retailerItems.id, existingId));
-
-			if (row.barcodes.length > 0) {
-				const primaryBarcode = row.barcodes[0] ?? null;
-				const barcodeRows = row.barcodes.map((barcode) => ({
-					id: generatePrefixedId("rib"),
-					retailerItemId: existingId,
-					barcode,
-					isPrimary: barcode === primaryBarcode,
-					createdAt: new Date(),
-				}));
-				await db
-					.insert(retailerItemBarcodes)
-					.values(barcodeRows)
-					.onConflictDoNothing();
-				for (const barcode of row.barcodes) {
-					cacheByBarcode.set(`${chainSlug}:barcode:${barcode}`, existingId);
-				}
-			}
-			return existingId;
-		}
-	}
-
-	if (!externalId && row.barcodes.length > 0) {
-		for (const barcode of row.barcodes) {
-			const existingId = await findRetailerItemByBarcode(
-				chainSlug,
-				barcode,
-				cacheByBarcode,
-			);
-			if (existingId) {
-				return existingId;
-			}
-		}
-	}
-
-	const itemId = generatePrefixedId("rit");
-	const primaryBarcode = row.barcodes[0] ?? null;
-
-	await db.insert(retailerItems).values({
-		id: itemId,
+): Promise<void> {
+	const updateData: Partial<typeof retailerItems.$inferInsert> = {
 		name: row.name,
-		externalId: externalId || null,
 		description: row.description,
 		category: row.category,
 		subcategory: row.subcategory,
@@ -310,34 +453,345 @@ async function upsertRetailerItem(
 		unit: row.unit,
 		unitQuantity: row.unitQuantity,
 		imageUrl: row.imageUrl,
-		barcode: primaryBarcode,
-		chainSlug,
-		archiveId: archiveId ?? null,
-		createdAt: new Date(),
-	});
+	};
+	if (archiveId) {
+		updateData.archiveId = archiveId;
+	}
+	await getDatabase()
+		.update(retailerItems)
+		.set(updateData)
+		.where(eq(retailerItems.id, itemId));
+}
 
+function buildNewItemCandidateKey(
+	externalId: string | null,
+	barcodes: string[],
+	rowIndex: number,
+): string {
 	if (externalId) {
-		cacheByExternalId.set(`${chainSlug}:${externalId}`, itemId);
+		return `external:${externalId}`;
+	}
+	const firstBarcode = barcodes[0];
+	if (firstBarcode) {
+		return `barcode:${firstBarcode}`;
+	}
+	return `row:${rowIndex}`;
+}
+
+async function resolveRetailerItemsForRows(
+	chainSlug: string,
+	rows: ValidRowForPersistence[],
+	archiveId: string | null,
+	state: ItemPersistenceState,
+): Promise<string[]> {
+	if (rows.length === 0) {
+		return [];
 	}
 
-	if (row.barcodes.length > 0) {
-		const barcodeRows = row.barcodes.map((barcode) => ({
-			id: generatePrefixedId("rib"),
-			retailerItemId: itemId,
-			barcode,
-			isPrimary: barcode === primaryBarcode,
-			createdAt: new Date(),
-		}));
-		await db
-			.insert(retailerItemBarcodes)
-			.values(barcodeRows)
-			.onConflictDoNothing();
-		for (const barcode of row.barcodes) {
-			cacheByBarcode.set(`${chainSlug}:barcode:${barcode}`, itemId);
+	const db = getDatabase();
+
+	const knownExternalIds = new Map<string, string>();
+	const missingExternalIds = new Set<string>();
+	for (const rowEntry of rows) {
+		const externalId = normalizeExternalId(rowEntry.row.externalId);
+		if (!externalId) {
+			continue;
+		}
+		const cached = state.cacheByExternalId.get(
+			externalIdCacheKey(chainSlug, externalId),
+		);
+		if (cached) {
+			knownExternalIds.set(externalId, cached);
+		} else {
+			missingExternalIds.add(externalId);
 		}
 	}
 
-	return itemId;
+	const loadedExternalIds = await loadItemsByExternalIds(
+		chainSlug,
+		Array.from(missingExternalIds),
+		state.batchSize,
+	);
+	for (const [externalId, itemId] of loadedExternalIds) {
+		knownExternalIds.set(externalId, itemId);
+		state.cacheByExternalId.set(
+			externalIdCacheKey(chainSlug, externalId),
+			itemId,
+		);
+	}
+
+	const knownBarcodes = new Map<string, string>();
+	const missingBarcodes = new Set<string>();
+	for (const rowEntry of rows) {
+		const externalId = normalizeExternalId(rowEntry.row.externalId);
+		if (externalId) {
+			continue;
+		}
+		for (const barcode of rowEntry.row.barcodes) {
+			const cached = state.cacheByBarcode.get(
+				barcodeCacheKey(chainSlug, barcode),
+			);
+			if (cached) {
+				knownBarcodes.set(barcode, cached);
+			} else {
+				missingBarcodes.add(barcode);
+			}
+		}
+	}
+
+	const loadedBarcodes = await loadItemsByBarcodes(
+		chainSlug,
+		Array.from(missingBarcodes),
+		state.batchSize,
+	);
+	for (const [barcode, itemId] of loadedBarcodes) {
+		knownBarcodes.set(barcode, itemId);
+		state.cacheByBarcode.set(barcodeCacheKey(chainSlug, barcode), itemId);
+	}
+
+	type NewItemCandidate = {
+		provisionalId: string;
+		externalId: string | null;
+		row: NormalizedRow;
+	};
+
+	const rowItemIds = new Array<string>(rows.length);
+	const rowExternalIds = new Array<string | null>(rows.length);
+	const newCandidates = new Map<string, NewItemCandidate>();
+
+	for (const [index, rowEntry] of rows.entries()) {
+		const externalId = normalizeExternalId(rowEntry.row.externalId);
+		rowExternalIds[index] = externalId;
+		let resolvedItemId: string | null = null;
+
+		if (externalId) {
+			resolvedItemId = knownExternalIds.get(externalId) ?? null;
+		} else {
+			for (const barcode of rowEntry.row.barcodes) {
+				const byBarcode = knownBarcodes.get(barcode);
+				if (byBarcode) {
+					resolvedItemId = byBarcode;
+					break;
+				}
+			}
+		}
+
+		if (resolvedItemId) {
+			rowItemIds[index] = resolvedItemId;
+			if (externalId) {
+				state.cacheByExternalId.set(
+					externalIdCacheKey(chainSlug, externalId),
+					resolvedItemId,
+				);
+			}
+			for (const barcode of rowEntry.row.barcodes) {
+				state.cacheByBarcode.set(
+					barcodeCacheKey(chainSlug, barcode),
+					resolvedItemId,
+				);
+			}
+			continue;
+		}
+
+		const candidateKey = buildNewItemCandidateKey(
+			externalId,
+			rowEntry.row.barcodes,
+			index,
+		);
+		const existingCandidate = newCandidates.get(candidateKey);
+		if (existingCandidate) {
+			rowItemIds[index] = existingCandidate.provisionalId;
+			continue;
+		}
+
+		const candidate: NewItemCandidate = {
+			provisionalId: generatePrefixedId("rit"),
+			externalId,
+			row: rowEntry.row,
+		};
+		newCandidates.set(candidateKey, candidate);
+		rowItemIds[index] = candidate.provisionalId;
+	}
+
+	const createdItemIds = new Set<string>();
+	const provisionalToFinal = new Map<string, string>();
+
+	const candidatesWithExternalId = Array.from(newCandidates.values()).filter(
+		(candidate) => candidate.externalId !== null,
+	);
+	const candidatesWithoutExternalId = Array.from(newCandidates.values()).filter(
+		(candidate) => candidate.externalId === null,
+	);
+
+	for (const candidate of candidatesWithoutExternalId) {
+		provisionalToFinal.set(candidate.provisionalId, candidate.provisionalId);
+	}
+
+	for (const chunk of chunkArray(
+		candidatesWithoutExternalId,
+		state.batchSize,
+	)) {
+		await db.insert(retailerItems).values(
+			chunk.map((candidate) => ({
+				id: candidate.provisionalId,
+				name: candidate.row.name,
+				externalId: null,
+				description: candidate.row.description,
+				category: candidate.row.category,
+				subcategory: candidate.row.subcategory,
+				brand: candidate.row.brand,
+				unit: candidate.row.unit,
+				unitQuantity: candidate.row.unitQuantity,
+				imageUrl: candidate.row.imageUrl,
+				barcode: candidate.row.barcodes[0] ?? null,
+				chainSlug,
+				archiveId,
+				createdAt: new Date(),
+			})),
+		);
+		for (const candidate of chunk) {
+			createdItemIds.add(candidate.provisionalId);
+			for (const barcode of candidate.row.barcodes) {
+				state.cacheByBarcode.set(
+					barcodeCacheKey(chainSlug, barcode),
+					candidate.provisionalId,
+				);
+			}
+		}
+	}
+
+	const insertedExternalIds = new Map<string, string>();
+	for (const chunk of chunkArray(candidatesWithExternalId, state.batchSize)) {
+		const insertedRows = await db
+			.insert(retailerItems)
+			.values(
+				chunk.map((candidate) => ({
+					id: candidate.provisionalId,
+					name: candidate.row.name,
+					externalId: candidate.externalId,
+					description: candidate.row.description,
+					category: candidate.row.category,
+					subcategory: candidate.row.subcategory,
+					brand: candidate.row.brand,
+					unit: candidate.row.unit,
+					unitQuantity: candidate.row.unitQuantity,
+					imageUrl: candidate.row.imageUrl,
+					barcode: candidate.row.barcodes[0] ?? null,
+					chainSlug,
+					archiveId,
+					createdAt: new Date(),
+				})),
+			)
+			.onConflictDoNothing({
+				target: [retailerItems.chainSlug, retailerItems.externalId],
+			})
+			.returning({
+				id: retailerItems.id,
+				externalId: retailerItems.externalId,
+			});
+
+		for (const inserted of insertedRows) {
+			if (inserted.externalId) {
+				insertedExternalIds.set(inserted.externalId, inserted.id);
+				createdItemIds.add(inserted.id);
+			}
+		}
+	}
+
+	const externalIdsToResolve = candidatesWithExternalId
+		.map((candidate) => candidate.externalId)
+		.filter((externalId): externalId is string => externalId !== null);
+	const finalExternalIds = await loadItemsByExternalIds(
+		chainSlug,
+		externalIdsToResolve,
+		state.batchSize,
+	);
+
+	for (const candidate of candidatesWithExternalId) {
+		const externalId = candidate.externalId;
+		if (!externalId) {
+			continue;
+		}
+		const finalId =
+			finalExternalIds.get(externalId) ?? insertedExternalIds.get(externalId);
+		if (!finalId) {
+			throw new Error(
+				`Failed to resolve item id for external id ${externalId} in chain ${chainSlug}`,
+			);
+		}
+		provisionalToFinal.set(candidate.provisionalId, finalId);
+		state.cacheByExternalId.set(
+			externalIdCacheKey(chainSlug, externalId),
+			finalId,
+		);
+		for (const barcode of candidate.row.barcodes) {
+			state.cacheByBarcode.set(barcodeCacheKey(chainSlug, barcode), finalId);
+		}
+	}
+
+	for (let i = 0; i < rowItemIds.length; i += 1) {
+		const finalId = provisionalToFinal.get(rowItemIds[i]);
+		if (finalId) {
+			rowItemIds[i] = finalId;
+		}
+	}
+
+	const metadataUpdates: Array<{ itemId: string; row: NormalizedRow }> = [];
+	const metadataQueuedInBatch = new Set<string>();
+
+	for (let i = 0; i < rows.length; i += 1) {
+		const itemId = rowItemIds[i];
+		const externalId = rowExternalIds[i];
+		if (!externalId || createdItemIds.has(itemId)) {
+			continue;
+		}
+		if (state.updatedItemIds.has(itemId) || metadataQueuedInBatch.has(itemId)) {
+			continue;
+		}
+		state.updatedItemIds.add(itemId);
+		metadataQueuedInBatch.add(itemId);
+		metadataUpdates.push({ itemId, row: rows[i].row });
+	}
+
+	for (const update of metadataUpdates) {
+		await updateRetailerItemMetadata(update.itemId, update.row, archiveId);
+	}
+
+	const barcodesToInsert: Array<{
+		id: string;
+		retailerItemId: string;
+		barcode: string;
+		isPrimary: boolean;
+		createdAt: Date;
+	}> = [];
+
+	for (let i = 0; i < rows.length; i += 1) {
+		const itemId = rowItemIds[i];
+		const row = rows[i].row;
+		const primaryBarcode = row.barcodes[0] ?? null;
+
+		for (const barcode of row.barcodes) {
+			const pairKey = `${itemId}:${barcode}`;
+			if (state.knownItemBarcodePairs.has(pairKey)) {
+				continue;
+			}
+			state.knownItemBarcodePairs.add(pairKey);
+			state.cacheByBarcode.set(barcodeCacheKey(chainSlug, barcode), itemId);
+			barcodesToInsert.push({
+				id: generatePrefixedId("rib"),
+				retailerItemId: itemId,
+				barcode,
+				isPrimary: barcode === primaryBarcode,
+				createdAt: new Date(),
+			});
+		}
+	}
+
+	for (const chunk of chunkArray(barcodesToInsert, state.batchSize)) {
+		await db.insert(retailerItemBarcodes).values(chunk).onConflictDoNothing();
+	}
+
+	return rowItemIds;
 }
 
 function buildValidationErrors(row: NormalizedRow, errors: string[]) {
@@ -447,24 +901,27 @@ async function insertErrors(
 		severity?: string;
 		entryId?: string | null;
 	}>,
+	batchSize: number,
 ): Promise<void> {
 	if (errors.length === 0) {
 		return;
 	}
-	await getDatabase()
-		.insert(ingestionErrors)
-		.values(
-			errors.map((err) => ({
-				runId: err.runId,
-				fileId: err.fileId,
-				errorType: err.errorType,
-				errorMessage: err.errorMessage,
-				errorDetails: err.errorDetails ?? null,
-				severity: err.severity ?? "error",
-				entryId: err.entryId ?? null,
-				createdAt: new Date(),
-			})),
-		);
+	for (const chunk of chunkArray(errors, batchSize)) {
+		await getDatabase()
+			.insert(ingestionErrors)
+			.values(
+				chunk.map((err) => ({
+					runId: err.runId,
+					fileId: err.fileId,
+					errorType: err.errorType,
+					errorMessage: err.errorMessage,
+					errorDetails: err.errorDetails ?? null,
+					severity: err.severity ?? "error",
+					entryId: err.entryId ?? null,
+					createdAt: new Date(),
+				})),
+			);
+	}
 }
 
 async function insertFailedRows(
@@ -476,25 +933,28 @@ async function insertFailedRows(
 		row: NormalizedRow;
 		errors: string[];
 	}>,
+	batchSize: number,
 ): Promise<void> {
 	if (rows.length === 0) {
 		return;
 	}
 
-	await getDatabase()
-		.insert(retailerItemsFailed)
-		.values(
-			rows.map((entry) => ({
-				id: generatePrefixedId("id"),
-				chainSlug: entry.chainSlug,
-				runId: entry.runId,
-				fileId: entry.fileId,
-				storeIdentifier: entry.storeIdentifier,
-				rowNumber: entry.row.rowNumber,
-				rawData: entry.row.rawData,
-				validationErrors: buildValidationErrors(entry.row, entry.errors),
-			})),
-		);
+	for (const chunk of chunkArray(rows, batchSize)) {
+		await getDatabase()
+			.insert(retailerItemsFailed)
+			.values(
+				chunk.map((entry) => ({
+					id: generatePrefixedId("id"),
+					chainSlug: entry.chainSlug,
+					runId: entry.runId,
+					fileId: entry.fileId,
+					storeIdentifier: entry.storeIdentifier,
+					rowNumber: entry.row.rowNumber,
+					rawData: entry.row.rawData,
+					validationErrors: buildValidationErrors(entry.row, entry.errors),
+				})),
+			);
+	}
 }
 
 function mapParseErrors(
@@ -523,6 +983,281 @@ function mapParseErrors(
 		severity: "error",
 		entryId: err.rowNumber ? String(err.rowNumber) : null,
 	}));
+}
+
+async function processIngestionFile(options: {
+	runId: string;
+	chainSlug: string;
+	targetDate: Date;
+	adapter: ChainAdapter;
+	fileEntry: FileToProcess;
+	storeIdentifierType: string;
+	performanceConfig: IngestionPerformanceConfig;
+	storeCache: Map<string, string>;
+	storeResolveInFlight: Map<string, Promise<string>>;
+	itemState: ItemPersistenceState;
+	serializeItemPersistence: SerializeFn;
+}): Promise<ProcessedFileResult> {
+	const db = getDatabase();
+	const {
+		runId,
+		chainSlug,
+		targetDate,
+		adapter,
+		fileEntry,
+		storeIdentifierType,
+		performanceConfig,
+		storeCache,
+		storeResolveInFlight,
+		itemState,
+		serializeItemPersistence,
+	} = options;
+
+	const [fileRow] = await db
+		.insert(ingestionFiles)
+		.values({
+			runId,
+			filename: fileEntry.filename,
+			fileType: fileEntry.type,
+			fileSize: fileEntry.content.length,
+			fileHash: fileEntry.hash,
+			status: "processing",
+			metadata: JSON.stringify({
+				sourceUrl: fileEntry.file.url,
+				archiveId: fileEntry.archiveId,
+				storageKey:
+					fileEntry.tempStorageKey ??
+					(fileEntry.expandedFrom
+						? buildExpandedKey(
+								chainSlug,
+								targetDate,
+								fileEntry.expandedFrom,
+								fileEntry.filename,
+							)
+						: buildArchiveKey(chainSlug, targetDate, fileEntry.filename)),
+				parentFilename: fileEntry.expandedFrom,
+			}),
+			createdAt: new Date(),
+		})
+		.returning({ id: ingestionFiles.id });
+
+	if (!fileRow) {
+		throw new Error(
+			`Failed to create ingestion file record for ${fileEntry.filename}`,
+		);
+	}
+
+	const fileId = fileRow.id;
+	let fileErrorCount = 0;
+	let fileWarningRows = 0;
+	let fileFailedRows = 0;
+	const parseStart = Date.now();
+	const parseResult = await adapter.parse(
+		fileEntry.content,
+		fileEntry.filename,
+	);
+	const parseDurationMs = Date.now() - parseStart;
+
+	fileErrorCount += parseResult.errors.length;
+	const parseErrors = mapParseErrors(runId, fileId, parseResult);
+	await insertErrors(parseErrors, performanceConfig.dbBatchSize);
+
+	const failedRows: Array<{
+		chainSlug: string;
+		runId: string;
+		fileId: bigint;
+		storeIdentifier: string;
+		row: NormalizedRow;
+		errors: string[];
+	}> = [];
+
+	const validationErrors: Array<{
+		runId: string;
+		fileId: bigint;
+		errorType: string;
+		errorMessage: string;
+		errorDetails?: string | null;
+		severity?: string;
+		entryId?: string | null;
+	}> = [];
+
+	const validRows: ValidRowForPersistence[] = [];
+	const storeMetadata = adapter.extractStoreMetadata(fileEntry.file);
+
+	for (const row of parseResult.rows) {
+		const storeIdentifier =
+			row.storeIdentifier?.trim() ||
+			adapter.extractStoreIdentifier(fileEntry.file)?.value ||
+			"";
+
+		if (!storeIdentifier) {
+			fileFailedRows += 1;
+			validationErrors.push({
+				runId,
+				fileId,
+				errorType: "store_resolution",
+				errorMessage: "Missing store identifier",
+				errorDetails: JSON.stringify({ rowNumber: row.rowNumber }),
+				severity: "error",
+				entryId: String(row.rowNumber),
+			});
+			continue;
+		}
+
+		const validation = adapter.validateRow(row);
+		if (!validation.isValid) {
+			fileFailedRows += 1;
+			fileErrorCount += 1;
+			failedRows.push({
+				chainSlug,
+				runId,
+				fileId,
+				storeIdentifier,
+				row,
+				errors: validation.errors,
+			});
+			validationErrors.push({
+				runId,
+				fileId,
+				errorType: "validation",
+				errorMessage: validation.errors.join("; "),
+				errorDetails: JSON.stringify({ rowNumber: row.rowNumber }),
+				severity: "error",
+				entryId: String(row.rowNumber),
+			});
+			continue;
+		}
+
+		const storeId = await resolveStoreId(
+			chainSlug,
+			storeIdentifier,
+			storeIdentifierType,
+			storeMetadata,
+			storeCache,
+			storeResolveInFlight,
+		);
+		const hasWarning = validation.warnings.length > 0;
+		if (hasWarning) {
+			fileWarningRows += 1;
+		}
+		validRows.push({
+			row,
+			storeId,
+			storeIdentifier,
+			hasWarning,
+		});
+	}
+
+	await insertFailedRows(failedRows, performanceConfig.dbBatchSize);
+	await insertErrors(validationErrors, performanceConfig.dbBatchSize);
+
+	const itemIds = await serializeItemPersistence(() =>
+		withDeadlockRetry("resolveRetailerItemsForRows", () =>
+			resolveRetailerItemsForRows(
+				chainSlug,
+				validRows,
+				fileEntry.archiveId,
+				itemState,
+			),
+		),
+	);
+
+	const storeStats = new Map<
+		string,
+		{
+			storeId: string;
+			storeIdentifier: string;
+			rowCount: number;
+			persistedCount: number;
+			failedRows: number;
+			warningRows: number;
+		}
+	>();
+	const localParquetRows: ParquetPriceRow[] = [];
+
+	for (let i = 0; i < validRows.length; i += 1) {
+		const validRow = validRows[i];
+		const itemId = itemIds[i];
+		const primaryBarcode = validRow.row.barcodes[0] ?? null;
+
+		localParquetRows.push({
+			target_date: targetDate,
+			chain_slug: chainSlug,
+			store_id: validRow.storeId,
+			retailer_item_id: itemId,
+			external_id: validRow.row.externalId ?? null,
+			name: validRow.row.name,
+			barcode: primaryBarcode,
+			price_cents: validRow.row.price,
+			discount_price_cents: validRow.row.discountPrice ?? null,
+			unit_price_cents: validRow.row.unitPrice ?? null,
+			category: validRow.row.category ?? null,
+			brand: validRow.row.brand ?? null,
+		});
+
+		const current = storeStats.get(validRow.storeIdentifier);
+		if (current) {
+			current.rowCount += 1;
+			current.persistedCount += 1;
+			current.warningRows += validRow.hasWarning ? 1 : 0;
+		} else {
+			storeStats.set(validRow.storeIdentifier, {
+				storeId: validRow.storeId,
+				storeIdentifier: validRow.storeIdentifier,
+				rowCount: 1,
+				persistedCount: 1,
+				failedRows: 0,
+				warningRows: validRow.hasWarning ? 1 : 0,
+			});
+		}
+	}
+
+	if (storeStats.size > 0) {
+		await db.insert(ingestionStoreStats).values(
+			Array.from(storeStats.values()).map((stat) => ({
+				runId,
+				fileId,
+				storeId: stat.storeId,
+				storeIdentifier: stat.storeIdentifier,
+				rowCount: stat.rowCount,
+				persistedCount: stat.persistedCount,
+				failedRows: stat.failedRows,
+				warningRows: stat.warningRows,
+				priceChanges: 0,
+				createdAt: new Date(),
+			})),
+		);
+	}
+
+	await db
+		.update(ingestionFiles)
+		.set({
+			entryCount: parseResult.totalRows,
+			status: "completed",
+			statusSeverity: fileErrorCount > 0 ? "warning" : null,
+			processedAt: new Date(),
+			processedChunks: 0,
+			totalChunks: 0,
+			metadata: JSON.stringify({
+				sourceUrl: fileEntry.file.url,
+				archiveId: fileEntry.archiveId,
+				rowCount: parseResult.totalRows,
+				processedRows: validRows.length,
+				failedRows: fileFailedRows,
+				warningRows: fileWarningRows,
+				parseDurationMs,
+			}),
+		})
+		.where(eq(ingestionFiles.id, fileId));
+
+	return {
+		totalRows: parseResult.totalRows,
+		processedRows: validRows.length,
+		warningRows: fileWarningRows,
+		failedRows: fileFailedRows,
+		errorCount: fileErrorCount,
+		parquetRows: localParquetRows,
+	};
 }
 
 export async function runIngestion(
@@ -616,32 +1351,50 @@ export async function runIngestion(
 	let processedFiles = 0;
 	let totalFiles = 0;
 	let tempDirPath: string | null = null;
+	const performanceConfig = getIngestionPerformanceConfig();
 
 	const parquetRows: ParquetPriceRow[] = [];
 	const storeCache = new Map<string, string>();
-	const itemCacheByExternalId = new Map<string, string>();
-	const itemCacheByBarcode = new Map<string, string>();
+	const storeResolveInFlight = new Map<string, Promise<string>>();
+	const itemState: ItemPersistenceState = {
+		cacheByExternalId: new Map<string, string>(),
+		cacheByBarcode: new Map<string, string>(),
+		updatedItemIds: new Set<string>(),
+		knownItemBarcodePairs: new Set<string>(),
+		batchSize: performanceConfig.dbBatchSize,
+	};
+	let itemPersistenceQueue: Promise<void> = Promise.resolve();
+	const serializeItemPersistence: SerializeFn = async <T>(
+		operation: () => Promise<T>,
+	): Promise<T> => {
+		const previous = itemPersistenceQueue;
+		let releaseCurrent: (() => void) | null = null;
+		itemPersistenceQueue = new Promise<void>((resolve) => {
+			releaseCurrent = resolve;
+		});
+		await previous;
+		try {
+			return await operation();
+		} finally {
+			releaseCurrent?.();
+		}
+	};
 
 	try {
 		const adapter = getAdapter(chainSlug as never);
+		const runWallStart = Date.now();
+		const discoverStartedAt = Date.now();
 		const discoveredFiles = await adapter.discover(dateStr);
+		const discoverDurationMs = Date.now() - discoverStartedAt;
 		log.info("Discovered files", { chainSlug, count: discoveredFiles.length });
 		const storeIdentifierType = buildStoreIdentifierType(chainSlug);
 
 		// Create timestamp for this ingestion run (for temp expanded files)
 		const timestamp = formatTimestamp(new Date());
 
-		const filesToProcess: Array<{
-			file: DiscoveredFile;
-			content: Buffer;
-			type: string;
-			filename: string;
-			hash: string;
-			archiveId: string;
-			expandedFrom?: string;
-			tempStorageKey?: string;
-		}> = [];
+		const filesToProcess: FileToProcess[] = [];
 
+		const fetchStartedAt = Date.now();
 		let fileIndex = 0;
 		for (const file of discoveredFiles) {
 			fileIndex++;
@@ -716,6 +1469,7 @@ export async function runIngestion(
 				});
 			}
 		}
+		const fetchDurationMs = Date.now() - fetchStartedAt;
 
 		totalFiles = filesToProcess.length;
 		await db
@@ -725,234 +1479,17 @@ export async function runIngestion(
 			})
 			.where(eq(ingestionRuns.id, runId));
 
-		for (const fileEntry of filesToProcess) {
-			const [fileRow] = await db
-				.insert(ingestionFiles)
-				.values({
-					runId,
-					filename: fileEntry.filename,
-					fileType: fileEntry.type,
-					fileSize: fileEntry.content.length,
-					fileHash: fileEntry.hash,
-					status: "processing",
-					metadata: JSON.stringify({
-						sourceUrl: fileEntry.file.url,
-						archiveId: fileEntry.archiveId,
-						storageKey:
-							fileEntry.tempStorageKey ??
-							(fileEntry.expandedFrom
-								? buildExpandedKey(
-										chainSlug,
-										targetDate,
-										fileEntry.expandedFrom,
-										fileEntry.filename,
-									)
-								: buildArchiveKey(chainSlug, targetDate, fileEntry.filename)),
-						parentFilename: fileEntry.expandedFrom,
-					}),
-					createdAt: new Date(),
-				})
-				.returning({ id: ingestionFiles.id });
-
-			if (!fileRow) {
-				throw new Error(
-					`Failed to create ingestion file record for ${fileEntry.filename}`,
-				);
+		const processingStartedAt = Date.now();
+		let lastProgressUpdateAt = 0;
+		const maybeUpdateProgress = async (force: boolean = false) => {
+			const now = Date.now();
+			if (
+				!force &&
+				now - lastProgressUpdateAt < performanceConfig.progressUpdateIntervalMs
+			) {
+				return;
 			}
-
-			const fileId = fileRow.id;
-			let fileErrorCount = 0;
-			let fileProcessedRows = 0;
-			let fileWarningRows = 0;
-			let fileFailedRows = 0;
-
-			const parseResult = await adapter.parse(
-				fileEntry.content,
-				fileEntry.filename,
-			);
-
-			totalEntries += parseResult.totalRows;
-			fileErrorCount += parseResult.errors.length;
-
-			const parseErrors = mapParseErrors(runId, fileId, parseResult);
-			await insertErrors(parseErrors);
-
-			const failedRows: Array<{
-				chainSlug: string;
-				runId: string;
-				fileId: bigint;
-				storeIdentifier: string;
-				row: NormalizedRow;
-				errors: string[];
-			}> = [];
-
-			const validationErrors: Array<{
-				runId: string;
-				fileId: bigint;
-				errorType: string;
-				errorMessage: string;
-				errorDetails?: string | null;
-				severity?: string;
-				entryId?: string | null;
-			}> = [];
-
-			const storeStats = new Map<
-				string,
-				{
-					storeId: string;
-					storeIdentifier: string;
-					rowCount: number;
-					persistedCount: number;
-					failedRows: number;
-					warningRows: number;
-				}
-			>();
-
-			for (const row of parseResult.rows) {
-				const storeIdentifier =
-					row.storeIdentifier?.trim() ||
-					adapter.extractStoreIdentifier(fileEntry.file)?.value ||
-					"";
-
-				if (!storeIdentifier) {
-					fileFailedRows += 1;
-					validationErrors.push({
-						runId,
-						fileId,
-						errorType: "store_resolution",
-						errorMessage: "Missing store identifier",
-						errorDetails: JSON.stringify({ rowNumber: row.rowNumber }),
-						severity: "error",
-						entryId: String(row.rowNumber),
-					});
-					continue;
-				}
-
-				const validation = adapter.validateRow(row);
-				if (!validation.isValid) {
-					fileFailedRows += 1;
-					fileErrorCount += 1;
-					failedRows.push({
-						chainSlug,
-						runId,
-						fileId,
-						storeIdentifier,
-						row,
-						errors: validation.errors,
-					});
-					validationErrors.push({
-						runId,
-						fileId,
-						errorType: "validation",
-						errorMessage: validation.errors.join("; "),
-						errorDetails: JSON.stringify({ rowNumber: row.rowNumber }),
-						severity: "error",
-						entryId: String(row.rowNumber),
-					});
-					continue;
-				}
-
-				if (validation.warnings.length > 0) {
-					fileWarningRows += 1;
-				}
-
-				const storeMetadata = adapter.extractStoreMetadata(fileEntry.file);
-				const storeId = await resolveStoreId(
-					chainSlug,
-					storeIdentifier,
-					storeIdentifierType,
-					storeMetadata,
-					storeCache,
-				);
-
-				const itemId = await upsertRetailerItem(
-					chainSlug,
-					row,
-					fileEntry.archiveId,
-					itemCacheByExternalId,
-					itemCacheByBarcode,
-				);
-
-				const primaryBarcode = row.barcodes.length > 0 ? row.barcodes[0] : null;
-
-				parquetRows.push({
-					target_date: targetDate,
-					chain_slug: chainSlug,
-					store_id: storeId,
-					retailer_item_id: itemId,
-					external_id: row.externalId ?? null,
-					name: row.name,
-					barcode: primaryBarcode,
-					price_cents: row.price,
-					discount_price_cents: row.discountPrice ?? null,
-					unit_price_cents: row.unitPrice ?? null,
-					category: row.category ?? null,
-					brand: row.brand ?? null,
-				});
-
-				fileProcessedRows += 1;
-
-				const current = storeStats.get(storeIdentifier);
-				if (current) {
-					current.rowCount += 1;
-					current.persistedCount += 1;
-					current.warningRows += validation.warnings.length > 0 ? 1 : 0;
-				} else {
-					storeStats.set(storeIdentifier, {
-						storeId,
-						storeIdentifier,
-						rowCount: 1,
-						persistedCount: 1,
-						failedRows: 0,
-						warningRows: validation.warnings.length > 0 ? 1 : 0,
-					});
-				}
-			}
-
-			await insertFailedRows(failedRows);
-			await insertErrors(validationErrors);
-
-			if (storeStats.size > 0) {
-				await db.insert(ingestionStoreStats).values(
-					Array.from(storeStats.values()).map((stat) => ({
-						runId,
-						fileId,
-						storeId: stat.storeId,
-						storeIdentifier: stat.storeIdentifier,
-						rowCount: stat.rowCount,
-						persistedCount: stat.persistedCount,
-						failedRows: stat.failedRows,
-						warningRows: stat.warningRows,
-						priceChanges: 0,
-						createdAt: new Date(),
-					})),
-				);
-			}
-
-			await db
-				.update(ingestionFiles)
-				.set({
-					entryCount: parseResult.totalRows,
-					status: "completed",
-					statusSeverity: fileErrorCount > 0 ? "warning" : null,
-					processedAt: new Date(),
-					processedChunks: 0,
-					totalChunks: 0,
-					metadata: JSON.stringify({
-						sourceUrl: fileEntry.file.url,
-						archiveId: fileEntry.archiveId,
-						rowCount: parseResult.totalRows,
-						processedRows: fileProcessedRows,
-						failedRows: fileFailedRows,
-						warningRows: fileWarningRows,
-					}),
-				})
-				.where(eq(ingestionFiles.id, fileId));
-
-			processedEntries += fileProcessedRows;
-			processedFiles += 1;
-			errorCount += fileErrorCount;
-
+			lastProgressUpdateAt = now;
 			await db
 				.update(ingestionRuns)
 				.set({
@@ -962,12 +1499,55 @@ export async function runIngestion(
 					errorCount,
 				})
 				.where(eq(ingestionRuns.id, runId));
-		}
+		};
 
+		await runWithConcurrency(
+			filesToProcess,
+			performanceConfig.fileConcurrency,
+			async (fileEntry, index) => {
+				const processed = await processIngestionFile({
+					runId,
+					chainSlug,
+					targetDate,
+					adapter,
+					fileEntry,
+					storeIdentifierType,
+					performanceConfig,
+					storeCache,
+					storeResolveInFlight,
+					itemState,
+					serializeItemPersistence,
+				});
+
+				totalEntries += processed.totalRows;
+				processedEntries += processed.processedRows;
+				errorCount += processed.errorCount;
+				processedFiles += 1;
+				parquetRows.push(...processed.parquetRows);
+
+				if ((index + 1) % 10 === 0 || index + 1 === filesToProcess.length) {
+					log.info("Processing files", {
+						progress: `${index + 1}/${filesToProcess.length}`,
+						processedFiles,
+						processedEntries,
+						totalEntries,
+						errorCount,
+					});
+				}
+
+				await maybeUpdateProgress(false);
+			},
+		);
+		await maybeUpdateProgress(true);
+		const processingDurationMs = Date.now() - processingStartedAt;
+
+		let parquetDurationMs = 0;
 		if (parquetRows.length > 0) {
+			const parquetStartedAt = Date.now();
 			const parquetKey = buildParquetKey(chainSlug, targetDate);
 			await writePricesParquet(parquetKey, parquetRows);
 			await recordParquetFile(chainSlug, targetDate, parquetKey);
+			parquetDurationMs = Date.now() - parquetStartedAt;
 		}
 
 		await db
@@ -993,6 +1573,13 @@ export async function runIngestion(
 			totalEntries,
 			processedEntries,
 			errorCount,
+			durations: {
+				discoverMs: discoverDurationMs,
+				fetchMs: fetchDurationMs,
+				processMs: processingDurationMs,
+				parquetMs: parquetDurationMs,
+				totalMs: Date.now() - runWallStart,
+			},
 		});
 
 		// Cleanup temp directory on success

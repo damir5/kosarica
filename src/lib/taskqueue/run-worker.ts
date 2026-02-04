@@ -31,23 +31,29 @@ export function createTaskQueueWorker(options?: {
 
 	worker.registerHandler("ingestion", async (task) => {
 		const payload = task.payload as IngestionTaskPayload;
-		await runIngestion({
+		const result = await runIngestion({
 			chainSlug: payload.chainSlug,
 			targetDate: payload.targetDate,
 			force: payload.force,
 			source: payload.source ?? "worker",
 			taskId: task.id,
 		});
+		if (result.status === "failed") {
+			throw new Error(`Ingestion failed for run ${result.runId}`);
+		}
 	});
 
 	worker.registerHandler("rerun", async (task) => {
 		const payload = task.payload as RerunTaskPayload;
-		await rerunIngestionRun(
+		const result = await rerunIngestionRun(
 			payload.originalRunId,
 			payload.rerunType,
 			payload.targetId,
 			task.id,
 		);
+		if (result.status === "failed") {
+			throw new Error(`Rerun failed for run ${result.runId}`);
+		}
 	});
 
 	worker.registerHandler("cleanup", async (task) => {
