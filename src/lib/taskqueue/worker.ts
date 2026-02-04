@@ -81,9 +81,7 @@ export class TaskQueueWorker {
 			`[WORKER] Worker ${this.config.workerId} claimed ${tasks.length} tasks`,
 		);
 
-		for (const task of tasks) {
-			await this.processTask(task);
-		}
+		await Promise.allSettled(tasks.map((task) => this.processTask(task)));
 	}
 
 	private async processTask(task: ClaimedTask) {

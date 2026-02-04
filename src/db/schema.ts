@@ -234,6 +234,10 @@ export const retailerItemBarcodes = pgTable(
 		barcodeIdx: index("retailer_item_barcodes_barcode_new_idx").on(
 			table.barcode,
 		),
+		barcodeItemIdx: index("retailer_item_barcodes_barcode_item_idx").on(
+			table.barcode,
+			table.retailerItemId,
+		),
 		// Ensure unique barcode per retailer item
 		retailerItemBarcodeUnique: uniqueIndex(
 			"retailer_item_barcodes_item_barcode_unique",

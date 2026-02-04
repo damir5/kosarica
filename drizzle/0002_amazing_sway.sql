@@ -1,0 +1,1 @@
+CREATE INDEX "retailer_item_barcodes_barcode_item_idx" ON "retailer_item_barcodes" USING btree ("barcode","retailer_item_id");

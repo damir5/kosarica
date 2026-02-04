@@ -15,6 +15,13 @@
       "when": 1770124315261,
       "tag": "0001_zippy_mephistopheles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770227534298,
+      "tag": "0002_amazing_sway",
+      "breakpoints": true
     }
   ]
 }
