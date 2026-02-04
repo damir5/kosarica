@@ -325,29 +325,48 @@ function mapRowToNormalized(
 	};
 
 	const priceStr = getString(indices.price);
-	let price = 0;
-	try {
-		price = parsePrice(priceStr);
-	} catch {
-		errors.push({
-			rowNumber,
-			field: "price",
-			message: "Invalid price value",
-			originalValue: priceStr,
-		});
-	}
-
-	let discountPrice: number | undefined;
 	const discountStr = getString(indices.discountPrice);
-	if (discountStr) {
+	let price = 0;
+	let discountPrice: number | undefined;
+
+	// Handle case where regular price is empty but discount price exists
+	// This happens in some retailers (e.g., DM) where only the sale price is provided
+	if (!priceStr && discountStr) {
 		try {
-			discountPrice = parsePrice(discountStr);
+			price = parsePrice(discountStr);
+			// Don't set discountPrice since we don't have the original price
 		} catch {
-			warnings.push({
+			errors.push({
 				rowNumber,
-				field: "discountPrice",
-				message: "Invalid discount price value, ignoring",
+				field: "price",
+				message: "Invalid price value",
+				originalValue: discountStr,
 			});
+		}
+	} else {
+		// Normal case: parse regular price
+		try {
+			price = parsePrice(priceStr);
+		} catch {
+			errors.push({
+				rowNumber,
+				field: "price",
+				message: "Invalid price value",
+				originalValue: priceStr,
+			});
+		}
+
+		// Parse discount price if available
+		if (discountStr) {
+			try {
+				discountPrice = parsePrice(discountStr);
+			} catch {
+				warnings.push({
+					rowNumber,
+					field: "discountPrice",
+					message: "Invalid discount price value, ignoring",
+				});
+			}
 		}
 	}
 
