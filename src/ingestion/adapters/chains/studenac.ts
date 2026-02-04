@@ -1,5 +1,11 @@
 import type { XmlFieldMapping } from "../../parsers/xml";
-import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
+import { expandZip } from "../../parsers/zip";
+import type {
+	DiscoveredFile,
+	ExpandedFile,
+	ParseOptions,
+	ParseResult,
+} from "../../types";
 import { BaseXmlAdapter } from "../base/xml";
 import { chainConfigs } from "../config";
 
@@ -27,26 +33,26 @@ const studenacFieldMapping: XmlFieldMapping = {
 };
 
 const studenacFieldMappingAlt: XmlFieldMapping = {
-	externalId: "Sifra",
-	name: "Naziv",
-	description: "Opis",
-	category: "Kategorija",
-	subcategory: "Podkategorija",
-	brand: "Marka",
-	unit: "Jedinica",
-	unitQuantity: "Kolicina",
-	price: "Cijena",
-	discountPrice: "AkcijskaCijena",
-	discountStart: "PocetakAkcije",
-	discountEnd: "KrajAkcije",
+	externalId: "SifraProizvoda",
+	name: "NazivProizvoda",
+	description: undefined,
+	category: "KategorijeProizvoda",
+	subcategory: undefined,
+	brand: "MarkaProizvoda",
+	unit: "JedinicaMjere",
+	unitQuantity: undefined,
+	price: "MaloprodajnaCijena",
+	discountPrice: "MaloprodajnaCijenaAkcija",
+	discountStart: undefined,
+	discountEnd: undefined,
 	barcodes: "Barkod",
-	imageUrl: "Slika",
+	imageUrl: undefined,
 	unitPrice: "CijenaZaJedinicuMjere",
-	unitPriceBaseQuantity: "JedinicaMjereKolicina",
-	unitPriceBaseUnit: "JedinicaMjereOznaka",
-	lowestPrice30d: "NajnizaCijena30Dana",
+	unitPriceBaseQuantity: undefined,
+	unitPriceBaseUnit: undefined,
+	lowestPrice30d: "NajnizaCijena",
 	anchorPrice: "SidrenaCijena",
-	anchorPriceAsOf: "SidrenaCijenaDatum",
+	anchorPriceAsOf: undefined,
 };
 
 export class StudenacAdapter extends BaseXmlAdapter {
@@ -68,14 +74,10 @@ export class StudenacAdapter extends BaseXmlAdapter {
 			},
 			fieldMapping: studenacFieldMapping,
 			alternativeFieldMapping: studenacFieldMappingAlt,
-			defaultItemsPath: "products.product",
+			defaultItemsPath: "Proizvodi.ProdajniObjekt.Proizvodi.Proizvod",
 			itemPaths: [
-				"products.product",
-				"Products.Product",
-				"Proizvodi.Proizvod",
-				"proizvodi.proizvod",
-				"items.item",
-				"Items.Item",
+				"Proizvodi.ProdajniObjekt.Proizvodi.Proizvod",
+				"Proizvodi.prodajniobjekt.proizvodi.proizvod",
 			],
 		});
 	}
@@ -99,7 +101,7 @@ export class StudenacAdapter extends BaseXmlAdapter {
 			);
 		}
 		const html = await response.text();
-		const pattern = /href=["']([^"']*\.xml(?:\?[^"']*)?)["']/gi;
+		const pattern = /href=["']([^"']*\.zip(?:\?[^"']*)?)["']/gi;
 		let match: RegExpExecArray | null;
 		while ((match = pattern.exec(html)) !== null) {
 			const href = match[1];
@@ -117,7 +119,7 @@ export class StudenacAdapter extends BaseXmlAdapter {
 			discovered.push({
 				url: fileUrl,
 				filename,
-				type: "xml",
+				type: "zip",
 				lastModified,
 				metadata: {
 					source: "studenac_portal",
@@ -137,11 +139,13 @@ export class StudenacAdapter extends BaseXmlAdapter {
 	): Promise<ParseResult> {
 		const result = await super.parse(content, filename, options);
 		const storeId = this.extractStoreIdentifierFromFilename(filename);
+
 		for (const row of result.rows) {
 			if (!row.storeIdentifier && storeId) {
 				row.storeIdentifier = storeId;
 			}
 		}
+
 		return result;
 	}
 
@@ -164,6 +168,11 @@ export class StudenacAdapter extends BaseXmlAdapter {
 		return `${this.baseUrl()}/${href}`;
 	}
 
+	async expandZip(content: Buffer, filename: string): Promise<ExpandedFile[]> {
+		const expanded = await expandZip(content, filename);
+		return expanded.filter((file) => file.type === "xml");
+	}
+
 	protected extractFilenameFromUrl(fileUrl: string): string {
 		try {
 			const parsed = new URL(fileUrl);
@@ -179,7 +188,7 @@ export class StudenacAdapter extends BaseXmlAdapter {
 		if (isoMatch) {
 			return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
 		}
-		const euMatch = filename.match(/(\d{2})-(\d{2})-(\d{4})/);
+		const euMatch = filename.match(/(\d{2})\.(\d{2})\.(\d{4})/);
 		if (euMatch) {
 			return `${euMatch[3]}-${euMatch[2]}-${euMatch[1]}`;
 		}

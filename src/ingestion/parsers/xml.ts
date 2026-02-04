@@ -168,12 +168,16 @@ function parseXmlToObject(
 		trimValues: true,
 		parseTagValue: false,
 		parseAttributeValue: false,
+		ignoreDeclaration: true,
 	});
 
-	const parsed = parser.parse(content);
-	return typeof parsed === "object" && parsed !== null
-		? (parsed as Record<string, unknown>)
-		: {};
+	const cleaned = content.replace(/<\?[^>]*\?>/g, "");
+
+	const parsed = parser.parse(cleaned);
+	if (!parsed || typeof parsed !== "object") {
+		return {};
+	}
+	return parsed as Record<string, unknown>;
 }
 
 function detectEncodingFromDeclaration(content: Buffer): Encoding | "" {

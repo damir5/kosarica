@@ -125,7 +125,7 @@ export class BaseChainAdapter {
 		const extensionPattern = extensions.join("|");
 		const linkPattern = new RegExp(
 			`href=["']([^"']*\\.(?:${extensionPattern})(?:\\?[^"']*)?)["']`,
-			"i",
+			"gi",
 		);
 
 		const matches = html.matchAll(linkPattern);

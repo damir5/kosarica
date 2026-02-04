@@ -77,9 +77,9 @@ export const chainConfigs: Record<ChainID, ChainConfig> = {
 		id: "studenac",
 		name: "Studenac",
 		baseUrl: "https://www.studenac.hr/popis-maloprodajnih-cijena",
-		primaryFileType: "xml",
-		supportedTypes: ["xml"],
-		usesZip: false,
+		primaryFileType: "zip",
+		supportedTypes: ["xml", "zip"],
+		usesZip: true,
 		storeResolution: "portal_id",
 	},
 	kaufland: {

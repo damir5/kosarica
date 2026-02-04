@@ -619,6 +619,7 @@ export async function runIngestion(
 	try {
 		const adapter = getAdapter(chainSlug as never);
 		const discoveredFiles = await adapter.discover(dateStr);
+		log.info("Discovered files", { chainSlug, count: discoveredFiles.length });
 		const storeIdentifierType = buildStoreIdentifierType(chainSlug);
 
 		const filesToProcess: Array<{
@@ -631,7 +632,12 @@ export async function runIngestion(
 			expandedFrom?: string;
 		}> = [];
 
+		let fileIndex = 0;
 		for (const file of discoveredFiles) {
+			fileIndex++;
+			if (fileIndex % 20 === 1 || fileIndex === discoveredFiles.length) {
+				log.info("Fetching files", { progress: `${fileIndex}/${discoveredFiles.length}` });
+			}
 			const fetched = await adapter.fetch(file);
 			const archiveKey = buildArchiveKey(chainSlug, targetDate, file.filename);
 			const archiveId = await createArchiveRecord(
