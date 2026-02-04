@@ -33,6 +33,10 @@ const ktcColumnMappingAlt: CsvColumnMapping = {
 
 export class KtcAdapter extends BaseCsvAdapter {
 	private discoveryDate?: string;
+	private static readonly portalUrls = [
+		"http://www.ktc.hr/cjenici/3005",
+		"http://www.ktc.hr/cjenici",
+	];
 
 	constructor() {
 		const chainConfig = chainConfigs.ktc;
@@ -65,7 +69,8 @@ export class KtcAdapter extends BaseCsvAdapter {
 			filterDate = new Date().toISOString().slice(0, 10);
 		}
 
-		const response = await this.fetchWithRetry(this.baseUrl());
+		const portalUrl = await this.resolvePortalUrl();
+		const response = await this.fetchWithRetry(portalUrl);
 		if (!response.ok) {
 			throw new Error(`Failed to fetch KTC portal: status ${response.status}`);
 		}
@@ -83,7 +88,7 @@ export class KtcAdapter extends BaseCsvAdapter {
 		}
 
 		for (const storeName of stores) {
-			const storeUrl = `${this.baseUrl()}?poslovnica=${encodeURIComponent(storeName)}`;
+			const storeUrl = `${portalUrl}?poslovnica=${encodeURIComponent(storeName)}`;
 			const storeResponse = await this.fetchWithRetry(storeUrl);
 			if (!storeResponse.ok) {
 				continue;
@@ -93,9 +98,7 @@ export class KtcAdapter extends BaseCsvAdapter {
 			let csvMatch: RegExpExecArray | null;
 			while ((csvMatch = csvPattern.exec(storeHtml)) !== null) {
 				const href = csvMatch[1];
-				const fileUrl = href.startsWith("http")
-					? href
-					: `${this.baseUrl()}/${href.replace(/^\//, "")}`;
+				const fileUrl = buildKtcFileUrl(href, portalUrl);
 				if (seenUrls.has(fileUrl)) {
 					continue;
 				}
@@ -116,12 +119,81 @@ export class KtcAdapter extends BaseCsvAdapter {
 						discoveredAt: new Date().toISOString(),
 						storeName,
 						portalDate: fileDate,
+						skipOn404: "true",
 					},
 				});
 			}
 		}
 
+		if (discovered.length === 0) {
+			this.collectDirectCsvLinks(
+				html,
+				portalUrl,
+				filterDate,
+				discovered,
+				seenUrls,
+			);
+		}
+
 		return discovered;
+	}
+
+	private async resolvePortalUrl(): Promise<string> {
+		const urlsToTry = new Set<string>([
+			this.baseUrl(),
+			...KtcAdapter.portalUrls,
+		]);
+		let lastError: string | undefined;
+		for (const url of urlsToTry) {
+			try {
+				const response = await this.fetchWithRetry(url);
+				if (response.ok) {
+					return url;
+				}
+				lastError = `status ${response.status} from ${url}`;
+			} catch (error) {
+				lastError = error instanceof Error ? error.message : String(error);
+			}
+		}
+		throw new Error(
+			`Failed to resolve KTC portal URL: ${lastError ?? "unknown"}`,
+		);
+	}
+
+	private collectDirectCsvLinks(
+		html: string,
+		portalUrl: string,
+		filterDate: string,
+		discovered: DiscoveredFile[],
+		seenUrls: Set<string>,
+	): void {
+		const csvPattern = /href=["']([^"']*\.csv(?:\?[^"']*)?)["']/gi;
+		let csvMatch: RegExpExecArray | null;
+		while ((csvMatch = csvPattern.exec(html)) !== null) {
+			const href = csvMatch[1];
+			const fileUrl = buildKtcFileUrl(href, portalUrl);
+			if (seenUrls.has(fileUrl)) {
+				continue;
+			}
+			seenUrls.add(fileUrl);
+			const filename = this.extractFilenameFromUrl(fileUrl);
+			const fileDate = this.extractDateFromFilename(filename);
+			if (filterDate && fileDate && fileDate !== filterDate) {
+				continue;
+			}
+			discovered.push({
+				url: fileUrl,
+				filename,
+				type: "csv",
+				lastModified: fileDate ? new Date(fileDate) : undefined,
+				metadata: {
+					source: "ktc_portal",
+					discoveredAt: new Date().toISOString(),
+					portalDate: fileDate,
+					skipOn404: "true",
+				},
+			});
+		}
 	}
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {
@@ -161,4 +233,39 @@ function safeDecodeURIComponent(value: string): string {
 	} catch {
 		return value;
 	}
+}
+
+function buildKtcFileUrl(href: string, portalUrl: string): string {
+	const resolved = resolveKtcHref(href, portalUrl);
+	if (!resolved) {
+		return href;
+	}
+
+	try {
+		const parsed = new URL(resolved);
+		parsed.pathname = parsed.pathname
+			.split("/")
+			.map((segment) =>
+				segment ? encodePathSegment(safeDecodeURIComponent(segment)) : "",
+			)
+			.join("/");
+		return parsed.toString();
+	} catch {
+		return resolved;
+	}
+}
+
+function resolveKtcHref(href: string, portalUrl: string): string | null {
+	try {
+		return new URL(href, portalUrl).toString();
+	} catch {
+		return null;
+	}
+}
+
+function encodePathSegment(segment: string): string {
+	return encodeURIComponent(segment).replace(
+		/[!'()*]/g,
+		(char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+	);
 }

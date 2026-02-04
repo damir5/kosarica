@@ -19,9 +19,9 @@ const trgocentarFieldMapping: XmlFieldMapping = {
 	priceExtractor: (item) => {
 		const regular = valueFromRecord(item, "mpc");
 		if (regular) {
-			return regular;
+			return normalizePriceValue(regular);
 		}
-		return valueFromRecord(item, "mpc_pop");
+		return normalizePriceValue(valueFromRecord(item, "mpc_pop"));
 	},
 };
 
@@ -174,4 +174,13 @@ function valueFromRecord(record: Record<string, unknown>, key: string): string {
 		return String(raw);
 	}
 	return "";
+}
+
+function normalizePriceValue(value: string): string {
+	const trimmed = value.trim();
+	if (!trimmed) {
+		return "";
+	}
+	const numeric = trimmed.match(/-?\d+(?:[.,]\d+)?/);
+	return numeric?.[0] ?? trimmed;
 }

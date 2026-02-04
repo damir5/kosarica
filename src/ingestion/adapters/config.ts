@@ -115,7 +115,7 @@ export const chainConfigs: Record<ChainID, ChainConfig> = {
 	ktc: {
 		id: "ktc",
 		name: "KTC",
-		baseUrl: "https://www.ktc.hr/cjenici",
+		baseUrl: "http://www.ktc.hr/cjenici",
 		primaryFileType: "csv",
 		supportedTypes: ["csv"],
 		csv: { delimiter: ";", encoding: "windows-1250", hasHeader: true },

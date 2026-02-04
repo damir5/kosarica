@@ -208,7 +208,14 @@ function splitCsvLine(
 		}
 
 		if (char === quoteChar) {
-			inQuotes = true;
+			// Treat quote as a wrapper only at field start.
+			// Some retailer exports contain literal quotes inside unquoted values
+			// (e.g. O"PLANT), which should not switch parser state.
+			if (current === "") {
+				inQuotes = true;
+				continue;
+			}
+			current += char;
 			continue;
 		}
 
