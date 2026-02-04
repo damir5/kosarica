@@ -19,6 +19,8 @@ const studenacFieldMapping: XmlFieldMapping = {
 	unit: "unit",
 	unitQuantity: "quantity",
 	price: "price",
+	priceExtractor: (item) =>
+		extractPriceWithFallback(item, "price", "discount_price"),
 	discountPrice: "discount_price",
 	discountStart: "discount_start",
 	discountEnd: "discount_end",
@@ -42,6 +44,12 @@ const studenacFieldMappingAlt: XmlFieldMapping = {
 	unit: "JedinicaMjere",
 	unitQuantity: undefined,
 	price: "MaloprodajnaCijena",
+	priceExtractor: (item) =>
+		extractPriceWithFallback(
+			item,
+			"MaloprodajnaCijena",
+			"MaloprodajnaCijenaAkcija",
+		),
 	discountPrice: "MaloprodajnaCijenaAkcija",
 	discountStart: undefined,
 	discountEnd: undefined,
@@ -144,6 +152,11 @@ export class StudenacAdapter extends BaseXmlAdapter {
 			if (!row.storeIdentifier && storeId) {
 				row.storeIdentifier = storeId;
 			}
+			// Fallback rows use akcija as the main price; treat equal/higher discount
+			// values as invalid discount metadata instead of producing warnings.
+			if (row.discountPrice !== undefined && row.discountPrice >= row.price) {
+				row.discountPrice = undefined;
+			}
 		}
 
 		return result;
@@ -194,4 +207,53 @@ export class StudenacAdapter extends BaseXmlAdapter {
 		}
 		return "";
 	}
+}
+
+function extractPriceWithFallback(
+	item: Record<string, unknown>,
+	regularKey: string,
+	fallbackKey: string,
+): string {
+	const regularPrice = valueFromRecord(item, regularKey);
+	if (regularPrice) {
+		return regularPrice;
+	}
+	return valueFromRecord(item, fallbackKey);
+}
+
+function valueFromRecord(record: Record<string, unknown>, key: string): string {
+	return unknownToString(record[key]);
+}
+
+function unknownToString(value: unknown): string {
+	if (typeof value === "string") {
+		return value.trim();
+	}
+	if (typeof value === "number" || typeof value === "boolean") {
+		return String(value);
+	}
+	if (Array.isArray(value)) {
+		for (const entry of value) {
+			const converted = unknownToString(entry);
+			if (converted) {
+				return converted;
+			}
+		}
+		return "";
+	}
+	if (value && typeof value === "object") {
+		const record = value as Record<string, unknown>;
+		const textValue =
+			record["#text"] ?? record._text ?? record["."] ?? record[""];
+		if (textValue !== undefined) {
+			return unknownToString(textValue);
+		}
+		for (const nested of Object.values(record)) {
+			const converted = unknownToString(nested);
+			if (converted) {
+				return converted;
+			}
+		}
+	}
+	return "";
 }
