@@ -250,7 +250,9 @@ function FileDetailPage() {
 			return orpc.admin.ingestion.rerunFile.call({ fileId });
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.ingestion.key({ type: "query" }),
+			});
 		},
 	});
 
@@ -262,7 +264,9 @@ function FileDetailPage() {
 			return orpc.admin.ingestion.rerunChunk.call({ chunkId });
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.ingestion.key({ type: "query" }),
+			});
 			setRerunningChunkId(null);
 		},
 		onError: () => {

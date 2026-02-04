@@ -77,7 +77,9 @@ export function StoreEnrichmentSection({
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			setVerifyModalOpen(false);
 			setSelectedTask(null);
 		},

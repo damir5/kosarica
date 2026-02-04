@@ -86,7 +86,9 @@ function UsersPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.users.key({ type: "query" }),
+			});
 		},
 	});
 
@@ -98,7 +100,9 @@ function UsersPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.users.key({ type: "query" }),
+			});
 		},
 	});
 
@@ -120,7 +124,9 @@ function UsersPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.users.key({ type: "query" }),
+			});
 		},
 	});
 

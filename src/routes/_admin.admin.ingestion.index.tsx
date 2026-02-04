@@ -259,7 +259,9 @@ function IngestionDashboard() {
 			return { chainSlug, dates, successes, failures };
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.ingestion.key({ type: "query" }),
+			});
 		},
 	});
 	const triggerResultLabel = triggerMutation.data
@@ -275,12 +277,16 @@ function IngestionDashboard() {
 			return orpc.admin.ingestion.deleteRun.call({ runId });
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.ingestion.key({ type: "query" }),
+			});
 		},
 	});
 
 	const handleRefresh = () => {
-		queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
+		queryClient.invalidateQueries({
+			queryKey: orpc.admin.ingestion.key({ type: "query" }),
+		});
 	};
 
 	return (

@@ -78,6 +78,18 @@ return { prices: transformed };
 
 ---
 
+## TanStack Query Keys (oRPC)
+
+Do NOT manually construct TanStack Query keys (for example `['admin', 'users']`).
+
+Always use the oRPC TanStack Query utilities from `src/orpc/client.ts`:
+- Full keys: `*.queryKey(...)` / `*.queryOptions(...)`
+- Partial keys for broad invalidation: `*.key({ type: 'query' })`
+
+Manual query keys are only allowed with explicit user approval and a documented reason.
+
+---
+
 ## Distributed Cron System
 
 The scheduler uses Postgres-coordinated cron execution with node-cron for tick scheduling.

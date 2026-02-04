@@ -64,7 +64,9 @@ function PendingStoresPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			setApprovalStore(null);
 			setApprovalError(null);
 		},
@@ -94,7 +96,9 @@ function PendingStoresPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			setMergeStore(null);
 		},
 	});
@@ -111,7 +115,9 @@ function PendingStoresPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			setRejectingStoreId(null);
 		},
 	});
@@ -131,7 +137,9 @@ function PendingStoresPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			setSelectedIds(new Set());
 		},
 	});
@@ -151,7 +159,9 @@ function PendingStoresPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			setSelectedIds(new Set());
 		},
 	});

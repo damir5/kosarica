@@ -19,6 +19,7 @@ import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index
 import { Route as ApiRpcSplatRouteImport } from './routes/api.rpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users'
+import { Route as AdminAdminTaskQueueRouteImport } from './routes/_admin.admin.task-queue'
 import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stores'
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as AdminAdminIngestionRouteImport } from './routes/_admin.admin.ingestion'
@@ -79,6 +80,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 const AdminAdminUsersRoute = AdminAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
+const AdminAdminTaskQueueRoute = AdminAdminTaskQueueRouteImport.update({
+  id: '/task-queue',
+  path: '/task-queue',
   getParentRoute: () => AdminAdminRoute,
 } as any)
 const AdminAdminStoresRoute = AdminAdminStoresRouteImport.update({
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
+  '/admin/task-queue': typeof AdminAdminTaskQueueRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
@@ -176,6 +183,7 @@ export interface FileRoutesByTo {
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/admin/cron': typeof AdminAdminCronRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
+  '/admin/task-queue': typeof AdminAdminTaskQueueRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/_admin/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
   '/_admin/admin/stores': typeof AdminAdminStoresRouteWithChildren
+  '/_admin/admin/task-queue': typeof AdminAdminTaskQueueRoute
   '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/admin/ingestion'
     | '/admin/settings'
     | '/admin/stores'
+    | '/admin/task-queue'
     | '/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/admin/catalog-prices'
     | '/admin/cron'
     | '/admin/settings'
+    | '/admin/task-queue'
     | '/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/_admin/admin/ingestion'
     | '/_admin/admin/settings'
     | '/_admin/admin/stores'
+    | '/_admin/admin/task-queue'
     | '/_admin/admin/users'
     | '/api/auth/$'
     | '/api/rpc/$'
@@ -363,6 +375,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminAdminUsersRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
+    '/_admin/admin/task-queue': {
+      id: '/_admin/admin/task-queue'
+      path: '/task-queue'
+      fullPath: '/admin/task-queue'
+      preLoaderRoute: typeof AdminAdminTaskQueueRouteImport
       parentRoute: typeof AdminAdminRoute
     }
     '/_admin/admin/stores': {
@@ -500,6 +519,7 @@ interface AdminAdminRouteChildren {
   AdminAdminIngestionRoute: typeof AdminAdminIngestionRouteWithChildren
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
   AdminAdminStoresRoute: typeof AdminAdminStoresRouteWithChildren
+  AdminAdminTaskQueueRoute: typeof AdminAdminTaskQueueRoute
   AdminAdminUsersRoute: typeof AdminAdminUsersRoute
   AdminAdminIndexRoute: typeof AdminAdminIndexRoute
   AdminAdminConfigIndexRoute: typeof AdminAdminConfigIndexRoute
@@ -511,6 +531,7 @@ const AdminAdminRouteChildren: AdminAdminRouteChildren = {
   AdminAdminIngestionRoute: AdminAdminIngestionRouteWithChildren,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,
   AdminAdminStoresRoute: AdminAdminStoresRouteWithChildren,
+  AdminAdminTaskQueueRoute: AdminAdminTaskQueueRoute,
   AdminAdminUsersRoute: AdminAdminUsersRoute,
   AdminAdminIndexRoute: AdminAdminIndexRoute,
   AdminAdminConfigIndexRoute: AdminAdminConfigIndexRoute,

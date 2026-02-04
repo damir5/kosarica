@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Database, Settings, Store, Users, Wrench } from "lucide-react";
+import {
+	Database,
+	ListChecks,
+	Settings,
+	Store,
+	Users,
+	Wrench,
+} from "lucide-react";
 import { orpc } from "@/orpc/client";
 
 export const Route = createFileRoute("/_admin/admin/")({
@@ -11,6 +18,8 @@ function AdminDashboard() {
 	const { data, isLoading, error } = useQuery(
 		orpc.admin.getConfigInfo.queryOptions({ input: {} }),
 	);
+	const errorMessage =
+		error instanceof Error ? error.message : error ? String(error) : null;
 
 	return (
 		<div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -21,9 +30,9 @@ function AdminDashboard() {
 						<p>Loading admin status...</p>
 					</div>
 				)}
-				{error && (
+				{errorMessage && (
 					<div className="text-destructive">
-						<p>Error: {error.message}</p>
+						<p>Error: {errorMessage}</p>
 					</div>
 				)}
 				{data && (
@@ -100,6 +109,18 @@ function AdminDashboard() {
 					</h3>
 					<p className="text-muted-foreground text-sm">
 						Monitor data ingestion runs, files, and errors
+					</p>
+				</Link>
+				<Link
+					to="/admin/task-queue"
+					className="block rounded-lg border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md"
+				>
+					<ListChecks className="mb-3 size-8 text-primary" />
+					<h3 className="mb-2 font-semibold text-foreground text-lg">
+						Task Queue
+					</h3>
+					<p className="text-muted-foreground text-sm">
+						Inspect and administer background tasks and retries
 					</p>
 				</Link>
 			</div>

@@ -6,9 +6,17 @@ import {
 	Trash2,
 	XCircle,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import {
 	Table,
 	TableBody,
@@ -72,6 +80,9 @@ export function IngestionRunList({
 	onDelete,
 	deletingRunId,
 }: IngestionRunListProps) {
+	const [confirmDeleteRunId, setConfirmDeleteRunId] = useState<string | null>(
+		null,
+	);
 	const skeletonKeys = useMemo(
 		() => Array.from({ length: 5 }, () => crypto.randomUUID()),
 		[],
@@ -148,167 +159,199 @@ export function IngestionRunList({
 	}
 
 	return (
-		<div className="rounded-md border">
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>Chain</TableHead>
-						<TableHead>Date</TableHead>
-						<TableHead>Status</TableHead>
-						<TableHead>Progress</TableHead>
-						<TableHead>Errors</TableHead>
-						<TableHead>Duration</TableHead>
-						<TableHead>Started</TableHead>
-						<TableHead className="w-[50px]"></TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{runs.map((run) => {
-						const status = run.status as RunStatus;
-						const StatusIcon = STATUS_ICONS[status] || Clock;
-						const totalFiles = run.totalFiles ?? 0;
-						const processedFiles = run.processedFiles ?? 0;
-						const progress =
-							totalFiles > 0
-								? Math.round((processedFiles / totalFiles) * 100)
-								: 0;
-						const noFilesDiscovered =
-							run.status === "completed" && totalFiles === 0;
-						const summarySeverity = run.statusSeverity ?? "";
-						const summaryLabel =
-							SUMMARY_LABELS[summarySeverity] || summarySeverity;
+		<>
+			<div className="rounded-md border">
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Chain</TableHead>
+							<TableHead>Date</TableHead>
+							<TableHead>Status</TableHead>
+							<TableHead>Progress</TableHead>
+							<TableHead>Errors</TableHead>
+							<TableHead>Duration</TableHead>
+							<TableHead>Started</TableHead>
+							<TableHead className="w-[50px]"></TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{runs.map((run) => {
+							const status = run.status as RunStatus;
+							const StatusIcon = STATUS_ICONS[status] || Clock;
+							const totalFiles = run.totalFiles ?? 0;
+							const processedFiles = run.processedFiles ?? 0;
+							const progress =
+								totalFiles > 0
+									? Math.round((processedFiles / totalFiles) * 100)
+									: 0;
+							const noFilesDiscovered =
+								run.status === "completed" && totalFiles === 0;
+							const summarySeverity = run.statusSeverity ?? "";
+							const summaryLabel =
+								SUMMARY_LABELS[summarySeverity] || summarySeverity;
 
-						return (
-							<TableRow key={run.id}>
-								<TableCell>
-									<div>
-										<a
-											href={`/admin/ingestion/${run.id}`}
-											className="font-medium hover:underline"
-										>
-											{run.chainSlug}
-										</a>
-										<div className="flex items-center gap-2 mt-0.5">
-											<Badge variant="outline" className="text-xs">
-												{SOURCE_LABELS[run.source] || run.source}
-											</Badge>
-											{run.parentRunId && (
-												<span className="text-xs text-muted-foreground">
-													(rerun)
-												</span>
+							return (
+								<TableRow key={run.id}>
+									<TableCell>
+										<div>
+											<a
+												href={`/admin/ingestion/${run.id}`}
+												className="font-medium hover:underline"
+											>
+												{run.chainSlug}
+											</a>
+											<div className="flex items-center gap-2 mt-0.5">
+												<Badge variant="outline" className="text-xs">
+													{SOURCE_LABELS[run.source] || run.source}
+												</Badge>
+												{run.parentRunId && (
+													<span className="text-xs text-muted-foreground">
+														(rerun)
+													</span>
+												)}
+											</div>
+											{noFilesDiscovered && (
+												<p className="mt-1 text-xs text-muted-foreground">
+													No files discovered; older prices retained until
+													publish.
+												</p>
 											)}
 										</div>
-										{noFilesDiscovered && (
-											<p className="mt-1 text-xs text-muted-foreground">
-												No files discovered; older prices retained until
-												publish.
-											</p>
-										)}
-									</div>
-								</TableCell>
-								<TableCell>
-									<span className="text-sm text-muted-foreground">
-										{formatTargetDate(run.targetDate)}
-									</span>
-								</TableCell>
-								<TableCell>
-									<Badge
-										variant={STATUS_COLORS[status] || "secondary"}
-										className={status === "running" ? "animate-pulse" : ""}
-									>
-										<StatusIcon
-											className={`mr-1 h-3 w-3 ${status === "running" ? "animate-spin" : ""}`}
-										/>
-										{status}
-									</Badge>
-									{run.statusReason && (
-										<div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-											<Badge
-												variant={SUMMARY_VARIANTS[summarySeverity] || "outline"}
-												className="text-xs"
-											>
-												{summaryLabel || "info"}
-											</Badge>
-											<span>{run.statusReason}</span>
-										</div>
-									)}
-								</TableCell>
-								<TableCell>
-									<div className="w-32">
-										<div className="flex justify-between text-xs text-muted-foreground mb-1">
-											<span>
-												{processedFiles}/{totalFiles}
-											</span>
-											<span>{progress}%</span>
-										</div>
-										<div className="h-1.5 bg-muted rounded-full overflow-hidden">
-											<div
-												className={`h-full transition-all duration-300 ${
-													status === "failed"
-														? "bg-destructive"
-														: status === "completed"
-															? "bg-green-500"
-															: "bg-primary"
-												}`}
-												style={{ width: `${progress}%` }}
+									</TableCell>
+									<TableCell>
+										<span className="text-sm text-muted-foreground">
+											{formatTargetDate(run.targetDate)}
+										</span>
+									</TableCell>
+									<TableCell>
+										<Badge
+											variant={STATUS_COLORS[status] || "secondary"}
+											className={status === "running" ? "animate-pulse" : ""}
+										>
+											<StatusIcon
+												className={`mr-1 h-3 w-3 ${status === "running" ? "animate-spin" : ""}`}
 											/>
-										</div>
-									</div>
-								</TableCell>
-								<TableCell>
-									<span
-										className={`font-medium ${(run.errorCount ?? 0) > 0 ? "text-destructive" : "text-muted-foreground"}`}
-									>
-										{run.errorCount ?? 0}
-									</span>
-								</TableCell>
-								<TableCell>
-									<span className="text-sm text-muted-foreground">
-										{formatDuration(run.startedAt, run.completedAt)}
-									</span>
-								</TableCell>
-								<TableCell>
-									<span className="text-sm text-muted-foreground">
-										{formatTimeAgo(run.createdAt)}
-									</span>
-								</TableCell>
-								<TableCell>
-									<div className="flex items-center gap-1">
-										{onDelete && (
-											<Button
-												variant="ghost"
-												size="icon"
-												onClick={() => {
-													if (
-														window.confirm(
-															`Delete run ${run.id}? This will also delete all associated files, chunks, and errors.`,
-														)
-													) {
-														onDelete(run.id);
+											{status}
+										</Badge>
+										{run.statusReason && (
+											<div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+												<Badge
+													variant={
+														SUMMARY_VARIANTS[summarySeverity] || "outline"
 													}
-												}}
-												disabled={deletingRunId === run.id}
-												className="text-muted-foreground hover:text-destructive"
-											>
-												{deletingRunId === run.id ? (
-													<Loader2 className="h-4 w-4 animate-spin" />
-												) : (
-													<Trash2 className="h-4 w-4" />
-												)}
-											</Button>
+													className="text-xs"
+												>
+													{summaryLabel || "info"}
+												</Badge>
+												<span>{run.statusReason}</span>
+											</div>
 										)}
-										<Button variant="ghost" size="icon" asChild>
-											<a href={`/admin/ingestion/${run.id}`}>
-												<ChevronRight className="h-4 w-4" />
-											</a>
-										</Button>
-									</div>
-								</TableCell>
-							</TableRow>
-						);
-					})}
-				</TableBody>
-			</Table>
-		</div>
+									</TableCell>
+									<TableCell>
+										<div className="w-32">
+											<div className="flex justify-between text-xs text-muted-foreground mb-1">
+												<span>
+													{processedFiles}/{totalFiles}
+												</span>
+												<span>{progress}%</span>
+											</div>
+											<div className="h-1.5 bg-muted rounded-full overflow-hidden">
+												<div
+													className={`h-full transition-all duration-300 ${
+														status === "failed"
+															? "bg-destructive"
+															: status === "completed"
+																? "bg-green-500"
+																: "bg-primary"
+													}`}
+													style={{ width: `${progress}%` }}
+												/>
+											</div>
+										</div>
+									</TableCell>
+									<TableCell>
+										<span
+											className={`font-medium ${(run.errorCount ?? 0) > 0 ? "text-destructive" : "text-muted-foreground"}`}
+										>
+											{run.errorCount ?? 0}
+										</span>
+									</TableCell>
+									<TableCell>
+										<span className="text-sm text-muted-foreground">
+											{formatDuration(run.startedAt, run.completedAt)}
+										</span>
+									</TableCell>
+									<TableCell>
+										<span className="text-sm text-muted-foreground">
+											{formatTimeAgo(run.createdAt)}
+										</span>
+									</TableCell>
+									<TableCell>
+										<div className="flex items-center gap-1">
+											{onDelete && (
+												<Button
+													variant="ghost"
+													size="icon"
+													onClick={() => {
+														setConfirmDeleteRunId(run.id);
+													}}
+													disabled={deletingRunId === run.id}
+													className="text-muted-foreground hover:text-destructive"
+												>
+													{deletingRunId === run.id ? (
+														<Loader2 className="h-4 w-4 animate-spin" />
+													) : (
+														<Trash2 className="h-4 w-4" />
+													)}
+												</Button>
+											)}
+											<Button variant="ghost" size="icon" asChild>
+												<a href={`/admin/ingestion/${run.id}`}>
+													<ChevronRight className="h-4 w-4" />
+												</a>
+											</Button>
+										</div>
+									</TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				</Table>
+			</div>
+
+			{onDelete && confirmDeleteRunId && (
+				<Dialog open={true} onOpenChange={() => setConfirmDeleteRunId(null)}>
+					<DialogContent className="sm:max-w-lg">
+						<DialogHeader>
+							<DialogTitle>Delete Run</DialogTitle>
+							<DialogDescription>
+								Delete run {confirmDeleteRunId}? This will also delete all
+								associated files, chunks, and errors.
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<Button
+								variant="outline"
+								onClick={() => setConfirmDeleteRunId(null)}
+								disabled={deletingRunId === confirmDeleteRunId}
+							>
+								Back
+							</Button>
+							<Button
+								variant="destructive"
+								onClick={() => {
+									const runId = confirmDeleteRunId;
+									setConfirmDeleteRunId(null);
+									onDelete(runId);
+								}}
+								disabled={deletingRunId === confirmDeleteRunId}
+							>
+								Confirm
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			)}
+		</>
 	);
 }

@@ -98,7 +98,9 @@ function CronDashboard() {
 			return orpc.admin.cron.toggle.call({ jobId, enabled });
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "cron"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.cron.key({ type: "query" }),
+			});
 		},
 	});
 
@@ -108,12 +110,16 @@ function CronDashboard() {
 			return orpc.admin.cron.trigger.call({ jobId });
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "cron"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.cron.key({ type: "query" }),
+			});
 		},
 	});
 
 	const handleRefresh = () => {
-		queryClient.invalidateQueries({ queryKey: ["admin", "cron"] });
+		queryClient.invalidateQueries({
+			queryKey: orpc.admin.cron.key({ type: "query" }),
+		});
 	};
 
 	const hasActiveRuns = runsData?.runs?.some((run) => run.status === "running");

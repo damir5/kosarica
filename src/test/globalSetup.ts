@@ -1,6 +1,125 @@
 import type { ExecException } from "node:child_process";
 import { exec } from "node:child_process";
+import { lookup } from "node:dns/promises";
+import fs from "node:fs";
+import path from "node:path";
+import dotenv from "dotenv";
 import postgres from "postgres";
+
+const DEFAULT_TEST_DATABASE_URL =
+	"postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test";
+
+function assertTestDatabaseUrl(url: string): void {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		throw new Error(`Invalid DATABASE_URL: ${url}`);
+	}
+
+	const dbName = parsed.pathname.replace(/^\//, "");
+	if (!dbName || !dbName.endsWith("_test")) {
+		throw new Error(
+			`Refusing to run test DB cleanup on non-test database: ${dbName || "<missing>"}`,
+		);
+	}
+}
+
+function tryLoadTestEnvFile(): void {
+	// Vitest doesn't automatically load `.env.test`. Migrations already do, but
+	// globalSetup needs DATABASE_URL before it can clean up the DB.
+	const envPath = path.join(process.cwd(), ".env.test");
+	if (!fs.existsSync(envPath)) return;
+	dotenv.config({ path: envPath });
+}
+
+async function maybeFallbackFromOrbStackDns(url: string): Promise<string> {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return url;
+	}
+
+	const hostname = parsed.hostname;
+	if (!hostname.endsWith(".orb.local")) return url;
+
+	try {
+		await lookup(hostname);
+		return url;
+	} catch {
+		parsed.hostname = "localhost";
+		parsed.port = "5433";
+		console.warn(
+			`WARNING: DNS lookup failed for ${hostname}; falling back to ${parsed.hostname}:${parsed.port} for tests.`,
+		);
+		return parsed.toString();
+	}
+}
+
+async function canConnectToPostgres(url: string): Promise<boolean> {
+	const sql = postgres(url, {
+		max: 1,
+		connect_timeout: 1,
+	});
+
+	try {
+		await sql`select 1`;
+		return true;
+	} catch {
+		return false;
+	} finally {
+		await sql.end({ timeout: 1 });
+	}
+}
+
+async function chooseTestDatabaseUrl(configuredUrl: string): Promise<string> {
+	assertTestDatabaseUrl(configuredUrl);
+
+	const candidates: string[] = [configuredUrl];
+	let parsed: URL | null = null;
+	try {
+		parsed = new URL(configuredUrl);
+	} catch {
+		parsed = null;
+	}
+
+	if (parsed) {
+		if (parsed.hostname.endsWith(".orb.local")) {
+			const localhost5433 = new URL(parsed.toString());
+			localhost5433.hostname = "localhost";
+			localhost5433.port = "5433";
+			candidates.push(localhost5433.toString());
+
+			const hostDocker5433 = new URL(parsed.toString());
+			hostDocker5433.hostname = "host.docker.internal";
+			hostDocker5433.port = "5433";
+			candidates.push(hostDocker5433.toString());
+		}
+
+		for (const port of ["5433", parsed.port || "5432", "5432"]) {
+			const local = new URL(parsed.toString());
+			local.hostname = "localhost";
+			local.port = port;
+			candidates.push(local.toString());
+		}
+	}
+
+	const uniqueCandidates = [...new Set(candidates)];
+	for (const candidate of uniqueCandidates) {
+		if (await canConnectToPostgres(candidate)) return candidate;
+	}
+
+	throw new Error(
+		[
+			"Unable to connect to the test database.",
+			"Tried:",
+			...uniqueCandidates.map((c) => `- ${c}`),
+			"",
+			"Start test services with `mise run test-all` (recommended) or `docker compose --profile test up -d postgres-test`.",
+		].join("\n"),
+	);
+}
 
 /**
  * Verify ClickHouse is available (warning only, don't fail for unit tests).
@@ -34,11 +153,8 @@ async function verifyClickHouse(): Promise<void> {
 /**
  * Clean up the test database by dropping all tables, types, enums, and the drizzle schema.
  */
-async function cleanupTestDatabase(): Promise<void> {
-	const testUrl =
-		process.env.DATABASE_URL ||
-		"postgresql://kosarica_test:kosarica_test@ade-postgres-test.orb.local:5432/kosarica_test";
-
+async function cleanupTestDatabase(testUrl: string): Promise<void> {
+	assertTestDatabaseUrl(testUrl);
 	const sql = postgres(testUrl);
 
 	try {
@@ -115,13 +231,22 @@ async function applyMigrations(): Promise<void> {
 export default async function globalSetup() {
 	console.log("Running global test setup...");
 
-	// Ensure DATABASE_URL is set for both cleanup and migrations
-	const testUrl =
-		process.env.DATABASE_URL ||
-		"postgresql://kosarica_test:kosarica_test@ade-postgres-test.orb.local:5432/kosarica_test";
-	process.env.DATABASE_URL = testUrl;
+	const hadDatabaseUrl = Boolean(process.env.DATABASE_URL);
+	if (!hadDatabaseUrl) {
+		tryLoadTestEnvFile();
+	}
 
-	await cleanupTestDatabase();
+	// Ensure DATABASE_URL is set for both cleanup and migrations.
+	// If DATABASE_URL came from `.env.test` and uses OrbStack DNS, fall back to
+	// localhost when OrbStack DNS isn't available.
+	const configuredUrl = process.env.DATABASE_URL || DEFAULT_TEST_DATABASE_URL;
+	const normalizedUrl = hadDatabaseUrl
+		? configuredUrl
+		: await maybeFallbackFromOrbStackDns(configuredUrl);
+	const chosenUrl = await chooseTestDatabaseUrl(normalizedUrl);
+	process.env.DATABASE_URL = chosenUrl;
+
+	await cleanupTestDatabase(chosenUrl);
 	await applyMigrations();
 
 	// Verify ClickHouse availability (warning only, don't fail)

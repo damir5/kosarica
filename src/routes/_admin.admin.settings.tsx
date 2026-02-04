@@ -35,7 +35,9 @@ function SettingsPage() {
 			return orpc.admin.settings.update.call(input);
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.settings.key({ type: "query" }),
+			});
 		},
 	});
 

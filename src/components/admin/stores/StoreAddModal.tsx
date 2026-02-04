@@ -55,7 +55,9 @@ export function StoreAddModal({
 			return orpc.admin.stores.create.call(data);
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			handleClose();
 		},
 	});

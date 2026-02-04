@@ -45,6 +45,7 @@ import {
 	updateStore,
 	verifyEnrichment,
 } from "./stores";
+import * as taskQueue from "./task-queue";
 import { addTodo, listTodos } from "./todos";
 import {
 	banUser,
@@ -151,6 +152,16 @@ export default {
 			toggle: cron.toggle,
 			health: cron.health,
 			getRun: cron.getRun,
+		},
+		taskQueue: {
+			stats: taskQueue.stats,
+			list: taskQueue.list,
+			get: taskQueue.get,
+			cancel: taskQueue.cancel,
+			requeue: taskQueue.requeue,
+			reschedule: taskQueue.reschedule,
+			recoverOrphaned: taskQueue.recoverOrphaned,
+			cleanupCompleted: taskQueue.cleanupCompleted,
 		},
 	},
 };

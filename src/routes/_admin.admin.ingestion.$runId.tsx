@@ -210,7 +210,9 @@ function RunDetailPage() {
 			return orpc.admin.ingestion.rerunFile.call({ fileId });
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "ingestion"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.ingestion.key({ type: "query" }),
+			});
 			setRerunningFileId(null);
 		},
 		onError: () => {

@@ -174,7 +174,9 @@ function StoresPage() {
 			});
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			setLinkModalStore(null);
 			setSelectedPriceSource("");
 		},
@@ -185,7 +187,9 @@ function StoresPage() {
 			return orpc.admin.stores.unlinkPriceSource.call({ storeId });
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["admin", "stores"] });
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
 			setUnlinkModalStore(null);
 		},
 	});
