@@ -1,6 +1,4 @@
--- Legacy helper for manual local setup.
--- Prefer migration runner instead: pnpm clickhouse:migrate
-
+-- Initial ClickHouse schema for price data.
 CREATE TABLE IF NOT EXISTS prices (
     target_date Date,
     chain_slug LowCardinality(String),

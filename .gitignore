@@ -64,6 +64,7 @@ go.work.sum
 
 # Sisyphus work session tracking
 .sisyphus/
+# Dev runtime logs (e.g. mise run dev output)
 log/
 
 # Backup files (editors, git merge conflicts, etc.)

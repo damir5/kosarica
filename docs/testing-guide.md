@@ -46,7 +46,7 @@ pnpm test:unit
 **Start ClickHouse (Docker example)**
 ```bash
 docker run -d --name clickhouse-local -p 8123:8123 -p 9000:9000 clickhouse/clickhouse-server:latest
-clickhouse-client < scripts/clickhouse-schema.sql
+CLICKHOUSE_URL=http://localhost:8123 pnpm clickhouse:migrate
 ```
 
 **Ensure Postgres is running** (dev setup or local container)
@@ -92,7 +92,7 @@ docker ps | grep postgres
 
 2. **Ensure schema is applied:**
    ```bash
-   clickhouse-client < scripts/clickhouse-schema.sql
+   pnpm clickhouse:migrate
    ```
 
 ### Tests Failing with Database Errors

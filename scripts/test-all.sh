@@ -90,10 +90,6 @@ choose_clickhouse_url() {
   echo "${CH_CANDIDATES[0]}"
 }
 
-ensure_clickhouse_schema() {
-  docker exec -i ade-clickhouse-test clickhouse-client --multiquery < scripts/clickhouse-schema.sql >/dev/null
-}
-
 run_node_tooling() {
   if command -v node >/dev/null 2>&1; then
     "$@"
@@ -122,9 +118,6 @@ wait_for_postgres_container
 echo "Waiting for ClickHouse..."
 wait_for_clickhouse_container
 
-echo "Applying ClickHouse schema..."
-ensure_clickhouse_schema
-
 export DATABASE_URL="$(choose_database_url)"
 export CLICKHOUSE_URL="$(choose_clickhouse_url)"
 export STORAGE_PATH="${STORAGE_PATH:-./data/storage-test}"
@@ -134,6 +127,9 @@ echo "ClickHouse: ${CLICKHOUSE_URL}"
 
 echo "Applying DB migrations..."
 run_node_tooling pnpm db:migrate
+
+echo "Applying ClickHouse migrations..."
+run_node_tooling pnpm clickhouse:migrate
 
 echo "Running frontend tests..."
 set +e

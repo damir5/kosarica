@@ -15,6 +15,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bash scripts/db-migrate.sh",
     "db:studio": "drizzle-kit studio",
+    "clickhouse:migrate": "bash scripts/clickhouse-migrate.sh",
+    "clickhouse:migrate:status": "bash scripts/clickhouse-migrate.sh --status",
     "analyze:price-variation": "node scripts/analyze-price-variation.mjs",
     "clickhouse:load-all": "tsx scripts/clickhouse-sync.ts all",
     "clickhouse:load-missing": "tsx scripts/clickhouse-sync.ts missing",

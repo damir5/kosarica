@@ -20,6 +20,7 @@ Very brief test commands
 - Apply migrations: `pnpm db:migrate` (uses `drizzle.config.ts` and `.env.test` when present)
 - Run full workflow (migrate, run JS tests): `mise run test-all`
 - Run frontend tests only: `pnpm test` (reports written to `/tmp/frontend-test-report.txt` on failures)
+- Dev server logs: `mise run dev` writes to `log/log.txt`
 
 ---
 

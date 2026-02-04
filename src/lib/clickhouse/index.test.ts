@@ -20,7 +20,7 @@ import {
  *
  * To run locally:
  * docker run -d --name clickhouse-local -p 8123:8123 -p 9000:9000 clickhouse/clickhouse-server:latest
- * docker exec -i clickhouse-local clickhouse-client < scripts/clickhouse-schema.sql
+ * CLICKHOUSE_URL=http://localhost:8123 pnpm clickhouse:migrate
  */
 describe("ClickHouseClient", () => {
 	let client: ClickHouseClient;
@@ -39,7 +39,7 @@ describe("ClickHouseClient", () => {
 		const tableExists = await client.tableExists();
 		if (!tableExists) {
 			throw new Error(
-				"prices table does not exist. Run: docker exec -i clickhouse-local clickhouse-client < scripts/clickhouse-schema.sql",
+				"prices table does not exist. Run: pnpm clickhouse:migrate",
 			);
 		}
 	});

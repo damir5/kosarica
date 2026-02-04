@@ -153,7 +153,7 @@ export const cacheWarmup = procedure.handler(async () => {
 	const exists = await clickhouse.tableExists();
 	if (!exists) {
 		throw new Error(
-			"ClickHouse prices table does not exist. Run: clickhouse-client < scripts/clickhouse-schema.sql",
+			"ClickHouse prices table does not exist. Run: pnpm clickhouse:migrate",
 		);
 	}
 	return {
@@ -179,7 +179,7 @@ export const cacheRefresh = procedure
 		const exists = await clickhouse.tableExists();
 		if (!exists) {
 			throw new Error(
-				"ClickHouse prices table does not exist. Run: clickhouse-client < scripts/clickhouse-schema.sql",
+				"ClickHouse prices table does not exist. Run: pnpm clickhouse:migrate",
 			);
 		}
 		return {

@@ -3,7 +3,7 @@ node = "24"
 
 [tasks.dev]
 description = "Run app in dev mode"
-run = "pnpm dev"
+run = "mkdir -p log && pnpm dev 2>&1 | tee log/log.txt | bunx pino-pretty"
 
 [tasks.services-up]
 description = "Start dev containers (Postgres + ClickHouse)"
@@ -16,6 +16,10 @@ run = "docker compose --profile dev down"
 [tasks.services-purge]
 description = "Remove dev containers and all dev volumes/networks"
 run = "docker compose --profile dev down --volumes --remove-orphans"
+
+[tasks.reset-data]
+description = "Reset dev data (storage + Postgres + ClickHouse + admin)"
+run = "./scripts/reset-dev-data.sh"
 
 [tasks.test-all]
 description = "Run full test suite (auto-starts docker test services)"
