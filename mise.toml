@@ -5,6 +5,18 @@ node = "24"
 description = "Run app in dev mode"
 run = "pnpm dev"
 
+[tasks.services-up]
+description = "Start dev containers (Postgres + ClickHouse)"
+run = "docker compose --profile dev up -d postgres clickhouse"
+
+[tasks.services-down]
+description = "Stop dev containers (Postgres + ClickHouse)"
+run = "docker compose --profile dev down"
+
+[tasks.services-purge]
+description = "Remove dev containers and all dev volumes/networks"
+run = "docker compose --profile dev down --volumes --remove-orphans"
+
 [tasks.test-all]
 description = "Run full test suite (auto-starts docker test services)"
 run = "./scripts/test-all.sh"

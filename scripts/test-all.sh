@@ -5,6 +5,13 @@ TEST_DB_USER="kosarica_test"
 TEST_DB_PASSWORD="kosarica_test"
 TEST_DB_NAME="kosarica_test"
 
+cleanup() {
+  echo ""
+  echo "Cleaning up test services..."
+  docker compose --profile test down -v 2>/dev/null || true
+}
+trap cleanup EXIT
+
 DB_CANDIDATES=(
   "postgresql://${TEST_DB_USER}:${TEST_DB_PASSWORD}@ade-postgres-test.orb.local:5432/${TEST_DB_NAME}"
   "postgresql://${TEST_DB_USER}:${TEST_DB_PASSWORD}@host.docker.internal:5433/${TEST_DB_NAME}"
