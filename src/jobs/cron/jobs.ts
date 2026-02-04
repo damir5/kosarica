@@ -33,7 +33,7 @@ export function registerAllCronJobs(): void {
 		name: "Temporary Storage Cleanup",
 		cronExpression: "0 */6 * * *", // Every 6 hours
 		timezone: "UTC",
-		taskType: "maintenance",
+		taskType: "cleanup",
 		handler: tempCleanupHandler,
 	});
 
@@ -44,7 +44,7 @@ export function registerAllCronJobs(): void {
 	//   name: "Weekly Data Cleanup",
 	//   cronExpression: "0 2 * * 0", // 2 AM every Sunday
 	//   timezone: "UTC",
-	//   taskType: "maintenance",
+	//   taskType: "cleanup",
 	//   handler: weeklyCleanupHandler,
 	// });
 }

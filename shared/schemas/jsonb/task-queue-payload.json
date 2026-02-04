@@ -11,6 +11,15 @@
         "chainSlug": {
           "type": "string"
         },
+        "targetDate": {
+          "type": "string"
+        },
+        "force": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
         "sourceUrl": {
           "type": "string"
         },
@@ -69,6 +78,27 @@
       },
       "required": [
         "type"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "clickhouseSync"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "missing",
+            "all"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "mode"
       ],
       "additionalProperties": false
     }

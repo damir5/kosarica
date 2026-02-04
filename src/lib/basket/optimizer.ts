@@ -150,8 +150,7 @@ function haversineDistanceKm(
 
 	const a =
 		Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-		Math.cos(rLat1) * Math.cos(rLat2) *
-			Math.sin(dLon / 2) * Math.sin(dLon / 2);
+		Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	return radiusKm * c;
 }
@@ -182,10 +181,11 @@ function buildItemPriceInfo(
 	priceCents: number,
 	discountPrice?: number | null,
 ): ItemPriceInfo {
-	const { effectivePrice, hasDiscount, discountPrice: resolvedDiscount } = getEffectivePrice(
-		priceCents,
-		discountPrice,
-	);
+	const {
+		effectivePrice,
+		hasDiscount,
+		discountPrice: resolvedDiscount,
+	} = getEffectivePrice(priceCents, discountPrice);
 	const lineTotal = effectivePrice * item.quantity;
 
 	return {
@@ -432,9 +432,7 @@ export async function optimizeSingleStore(
 		}
 
 		const coverageRatio =
-			input.basketItems.length > 0
-				? foundCount / input.basketItems.length
-				: 0;
+			input.basketItems.length > 0 ? foundCount / input.basketItems.length : 0;
 
 		results.push({
 			storeId,
@@ -580,8 +578,10 @@ export async function optimizeMultiStore(
 			if (
 				coverage > bestCoverage ||
 				(coverage === bestCoverage && storeTotal < bestCost) ||
-				(coverage === bestCoverage && storeTotal === bestCost &&
-					bestStoreId !== null && storeId < bestStoreId)
+				(coverage === bestCoverage &&
+					storeTotal === bestCost &&
+					bestStoreId !== null &&
+					storeId < bestStoreId)
 			) {
 				bestStoreId = storeId;
 				bestCoverage = coverage;
@@ -654,21 +654,29 @@ export async function optimizeMultiStore(
 
 export async function getCacheHealth(): Promise<{
 	status: "ok" | "degraded";
-	chains: { chainSlug: string; loadedAt: number; isStale: boolean; estimatedMB: number }[];
+	chains: {
+		chainSlug: string;
+		loadedAt: number;
+		isStale: boolean;
+		estimatedMB: number;
+	}[];
 }> {
 	const clickhouse = getClickHouse();
 	const chainSlugs = await loadChainSlugs();
 	const rows = await clickhouse.query<{
 		chain_slug: string;
 		target_date: string | null;
-	}>("SELECT chain_slug, max(target_date) AS target_date FROM prices GROUP BY chain_slug");
+	}>(
+		"SELECT chain_slug, max(target_date) AS target_date FROM prices GROUP BY chain_slug",
+	);
 
 	const latestMap = new Map<string, string | null>();
 	for (const row of rows) {
 		latestMap.set(row.chain_slug, row.target_date);
 	}
 
-	const chainsWithData = chainSlugs.length > 0 ? chainSlugs : Array.from(latestMap.keys());
+	const chainsWithData =
+		chainSlugs.length > 0 ? chainSlugs : Array.from(latestMap.keys());
 
 	const chainsStatus = chainsWithData.map((chainSlug) => {
 		const targetDate = latestMap.get(chainSlug) ?? null;

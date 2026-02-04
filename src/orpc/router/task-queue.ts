@@ -27,7 +27,7 @@ const TaskStatusSchema = z.enum([
 	"waiting_for_children",
 ]);
 
-const TaskTypeSchema = z.enum(["ingestion", "rerun", "cleanup", "maintenance"]);
+const TaskTypeSchema = z.enum(["ingestion", "rerun", "cleanup", "clickhouse"]);
 
 const SortFieldSchema = z.enum([
 	"createdAt",
@@ -172,7 +172,6 @@ export const list = superadminProcedure
 						: desc(taskQueue.updatedAt);
 				case "priority":
 					return dir === "asc" ? taskQueue.priority : desc(taskQueue.priority);
-				case "createdAt":
 				default:
 					return dir === "asc"
 						? taskQueue.createdAt

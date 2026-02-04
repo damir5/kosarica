@@ -86,6 +86,7 @@ export default {
 			loadAll: clickhouse.loadAll,
 			loadMissing: clickhouse.loadMissing,
 			status: clickhouse.status,
+			startSync: clickhouse.startSync,
 		},
 		ingestion: {
 			listRuns: ingestion.listRuns,

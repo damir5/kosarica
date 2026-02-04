@@ -68,7 +68,10 @@ describe("Prices Router Integration Tests", () => {
 		// Clean up test items
 		for (const itemId of testItemIds) {
 			try {
-				await db.delete(retailerItems).where(eq(retailerItems.id, itemId)).execute();
+				await db
+					.delete(retailerItems)
+					.where(eq(retailerItems.id, itemId))
+					.execute();
 			} catch (_e) {
 				// Ignore cleanup errors
 			}
@@ -356,7 +359,8 @@ describe("ClickHouse Price Queries (Unit Tests)", () => {
 				params.maxPrice = maxPrice;
 			}
 
-			const havingClause = having.length > 0 ? `HAVING ${having.join(" AND ")}` : "";
+			const havingClause =
+				having.length > 0 ? `HAVING ${having.join(" AND ")}` : "";
 
 			expect(havingClause).toContain("price_cents >= {minPrice:Int32}");
 			expect(havingClause).toContain("price_cents <= {maxPrice:Int32}");
@@ -392,7 +396,10 @@ describe("Input Validation Schema Tests", () => {
 		});
 
 		// Should fail with negative offset
-		const negativeOffset = paginationSchema.safeParse({ limit: 10, offset: -1 });
+		const negativeOffset = paginationSchema.safeParse({
+			limit: 10,
+			offset: -1,
+		});
 		expect(negativeOffset.success).toBe(false);
 
 		// Should fail with limit > 1000

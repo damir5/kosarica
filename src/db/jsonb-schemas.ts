@@ -26,10 +26,16 @@ export const cleanupTaskPayload = z.object({
 	daysToKeep: z.number().int().positive().optional(),
 });
 
+export const clickhouseSyncTaskPayload = z.object({
+	type: z.literal("clickhouseSync"),
+	mode: z.enum(["missing", "all"]),
+});
+
 export const taskQueuePayload = z.discriminatedUnion("type", [
 	ingestionTaskPayload,
 	rerunTaskPayload,
 	cleanupTaskPayload,
+	clickhouseSyncTaskPayload,
 ]);
 
 // ============================================================================
@@ -83,6 +89,9 @@ export const archiveMetadata = z.looseObject({
 export type IngestionTaskPayload = z.infer<typeof ingestionTaskPayload>;
 export type RerunTaskPayload = z.infer<typeof rerunTaskPayload>;
 export type CleanupTaskPayload = z.infer<typeof cleanupTaskPayload>;
+export type ClickHouseSyncTaskPayload = z.infer<
+	typeof clickhouseSyncTaskPayload
+>;
 export type TaskQueuePayload = z.infer<typeof taskQueuePayload>;
 export type ValidationError = z.infer<typeof validationError>;
 export type ValidationErrors = z.infer<typeof validationErrors>;

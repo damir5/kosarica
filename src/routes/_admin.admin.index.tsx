@@ -5,6 +5,7 @@ import {
 	ListChecks,
 	Settings,
 	Store,
+	Table,
 	Users,
 	Wrench,
 } from "lucide-react";
@@ -112,7 +113,20 @@ function AdminDashboard() {
 					</p>
 				</Link>
 				<Link
+					to="/admin/clickhouse"
+					className="block rounded-lg border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md"
+				>
+					<Table className="mb-3 size-8 text-primary" />
+					<h3 className="mb-2 font-semibold text-foreground text-lg">
+						ClickHouse
+					</h3>
+					<p className="text-muted-foreground text-sm">
+						See Parquet import status and trigger sync tasks
+					</p>
+				</Link>
+				<Link
 					to="/admin/task-queue"
+					search={{}}
 					className="block rounded-lg border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md"
 				>
 					<ListChecks className="mb-3 size-8 text-primary" />

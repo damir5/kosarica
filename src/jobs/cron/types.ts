@@ -6,6 +6,7 @@
 
 import type {
 	CleanupTaskPayload,
+	ClickHouseSyncTaskPayload,
 	IngestionTaskPayload,
 	RerunTaskPayload,
 } from "@/db/jsonb-schemas";
@@ -29,6 +30,7 @@ type TaskPayloadByType = {
 	ingestion: Omit<IngestionTaskPayload, "type">;
 	rerun: Omit<RerunTaskPayload, "type">;
 	cleanup: Omit<CleanupTaskPayload, "type">;
+	clickhouse: Omit<ClickHouseSyncTaskPayload, "type">;
 };
 
 export type TaskToEnqueue =
@@ -45,6 +47,11 @@ export type TaskToEnqueue =
 	| {
 			type: "cleanup";
 			payload?: TaskPayloadByType["cleanup"];
+			idempotencyKey?: string;
+	  }
+	| {
+			type: "clickhouse";
+			payload: TaskPayloadByType["clickhouse"];
 			idempotencyKey?: string;
 	  };
 

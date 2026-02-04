@@ -55,6 +55,9 @@ async function enqueueTasks(
 			case "cleanup":
 				payload = { type: "cleanup", ...(task.payload ?? {}) };
 				break;
+			case "clickhouse":
+				payload = { type: "clickhouseSync", ...task.payload };
+				break;
 			default: {
 				// @ts-expect-error - exhaustive check for unreachable code
 				const _exhaustiveCheck: never = task;

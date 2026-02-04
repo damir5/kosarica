@@ -1,9 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { zstdCompressSync, zstdDecompressSync } from "node:zlib";
+import { PARQUET_COMPRESSION_METHODS } from "@dsnp/parquetjs/dist/lib/compression";
 import type { ParquetCompression } from "@dsnp/parquetjs/dist/parquet";
 import { ParquetSchema, ParquetWriter } from "@dsnp/parquetjs/dist/parquet";
-import { PARQUET_COMPRESSION_METHODS } from "@dsnp/parquetjs/dist/lib/compression";
 import { resolveStoragePath } from "@/lib/storage";
 
 export interface ParquetPriceRow {
@@ -47,7 +47,11 @@ const PRICE_SCHEMA = new ParquetSchema({
 	chain_slug: { type: "UTF8", compression: PARQUET_COMPRESSION },
 	store_id: { type: "UTF8", compression: PARQUET_COMPRESSION },
 	retailer_item_id: { type: "UTF8", compression: PARQUET_COMPRESSION },
-	external_id: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
+	external_id: {
+		type: "UTF8",
+		optional: true,
+		compression: PARQUET_COMPRESSION,
+	},
 	name: { type: "UTF8", compression: PARQUET_COMPRESSION },
 	barcode: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
 	price_cents: { type: "INT32", compression: PARQUET_COMPRESSION },
@@ -56,7 +60,11 @@ const PRICE_SCHEMA = new ParquetSchema({
 		optional: true,
 		compression: PARQUET_COMPRESSION,
 	},
-	unit_price_cents: { type: "INT32", optional: true, compression: PARQUET_COMPRESSION },
+	unit_price_cents: {
+		type: "INT32",
+		optional: true,
+		compression: PARQUET_COMPRESSION,
+	},
 	category: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
 	brand: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
 });

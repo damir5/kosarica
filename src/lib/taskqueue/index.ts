@@ -10,7 +10,7 @@ export type TaskStatus =
 	| "failed"
 	| "cancelled"
 	| "waiting_for_children";
-export type TaskType = "ingestion" | "rerun" | "cleanup" | "maintenance";
+export type TaskType = "ingestion" | "rerun" | "cleanup" | "clickhouse";
 
 export interface ClaimedTask {
 	id: string;

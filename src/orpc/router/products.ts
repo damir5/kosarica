@@ -7,10 +7,7 @@ import {
 	productMatchQueue,
 	productMatchRejections,
 } from "@/db/schema";
-import {
-	runBarcodeMatching,
-	runTrigramMatching,
-} from "@/lib/matching";
+import { runBarcodeMatching, runTrigramMatching } from "@/lib/matching";
 import { getDb } from "@/utils/bindings";
 import { superadminProcedure } from "../base";
 

@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import * as z from "zod";
-import { getClickHouse, parseNumber } from "@/lib/clickhouse";
 import { chains, retailerItems, stores } from "@/db/schema";
+import { getClickHouse, parseNumber } from "@/lib/clickhouse";
 import { getDb } from "@/utils/bindings";
 import { procedure } from "../base";
 
@@ -90,8 +90,10 @@ export const listCatalogPrices = procedure
 			params.maxPrice = input.maxPrice;
 		}
 
-		const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-		const havingClause = having.length > 0 ? `HAVING ${having.join(" AND ")}` : "";
+		const whereClause =
+			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+		const havingClause =
+			having.length > 0 ? `HAVING ${having.join(" AND ")}` : "";
 
 		const baseQuery = `
 			SELECT
@@ -127,7 +129,12 @@ export const listCatalogPrices = procedure
 		const storeIds = Array.from(new Set(rows.map((row) => row.store_id)));
 		const storeMap = new Map<
 			string,
-			{ name: string; city: string | null; chainSlug: string; chainName: string }
+			{
+				name: string;
+				city: string | null;
+				chainSlug: string;
+				chainName: string;
+			}
 		>();
 		if (storeIds.length > 0) {
 			const storeRows = await db

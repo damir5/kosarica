@@ -1,7 +1,7 @@
 import { and, count, eq, like, or } from "drizzle-orm";
 import * as z from "zod";
-import { getClickHouse, parseNumber } from "@/lib/clickhouse";
 import { retailerItems } from "@/db/schema";
+import { getClickHouse, parseNumber } from "@/lib/clickhouse";
 import { getDb } from "@/utils/bindings";
 import { procedure } from "../base";
 
@@ -106,7 +106,8 @@ export const searchItems = procedure
 			conditions.push(eq(retailerItems.chainSlug, input.chainSlug));
 		}
 
-		const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+		const whereClause =
+			conditions.length === 1 ? conditions[0] : and(...conditions);
 
 		const [items, totalResult] = await Promise.all([
 			db
@@ -126,10 +127,7 @@ export const searchItems = procedure
 				.where(whereClause)
 				.orderBy(retailerItems.name)
 				.limit(input.limit),
-			db
-				.select({ count: count() })
-				.from(retailerItems)
-				.where(whereClause),
+			db.select({ count: count() }).from(retailerItems).where(whereClause),
 		]);
 
 		const total = Number(totalResult[0]?.count ?? 0);

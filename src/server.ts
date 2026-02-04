@@ -11,6 +11,8 @@ import tanstackHandler, {
 import { config } from "dotenv";
 import { closeDatabase } from "@/db";
 import { startScheduler, stopScheduler } from "@/jobs/scheduler";
+import { startWorker } from "@/lib/taskqueue/run-worker";
+import type { TaskQueueWorker } from "@/lib/taskqueue/worker";
 import { initTelemetry, shutdownTelemetry } from "@/telemetry";
 import { createLogger } from "@/utils/logger";
 import {
@@ -38,11 +40,21 @@ setupTelemetry().catch((error) => {
 
 const logger = createLogger("app");
 
+const globalState = globalThis as unknown as {
+	__kosaricaBackgroundStarted?: boolean;
+	__kosaricaTaskWorker?: TaskQueueWorker;
+};
+
 /**
  * Initialize the server and start background services.
  */
 async function initServer(): Promise<void> {
 	logger.info("Initializing server...");
+
+	if (globalState.__kosaricaBackgroundStarted) {
+		return;
+	}
+	globalState.__kosaricaBackgroundStarted = true;
 
 	// Start the job scheduler
 	try {
@@ -50,6 +62,14 @@ async function initServer(): Promise<void> {
 		logger.info("Job scheduler started");
 	} catch (error) {
 		logger.error("Failed to start job scheduler", { error });
+	}
+
+	// Start the task queue worker (distributed via DB locking)
+	try {
+		globalState.__kosaricaTaskWorker = await startWorker({ background: true });
+		logger.info("Task queue worker started");
+	} catch (error) {
+		logger.error("Failed to start task queue worker", { error });
 	}
 }
 
@@ -65,6 +85,12 @@ async function shutdown(signal: string): Promise<void> {
 		logger.info("Job scheduler stopped");
 	} catch (error) {
 		logger.error("Error stopping scheduler", { error });
+	}
+
+	try {
+		await globalState.__kosaricaTaskWorker?.stop();
+	} catch (error) {
+		logger.error("Error stopping task queue worker", { error });
 	}
 
 	try {

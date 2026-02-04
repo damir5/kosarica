@@ -172,10 +172,18 @@ function normalizeUnit(unit: string, quantity: string): string {
 	}
 
 	const quantityValue = Number.parseFloat(normalizedQuantity);
-	if (normalizedUnit === "ml" && Number.isFinite(quantityValue) && quantityValue >= 1000) {
+	if (
+		normalizedUnit === "ml" &&
+		Number.isFinite(quantityValue) &&
+		quantityValue >= 1000
+	) {
 		return `${quantityValue / 1000}l`;
 	}
-	if (normalizedUnit === "g" && Number.isFinite(quantityValue) && quantityValue >= 1000) {
+	if (
+		normalizedUnit === "g" &&
+		Number.isFinite(quantityValue) &&
+		quantityValue >= 1000
+	) {
 		return `${quantityValue / 1000}kg`;
 	}
 
@@ -326,7 +334,10 @@ function pickBestItem(items: RetailerItem[]): RetailerItem {
 	return best;
 }
 
-function hasPrivateLabelConflict(item: RetailerItem, candidate: Candidate): boolean {
+function hasPrivateLabelConflict(
+	item: RetailerItem,
+	candidate: Candidate,
+): boolean {
 	if (
 		item.brand &&
 		!isGenericBrand(item.brand) &&
@@ -334,7 +345,9 @@ function hasPrivateLabelConflict(item: RetailerItem, candidate: Candidate): bool
 		!isGenericBrand(candidate.product.brand)
 	) {
 		const itemBrand = removeDiacritics(item.brand).toLowerCase();
-		const candidateBrand = removeDiacritics(candidate.product.brand).toLowerCase();
+		const candidateBrand = removeDiacritics(
+			candidate.product.brand,
+		).toLowerCase();
 		return itemBrand !== candidateBrand;
 	}
 	return false;
@@ -472,7 +485,8 @@ export async function runBarcodeMatching(options?: {
 		ORDER BY rib.barcode
 	`);
 
-	const rows = ((result as { rows?: unknown[] }).rows ?? []) as RetailerItemRow[];
+	const rows = ((result as { rows?: unknown[] }).rows ??
+		[]) as RetailerItemRow[];
 	const barcodeItems = new Map<string, RetailerItem[]>();
 	let skipped = 0;
 
@@ -615,7 +629,8 @@ export async function runTrigramMatching(options?: {
 		LIMIT ${batchSize}
 	`);
 
-	const itemRows = ((itemsResult as { rows?: unknown[] }).rows ?? []) as RetailerItemRow[];
+	const itemRows = ((itemsResult as { rows?: unknown[] }).rows ??
+		[]) as RetailerItemRow[];
 
 	const result: TrigramMatchingResult = {
 		runId,

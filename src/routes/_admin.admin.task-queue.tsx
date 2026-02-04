@@ -8,7 +8,7 @@ import {
 	Trash2,
 	Wrench,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TaskQueueRow } from "@/components/admin/task-queue";
 import {
 	TaskQueueDetailDialog,
@@ -55,6 +55,10 @@ import { cn } from "@/lib/utils";
 import { orpc } from "@/orpc/client";
 
 export const Route = createFileRoute("/_admin/admin/task-queue")({
+	validateSearch: (search: Record<string, unknown>) => {
+		const q = typeof search.search === "string" ? search.search : undefined;
+		return q ? { search: q } : {};
+	},
 	component: TaskQueueDashboard,
 });
 
@@ -68,7 +72,7 @@ type StatusFilter =
 	| "cancelled"
 	| "waiting_for_children";
 
-type TypeFilter = "all" | "ingestion" | "rerun" | "cleanup" | "maintenance";
+type TypeFilter = "all" | "ingestion" | "rerun" | "cleanup" | "clickhouse";
 
 type TaskStatus = Exclude<StatusFilter, "all">;
 type TaskType = Exclude<TypeFilter, "all">;
@@ -77,10 +81,12 @@ type TaskQueueListInput = Parameters<typeof orpc.admin.taskQueue.list.call>[0];
 
 function TaskQueueDashboard() {
 	const queryClient = useQueryClient();
+	const searchParams = Route.useSearch();
+	const searchParam = searchParams.search;
 	const [status, setStatus] = useState<StatusFilter>("all");
 	const [taskType, setTaskType] = useState<TypeFilter>("all");
 	const [workerId, setWorkerId] = useState<string>("");
-	const [search, setSearch] = useState<string>("");
+	const [search, setSearch] = useState<string>(searchParam ?? "");
 	const [stuckOnly, setStuckOnly] = useState<boolean>(false);
 	const [page, setPage] = useState<number>(1);
 	const pageSize = 50;
@@ -107,6 +113,12 @@ function TaskQueueDashboard() {
 			sort: { field: "createdAt", direction: "desc" },
 		};
 	}, [status, taskType, workerId, search, stuckOnly, page]);
+
+	// If the route search param changes, reflect it in the input box.
+	useEffect(() => {
+		setSearch(searchParam ?? "");
+		setPage(1);
+	}, [searchParam]);
 
 	const { data: stats, isLoading: statsLoading } = useQuery(
 		orpc.admin.taskQueue.stats.queryOptions({}),
@@ -387,7 +399,7 @@ function TaskQueueDashboard() {
 											<SelectItem value="ingestion">Ingestion</SelectItem>
 											<SelectItem value="rerun">Rerun</SelectItem>
 											<SelectItem value="cleanup">Cleanup</SelectItem>
-											<SelectItem value="maintenance">Maintenance</SelectItem>
+											<SelectItem value="clickhouse">ClickHouse</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>

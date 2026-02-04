@@ -24,6 +24,7 @@ import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stor
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as AdminAdminIngestionRouteImport } from './routes/_admin.admin.ingestion'
 import { Route as AdminAdminCronRouteImport } from './routes/_admin.admin.cron'
+import { Route as AdminAdminClickhouseRouteImport } from './routes/_admin.admin.clickhouse'
 import { Route as AdminAdminCatalogPricesRouteImport } from './routes/_admin.admin.catalog-prices'
 import { Route as AdminAdminStoresIndexRouteImport } from './routes/_admin.admin.stores.index'
 import { Route as AdminAdminIngestionIndexRouteImport } from './routes/_admin.admin.ingestion.index'
@@ -107,6 +108,11 @@ const AdminAdminCronRoute = AdminAdminCronRouteImport.update({
   path: '/cron',
   getParentRoute: () => AdminAdminRoute,
 } as any)
+const AdminAdminClickhouseRoute = AdminAdminClickhouseRouteImport.update({
+  id: '/clickhouse',
+  path: '/clickhouse',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
 const AdminAdminCatalogPricesRoute = AdminAdminCatalogPricesRouteImport.update({
   id: '/catalog-prices',
   path: '/catalog-prices',
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminAdminRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/admin/clickhouse': typeof AdminAdminClickhouseRoute
   '/admin/cron': typeof AdminAdminCronRoute
   '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/settings': typeof AdminAdminSettingsRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/api/$': typeof ApiSplatRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/admin/clickhouse': typeof AdminAdminClickhouseRoute
   '/admin/cron': typeof AdminAdminCronRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/task-queue': typeof AdminAdminTaskQueueRoute
@@ -205,6 +213,7 @@ export interface FileRoutesById {
   '/_admin/admin': typeof AdminAdminRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/_admin/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/_admin/admin/clickhouse': typeof AdminAdminClickhouseRoute
   '/_admin/admin/cron': typeof AdminAdminCronRoute
   '/_admin/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/api/$'
     | '/admin/catalog-prices'
+    | '/admin/clickhouse'
     | '/admin/cron'
     | '/admin/ingestion'
     | '/admin/settings'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/api/$'
     | '/admin/catalog-prices'
+    | '/admin/clickhouse'
     | '/admin/cron'
     | '/admin/settings'
     | '/admin/task-queue'
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | '/_admin/admin'
     | '/api/$'
     | '/_admin/admin/catalog-prices'
+    | '/_admin/admin/clickhouse'
     | '/_admin/admin/cron'
     | '/_admin/admin/ingestion'
     | '/_admin/admin/settings'
@@ -412,6 +424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminCronRouteImport
       parentRoute: typeof AdminAdminRoute
     }
+    '/_admin/admin/clickhouse': {
+      id: '/_admin/admin/clickhouse'
+      path: '/clickhouse'
+      fullPath: '/admin/clickhouse'
+      preLoaderRoute: typeof AdminAdminClickhouseRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
     '/_admin/admin/catalog-prices': {
       id: '/_admin/admin/catalog-prices'
       path: '/catalog-prices'
@@ -515,6 +534,7 @@ const AdminAdminStoresRouteWithChildren =
 
 interface AdminAdminRouteChildren {
   AdminAdminCatalogPricesRoute: typeof AdminAdminCatalogPricesRoute
+  AdminAdminClickhouseRoute: typeof AdminAdminClickhouseRoute
   AdminAdminCronRoute: typeof AdminAdminCronRoute
   AdminAdminIngestionRoute: typeof AdminAdminIngestionRouteWithChildren
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
@@ -527,6 +547,7 @@ interface AdminAdminRouteChildren {
 
 const AdminAdminRouteChildren: AdminAdminRouteChildren = {
   AdminAdminCatalogPricesRoute: AdminAdminCatalogPricesRoute,
+  AdminAdminClickhouseRoute: AdminAdminClickhouseRoute,
   AdminAdminCronRoute: AdminAdminCronRoute,
   AdminAdminIngestionRoute: AdminAdminIngestionRouteWithChildren,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,

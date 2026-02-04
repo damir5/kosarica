@@ -64,6 +64,8 @@ pnpm db:migrate
 pnpm dev
 ```
 
+Background worker runs in-process with the app.
+
 Visit `http://localhost:3000` to access the application.
 
 ### Service Management

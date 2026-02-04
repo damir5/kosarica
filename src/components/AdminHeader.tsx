@@ -8,6 +8,7 @@ import {
 	Settings,
 	Shield,
 	Store,
+	Table,
 	Users,
 	Wrench,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const adminNavItems = [
 	{ to: "/admin/stores", label: "Stores", icon: Store },
 	{ to: "/admin/catalog-prices", label: "Prices", icon: DollarSign },
 	{ to: "/admin/ingestion", label: "Ingestion", icon: Database },
+	{ to: "/admin/clickhouse", label: "ClickHouse", icon: Table },
 	{ to: "/admin/task-queue", label: "Task Queue", icon: ListChecks },
 	{ to: "/admin/cron", label: "Cron", icon: Clock },
 	{ to: "/admin/settings", label: "Settings", icon: Settings },
