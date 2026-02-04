@@ -17,7 +17,7 @@ export function getTestDb() {
 	if (!testDb) {
 		const testUrl =
 			process.env.DATABASE_URL ||
-			"postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test";
+			"postgresql://kosarica_test:kosarica_test@ade-postgres-test.orb.local:5432/kosarica_test";
 		sqlInstance = postgres(testUrl);
 		testDb = drizzle(sqlInstance, { schema });
 	}

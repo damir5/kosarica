@@ -409,12 +409,14 @@ export class LocalStorage implements Storage {
 	 * Cleans the key to prevent path traversal attacks.
 	 */
 	private keyToPath(key: string): string {
-		// Clean the key to prevent path traversal
-		let cleanKey = path.normalize(key);
-		cleanKey = cleanKey.replace(/^[/\\]+/, "");
+		// Normalize path separators and collapse redundant segments.
+		let cleanKey = key.replace(/\\/g, "/");
+		cleanKey = path.posix.normalize(cleanKey);
+		cleanKey = cleanKey.replace(/^[/]+/, "");
 
-		// Ensure no path traversal
-		if (cleanKey.includes("..")) {
+		// Reject parent-directory traversal segments but allow filenames with "..".
+		const parts = cleanKey.split("/").filter(Boolean);
+		if (parts.some((part) => part === "..")) {
 			throw new Error(`invalid key: path traversal detected in "${key}"`);
 		}
 

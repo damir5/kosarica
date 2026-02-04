@@ -40,14 +40,15 @@ services:
     image: clickhouse/clickhouse-server:24.3-alpine
     profiles: ["dev"]
     container_name: ade-clickhouse
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
     ports:
       - "8123:8123"
       - "9000:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./scripts/clickhouse-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -57,13 +58,13 @@ services:
     image: clickhouse/clickhouse-server:24.3-alpine
     profiles: ["test"]
     container_name: ade-clickhouse-test
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
     ports:
       - "8124:8123"
       - "9001:9000"
-    volumes:
-      - ./scripts/clickhouse-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 5s
       timeout: 5s
       retries: 5

@@ -4,6 +4,11 @@
  */
 export const parseNumber = (value?: number | string | null): number | null => {
 	if (value === null || value === undefined) return null;
-	const parsed = typeof value === "number" ? value : Number(value);
-	return Number.isNaN(parsed) ? null : parsed;
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (trimmed.length === 0) return null;
+		const parsed = Number(trimmed);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return Number.isFinite(value) ? value : null;
 };

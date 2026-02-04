@@ -20,13 +20,13 @@ async function verifyClickHouse(): Promise<void> {
 				`WARNING: ClickHouse ping returned ${response.status} at ${clickhouseUrl}`,
 			);
 			console.warn(
-				"  ClickHouse integration tests may fail. Run 'mise run services-up' to start services.",
+				"  ClickHouse integration tests may fail. Run 'mise run test-all' to auto-start test services.",
 			);
 		}
 	} catch {
 		console.warn(`WARNING: ClickHouse not available at ${clickhouseUrl}`);
 		console.warn(
-			"  ClickHouse integration tests may fail. Run 'mise run services-up' to start services.",
+			"  ClickHouse integration tests may fail. Run 'mise run test-all' to auto-start test services.",
 		);
 	}
 }
@@ -37,7 +37,7 @@ async function verifyClickHouse(): Promise<void> {
 async function cleanupTestDatabase(): Promise<void> {
 	const testUrl =
 		process.env.DATABASE_URL ||
-		"postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test";
+		"postgresql://kosarica_test:kosarica_test@ade-postgres-test.orb.local:5432/kosarica_test";
 
 	const sql = postgres(testUrl);
 
