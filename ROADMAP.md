@@ -29,3 +29,15 @@ https://www.reddit.com/r/ClaudeAI/comments/1qgdg6v/finally_get_1500_users_on_my_
 - report item in store as unavailable - stats
 - send suggestions UI
 - take into account gas price for between store travel in basket optimization
+- login needed for add to cart + mark unavailable etc
+- agen analyzes and scores users realiability
+- agent price analysis - trends/oportunities/ - blog - daily/weekly
+- agent/claw - reddit channel, discord, telegram, whatsapp-control-channel for me
+- ai matching alerting me of new stuff
+
+
+[reports / stats]
+- barcode matching
+- categories
+- ai matching - analyze and create instructions ? or run in bg as claw and create reports for manual review by other ais and then human - whatapp channel
+
