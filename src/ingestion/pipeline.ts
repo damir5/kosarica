@@ -26,6 +26,11 @@ import {
 	buildArchiveKey,
 	buildExpandedKey,
 	buildParquetKey,
+	buildTempExpandedKey,
+	cleanupTempDirs,
+	createTempDir,
+	deleteTempDir,
+	formatTimestamp,
 	getStorage,
 } from "@/lib/storage";
 import { generatePrefixedId } from "@/utils/id";
@@ -610,6 +615,7 @@ export async function runIngestion(
 	let errorCount = 0;
 	let processedFiles = 0;
 	let totalFiles = 0;
+	let tempDirPath: string | null = null;
 
 	const parquetRows: ParquetPriceRow[] = [];
 	const storeCache = new Map<string, string>();
@@ -622,6 +628,9 @@ export async function runIngestion(
 		log.info("Discovered files", { chainSlug, count: discoveredFiles.length });
 		const storeIdentifierType = buildStoreIdentifierType(chainSlug);
 
+		// Create timestamp for this ingestion run (for temp expanded files)
+		const timestamp = formatTimestamp(new Date());
+
 		const filesToProcess: Array<{
 			file: DiscoveredFile;
 			content: Buffer;
@@ -630,13 +639,16 @@ export async function runIngestion(
 			hash: string;
 			archiveId: string;
 			expandedFrom?: string;
+			tempStorageKey?: string;
 		}> = [];
 
 		let fileIndex = 0;
 		for (const file of discoveredFiles) {
 			fileIndex++;
 			if (fileIndex % 20 === 1 || fileIndex === discoveredFiles.length) {
-				log.info("Fetching files", { progress: `${fileIndex}/${discoveredFiles.length}` });
+				log.info("Fetching files", {
+					progress: `${fileIndex}/${discoveredFiles.length}`,
+				});
 			}
 			const fetched = await adapter.fetch(file);
 			const archiveKey = buildArchiveKey(chainSlug, targetDate, file.filename);
@@ -653,10 +665,22 @@ export async function runIngestion(
 					fetched.content,
 					file.filename,
 				);
+
+				// Create temp directory for expanded files (only once)
+				if (!tempDirPath) {
+					tempDirPath = await createTempDir(
+						"expanded",
+						`${timestamp}-${chainSlug}`,
+					);
+					log.info("Created temporary directory for expanded files", {
+						path: tempDirPath,
+					});
+				}
+
 				for (const inner of expanded) {
-					const expandedKey = buildExpandedKey(
+					const expandedKey = buildTempExpandedKey(
+						timestamp,
 						chainSlug,
-						targetDate,
 						file.filename,
 						inner.innerFilename,
 					);
@@ -678,6 +702,7 @@ export async function runIngestion(
 						hash: inner.hash,
 						archiveId,
 						expandedFrom: file.filename,
+						tempStorageKey: expandedKey,
 					});
 				}
 			} else {
@@ -713,14 +738,16 @@ export async function runIngestion(
 					metadata: JSON.stringify({
 						sourceUrl: fileEntry.file.url,
 						archiveId: fileEntry.archiveId,
-						storageKey: fileEntry.expandedFrom
-							? buildExpandedKey(
-									chainSlug,
-									targetDate,
-									fileEntry.expandedFrom,
-									fileEntry.filename,
-								)
-							: buildArchiveKey(chainSlug, targetDate, fileEntry.filename),
+						storageKey:
+							fileEntry.tempStorageKey ??
+							(fileEntry.expandedFrom
+								? buildExpandedKey(
+										chainSlug,
+										targetDate,
+										fileEntry.expandedFrom,
+										fileEntry.filename,
+									)
+								: buildArchiveKey(chainSlug, targetDate, fileEntry.filename)),
 						parentFilename: fileEntry.expandedFrom,
 					}),
 					createdAt: new Date(),
@@ -968,6 +995,20 @@ export async function runIngestion(
 			errorCount,
 		});
 
+		// Cleanup temp directory on success
+		if (tempDirPath) {
+			try {
+				await deleteTempDir(tempDirPath);
+				log.info("Cleaned up temporary directory", { path: tempDirPath });
+			} catch (cleanupError) {
+				// Don't fail the ingestion if cleanup fails
+				log.warn("Failed to cleanup temporary directory", {
+					path: tempDirPath,
+					error: errorToObject(cleanupError),
+				});
+			}
+		}
+
 		return { runId, status: "completed" };
 	} catch (error) {
 		log.error("Ingestion failed", {
@@ -975,6 +1016,15 @@ export async function runIngestion(
 			runId,
 			error: errorToObject(error),
 		});
+
+		// Leave temp directory on error for debugging
+		if (tempDirPath) {
+			log.info("Temporary directory left for debugging", {
+				path: tempDirPath,
+				note: "Will be cleaned up automatically after retention period",
+			});
+		}
+
 		await db
 			.update(ingestionRuns)
 			.set({
@@ -991,6 +1041,21 @@ export async function runIngestion(
 			await db
 				.delete(activeIngestionOperations)
 				.where(eq(activeIngestionOperations.taskId, options.taskId));
+		}
+
+		// Attempt best-effort cleanup of old temp dirs on each run
+		try {
+			const cleaned = await cleanupTempDirs("expanded");
+			if (cleaned.length > 0) {
+				const totalSize = cleaned.reduce((sum, dir) => sum + dir.sizeBytes, 0);
+				log.info("Cleaned up old temporary directories", {
+					count: cleaned.length,
+					totalSizeBytes: totalSize,
+				});
+			}
+		} catch (cleanupError) {
+			// Don't fail if cleanup fails
+			log.debug("Background temp cleanup failed", {}, cleanupError);
 		}
 	}
 }

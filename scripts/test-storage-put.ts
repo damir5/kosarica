@@ -2,7 +2,7 @@ import { config } from "dotenv";
 config({ path: ".env.development" });
 config();
 
-import { getStorage } from "@/lib/storage";
+import { createTestTempDir, deleteTempDir, getStorage } from "@/lib/storage";
 
 async function main() {
     console.log("Testing storage.put...");
@@ -15,7 +15,11 @@ async function main() {
     const data = Buffer.alloc(size, "test,data,row\n");
     console.log("Created buffer of size:", data.length);
 
-    const key = `test/${Date.now()}/test-file.csv`;
+    // Use temp directory for test files
+    const tempDir = await createTestTempDir("storage-put-test");
+    console.log("Created temp directory:", tempDir);
+
+    const key = `${tempDir}/test-file.csv`;
     console.log("Key:", key);
 
     console.log("Starting storage.put with csv metadata...");
@@ -39,7 +43,7 @@ async function main() {
 
     // Cleanup
     console.log("Cleaning up...");
-    await storage.delete(key);
+    await deleteTempDir(tempDir);
 
     console.log("Done!");
 }

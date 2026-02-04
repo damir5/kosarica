@@ -12,7 +12,11 @@ import * as path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createGunzip, createGzip } from "node:zlib";
-import { compressGzip, decompressGzip, shouldCompress } from "./compression";
+import {
+	compressGzip,
+	decompressGzip,
+	shouldCompressSmart,
+} from "./compression";
 import type { FileInfo, Storage, StorageMetadata } from "./index";
 
 /** Minimum size in bytes before compression is attempted */
@@ -47,11 +51,15 @@ export class LocalStorage implements Storage {
 		let compressed = false;
 		let storePath = fullPath;
 
-		// Determine if we should compress
-		if (metadata && data.length >= MIN_COMPRESSION_SIZE) {
-			const fileType = metadata.custom?.file_type || "";
-			if (shouldCompress(fileType)) {
+		// Determine if we should compress using smart compression
+		// This checks both file type and if file is already compressed
+		if (data.length >= MIN_COMPRESSION_SIZE) {
+			const filename = metadata?.originalName || path.basename(key);
+			const fileType = metadata?.custom?.file_type;
+
+			if (shouldCompressSmart(filename, fileType)) {
 				const compressedData = await compressGzip(data);
+				// Only use compression if it actually reduces size
 				if (compressedData.length < data.length) {
 					dataToStore = compressedData;
 					compressed = true;
@@ -97,11 +105,12 @@ export class LocalStorage implements Storage {
 		const dir = path.dirname(fullPath);
 		await mkdir(dir, { recursive: true });
 
-		// Determine if we should compress
+		// Determine if we should compress using smart compression
+		const filename = metadata?.originalName || path.basename(key);
+		const fileType = metadata?.custom?.file_type;
 		const shouldCompressFile =
-			metadata &&
 			data.length >= MIN_COMPRESSION_SIZE &&
-			shouldCompress(metadata.custom?.file_type || "");
+			shouldCompressSmart(filename, fileType);
 
 		if (shouldCompressFile) {
 			const storePath = `${fullPath}.gz`;

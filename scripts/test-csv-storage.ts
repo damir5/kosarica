@@ -2,8 +2,7 @@ import { config } from "dotenv";
 config({ path: ".env.development" });
 config();
 
-import { getStorage } from "@/lib/storage";
-import { readFile } from "node:fs/promises";
+import { createTestTempDir, deleteTempDir, getStorage } from "@/lib/storage";
 
 async function main() {
     console.log("Testing CSV storage...");
@@ -16,7 +15,12 @@ async function main() {
     console.log("Fetched", content.length, "bytes");
 
     const storage = getStorage();
-    const key = `test-csv/${Date.now()}/test.csv`;
+    
+    // Use temp directory for test files
+    const tempDir = await createTestTempDir("csv-storage-test");
+    console.log("Created temp directory:", tempDir);
+
+    const key = `${tempDir}/test.csv`;
 
     console.log("Calling storage.put...");
     const start = Date.now();
@@ -37,7 +41,7 @@ async function main() {
     console.log("Exists:", exists);
 
     // Cleanup
-    await storage.delete(key);
+    await deleteTempDir(tempDir);
 
     console.log("Done!");
 }

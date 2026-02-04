@@ -110,6 +110,9 @@ export function buildArchiveKey(
 /**
  * Build a storage key for an expanded file from a ZIP.
  * Format: expanded/{chainSlug}/{date}/{parentBase}/{innerFilename}
+ *
+ * DEPRECATED: Use buildTempExpandedKey() for new code.
+ * This function is kept for backward compatibility with existing expanded files.
  */
 export function buildExpandedKey(
 	chainSlug: string,
@@ -121,6 +124,29 @@ export function buildExpandedKey(
 	// Remove .zip extension from parent
 	const parentBase = parentFilename.replace(/\.zip$/i, "");
 	return `expanded/${chainSlug}/${dateStr}/${parentBase}/${innerFilename}`;
+}
+
+/**
+ * Build a temporary storage key for an expanded file from a ZIP.
+ * Format: temp/expanded/{timestamp}-{chainSlug}/{parentBase}/{innerFilename}
+ *
+ * The timestamp should be created once per ingestion run and reused for all
+ * files extracted in that run.
+ *
+ * @param timestamp - Timestamp string (format: YYYYMMDD-HHmmss)
+ * @param chainSlug - Chain identifier
+ * @param parentFilename - Original ZIP filename
+ * @param innerFilename - Extracted file name
+ */
+export function buildTempExpandedKey(
+	timestamp: string,
+	chainSlug: string,
+	parentFilename: string,
+	innerFilename: string,
+): string {
+	// Remove .zip extension from parent
+	const parentBase = parentFilename.replace(/\.zip$/i, "");
+	return `temp/expanded/${timestamp}-${chainSlug}/${parentBase}/${innerFilename}`;
 }
 
 /**
@@ -166,12 +192,42 @@ function formatDate(date: Date): string {
 	return `${year}-${month}-${day}`;
 }
 
+/**
+ * Format a date as a timestamp for directory names.
+ * Format: YYYYMMDD-HHmmss
+ */
+export function formatTimestamp(date: Date): string {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	const hour = String(date.getHours()).padStart(2, "0");
+	const minute = String(date.getMinutes()).padStart(2, "0");
+	const second = String(date.getSeconds()).padStart(2, "0");
+
+	return `${year}${month}${day}-${hour}${minute}${second}`;
+}
+
 export {
 	compressGzip,
 	compressGzipStream,
 	decompressGzip,
 	decompressGzipStream,
+	detectFileType,
+	isAlreadyCompressed,
 	shouldCompress,
+	shouldCompressSmart,
 } from "./compression";
 // Re-export components
 export { computeChecksum, LocalStorage, MIN_COMPRESSION_SIZE } from "./local";
+// Re-export temp storage utilities
+export {
+	cleanupTempDirs,
+	createTempDir,
+	createTestTempDir,
+	deleteTempDir,
+	getTempStorageConfig,
+	listAllTempDirs,
+	listTempDirs,
+	type TempDirInfo,
+	type TempStorageConfig,
+} from "./temp";

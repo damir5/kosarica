@@ -7,6 +7,7 @@
  */
 
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
+import { tempCleanupHandler } from "./handlers/temp-cleanup";
 import { registerCronJob } from "./registry";
 
 /**
@@ -24,6 +25,16 @@ export function registerAllCronJobs(): void {
 		timezone: "UTC",
 		taskType: "ingestion",
 		handler: dailyIngestionHandler,
+	});
+
+	// Temporary storage cleanup every 6 hours
+	registerCronJob({
+		id: "temp-cleanup",
+		name: "Temporary Storage Cleanup",
+		cronExpression: "0 */6 * * *", // Every 6 hours
+		timezone: "UTC",
+		taskType: "maintenance",
+		handler: tempCleanupHandler,
 	});
 
 	// Add more jobs here as needed:

@@ -21,6 +21,8 @@ todos.json
 
 # Local data files
 data/
+# Temporary storage (auto-cleaned after retention period)
+data/temp/
 # bd worktree
 main-fgy/
 # bd worktree
