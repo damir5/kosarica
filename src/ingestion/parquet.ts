@@ -1,6 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { zstdCompressSync, zstdDecompressSync } from "node:zlib";
+import type { ParquetCompression } from "@dsnp/parquetjs/dist/parquet";
 import { ParquetSchema, ParquetWriter } from "@dsnp/parquetjs/dist/parquet";
+import { PARQUET_COMPRESSION_METHODS } from "@dsnp/parquetjs/dist/lib/compression";
 import { resolveStoragePath } from "@/lib/storage";
 
 export interface ParquetPriceRow {
@@ -19,23 +22,43 @@ export interface ParquetPriceRow {
 	[key: string]: unknown; // Index signature for ParquetWriter compatibility
 }
 
+// parquetjs supports ZSTD in parquet metadata, but its TS type and method map lag behind.
+const PARQUET_COMPRESSION = "ZSTD" as unknown as ParquetCompression;
+
+function toBuffer(value: unknown): Buffer {
+	if (Buffer.isBuffer(value)) {
+		return value;
+	}
+	if (value instanceof Uint8Array) {
+		return Buffer.from(value);
+	}
+	throw new TypeError("Expected Buffer or Uint8Array for parquet compression");
+}
+
+if (!("ZSTD" in PARQUET_COMPRESSION_METHODS)) {
+	PARQUET_COMPRESSION_METHODS.ZSTD = {
+		deflate: (value: unknown) => zstdCompressSync(toBuffer(value)),
+		inflate: async (value: unknown) => zstdDecompressSync(toBuffer(value)),
+	};
+}
+
 const PRICE_SCHEMA = new ParquetSchema({
-	target_date: { type: "DATE", compression: "SNAPPY" },
-	chain_slug: { type: "UTF8", compression: "SNAPPY" },
-	store_id: { type: "UTF8", compression: "SNAPPY" },
-	retailer_item_id: { type: "UTF8", compression: "SNAPPY" },
-	external_id: { type: "UTF8", optional: true, compression: "SNAPPY" },
-	name: { type: "UTF8", compression: "SNAPPY" },
-	barcode: { type: "UTF8", optional: true, compression: "SNAPPY" },
-	price_cents: { type: "INT32", compression: "SNAPPY" },
+	target_date: { type: "DATE", compression: PARQUET_COMPRESSION },
+	chain_slug: { type: "UTF8", compression: PARQUET_COMPRESSION },
+	store_id: { type: "UTF8", compression: PARQUET_COMPRESSION },
+	retailer_item_id: { type: "UTF8", compression: PARQUET_COMPRESSION },
+	external_id: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
+	name: { type: "UTF8", compression: PARQUET_COMPRESSION },
+	barcode: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
+	price_cents: { type: "INT32", compression: PARQUET_COMPRESSION },
 	discount_price_cents: {
 		type: "INT32",
 		optional: true,
-		compression: "SNAPPY",
+		compression: PARQUET_COMPRESSION,
 	},
-	unit_price_cents: { type: "INT32", optional: true, compression: "SNAPPY" },
-	category: { type: "UTF8", optional: true, compression: "SNAPPY" },
-	brand: { type: "UTF8", optional: true, compression: "SNAPPY" },
+	unit_price_cents: { type: "INT32", optional: true, compression: PARQUET_COMPRESSION },
+	category: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
+	brand: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
 });
 
 export async function writePricesParquet(
