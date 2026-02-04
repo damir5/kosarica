@@ -4,6 +4,8 @@ import type {
 	ParseError,
 	ParseResult,
 	ParseWarning,
+	PriceStatus,
+	PriceUnavailableReason,
 } from "../types";
 import { parsePrice } from "./price";
 
@@ -326,34 +328,42 @@ function mapRowToNormalized(
 
 	const priceStr = getString(indices.price);
 	const discountStr = getString(indices.discountPrice);
-	let price = 0;
+	let price: number | null = null;
+	let priceStatus: PriceStatus = "unavailable";
+	let priceUnavailableReason: PriceUnavailableReason | undefined = "missing";
 	let discountPrice: number | undefined;
 
 	// Handle case where regular price is empty but discount price exists
 	// This happens in some retailers (e.g., DM) where only the sale price is provided
 	if (!priceStr && discountStr) {
 		try {
-			price = parsePrice(discountStr);
-			// Don't set discountPrice since we don't have the original price
+			const parsedPrice = parsePrice(discountStr);
+			if (parsedPrice > 0) {
+				price = parsedPrice;
+				priceStatus = "available";
+				priceUnavailableReason = undefined;
+			} else {
+				priceUnavailableReason = "non_positive";
+			}
+			// Don't set discountPrice since we don't have the original price.
 		} catch {
-			errors.push({
-				rowNumber,
-				field: "price",
-				message: "Invalid price value",
-				originalValue: discountStr,
-			});
+			priceUnavailableReason = "invalid";
 		}
 	} else {
 		// Normal case: parse regular price
-		try {
-			price = parsePrice(priceStr);
-		} catch {
-			errors.push({
-				rowNumber,
-				field: "price",
-				message: "Invalid price value",
-				originalValue: priceStr,
-			});
+		if (priceStr) {
+			try {
+				const parsedPrice = parsePrice(priceStr);
+				if (parsedPrice > 0) {
+					price = parsedPrice;
+					priceStatus = "available";
+					priceUnavailableReason = undefined;
+				} else {
+					priceUnavailableReason = "non_positive";
+				}
+			} catch {
+				priceUnavailableReason = "invalid";
+			}
 		}
 
 		// Parse discount price if available
@@ -368,6 +378,10 @@ function mapRowToNormalized(
 				});
 			}
 		}
+	}
+
+	if (priceStatus === "unavailable") {
+		discountPrice = undefined;
 	}
 
 	const discountStart = parseDate(getRawValue(indices.discountStart));
@@ -447,6 +461,8 @@ function mapRowToNormalized(
 		unit: getOptionalString(indices.unit),
 		unitQuantity: getOptionalString(indices.unitQuantity),
 		price,
+		priceStatus,
+		priceUnavailableReason,
 		discountPrice,
 		discountStart,
 		discountEnd,
@@ -469,9 +485,6 @@ function validateRequiredFields(row: NormalizedRow): string[] {
 	const errors: string[] = [];
 	if (!row.name || row.name.trim() === "") {
 		errors.push("Name is required");
-	}
-	if (row.price <= 0) {
-		errors.push("Price must be positive");
 	}
 	return errors;
 }

@@ -13,6 +13,8 @@ type ClickHouseCatalogRow = {
 	brand?: string | null;
 	category?: string | null;
 	price_cents?: number | string | null;
+	price_status?: "available" | "unavailable" | null;
+	price_unavailable_reason?: "missing" | "invalid" | "non_positive" | null;
 	discount_price_cents?: number | string | null;
 	last_seen_at?: string | null;
 };
@@ -104,6 +106,8 @@ export const listCatalogPrices = procedure
 				argMax(brand, target_date) AS brand,
 				argMax(category, target_date) AS category,
 				argMax(price_cents, target_date) AS price_cents,
+				argMax(price_status, target_date) AS price_status,
+				argMax(price_unavailable_reason, target_date) AS price_unavailable_reason,
 				argMax(discount_price_cents, target_date) AS discount_price_cents,
 				max(target_date) AS last_seen_at
 			FROM prices
@@ -156,6 +160,18 @@ export const listCatalogPrices = procedure
 
 		const prices = rows.map((row) => {
 			const store = storeMap.get(row.store_id);
+			const currentPrice = parseNumber(row.price_cents);
+			const isUnavailable =
+				row.price_status === "unavailable" || currentPrice === null;
+			const rawReason = row.price_unavailable_reason;
+			const reason =
+				isUnavailable &&
+				(rawReason === "missing" ||
+					rawReason === "invalid" ||
+					rawReason === "non_positive")
+					? rawReason
+					: null;
+
 			return {
 				id: `${row.store_id}:${row.retailer_item_id}`,
 				productName: row.name,
@@ -166,7 +182,9 @@ export const listCatalogPrices = procedure
 				storeId: row.store_id,
 				storeName: store?.name ?? row.store_id,
 				storeCity: store?.city ?? null,
-				currentPrice: parseNumber(row.price_cents),
+				currentPrice,
+				priceStatus: isUnavailable ? "unavailable" : "available",
+				priceUnavailableReason: reason,
 				discountPrice: parseNumber(row.discount_price_cents),
 				lastSeenAt: row.last_seen_at ?? null,
 			};

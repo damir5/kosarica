@@ -17,7 +17,9 @@ export interface PriceRow {
 	external_id?: string | null;
 	name: string;
 	barcode?: string | null;
-	price_cents: number;
+	price_cents?: number | null;
+	price_status?: "available" | "unavailable" | null;
+	price_unavailable_reason?: "missing" | "invalid" | "non_positive" | null;
 	discount_price_cents?: number | null;
 	unit_price_cents?: number | null;
 	category?: string | null;

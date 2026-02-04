@@ -22,6 +22,7 @@ import type {
 	DiscoveredFile,
 	NormalizedRow,
 	ParseResult,
+	PriceUnavailableReason,
 } from "@/ingestion/types";
 import {
 	buildArchiveKey,
@@ -85,6 +86,7 @@ interface ProcessedFileResult {
 	itemMetadataUpdateMs: number;
 	barcodeInsertMs: number;
 	deadlockRetries: number;
+	priceAvailability: PriceAvailabilityStats;
 }
 
 interface FileToProcess {
@@ -126,6 +128,41 @@ interface ItemWriteSharder {
 		shardIndex: number,
 		operation: () => Promise<T>,
 	) => Promise<T>;
+}
+
+interface PriceAvailabilityStats {
+	availableRows: number;
+	unavailableRows: number;
+	unavailableMissingRows: number;
+	unavailableInvalidRows: number;
+	unavailableNonPositiveRows: number;
+}
+
+function emptyPriceAvailabilityStats(): PriceAvailabilityStats {
+	return {
+		availableRows: 0,
+		unavailableRows: 0,
+		unavailableMissingRows: 0,
+		unavailableInvalidRows: 0,
+		unavailableNonPositiveRows: 0,
+	};
+}
+
+function trackUnavailableReason(
+	stats: PriceAvailabilityStats,
+	reason: PriceUnavailableReason | undefined,
+): void {
+	switch (reason) {
+		case "invalid":
+			stats.unavailableInvalidRows += 1;
+			return;
+		case "non_positive":
+			stats.unavailableNonPositiveRows += 1;
+			return;
+		case "missing":
+		default:
+			stats.unavailableMissingRows += 1;
+	}
 }
 
 function parsePositiveIntEnv(name: string, fallback: number): number {
@@ -1240,6 +1277,7 @@ async function processIngestionFile(options: {
 	}> = [];
 
 	const validRows: ValidRowForPersistence[] = [];
+	const priceAvailability = emptyPriceAvailabilityStats();
 	const storeMetadata = adapter.extractStoreMetadata(fileEntry.file);
 
 	for (const row of parseResult.rows) {
@@ -1298,6 +1336,14 @@ async function processIngestionFile(options: {
 		if (hasWarning) {
 			fileWarningRows += 1;
 		}
+
+		if (row.priceStatus === "available") {
+			priceAvailability.availableRows += 1;
+		} else {
+			priceAvailability.unavailableRows += 1;
+			trackUnavailableReason(priceAvailability, row.priceUnavailableReason);
+		}
+
 		validRows.push({
 			row,
 			storeId,
@@ -1397,6 +1443,8 @@ async function processIngestionFile(options: {
 			name: validRow.row.name,
 			barcode: primaryBarcode,
 			price_cents: validRow.row.price,
+			price_status: validRow.row.priceStatus,
+			price_unavailable_reason: validRow.row.priceUnavailableReason ?? null,
 			discount_price_cents: validRow.row.discountPrice ?? null,
 			unit_price_cents: validRow.row.unitPrice ?? null,
 			category: validRow.row.category ?? null,
@@ -1459,6 +1507,7 @@ async function processIngestionFile(options: {
 				itemMetadataUpdateMs,
 				barcodeInsertMs,
 				deadlockRetries,
+				priceAvailability,
 			}),
 		})
 		.where(eq(ingestionFiles.id, fileId));
@@ -1475,6 +1524,7 @@ async function processIngestionFile(options: {
 		itemMetadataUpdateMs,
 		barcodeInsertMs,
 		deadlockRetries,
+		priceAvailability,
 	};
 }
 
@@ -1573,6 +1623,7 @@ export async function runIngestion(
 	let itemMetadataUpdateMsTotal = 0;
 	let barcodeInsertMsTotal = 0;
 	let deadlockRetriesTotal = 0;
+	const priceAvailabilityTotals = emptyPriceAvailabilityStats();
 	let tempDirPath: string | null = null;
 	const performanceConfig = getIngestionPerformanceConfig();
 
@@ -1737,6 +1788,16 @@ export async function runIngestion(
 				itemMetadataUpdateMsTotal += processed.itemMetadataUpdateMs;
 				barcodeInsertMsTotal += processed.barcodeInsertMs;
 				deadlockRetriesTotal += processed.deadlockRetries;
+				priceAvailabilityTotals.availableRows +=
+					processed.priceAvailability.availableRows;
+				priceAvailabilityTotals.unavailableRows +=
+					processed.priceAvailability.unavailableRows;
+				priceAvailabilityTotals.unavailableMissingRows +=
+					processed.priceAvailability.unavailableMissingRows;
+				priceAvailabilityTotals.unavailableInvalidRows +=
+					processed.priceAvailability.unavailableInvalidRows;
+				priceAvailabilityTotals.unavailableNonPositiveRows +=
+					processed.priceAvailability.unavailableNonPositiveRows;
 				processedFiles += 1;
 				parquetRows.push(...processed.parquetRows);
 
@@ -1791,6 +1852,7 @@ export async function runIngestion(
 						barcodeInsertMs: barcodeInsertMsTotal,
 						deadlockRetries: deadlockRetriesTotal,
 					},
+					priceAvailability: priceAvailabilityTotals,
 				}),
 			})
 			.where(eq(ingestionRuns.id, runId));
@@ -1813,6 +1875,7 @@ export async function runIngestion(
 				itemInsertMs: itemInsertMsTotal,
 				itemMetadataUpdateMs: itemMetadataUpdateMsTotal,
 				barcodeInsertMs: barcodeInsertMsTotal,
+				priceAvailability: priceAvailabilityTotals,
 			},
 			deadlockRetries: deadlockRetriesTotal,
 		});

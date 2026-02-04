@@ -197,15 +197,23 @@ export class BaseChainAdapter {
 			errors.push("Missing product name");
 		}
 
-		if (row.price <= 0) {
-			errors.push("Price must be positive");
+		if (row.priceStatus === "available") {
+			if (row.price === null || row.price <= 0) {
+				errors.push("Price must be positive when marked available");
+			}
+		} else if (row.price !== null && row.price > 0) {
+			warnings.push("Unavailable row has a positive price value");
 		}
 
-		if (row.price > 100_000_000) {
+		if (row.price !== null && row.price > 100_000_000) {
 			warnings.push("Price seems unusually high");
 		}
 
-		if (row.discountPrice !== undefined && row.discountPrice >= row.price) {
+		if (
+			row.price !== null &&
+			row.discountPrice !== undefined &&
+			row.discountPrice >= row.price
+		) {
 			warnings.push("Discount price is not less than regular price");
 		}
 

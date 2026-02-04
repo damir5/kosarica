@@ -462,6 +462,11 @@ export async function runBarcodeMatching(options?: {
 				AND NOT EXISTS (
 					SELECT 1 FROM product_links pl WHERE pl.retailer_item_id = ri.id
 				)
+				AND NOT EXISTS (
+					SELECT 1 FROM product_match_queue pmq
+					WHERE pmq.retailer_item_id = ri.id
+						AND pmq.status = 'pending'
+				)
 			ORDER BY rib.barcode
 			LIMIT ${batchSize}
 		)
@@ -481,6 +486,11 @@ export async function runBarcodeMatching(options?: {
 		JOIN target_barcodes tb ON tb.barcode = rib.barcode
 		WHERE NOT EXISTS (
 			SELECT 1 FROM product_links pl WHERE pl.retailer_item_id = ri.id
+		)
+		AND NOT EXISTS (
+			SELECT 1 FROM product_match_queue pmq
+			WHERE pmq.retailer_item_id = ri.id
+				AND pmq.status = 'pending'
 		)
 		ORDER BY rib.barcode
 	`);

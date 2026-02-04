@@ -1,4 +1,10 @@
-import type { NormalizedRow, ParseError, ParseResult } from "../types";
+import type {
+	NormalizedRow,
+	ParseError,
+	ParseResult,
+	PriceStatus,
+	PriceUnavailableReason,
+} from "../types";
 import { decode, detectEncoding, type Encoding } from "./charset";
 import { parsePrice } from "./price";
 
@@ -357,43 +363,54 @@ function mapRowToNormalized(
 		return val;
 	};
 
-	let price = 0;
+	let price: number | null = null;
+	let priceStatus: PriceStatus = "unavailable";
+	let priceUnavailableReason: PriceUnavailableReason | undefined = "missing";
 	const priceStr = getValue("price");
+	const discountPriceStr = getValue("discountPrice");
 	if (priceStr) {
 		try {
-			price = parsePrice(priceStr);
+			const parsedPrice = parsePrice(priceStr);
+			if (parsedPrice > 0) {
+				price = parsedPrice;
+				priceStatus = "available";
+				priceUnavailableReason = undefined;
+			} else {
+				priceUnavailableReason = "non_positive";
+			}
 		} catch {
-			errors.push({
-				rowNumber,
-				field: "price",
-				message: "Invalid price value",
-				originalValue: priceStr,
-			});
+			priceUnavailableReason = "invalid";
 		}
 	}
 
-	if (price === 0) {
-		const discountPriceStr = getValue("discountPrice");
-		if (discountPriceStr) {
-			try {
-				const parsed = parsePrice(discountPriceStr);
-				if (parsed > 0) {
-					price = parsed;
-				}
-			} catch {
-				// Ignore fallback failures
+	if (priceStatus === "unavailable" && discountPriceStr) {
+		try {
+			const parsed = parsePrice(discountPriceStr);
+			if (parsed > 0) {
+				price = parsed;
+				priceStatus = "available";
+				priceUnavailableReason = undefined;
+			} else {
+				priceUnavailableReason = "non_positive";
+			}
+		} catch {
+			if (priceUnavailableReason === "missing") {
+				priceUnavailableReason = "invalid";
 			}
 		}
 	}
 
 	let discountPrice: number | undefined;
-	const discountStr = getValue("discountPrice");
-	if (discountStr) {
+	if (discountPriceStr) {
 		try {
-			discountPrice = parsePrice(discountStr);
+			discountPrice = parsePrice(discountPriceStr);
 		} catch {
 			// Ignore
 		}
+	}
+
+	if (priceStatus === "unavailable") {
+		discountPrice = undefined;
 	}
 
 	const discountStart = parseDate(getValue("discountStart"));
@@ -469,6 +486,8 @@ function mapRowToNormalized(
 		unit: getValue("unit"),
 		unitQuantity: getValue("unitQuantity"),
 		price,
+		priceStatus,
+		priceUnavailableReason,
 		discountPrice,
 		discountStart,
 		discountEnd,

@@ -24,6 +24,8 @@ export type CatalogPriceRow = {
 	storeName: string;
 	storeCity: string | null;
 	currentPrice: number | null;
+	priceStatus?: "available" | "unavailable";
+	priceUnavailableReason?: "missing" | "invalid" | "non_positive" | null;
 	discountPrice: number | null;
 	lastSeenAt: Date | string | null;
 };
@@ -94,10 +96,17 @@ export function CatalogPricesTable({ prices }: CatalogPricesTableProps) {
 								)}
 							</TableCell>
 							<TableCell className="font-mono">
-								{formatPrice(price.currentPrice)}
+								{price.priceStatus === "unavailable" ? (
+									<span className="text-muted-foreground">
+										Price unavailable
+									</span>
+								) : (
+									formatPrice(price.currentPrice)
+								)}
 							</TableCell>
 							<TableCell>
-								{price.discountPrice !== null &&
+								{price.priceStatus !== "unavailable" &&
+								price.discountPrice !== null &&
 								price.discountPrice !== undefined ? (
 									<Badge variant="destructive" className="font-mono">
 										{formatPrice(price.discountPrice)}

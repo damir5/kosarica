@@ -1,5 +1,11 @@
 import { XMLParser } from "fast-xml-parser";
-import type { NormalizedRow, ParseError, ParseResult } from "../types";
+import type {
+	NormalizedRow,
+	ParseError,
+	ParseResult,
+	PriceStatus,
+	PriceUnavailableReason,
+} from "../types";
 import { decode, detectEncoding, type Encoding } from "./charset";
 import { parsePrice } from "./price";
 
@@ -301,19 +307,21 @@ function mapItemToRow(
 		priceValue = extractString(mapping.price) ?? "";
 	}
 
-	let price = 0;
-	if (!priceValue) {
-		errors.push({ rowNumber, field: "price", message: "Price is required" });
-	} else {
+	let price: number | null = null;
+	let priceStatus: PriceStatus = "unavailable";
+	let priceUnavailableReason: PriceUnavailableReason | undefined = "missing";
+	if (priceValue) {
 		try {
-			price = parsePrice(priceValue);
+			const parsedPrice = parsePrice(priceValue);
+			if (parsedPrice > 0) {
+				price = parsedPrice;
+				priceStatus = "available";
+				priceUnavailableReason = undefined;
+			} else {
+				priceUnavailableReason = "non_positive";
+			}
 		} catch {
-			errors.push({
-				rowNumber,
-				field: "price",
-				message: "Invalid price value",
-				originalValue: priceValue,
-			});
+			priceUnavailableReason = "invalid";
 		}
 	}
 
@@ -355,6 +363,8 @@ function mapItemToRow(
 		unit: extractString(mapping.unit),
 		unitQuantity: extractString(mapping.unitQuantity),
 		price,
+		priceStatus,
+		priceUnavailableReason,
 		discountPrice,
 		discountStart,
 		discountEnd,

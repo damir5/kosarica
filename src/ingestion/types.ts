@@ -1,5 +1,8 @@
 export type FileType = "csv" | "xml" | "xlsx" | "zip";
 
+export type PriceStatus = "available" | "unavailable";
+export type PriceUnavailableReason = "missing" | "invalid" | "non_positive";
+
 export interface NormalizedRow {
 	storeIdentifier: string;
 	externalId?: string;
@@ -10,7 +13,9 @@ export interface NormalizedRow {
 	brand?: string;
 	unit?: string;
 	unitQuantity?: string;
-	price: number;
+	price: number | null;
+	priceStatus: PriceStatus;
+	priceUnavailableReason?: PriceUnavailableReason;
 	discountPrice?: number;
 	discountStart?: Date;
 	discountEnd?: Date;

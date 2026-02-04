@@ -7,6 +7,7 @@
  */
 
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
+import { barcodeMatchingHandler } from "./handlers/barcode-matching";
 import { tempCleanupHandler } from "./handlers/temp-cleanup";
 import { registerCronJob } from "./registry";
 
@@ -35,6 +36,16 @@ export function registerAllCronJobs(): void {
 		timezone: "UTC",
 		taskType: "cleanup",
 		handler: tempCleanupHandler,
+	});
+
+	// Barcode matching after daily ingestion window
+	registerCronJob({
+		id: "barcode-matching",
+		name: "Barcode Product Matching",
+		cronExpression: "0 9 * * *",
+		timezone: "UTC",
+		taskType: "cleanup",
+		handler: barcodeMatchingHandler,
 	});
 
 	// Add more jobs here as needed:

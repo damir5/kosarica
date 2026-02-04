@@ -70,7 +70,7 @@ export interface MultiStoreResult {
 interface PriceRow {
 	store_id: string;
 	retailer_item_id: string;
-	price_cents: number | string;
+	price_cents: number | string | null;
 	discount_price_cents?: number | string | null;
 }
 

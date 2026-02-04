@@ -39,15 +39,21 @@ describe("StudenacAdapter", () => {
 		);
 
 		expect(result.totalRows).toBe(3);
-		expect(result.validRows).toBe(2);
-		expect(result.errors).toHaveLength(1);
-		expect(result.errors[0]?.message).toBe("Price is required");
+		expect(result.validRows).toBe(3);
+		expect(result.errors).toHaveLength(0);
 
 		const fallbackRow = result.rows.find((row) => row.externalId === "1002");
 		expect(fallbackRow).toBeDefined();
 		expect(fallbackRow?.storeIdentifier).toBe("123");
 		expect(fallbackRow?.price).toBe(189);
+		expect(fallbackRow?.priceStatus).toBe("available");
 		expect(fallbackRow?.discountPrice).toBeUndefined();
+
+		const missingPriceRow = result.rows.find((row) => row.externalId === "1003");
+		expect(missingPriceRow).toBeDefined();
+		expect(missingPriceRow?.price).toBeNull();
+		expect(missingPriceRow?.priceStatus).toBe("unavailable");
+		expect(missingPriceRow?.priceUnavailableReason).toBe("missing");
 	});
 
 	it("keeps akcija as discount when regular price exists", async () => {

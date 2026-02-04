@@ -14,7 +14,9 @@ export interface ParquetPriceRow {
 	external_id?: string | null;
 	name: string;
 	barcode?: string | null;
-	price_cents: number;
+	price_cents?: number | null;
+	price_status: "available" | "unavailable";
+	price_unavailable_reason?: "missing" | "invalid" | "non_positive" | null;
 	discount_price_cents?: number | null;
 	unit_price_cents?: number | null;
 	category?: string | null;
@@ -54,7 +56,17 @@ const PRICE_SCHEMA = new ParquetSchema({
 	},
 	name: { type: "UTF8", compression: PARQUET_COMPRESSION },
 	barcode: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
-	price_cents: { type: "INT32", compression: PARQUET_COMPRESSION },
+	price_cents: {
+		type: "INT32",
+		optional: true,
+		compression: PARQUET_COMPRESSION,
+	},
+	price_status: { type: "UTF8", compression: PARQUET_COMPRESSION },
+	price_unavailable_reason: {
+		type: "UTF8",
+		optional: true,
+		compression: PARQUET_COMPRESSION,
+	},
 	discount_price_cents: {
 		type: "INT32",
 		optional: true,

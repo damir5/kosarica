@@ -154,7 +154,11 @@ export class StudenacAdapter extends BaseXmlAdapter {
 			}
 			// Fallback rows use akcija as the main price; treat equal/higher discount
 			// values as invalid discount metadata instead of producing warnings.
-			if (row.discountPrice !== undefined && row.discountPrice >= row.price) {
+			if (
+				row.price !== null &&
+				row.discountPrice !== undefined &&
+				row.discountPrice >= row.price
+			) {
 				row.discountPrice = undefined;
 			}
 		}

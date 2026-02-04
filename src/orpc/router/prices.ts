@@ -11,6 +11,8 @@ type ClickHouseStorePriceRow = {
 	item_name: string;
 	brand?: string | null;
 	current_price?: number | string | null;
+	price_status?: "available" | "unavailable" | null;
+	price_unavailable_reason?: "missing" | "invalid" | "non_positive" | null;
 	discount_price?: number | string | null;
 	unit_price?: number | string | null;
 	last_seen_at?: string | null;
@@ -40,6 +42,8 @@ export const getStorePrices = procedure
 				argMax(name, target_date) AS item_name,
 				argMax(brand, target_date) AS brand,
 				argMax(price_cents, target_date) AS current_price,
+				argMax(price_status, target_date) AS price_status,
+				argMax(price_unavailable_reason, target_date) AS price_unavailable_reason,
 				argMax(discount_price_cents, target_date) AS discount_price,
 				argMax(unit_price_cents, target_date) AS unit_price,
 				max(target_date) AS last_seen_at
@@ -66,16 +70,32 @@ export const getStorePrices = procedure
 			},
 		);
 
-		const prices = rows.map((row) => ({
-			retailerItemId: row.retailer_item_id,
-			itemExternalId: row.item_external_id ?? null,
-			itemName: row.item_name,
-			brand: row.brand ?? null,
-			currentPrice: parseNumber(row.current_price),
-			discountPrice: parseNumber(row.discount_price),
-			unitPrice: parseNumber(row.unit_price),
-			lastSeenAt: row.last_seen_at ?? null,
-		}));
+		const prices = rows.map((row) => {
+			const currentPrice = parseNumber(row.current_price);
+			const isUnavailable =
+				row.price_status === "unavailable" || currentPrice === null;
+			const rawReason = row.price_unavailable_reason;
+			const reason =
+				isUnavailable &&
+				(rawReason === "missing" ||
+					rawReason === "invalid" ||
+					rawReason === "non_positive")
+					? rawReason
+					: null;
+
+			return {
+				retailerItemId: row.retailer_item_id,
+				itemExternalId: row.item_external_id ?? null,
+				itemName: row.item_name,
+				brand: row.brand ?? null,
+				currentPrice,
+				priceStatus: isUnavailable ? "unavailable" : "available",
+				priceUnavailableReason: reason,
+				discountPrice: parseNumber(row.discount_price),
+				unitPrice: parseNumber(row.unit_price),
+				lastSeenAt: row.last_seen_at ?? null,
+			};
+		});
 
 		return {
 			prices,

@@ -287,6 +287,11 @@ describe("ClickHouse Price Queries (Unit Tests)", () => {
 				itemName: mockRow.item_name,
 				brand: mockRow.brand ?? null,
 				currentPrice: parseNumber(mockRow.current_price),
+				priceStatus:
+					parseNumber(mockRow.current_price) === null
+						? "unavailable"
+						: "available",
+				priceUnavailableReason: null,
 				discountPrice: parseNumber(mockRow.discount_price),
 				unitPrice: parseNumber(mockRow.unit_price),
 				lastSeenAt: mockRow.last_seen_at ?? null,
@@ -295,6 +300,7 @@ describe("ClickHouse Price Queries (Unit Tests)", () => {
 			expect(mapped.retailerItemId).toBe("ri_123");
 			expect(mapped.currentPrice).toBe(1999);
 			expect(mapped.discountPrice).toBe(1499);
+			expect(mapped.priceStatus).toBe("available");
 			// Verify inStock is NOT in the response
 			expect(mapped).not.toHaveProperty("inStock");
 		});
