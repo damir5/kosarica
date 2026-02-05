@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+import { eq } from "drizzle-orm";
 config({ path: ".env.development" });
 config();
 
@@ -62,7 +63,7 @@ async function main() {
 
     // Cleanup
     await storage.delete(archiveKey);
-    await db.delete(archives).where(archives.id === archiveId);
+    await db.delete(archives).where(eq(archives.id, archiveId));
 
     console.log("All done!");
 }

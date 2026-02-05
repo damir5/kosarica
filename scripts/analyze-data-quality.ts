@@ -70,7 +70,7 @@ async function clickhouseQuery<T = unknown>(
 			query_params: params,
 			format: "JSONEachRow",
 		});
-		return await resultSet.json<T[]>();
+		return await resultSet.json<T>();
 	});
 	return { data: result, duration, rowCount: result.length };
 }
