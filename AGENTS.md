@@ -4,6 +4,16 @@
 
 ## Minimal dev & test setup
 
+Start containers first:
+
+```bash
+# Dev services (persistent data)
+docker compose --profile dev up -d
+
+# Test services (ephemeral)
+docker compose --profile test up -d
+```
+
 - Dev .env: create `./.env.development` (or edit) with at least:
   - `DATABASE_URL=postgresql://kosarica:kosarica@localhost:5432/kosarica`
   - `PORT=3002` (frontend dev)
@@ -11,9 +21,9 @@
   - `CLICKHOUSE_URL=http://localhost:8123`
 
 - Test .env: create `./.env.test` with at least:
-  - `DATABASE_URL=postgresql://kosarica_test:kosarica_test@localhost:5432/kosarica_test`
+  - `DATABASE_URL=postgresql://kosarica_test:kosarica_test@localhost:5433/kosarica_test`
   - `STORAGE_PATH=./data/storage-test`
-  - `CLICKHOUSE_URL=http://localhost:8123`
+  - `CLICKHOUSE_URL=http://localhost:8124`
 
 Very brief test commands
 
