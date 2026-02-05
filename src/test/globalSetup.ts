@@ -185,7 +185,20 @@ async function cleanupTestDatabase(testUrl: string): Promise<void> {
       DO $$ DECLARE
         r RECORD;
       BEGIN
-        FOR r IN (SELECT typname FROM pg_type WHERE typtype IN ('b', 'c') AND typnamespace = 'public'::regnamespace) LOOP
+        FOR r IN (
+          SELECT t.typname
+          FROM pg_type t
+          WHERE t.typtype = 'c'
+            AND t.typnamespace = 'public'::regnamespace
+            AND NOT EXISTS (
+              SELECT 1
+              FROM pg_depend d
+              JOIN pg_extension e ON e.oid = d.refobjid
+              WHERE d.classid = 'pg_type'::regclass
+                AND d.objid = t.oid
+                AND d.deptype = 'e'
+            )
+        ) LOOP
           EXECUTE 'DROP TYPE IF EXISTS ' || quote_ident(r.typname) || ' CASCADE';
         END LOOP;
       END $$;

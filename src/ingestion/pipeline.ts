@@ -25,6 +25,7 @@ import type {
 	ParseResult,
 	PriceUnavailableReason,
 } from "@/ingestion/types";
+import { indexRetailerItemsBatch } from "@/lib/search";
 import {
 	buildArchiveKey,
 	buildExpandedKey,
@@ -1842,12 +1843,32 @@ export async function runIngestion(
 		const processingDurationMs = Date.now() - processingStartedAt;
 
 		let parquetDurationMs = 0;
+		let searchIndexDurationMs = 0;
 		if (parquetRows.length > 0) {
 			const parquetStartedAt = Date.now();
 			const parquetKey = buildParquetKey(chainSlug, targetDate);
 			await writePricesParquet(parquetKey, parquetRows);
 			await recordParquetFile(chainSlug, targetDate, parquetKey);
 			parquetDurationMs = Date.now() - parquetStartedAt;
+
+			const searchIndexStartedAt = Date.now();
+			const itemIdsToIndex = [
+				...new Set(parquetRows.map((row) => row.retailer_item_id)),
+			];
+
+			try {
+				await indexRetailerItemsBatch(itemIdsToIndex);
+				searchIndexDurationMs = Date.now() - searchIndexStartedAt;
+				log.info("Search index updated", {
+					indexed: itemIdsToIndex.length,
+					durationMs: searchIndexDurationMs,
+				});
+			} catch (searchError) {
+				log.warn("Search indexing failed (non-fatal)", {
+					error: errorToObject(searchError),
+					itemCount: itemIdsToIndex.length,
+				});
+			}
 		}
 		const totalDurationMs = Date.now() - runWallStart;
 
@@ -1869,6 +1890,7 @@ export async function runIngestion(
 						fetchMs: fetchDurationMs,
 						processMs: processingDurationMs,
 						parquetMs: parquetDurationMs,
+						searchIndexMs: searchIndexDurationMs,
 						totalMs: totalDurationMs,
 						itemResolveMs: itemResolveMsTotal,
 						itemInsertMs: itemInsertMsTotal,
@@ -1894,6 +1916,7 @@ export async function runIngestion(
 				fetchMs: fetchDurationMs,
 				processMs: processingDurationMs,
 				parquetMs: parquetDurationMs,
+				searchIndexMs: searchIndexDurationMs,
 				totalMs: totalDurationMs,
 				itemResolveMs: itemResolveMsTotal,
 				itemInsertMs: itemInsertMsTotal,

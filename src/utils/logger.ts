@@ -24,6 +24,7 @@ const ALL_LOGGER_TYPES = [
 	"daily-ingestion",
 	"temp-cleanup",
 	"matching",
+	"search",
 ] as const;
 export type LoggerType = (typeof ALL_LOGGER_TYPES)[number];
 

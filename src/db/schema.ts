@@ -862,3 +862,38 @@ export const activeIngestionOperations = pgTable(
 		taskIdIdx: index("idx_active_ops_task_id").on(table.taskId),
 	}),
 );
+
+// ============================================================================
+// Search Index: Unified full-text search for products, items, and stores
+// ============================================================================
+
+export const searchIndex = pgTable(
+	"search_index",
+	{
+		id: cuid2("six").primaryKey(),
+		entityType: text("entity_type").notNull(),
+		entityId: text("entity_id").notNull(),
+		chainSlug: text("chain_slug"),
+		category: text("category"),
+		subcategory: text("subcategory"),
+		title: text("title").notNull(),
+		subtitle: text("subtitle"),
+		body: text("body"),
+		imageUrl: text("image_url"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		entityUnique: uniqueIndex("search_index_entity_unique").on(
+			table.entityType,
+			table.entityId,
+		),
+		entityTypeIdx: index("search_index_entity_type_idx").on(table.entityType),
+		chainSlugIdx: index("search_index_chain_slug_idx").on(table.chainSlug),
+		categoryIdx: index("search_index_category_idx").on(table.category),
+	}),
+);

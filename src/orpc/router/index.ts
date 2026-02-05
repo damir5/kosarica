@@ -21,6 +21,7 @@ import {
 	triggerBarcodeMatching,
 	triggerTrigramMatching,
 } from "./products";
+import * as search from "./search";
 import { getSettings, updateSettings } from "./settings";
 import {
 	approveStore,
@@ -68,6 +69,10 @@ export default {
 	prices: {
 		getStorePrices: prices.getStorePrices,
 		searchItems: prices.searchItems,
+	},
+	search: {
+		autocomplete: search.autocomplete,
+		search: search.search,
 	},
 	admin: {
 		getConfigInfo,
