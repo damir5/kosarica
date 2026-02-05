@@ -114,18 +114,34 @@ export class IntersparAdapter extends BaseCsvAdapter {
 					return okAsync<DiscoveredFile[]>([]);
 				}
 
-				const files: DiscoveredFile[] = parsed.files.map((file) => ({
-					url: file.URL,
-					filename: file.name,
-					type: "csv",
-					lastModified: new Date(date),
-					metadata: {
-						source: "interspar_json_api",
-						discoveredAt: new Date().toISOString(),
-						portalDate: date,
-						sha: file.SHA,
-					},
-				}));
+				const seenUrls = new Set<string>();
+				const seenFilenames = new Set<string>();
+				const files: DiscoveredFile[] = [];
+
+				for (const file of parsed.files) {
+					const fileUrl = file.URL;
+					const filename = file.name;
+
+					// Skip duplicates
+					if (seenUrls.has(fileUrl) || seenFilenames.has(filename)) {
+						continue;
+					}
+					seenUrls.add(fileUrl);
+					seenFilenames.add(filename);
+
+					files.push({
+						url: fileUrl,
+						filename,
+						type: "csv",
+						lastModified: new Date(date),
+						metadata: {
+							source: "interspar_json_api",
+							discoveredAt: new Date().toISOString(),
+							portalDate: date,
+							sha: file.SHA,
+						},
+					});
+				}
 
 				return okAsync(files);
 			})

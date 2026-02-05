@@ -100,7 +100,7 @@ export const chainConfigs: Record<ChainID, ChainConfig> = {
 		supportedTypes: ["csv", "zip"],
 		csv: { delimiter: ";", encoding: "utf-8", hasHeader: true },
 		usesZip: true,
-		storeResolution: "filename",
+		storeResolution: "national",
 	},
 	dm: {
 		id: "dm",
