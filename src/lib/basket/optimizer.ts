@@ -158,7 +158,7 @@ function haversineDistanceKm(
 async function getLatestTargetDate(chainSlug: string): Promise<string | null> {
 	const clickhouse = getClickHouse();
 	const rows = await clickhouse.query<{ target_date?: string | null }>(
-		"SELECT max(target_date) AS target_date FROM prices WHERE chain_slug = {chainSlug:String}",
+		"SELECT max(target_date) AS target_date FROM prices WHERE chain_slug = {chainSlug:String} AND target_date <= today()",
 		{ chainSlug },
 	);
 	const targetDate = rows[0]?.target_date;
@@ -287,6 +287,7 @@ async function loadPriceData(
 		FROM prices
 		WHERE chain_slug = {chainSlug:String}
 			AND target_date = {targetDate:Date}
+			AND target_date <= today()
 			AND retailer_item_id IN ({itemIds:Array(String)})
 		GROUP BY store_id, retailer_item_id`,
 		{ chainSlug, targetDate, itemIds },
@@ -313,6 +314,7 @@ async function loadPriceData(
 		FROM prices
 		WHERE chain_slug = {chainSlug:String}
 			AND target_date = {targetDate:Date}
+			AND target_date <= today()
 			AND retailer_item_id IN ({itemIds:Array(String)})
 		GROUP BY retailer_item_id`,
 		{ chainSlug, targetDate, itemIds },
@@ -667,7 +669,7 @@ export async function getCacheHealth(): Promise<{
 		chain_slug: string;
 		target_date: string | null;
 	}>(
-		"SELECT chain_slug, max(target_date) AS target_date FROM prices GROUP BY chain_slug",
+		"SELECT chain_slug, max(target_date) AS target_date FROM prices WHERE target_date <= today() GROUP BY chain_slug",
 	);
 
 	const latestMap = new Map<string, string | null>();

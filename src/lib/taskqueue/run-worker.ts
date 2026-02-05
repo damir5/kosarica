@@ -9,6 +9,7 @@ import {
 	loadMissingToClickHouse,
 } from "@/ingestion/clickhouse-sync";
 import { rerunIngestionRun, runIngestion } from "@/ingestion/pipeline";
+import { scheduleTask } from "./index";
 import { TaskQueueWorker } from "./worker";
 
 export function createTaskQueueWorker(options?: {
@@ -38,6 +39,19 @@ export function createTaskQueueWorker(options?: {
 			source: payload.source ?? "worker",
 			taskId: task.id,
 		});
+		if (result.retryAt) {
+			await scheduleTask({
+				taskType: "ingestion",
+				scheduledFor: new Date(result.retryAt),
+				payload: {
+					type: "ingestion",
+					chainSlug: payload.chainSlug,
+					targetDate: payload.targetDate,
+					force: true,
+					source: payload.source ?? "worker",
+				},
+			});
+		}
 		if (result.status === "failed") {
 			throw new Error(`Ingestion failed for run ${result.runId}`);
 		}

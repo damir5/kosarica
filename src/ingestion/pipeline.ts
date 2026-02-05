@@ -17,6 +17,7 @@ import {
 import { getChainConfig } from "@/ingestion/adapters/config";
 import { getAdapter } from "@/ingestion/adapters/registry";
 import type { ChainAdapter } from "@/ingestion/adapters/types";
+import { IngestionClassifiedError } from "@/ingestion/errors";
 import { type ParquetPriceRow, writePricesParquet } from "@/ingestion/parquet";
 import type {
 	DiscoveredFile,
@@ -53,6 +54,9 @@ export interface IngestionResult {
 	runId: string;
 	status: "completed" | "failed" | "skipped";
 	message?: string;
+	statusType?: string;
+	statusSeverity?: "warning" | "error" | "critical";
+	retryAt?: string;
 }
 
 const log = createLogger("ingestion");
@@ -159,7 +163,6 @@ function trackUnavailableReason(
 		case "non_positive":
 			stats.unavailableNonPositiveRows += 1;
 			return;
-		case "missing":
 		default:
 			stats.unavailableMissingRows += 1;
 	}
@@ -277,7 +280,7 @@ function createItemWriteSharder(shardCount: number): ItemWriteSharder {
 			Math.min(normalizedShardCount - 1, shardIndex),
 		);
 		const previous = shardQueues[safeShardIndex];
-		let releaseCurrent: (() => void) | null = null;
+		let releaseCurrent: () => void = () => {};
 		shardQueues[safeShardIndex] = new Promise<void>((resolve) => {
 			releaseCurrent = resolve;
 		});
@@ -286,7 +289,7 @@ function createItemWriteSharder(shardCount: number): ItemWriteSharder {
 		try {
 			return await operation();
 		} finally {
-			releaseCurrent?.();
+			releaseCurrent();
 		}
 	};
 
@@ -379,6 +382,27 @@ function parseTargetDate(input?: string): { date: Date; dateStr: string } {
 	const [year, month, day] = parts;
 	const date = new Date(year, month - 1, day);
 	return { date, dateStr: input };
+}
+
+function mergeMetadata(
+	existing: string | null | undefined,
+	additional: Record<string, unknown>,
+): string {
+	let base: Record<string, unknown> = {};
+	if (existing) {
+		try {
+			const parsed = JSON.parse(existing);
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+				base = parsed as Record<string, unknown>;
+			}
+		} catch {
+			base = {};
+		}
+	}
+	return JSON.stringify({
+		...base,
+		...additional,
+	});
 }
 
 function buildStoreIdentifierType(chainSlug: string): string {
@@ -1910,17 +1934,60 @@ export async function runIngestion(
 			});
 		}
 
+		if (error instanceof IngestionClassifiedError) {
+			const retryAt = error.classification.retryAt;
+			await db
+				.update(ingestionRuns)
+				.set({
+					status: error.classification.status,
+					statusType: error.classification.statusType,
+					statusSeverity: error.classification.statusSeverity,
+					statusReason: error.classification.statusReason,
+					completedAt: new Date(),
+					metadata: mergeMetadata(null, {
+						classification: {
+							statusType: error.classification.statusType,
+							statusSeverity: error.classification.statusSeverity,
+							retryAt: retryAt?.toISOString(),
+						},
+						...(error.classification.metadata ?? {}),
+					}),
+				})
+				.where(eq(ingestionRuns.id, runId));
+
+			return {
+				runId,
+				status: error.classification.status,
+				message: error.classification.statusReason,
+				statusType: error.classification.statusType,
+				statusSeverity: error.classification.statusSeverity,
+				retryAt: retryAt?.toISOString(),
+			};
+		}
+
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const statusType = errorMessage.startsWith("Failed to fetch")
+			? "source_fetch_error"
+			: "pipeline_error";
+
 		await db
 			.update(ingestionRuns)
 			.set({
 				status: "failed",
-				statusReason: error instanceof Error ? error.message : String(error),
+				statusType,
+				statusReason: errorMessage,
 				statusSeverity: "critical",
 				completedAt: new Date(),
 			})
 			.where(eq(ingestionRuns.id, runId));
 
-		return { runId, status: "failed" };
+		return {
+			runId,
+			status: "failed",
+			message: errorMessage,
+			statusType,
+			statusSeverity: "critical",
+		};
 	} finally {
 		if (options.taskId) {
 			await db

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import * as XLSX from "xlsx";
+import { IngestionClassifiedError } from "@/ingestion/errors";
+import { formatDateInTimezone, ZAGREB_TIMEZONE } from "@/ingestion/time";
 import type { XlsxColumnMapping } from "../../parsers/xlsx";
 import type {
 	DiscoveredFile,
@@ -18,6 +20,7 @@ const dmPortalURL =
 const dmPriceListURL =
 	"https://content.services.dmtech.com/rootpage-dm-shop-hr-hr/resource/blob/3245770/0a2d2d47073cad06c1f3a8d4fbba2e50/vlada-oznacavanje-cijena-cijenik-236-data.xlsx";
 const dmNationalStoreIdentifier = "dm_national";
+const dmSourceMode = "snapshot";
 
 const dmWebColumnMapping: XlsxColumnMapping = {
 	name: newNumericIndex(0),
@@ -105,9 +108,9 @@ export class DmAdapter extends BaseXlsxAdapter {
 	}
 
 	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
-		let date = targetDate || this.discoveryDate;
-		if (!date) {
-			date = new Date().toISOString().slice(0, 10);
+		let requestedDate = targetDate || this.discoveryDate;
+		if (!requestedDate) {
+			requestedDate = formatDateInTimezone(new Date(), ZAGREB_TIMEZONE);
 		}
 
 		const response = await this.fetchWithRetry(dmPriceListURL);
@@ -116,9 +119,6 @@ export class DmAdapter extends BaseXlsxAdapter {
 		}
 		const body = Buffer.from(await response.arrayBuffer());
 		const inferredDate = inferDateFromXlsxContent(body);
-		if (date && inferredDate && inferredDate !== date) {
-			return [];
-		}
 
 		const contentLength = response.headers.get("Content-Length");
 		const lastModified = response.headers.get("Last-Modified");
@@ -146,6 +146,24 @@ export class DmAdapter extends BaseXlsxAdapter {
 		if (!modTime) {
 			modTime = new Date();
 		}
+		const resolvedSnapshotDate =
+			inferredDate || formatDateInTimezone(modTime, ZAGREB_TIMEZONE);
+
+		if (requestedDate && requestedDate !== resolvedSnapshotDate) {
+			throw new IngestionClassifiedError({
+				status: "completed",
+				statusType: "source_snapshot_mismatch",
+				statusSeverity: "warning",
+				statusReason: `DM source is snapshot-only: requested ${requestedDate}, resolved snapshot date ${resolvedSnapshotDate}`,
+				metadata: {
+					sourceMode: dmSourceMode,
+					requestedTargetDate: requestedDate,
+					resolvedSnapshotDate,
+					sourceUrl: dmPriceListURL,
+					timezone: ZAGREB_TIMEZONE,
+				},
+			});
+		}
 
 		return [
 			{
@@ -158,7 +176,8 @@ export class DmAdapter extends BaseXlsxAdapter {
 					source: "dm_web",
 					discoveredAt: new Date().toISOString(),
 					portalUrl: dmPortalURL,
-					portalDate: inferredDate,
+					portalDate: resolvedSnapshotDate,
+					sourceMode: dmSourceMode,
 				},
 			},
 		];

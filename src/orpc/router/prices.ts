@@ -28,12 +28,16 @@ export const getStorePrices = procedure
 		z.object({
 			chainSlug: ChainSlugSchema,
 			storeId: z.string(),
+			includeFutureDates: z.boolean().optional().default(false),
 			limit: z.number().int().min(1).max(1000).default(100),
 			offset: z.number().int().min(0).default(0),
 		}),
 	)
 	.handler(async ({ input }) => {
 		const clickhouse = getClickHouse();
+		const dateGuard = input.includeFutureDates
+			? ""
+			: "AND target_date <= today()";
 
 		const baseQuery = `
 			SELECT
@@ -48,7 +52,7 @@ export const getStorePrices = procedure
 				argMax(unit_price_cents, target_date) AS unit_price,
 				max(target_date) AS last_seen_at
 			FROM prices
-			WHERE chain_slug = {chainSlug:String} AND store_id = {storeId:String}
+			WHERE chain_slug = {chainSlug:String} AND store_id = {storeId:String} ${dateGuard}
 			GROUP BY retailer_item_id
 		`;
 
@@ -74,6 +78,9 @@ export const getStorePrices = procedure
 			const currentPrice = parseNumber(row.current_price);
 			const isUnavailable =
 				row.price_status === "unavailable" || currentPrice === null;
+			const priceStatus: "available" | "unavailable" = isUnavailable
+				? "unavailable"
+				: "available";
 			const rawReason = row.price_unavailable_reason;
 			const reason =
 				isUnavailable &&
@@ -89,7 +96,7 @@ export const getStorePrices = procedure
 				itemName: row.item_name,
 				brand: row.brand ?? null,
 				currentPrice,
-				priceStatus: isUnavailable ? "unavailable" : "available",
+				priceStatus,
 				priceUnavailableReason: reason,
 				discountPrice: parseNumber(row.discount_price),
 				unitPrice: parseNumber(row.unit_price),

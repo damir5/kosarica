@@ -1,3 +1,10 @@
+import { IngestionClassifiedError } from "@/ingestion/errors";
+import {
+	compareDateKeys,
+	formatDateParts,
+	getTimezoneDateParts,
+	ZAGREB_TIMEZONE,
+} from "@/ingestion/time";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
@@ -12,6 +19,8 @@ interface IntersparJsonFile {
 interface IntersparJsonResponse {
 	files: IntersparJsonFile[];
 }
+
+const INTERSPAR_PUBLISH_CUTOFF_HOUR = 5;
 
 const intersparColumnMapping: CsvColumnMapping = {
 	externalId: "šifra",
@@ -84,6 +93,37 @@ export class IntersparAdapter extends BaseCsvAdapter {
 
 		const response = await this.fetchWithRetry(apiUrl);
 		if (!response.ok) {
+			if (response.status === 404) {
+				const noDataState = getIntersparNoDataState(date);
+				if (noDataState.retryAt) {
+					throw new IngestionClassifiedError({
+						status: "completed",
+						statusType: "source_not_published_yet",
+						statusSeverity: "warning",
+						statusReason: `Interspar index not published yet for ${date}; retry scheduled hourly until ${INTERSPAR_PUBLISH_CUTOFF_HOUR}:00 ${ZAGREB_TIMEZONE}`,
+						retryAt: noDataState.retryAt,
+						metadata: {
+							targetDate: date,
+							sourceUrl: apiUrl,
+							cutoffHourLocal: INTERSPAR_PUBLISH_CUTOFF_HOUR,
+							timezone: ZAGREB_TIMEZONE,
+						},
+					});
+				}
+
+				throw new IngestionClassifiedError({
+					status: "completed",
+					statusType: "source_no_data",
+					statusSeverity: "warning",
+					statusReason: `Interspar index not published for ${date} by ${INTERSPAR_PUBLISH_CUTOFF_HOUR}:00 ${ZAGREB_TIMEZONE}`,
+					metadata: {
+						targetDate: date,
+						sourceUrl: apiUrl,
+						cutoffHourLocal: INTERSPAR_PUBLISH_CUTOFF_HOUR,
+						timezone: ZAGREB_TIMEZONE,
+					},
+				});
+			}
 			throw new Error(
 				`Failed to fetch Interspar JSON API: status ${response.status}`,
 			);
@@ -121,4 +161,21 @@ export class IntersparAdapter extends BaseCsvAdapter {
 		}
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
+}
+
+function getIntersparNoDataState(targetDate: string): {
+	retryAt?: Date;
+} {
+	const now = new Date();
+	const nowInZagreb = getTimezoneDateParts(now, ZAGREB_TIMEZONE);
+	const localDate = formatDateParts(nowInZagreb);
+	const dateComparison = compareDateKeys(localDate, targetDate);
+	const beforeCutoffToday =
+		dateComparison === 0 && nowInZagreb.hour < INTERSPAR_PUBLISH_CUTOFF_HOUR;
+
+	if (beforeCutoffToday) {
+		return { retryAt: new Date(now.getTime() + 60 * 60 * 1000) };
+	}
+
+	return {};
 }

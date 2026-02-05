@@ -31,6 +31,7 @@ export const listCatalogPrices = procedure
 		z.object({
 			page: z.number().int().min(1).default(1),
 			pageSize: z.number().int().min(1).max(100).default(20),
+			includeFutureDates: z.boolean().optional().default(false),
 			chainSlug: z.string().optional(),
 			storeId: z.string().optional(),
 			category: z.string().optional(),
@@ -48,6 +49,9 @@ export const listCatalogPrices = procedure
 
 		const conditions: string[] = [];
 		const params: Record<string, string | number> = {};
+		if (!input.includeFutureDates) {
+			conditions.push("target_date <= today()");
+		}
 
 		if (input.chainSlug) {
 			conditions.push("chain_slug = {chainSlug:String}");
@@ -163,6 +167,9 @@ export const listCatalogPrices = procedure
 			const currentPrice = parseNumber(row.price_cents);
 			const isUnavailable =
 				row.price_status === "unavailable" || currentPrice === null;
+			const priceStatus: "available" | "unavailable" = isUnavailable
+				? "unavailable"
+				: "available";
 			const rawReason = row.price_unavailable_reason;
 			const reason =
 				isUnavailable &&
@@ -183,7 +190,7 @@ export const listCatalogPrices = procedure
 				storeName: store?.name ?? row.store_id,
 				storeCity: store?.city ?? null,
 				currentPrice,
-				priceStatus: isUnavailable ? "unavailable" : "available",
+				priceStatus,
 				priceUnavailableReason: reason,
 				discountPrice: parseNumber(row.discount_price_cents),
 				lastSeenAt: row.last_seen_at ?? null,
