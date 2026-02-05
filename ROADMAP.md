@@ -1,7 +1,3 @@
-sequential-noodling-oasis.md - error handling
-
-- fts - ngram/bm25 options
-
 - front ux
   - ux skill
   - sample ui from figma
@@ -41,4 +37,4 @@ https://www.reddit.com/r/ClaudeAI/comments/1qgdg6v/finally_get_1500_users_on_my_
 - barcode matching
 - categories
 - ai matching - analyze and create instructions ? or run in bg as claw and create reports for manual review by other ais and then human - whatapp channel
-
+- stores
