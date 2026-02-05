@@ -1,5 +1,5 @@
 import type { CsvColumnMapping } from "../../parsers/csv";
-import type { DiscoveredFile } from "../../types";
+import type { DiscoveredFile, ParseResult } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
 
@@ -208,6 +208,47 @@ export class KtcAdapter extends BaseCsvAdapter {
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
 
+	protected postprocessResult(result: ParseResult): ParseResult {
+		const warnings = [...result.warnings];
+		const rows = result.rows.map((row) => {
+			if (row.barcodes.length === 0) {
+				return row;
+			}
+
+			const deduped: string[] = [];
+			const seen = new Set<string>();
+
+			for (const barcode of row.barcodes) {
+				const normalized = normalizeKtcBarcode(barcode);
+				if (!normalized) {
+					warnings.push({
+						rowNumber: row.rowNumber,
+						field: "barcodes",
+						message: `Dropped invalid KTC barcode: ${barcode}`,
+					});
+					continue;
+				}
+
+				if (seen.has(normalized)) {
+					continue;
+				}
+				seen.add(normalized);
+				deduped.push(normalized);
+			}
+
+			return {
+				...row,
+				barcodes: deduped,
+			};
+		});
+
+		return {
+			...result,
+			rows,
+			warnings,
+		};
+	}
+
 	private extractDateFromFilename(filename: string): string {
 		const match = filename.match(/(\d{4})(\d{2})(\d{2})-\d{6}\.csv$/);
 		if (match) {
@@ -261,6 +302,14 @@ function resolveKtcHref(href: string, portalUrl: string): string | null {
 	} catch {
 		return null;
 	}
+}
+
+function normalizeKtcBarcode(value: string): string | null {
+	const digitsOnly = value.replace(/[^0-9]/g, "");
+	if (digitsOnly.length < 8 || digitsOnly.length > 14) {
+		return null;
+	}
+	return digitsOnly;
 }
 
 function encodePathSegment(segment: string): string {
