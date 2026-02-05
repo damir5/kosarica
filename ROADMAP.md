@@ -1,5 +1,6 @@
 sequential-noodling-oasis.md - error handling
-convert logging to pino
+
+- fts - ngram/bm25 options
 
 - front ux
   - ux skill
