@@ -7,6 +7,9 @@ import {
 	getTempStorageConfig,
 	listAllTempDirs,
 } from "@/lib/storage/temp";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("temp-cleanup");
 
 /**
  * Manual cleanup script for temporary storage.
@@ -105,6 +108,7 @@ function formatSize(bytes: number): string {
 }
 
 main().catch((error) => {
+	log.error("Temporary storage cleanup failed", { error });
 	console.error("❌ Error:", error);
 	process.exit(1);
 });

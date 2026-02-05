@@ -5,6 +5,9 @@ config();
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { getTempStorageConfig, listAllTempDirs } from "@/lib/storage";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("temp-cleanup");
 
 /**
  * Storage Health Check Script
@@ -49,7 +52,7 @@ async function getDirectoryStats(dirPath: string): Promise<DirectoryStats> {
 	} catch (error) {
 		// Directory doesn't exist or can't be read
 		if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-			console.warn(`Warning: Could not read ${dirPath}:`, error);
+			log.warn(`Could not read ${dirPath}`, { error });
 		}
 	}
 
@@ -199,6 +202,7 @@ async function main() {
 }
 
 main().catch((error) => {
+	log.error("Storage health check failed", { error });
 	console.error("❌ Error:", error);
 	process.exit(1);
 });

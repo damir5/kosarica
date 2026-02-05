@@ -1,6 +1,9 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("app");
 
 // Validate that Drizzle migrations are consistent
 function validateMigrations(): boolean {
@@ -71,8 +74,10 @@ success = validateMigrations() && success;
 
 if (success) {
 	console.log("\n✓ All schema validations passed");
+	log.info("Schema validation passed");
 	process.exit(0);
 } else {
 	console.error("\n✗ Schema validation failed");
+	log.error("Schema validation failed");
 	process.exit(1);
 }

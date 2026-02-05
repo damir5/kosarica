@@ -1,21 +1,11 @@
 /**
- * Structured JSONL logger for Node.js
- * Uses pino-compatible log format for use with pino-pretty in development
+ * Structured JSONL logger for Node.js using pino
+ * Maintains pino-compatible log format for use with pino-pretty in development
  */
 
+import pino from "pino";
 import { serializeError } from "serialize-error";
 import { getRequestId } from "./request-context";
-
-/**
- * Convert an error to a plain object with stack trace preserved.
- * Use this to serialize errors for logging or API responses.
- */
-export function errorToObject(error: unknown): Record<string, unknown> {
-	if (error instanceof Error) {
-		return serializeError(error);
-	}
-	return { message: String(error) };
-}
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -48,16 +38,6 @@ const LOG_LEVEL_ORDER: Record<LogLevel, number> = {
 };
 
 /**
- * Pino-compatible numeric log levels
- */
-const PINO_LEVELS: Record<LogLevel, number> = {
-	debug: 20,
-	info: 30,
-	warn: 40,
-	error: 50,
-};
-
-/**
  * Check if running in development mode
  */
 const isDev = process.env.NODE_ENV === "development";
@@ -74,13 +54,15 @@ function getCallerLocation(): string | undefined {
 	if (!stack) return undefined;
 
 	// Stack format: Error\n    at fn (file:line:col)\n...
-	// We need to skip: Error, getCallerLocation, formatLogEntry, debug/info/warn/error
+	// We need to skip: Error, getCallerLocation, and pino internals
 	const lines = stack.split("\n");
 
-	// Find the first line that's not from logger.ts
+	// Find the first line that's not from logger.ts or pino internals
 	for (const line of lines) {
 		if (line.includes("logger.ts")) continue;
+		if (line.includes("node_modules/pino")) continue;
 		if (line.includes("Error")) continue;
+		if (line.trim() === "") continue;
 
 		// Match file:line:col pattern
 		const match =
@@ -199,18 +181,41 @@ export interface LogContext {
 }
 
 /**
- * Pino-compatible log entry structure
+ * Convert an error to a plain object with stack trace preserved.
+ * Use this to serialize errors for logging or API responses.
  */
-interface PinoLogEntry {
-	level: number;
-	time: number;
-	msg: string;
-	caller?: string;
-	loggerType?: LoggerType;
-	requestId?: string;
-	service: string;
-	[key: string]: unknown;
+export function errorToObject(error: unknown): Record<string, unknown> {
+	if (error instanceof Error) {
+		return serializeError(error);
+	}
+	return { message: String(error) };
 }
+
+/**
+ * Sensitive field keys for redaction
+ */
+const SENSITIVE_KEYS = [
+	"password",
+	"apikey",
+	"api_key",
+	"secret",
+	"token",
+	"authorization",
+	"signingkey",
+];
+
+/**
+ * Pino redaction paths for sensitive data
+ */
+const PINO_REDACT_PATHS = SENSITIVE_KEYS.map((key) => `[${key}]`);
+
+/**
+ * Create pino redaction paths for nested objects
+ */
+const NESTED_REDACT_PATHS = SENSITIVE_KEYS.flatMap((key) => [
+	`[*].${key}`,
+	`*.${key}`,
+]);
 
 /**
  * Sanitize sensitive data from objects before logging.
@@ -241,19 +246,10 @@ export function sanitize(data: unknown, depth = 0): unknown {
 	}
 
 	const sanitized: Record<string, unknown> = {};
-	const sensitiveKeys = [
-		"password",
-		"apikey",
-		"api_key",
-		"secret",
-		"token",
-		"authorization",
-		"signingkey",
-	];
 
 	for (const [key, value] of Object.entries(data)) {
 		const lowerKey = key.toLowerCase();
-		if (sensitiveKeys.some((sensitive) => lowerKey.includes(sensitive))) {
+		if (SENSITIVE_KEYS.some((sensitive) => lowerKey.includes(sensitive))) {
 			sanitized[key] = "[REDACTED]";
 		} else if (typeof value === "bigint") {
 			sanitized[key] = `${value.toString()}n`;
@@ -268,202 +264,164 @@ export function sanitize(data: unknown, depth = 0): unknown {
 }
 
 /**
- * Merge error into context, serializing Error instances
+ * Create a custom pino destination that filters based on shouldLog
  */
-function mergeErrorIntoContext(
-	context: LogContext | undefined,
-	error: unknown,
-): LogContext {
-	const base = context ?? {};
-	if (error !== undefined) {
-		return {
-			...base,
-			error: error instanceof Error ? serializeError(error) : error,
-		};
-	}
-	return base;
+function createFilteredDestination(_loggerType?: LoggerType) {
+	// Use pino's default destination (stdout/stderr)
+	return pino.destination({
+		sync: false,
+	});
 }
 
 /**
- * Format log entry as pino-compatible JSON
- * Fields are at top level (not nested) for pino-pretty compatibility
+ * Create pino configuration for a specific logger type
  */
-function formatLogEntry(
-	level: LogLevel,
-	message: string,
-	context?: LogContext,
-	loggerType?: LoggerType,
-	requestId?: string,
-): string {
-	const entry: PinoLogEntry = {
-		level: PINO_LEVELS[level],
-		time: Date.now(),
-		msg: message,
-		service: "kosarica-nodejs",
+function createPinoConfig(loggerType?: LoggerType): pino.LoggerOptions {
+	return {
+		level: (process.env.LOG_LEVEL as LogLevel) ?? "info",
+		formatters: {
+			level: (label) => ({ level: label }),
+			log: (object) => {
+				// Add caller location in dev mode
+				if (isDev) {
+					const caller = getCallerLocation();
+					if (caller) {
+						object.caller = caller;
+					}
+				}
+				// Add loggerType if specified
+				if (loggerType) {
+					object.loggerType = loggerType;
+				}
+				return object;
+			},
+		},
+		serializers: {
+			err: (err) => serializeError(err),
+		},
+		redact: {
+			paths: [...PINO_REDACT_PATHS, ...NESTED_REDACT_PATHS],
+			censor: "[REDACTED]",
+			remove: true,
+		},
+		base: {
+			service: "kosarica-nodejs",
+		},
+		timestamp: () => `,"time":${Date.now()}`,
+		mixin: () => {
+			const mixinData: Record<string, unknown> = {};
+			const requestId = getRequestId();
+			if (requestId) mixinData.requestId = requestId;
+			return mixinData;
+		},
 	};
-
-	// Add caller location in dev mode
-	const caller = getCallerLocation();
-	if (caller) {
-		entry.caller = caller;
-	}
-
-	if (loggerType) {
-		entry.loggerType = loggerType;
-	}
-
-	if (requestId) {
-		entry.requestId = requestId;
-	}
-
-	// Spread context fields at top level for pino-pretty compatibility
-	if (context && Object.keys(context).length > 0) {
-		const sanitized = sanitize(context) as LogContext;
-		Object.assign(entry, sanitized);
-	}
-
-	return JSON.stringify(entry);
 }
 
 /**
- * Logger class with structured logging support
+ * Pino instance cache for each logger type
+ */
+const pinoCache = new Map<LoggerType | undefined, pino.Logger>();
+
+/**
+ * Get or create a pino instance for a specific logger type
+ */
+function getPinoLogger(loggerType?: LoggerType): pino.Logger {
+	const existing = pinoCache.get(loggerType);
+	if (existing) {
+		return existing;
+	}
+
+	const pinoInstance = pino(
+		createPinoConfig(loggerType),
+		createFilteredDestination(loggerType),
+	);
+
+	pinoCache.set(loggerType, pinoInstance);
+	return pinoInstance;
+}
+
+/**
+ * Logger class with structured logging support using pino
  */
 class Logger {
+	private pinoLogger: pino.Logger;
 	private loggerType?: LoggerType;
+	private baseContext?: LogContext;
 
-	constructor(loggerType?: LoggerType) {
+	constructor(loggerType?: LoggerType, baseContext?: LogContext) {
 		this.loggerType = loggerType;
+		this.baseContext = baseContext;
+		this.pinoLogger = getPinoLogger(loggerType);
+	}
+
+	private shouldLog(level: LogLevel): boolean {
+		return shouldLog(level, this.loggerType);
+	}
+
+	private prepareContext(
+		context?: LogContext,
+		error?: unknown,
+	): Record<string, unknown> {
+		let result: Record<string, unknown> = {};
+
+		// Add base context from child logger
+		if (this.baseContext) {
+			result = { ...result, ...this.baseContext };
+		}
+
+		// Add provided context
+		if (context && Object.keys(context).length > 0) {
+			result = { ...result, ...context };
+		}
+
+		// Add error if provided
+		if (error !== undefined) {
+			if (error instanceof Error) {
+				result.err = error;
+			} else {
+				result.error = error;
+			}
+		}
+
+		return result;
 	}
 
 	debug(message: string, context?: LogContext, error?: unknown): void {
-		if (!shouldLog("debug", this.loggerType)) return;
+		if (!this.shouldLog("debug")) return;
 
-		const mergedContext =
-			error !== undefined ? mergeErrorIntoContext(context, error) : context;
-		const sanitizedContext = mergedContext
-			? (sanitize(mergedContext) as LogContext)
-			: undefined;
-		const requestId = getRequestId();
-
-		console.debug(
-			formatLogEntry(
-				"debug",
-				message,
-				sanitizedContext,
-				this.loggerType,
-				requestId,
-			),
-		);
+		const preparedContext = this.prepareContext(context, error);
+		this.pinoLogger.debug(preparedContext, message);
 	}
 
 	info(message: string, context?: LogContext, error?: unknown): void {
-		if (!shouldLog("info", this.loggerType)) return;
+		if (!this.shouldLog("info")) return;
 
-		const mergedContext =
-			error !== undefined ? mergeErrorIntoContext(context, error) : context;
-		const sanitizedContext = mergedContext
-			? (sanitize(mergedContext) as LogContext)
-			: undefined;
-		const requestId = getRequestId();
-
-		console.log(
-			formatLogEntry(
-				"info",
-				message,
-				sanitizedContext,
-				this.loggerType,
-				requestId,
-			),
-		);
+		const preparedContext = this.prepareContext(context, error);
+		this.pinoLogger.info(preparedContext, message);
 	}
 
 	warn(message: string, context?: LogContext, error?: unknown): void {
-		if (!shouldLog("warn", this.loggerType)) return;
+		if (!this.shouldLog("warn")) return;
 
-		const mergedContext =
-			error !== undefined ? mergeErrorIntoContext(context, error) : context;
-		const sanitizedContext = mergedContext
-			? (sanitize(mergedContext) as LogContext)
-			: undefined;
-		const requestId = getRequestId();
-
-		console.warn(
-			formatLogEntry(
-				"warn",
-				message,
-				sanitizedContext,
-				this.loggerType,
-				requestId,
-			),
-		);
+		const preparedContext = this.prepareContext(context, error);
+		this.pinoLogger.warn(preparedContext, message);
 	}
 
 	error(message: string, context?: LogContext, error?: unknown): void {
-		if (!shouldLog("error", this.loggerType)) return;
+		if (!this.shouldLog("error")) return;
 
-		const mergedContext =
-			error !== undefined ? mergeErrorIntoContext(context, error) : context;
-		const sanitizedContext = mergedContext
-			? (sanitize(mergedContext) as LogContext)
-			: undefined;
-		const requestId = getRequestId();
-
-		console.error(
-			formatLogEntry(
-				"error",
-				message,
-				sanitizedContext,
-				this.loggerType,
-				requestId,
-			),
-		);
+		const preparedContext = this.prepareContext(context, error);
+		this.pinoLogger.error(preparedContext, message);
 	}
 
 	/**
 	 * Create a child logger with a base operation context
 	 */
 	child(baseContext: LogContext): Logger {
-		const childLogger = new Logger(this.loggerType);
-		const originalMethods = {
-			debug: childLogger.debug.bind(childLogger),
-			info: childLogger.info.bind(childLogger),
-			warn: childLogger.warn.bind(childLogger),
-			error: childLogger.error.bind(childLogger),
-		};
-
-		childLogger.debug = (
-			message: string,
-			context?: LogContext,
-			error?: unknown,
-		) => {
-			originalMethods.debug(message, { ...baseContext, ...context }, error);
-		};
-
-		childLogger.info = (
-			message: string,
-			context?: LogContext,
-			error?: unknown,
-		) => {
-			originalMethods.info(message, { ...baseContext, ...context }, error);
-		};
-
-		childLogger.warn = (
-			message: string,
-			context?: LogContext,
-			error?: unknown,
-		) => {
-			originalMethods.warn(message, { ...baseContext, ...context }, error);
-		};
-
-		childLogger.error = (
-			message: string,
-			context?: LogContext,
-			error?: unknown,
-		) => {
-			originalMethods.error(message, { ...baseContext, ...context }, error);
-		};
-
-		return childLogger;
+		return new Logger(this.loggerType, {
+			...this.baseContext,
+			...baseContext,
+		});
 	}
 }
 
@@ -480,7 +438,7 @@ export function createLogger(loggerType: LoggerType): Logger {
 /**
  * Helper to measure execution time
  */
-export function measureTime<T>(
+export async function measureTime<T>(
 	fn: () => T | Promise<T>,
 ): Promise<{ result: T; duration: number }> {
 	const start = Date.now();

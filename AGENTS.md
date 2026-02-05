@@ -176,3 +176,62 @@ Add `"scheduler"` to `LOG_TYPES` environment variable to enable scheduler logs:
 ```bash
 LOG_TYPES=scheduler,daily-ingestion
 ```
+
+---
+
+## Logging (Pino)
+
+This project uses **pino** for structured JSON logging with pino-pretty for development output.
+
+### Logger API
+
+```typescript
+import { createLogger, logger } from "@/utils/logger";
+
+// Use singleton (type: "app")
+logger.info("Message", { key: "value" });
+
+// Create typed logger
+const log = createLogger("matching");
+log.info("Starting operation", { operation: "barcode-match" });
+log.error("Operation failed", { error }); // Error instances are serialized automatically
+```
+
+### Log Levels
+
+- `debug` - Detailed debugging information
+- `info` - General informational messages
+- `warn` - Warning messages
+- `error` - Error messages
+
+### Logger Types
+
+Available types for filtering: `rpc`, `http`, `auth`, `db`, `app`, `ingestion`, `scheduler`, `daily-ingestion`, `temp-cleanup`, `matching`
+
+### Environment Variables
+
+- `LOG_LEVEL` - Minimum level to output (default: `info`)
+- `LOG_TYPES` - Comma-separated list of types to log, or `*` for all
+
+Examples:
+```bash
+LOG_LEVEL=error              # Only errors
+LOG_TYPES=rpc,http           # Only RPC and HTTP logs
+LOG_TYPES=*,-db             # All except database logs
+```
+
+### Features
+
+- **Request ID tracking** - Automatically included from AsyncLocalStorage
+- **Sensitive data redaction** - Fields like `password`, `token`, `secret` are redacted
+- **Caller location** - File:line:col shown in development mode
+- **Child loggers** - Create contextual loggers with `.child({ context })`
+- **BigInt serialization** - Automatically converted to strings
+- **Error serialization** - Stack traces preserved via `serialize-error`
+
+### Scripts Logging Pattern
+
+For CLI scripts where console output is user-facing:
+- Use `log.info()`/`log.error()` for internal operations
+- Keep `console.log()` for final results displayed to user
+

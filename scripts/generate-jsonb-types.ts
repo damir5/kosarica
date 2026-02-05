@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { writeFileSync, mkdirSync } from "node:fs";
 import * as schemas from "../src/db/jsonb-schemas";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("app");
 
 const outputDir = "shared/schemas/jsonb";
 mkdirSync(outputDir, { recursive: true });
@@ -30,3 +33,4 @@ for (const [name, schema] of Object.entries(schemaMap)) {
 }
 
 console.log("Generated JSON schemas in", outputDir);
+log.info("Generated JSON schemas", { outputDir });

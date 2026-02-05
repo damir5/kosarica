@@ -1,10 +1,13 @@
 import "dotenv/config";
 import { getDatabase } from "../src/db/index";
 import { sql } from "drizzle-orm";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("app");
 
 async function seedTestData() {
 	const db = getDatabase();
-	console.log("Seeding test data...");
+	log.info("Seeding test data...");
 
 	try {
 		await db.execute(
@@ -119,20 +122,24 @@ async function seedTestData() {
 		console.log(`   Store price refs: ${storeRefsCount} rows`);
 
 		console.log("\n✅ Test data seeded successfully!");
+		log.info("Test data seeded successfully");
 	} catch (error) {
 		console.error("\n❌ Error seeding test data:", error);
+		log.error("Error seeding test data", { error });
 		throw error;
 	} finally {
-		
+
 	}
 }
 
 seedTestData()
 	.then(() => {
 		console.log("\nDone!");
+		log.info("Test data seeding complete");
 		process.exit(0);
 	})
 	.catch((error) => {
 		console.error("\nFatal error:", error);
+		log.error("Fatal error during test data seeding", { error });
 		process.exit(1);
 	});
