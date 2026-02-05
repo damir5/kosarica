@@ -235,3 +235,84 @@ For CLI scripts where console output is user-facing:
 - Use `log.info()`/`log.error()` for internal operations
 - Keep `console.log()` for final results displayed to user
 
+---
+
+## Error Handling (neverthrow)
+
+The codebase uses `neverthrow` `Result`/`ResultAsync` types for type-safe error handling in adapters and infrastructure wrappers. Do NOT use try/catch in these layers — return typed errors instead.
+
+### Error types (`src/lib/errors.ts`)
+
+Discriminated union with `_tag` field:
+- `DbError` — database failures (includes PostgreSQL error `code`)
+- `FetchError` — HTTP/network failures (includes `retryable`, `attempts`)
+- `StorageError` — file storage failures
+
+Constructors: `dbError()`, `fetchError()`, `storageError()`
+Helpers: `isDeadlock()`, `isUniqueViolation()`, `toLogContext()`
+
+### Wrappers
+
+| Wrapper | File | Usage |
+|---------|------|-------|
+| `safeQuery()` | `src/lib/safe-db.ts` | Wraps any DB promise into `ResultAsync<T, DbError>` |
+| `safeFetch()` | `src/lib/safe-fetch.ts` | Standalone fetch with retry returning `ResultAsync<Response, FetchError>` |
+| `createSafeStorage()` | `src/lib/safe-storage.ts` | Wraps `Storage` interface into `SafeStorage` with `ResultAsync` methods |
+
+### Adapter pattern
+
+Chain adapters return `ResultAsync` from `discover()`, `fetch()`, and `parse()`. Chain results using `.andThen()` for async and `.map()` for sync transforms:
+
+```typescript
+// Chaining ResultAsync — fetch then transform
+fetch(file: DiscoveredFile): ResultAsync<FetchedFile, FetchError> {
+  return this.fetchWithRetry(file.url)
+    .andThen((response) =>
+      ResultAsync.fromPromise(response.arrayBuffer(), (e) =>
+        fetchError({
+          url: file.url,
+          message: e instanceof Error ? e.message : "Failed to read response body",
+          retryable: false, attempts: 1, cause: e,
+        }),
+      ),
+    )
+    .map((arrayBuffer) => ({
+      discovered: file,
+      content: Buffer.from(arrayBuffer),
+      hash: computeSha256(Buffer.from(arrayBuffer)),
+    }));
+}
+
+// Returning a classified error instead of throwing
+return errAsync(ingestionClassified({
+  status: "completed",
+  statusType: "no_data_in_window",
+  statusSeverity: "warning",
+  statusReason: "No data available in publish window",
+}));
+```
+
+### Pipeline boundary
+
+`pipeline.ts` unwraps `Result` back to exceptions at the adapter call sites. This is the intentional bridge — pipeline internals still use try/catch:
+
+```typescript
+const discoverResult = await adapter.discover(dateStr);
+if (discoverResult.isErr()) {
+  const error = discoverResult.error;
+  if (error._tag === "IngestionClassified") {
+    throw new IngestionClassifiedError(error.classification);
+  }
+  throw new Error(error.message);
+}
+const discoveredFiles = discoverResult.value;
+```
+
+### Rules
+
+- **Adapters/wrappers**: Always return `ResultAsync`, never throw
+- **Pipeline boundary**: Unwrap with `.isErr()` / `.value` and convert to exceptions
+- Use `.map()` for sync transforms, `.andThen()` for async transforms
+- Do NOT add no-op `.orElse()` chains that just pass errors through
+- `IngestionClassified` (value type) is for Result errors; `IngestionClassifiedError` (class) is for pipeline catch blocks — both coexist
+

@@ -1,3 +1,5 @@
+import { ResultAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
 import { type CsvColumnMapping, CsvParser } from "../../parsers/csv";
 import type { ParseOptions, ParseResult } from "../../types";
 import { type BaseAdapterConfig, BaseChainAdapter } from "./chain";
@@ -40,15 +42,31 @@ export class BaseCsvAdapter extends BaseChainAdapter {
 		this.csvParser.setAlternativeMapping(cfg.alternativeColumnMapping);
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		_options?: ParseOptions,
-	): Promise<ParseResult> {
-		const processed = this.preprocessContent(content);
-		const storeIdentifier = this.extractStoreIdentifierFromFilename(filename);
-		const result = this.csvParser.parseWithStoreId(processed, storeIdentifier);
-		return this.postprocessResult(result);
+	): ResultAsync<ParseResult, FetchError> {
+		return ResultAsync.fromPromise(
+			Promise.resolve().then(() => {
+				const processed = this.preprocessContent(content);
+				const storeIdentifier = this.extractStoreIdentifierFromFilename(filename);
+				const result = this.csvParser.parseWithStoreId(
+					processed,
+					storeIdentifier,
+				);
+				return result;
+			}),
+			(e) =>
+				fetchError({
+					url: filename,
+					message: e instanceof Error ? e.message : "CSV parse failed",
+					retryable: false,
+					attempts: 0,
+					cause: e,
+				}),
+		)
+			.map((result) => this.postprocessResult(result));
 	}
 
 	protected preprocessContent(content: Buffer): Buffer {

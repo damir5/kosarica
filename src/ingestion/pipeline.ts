@@ -1276,10 +1276,14 @@ async function processIngestionFile(options: {
 		fileEntry.content,
 		fileEntry.filename,
 	);
+	if (parseResult.isErr()) {
+		throw new Error(parseResult.error.message);
+	}
 	const parseDurationMs = Date.now() - parseStart;
 
-	fileErrorCount += parseResult.errors.length;
-	const parseErrors = mapParseErrors(runId, fileId, parseResult);
+	const parsed = parseResult.value;
+	fileErrorCount += parsed.errors.length;
+	const parseErrors = mapParseErrors(runId, fileId, parsed);
 	await insertErrors(parseErrors, performanceConfig.dbBatchSize);
 
 	const failedRows: Array<{
@@ -1305,7 +1309,7 @@ async function processIngestionFile(options: {
 	const priceAvailability = emptyPriceAvailabilityStats();
 	const storeMetadata = adapter.extractStoreMetadata(fileEntry.file);
 
-	for (const row of parseResult.rows) {
+	for (const row of parsed.rows) {
 		const storeIdentifier =
 			row.storeIdentifier?.trim() ||
 			adapter.extractStoreIdentifier(fileEntry.file)?.value ||
@@ -1513,7 +1517,7 @@ async function processIngestionFile(options: {
 	await db
 		.update(ingestionFiles)
 		.set({
-			entryCount: parseResult.totalRows,
+			entryCount: parsed.totalRows,
 			status: "completed",
 			statusSeverity: fileErrorCount > 0 ? "warning" : null,
 			processedAt: new Date(),
@@ -1522,7 +1526,7 @@ async function processIngestionFile(options: {
 			metadata: JSON.stringify({
 				sourceUrl: fileEntry.file.url,
 				archiveId: fileEntry.archiveId,
-				rowCount: parseResult.totalRows,
+				rowCount: parsed.totalRows,
 				processedRows: validRows.length,
 				failedRows: fileFailedRows,
 				warningRows: fileWarningRows,
@@ -1538,7 +1542,7 @@ async function processIngestionFile(options: {
 		.where(eq(ingestionFiles.id, fileId));
 
 	return {
-		totalRows: parseResult.totalRows,
+		totalRows: parsed.totalRows,
 		processedRows: validRows.length,
 		warningRows: fileWarningRows,
 		failedRows: fileFailedRows,
@@ -1670,7 +1674,15 @@ export async function runIngestion(
 		const adapter = getAdapter(chainSlug as never);
 		const runWallStart = Date.now();
 		const discoverStartedAt = Date.now();
-		const discoveredFiles = await adapter.discover(dateStr);
+		const discoverResult = await adapter.discover(dateStr);
+		if (discoverResult.isErr()) {
+			const discoverError = discoverResult.error;
+			if (discoverError._tag === "IngestionClassified") {
+				throw new IngestionClassifiedError(discoverError.classification);
+			}
+			throw new Error(discoverError.message);
+		}
+		const discoveredFiles = discoverResult.value;
 		const discoverDurationMs = Date.now() - discoverStartedAt;
 		log.info("Discovered files", { chainSlug, count: discoveredFiles.length });
 		const storeIdentifierType = buildStoreIdentifierType(chainSlug);
@@ -1689,7 +1701,11 @@ export async function runIngestion(
 					progress: `${fileIndex}/${discoveredFiles.length}`,
 				});
 			}
-			const fetched = await adapter.fetch(file);
+			const fetchResult = await adapter.fetch(file);
+			if (fetchResult.isErr()) {
+				throw new Error(fetchResult.error.message);
+			}
+			const fetched = fetchResult.value;
 			const archiveKey = buildArchiveKey(chainSlug, targetDate, file.filename);
 			const archiveId = await createArchiveRecord(
 				chainSlug,

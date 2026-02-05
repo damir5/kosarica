@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import { ResultAsync, errAsync, okAsync } from "neverthrow";
 import * as XLSX from "xlsx";
-import { IngestionClassifiedError } from "@/ingestion/errors";
+import { fetchError, type FetchError } from "@/lib/errors";
+import { ingestionClassified, type IngestionClassified } from "@/ingestion/errors";
 import { formatDateInTimezone, ZAGREB_TIMEZONE } from "@/ingestion/time";
 import type { XlsxColumnMapping } from "../../parsers/xlsx";
 import type {
@@ -107,100 +109,133 @@ export class DmAdapter extends BaseXlsxAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		let requestedDate = targetDate || this.discoveryDate;
 		if (!requestedDate) {
 			requestedDate = formatDateInTimezone(new Date(), ZAGREB_TIMEZONE);
 		}
 
-		const response = await this.fetchWithRetry(dmPriceListURL);
-		if (!response.ok) {
-			return [];
-		}
-		const body = Buffer.from(await response.arrayBuffer());
-		const inferredDate = inferDateFromXlsxContent(body);
+		return this.fetchWithRetry(dmPriceListURL)
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.arrayBuffer(), (e) =>
+					fetchError({
+						url: dmPriceListURL,
+						message:
+							e instanceof Error ? e.message : "Failed to read response body",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				).map((arrayBuffer) => ({
+					response,
+					body: Buffer.from(arrayBuffer),
+				})),
+			)
+			.andThen(({ response, body }) => {
+				const inferredDate = inferDateFromXlsxContent(body);
 
-		const contentLength = response.headers.get("Content-Length");
-		const lastModified = response.headers.get("Last-Modified");
-		const urlParts = dmPriceListURL.split("/");
-		const urlFilename = urlParts[urlParts.length - 1] || "dm-cjenik.xlsx";
+				const contentLength = response.headers.get("Content-Length");
+				const lastModified = response.headers.get("Last-Modified");
+				const urlParts = dmPriceListURL.split("/");
+				const urlFilename = urlParts[urlParts.length - 1] || "dm-cjenik.xlsx";
 
-		let size: number | undefined;
-		if (contentLength) {
-			const parsed = Number.parseInt(contentLength, 10);
-			if (!Number.isNaN(parsed) && parsed > 0) {
-				size = parsed;
-			}
-		}
-		if (!size && body.length > 0) {
-			size = body.length;
-		}
+				let size: number | undefined;
+				if (contentLength) {
+					const parsed = Number.parseInt(contentLength, 10);
+					if (!Number.isNaN(parsed) && parsed > 0) {
+						size = parsed;
+					}
+				}
+				if (!size && body.length > 0) {
+					size = body.length;
+				}
 
-		let modTime: Date | undefined;
-		if (lastModified) {
-			const parsed = Date.parse(lastModified);
-			if (!Number.isNaN(parsed)) {
-				modTime = new Date(parsed);
-			}
-		}
-		if (!modTime) {
-			modTime = new Date();
-		}
-		const resolvedSnapshotDate =
-			inferredDate || formatDateInTimezone(modTime, ZAGREB_TIMEZONE);
+				let modTime: Date | undefined;
+				if (lastModified) {
+					const parsed = Date.parse(lastModified);
+					if (!Number.isNaN(parsed)) {
+						modTime = new Date(parsed);
+					}
+				}
+				if (!modTime) {
+					modTime = new Date();
+				}
+				const resolvedSnapshotDate =
+					inferredDate || formatDateInTimezone(modTime, ZAGREB_TIMEZONE);
 
-		if (requestedDate && requestedDate !== resolvedSnapshotDate) {
-			throw new IngestionClassifiedError({
-				status: "completed",
-				statusType: "source_snapshot_mismatch",
-				statusSeverity: "warning",
-				statusReason: `DM source is snapshot-only: requested ${requestedDate}, resolved snapshot date ${resolvedSnapshotDate}`,
-				metadata: {
-					sourceMode: dmSourceMode,
-					requestedTargetDate: requestedDate,
-					resolvedSnapshotDate,
-					sourceUrl: dmPriceListURL,
-					timezone: ZAGREB_TIMEZONE,
-				},
+				if (requestedDate && requestedDate !== resolvedSnapshotDate) {
+					return errAsync(
+						ingestionClassified({
+							status: "completed",
+							statusType: "source_snapshot_mismatch",
+							statusSeverity: "warning",
+							statusReason: `DM source is snapshot-only: requested ${requestedDate}, resolved snapshot date ${resolvedSnapshotDate}`,
+							metadata: {
+								sourceMode: dmSourceMode,
+								requestedTargetDate: requestedDate,
+								resolvedSnapshotDate,
+								sourceUrl: dmPriceListURL,
+								timezone: ZAGREB_TIMEZONE,
+							},
+						}),
+					);
+				}
+
+				const files: DiscoveredFile[] = [
+					{
+						url: dmPriceListURL,
+						filename: urlFilename,
+						type: "xlsx",
+						size,
+						lastModified: modTime,
+						metadata: {
+							source: "dm_web",
+							discoveredAt: new Date().toISOString(),
+							portalUrl: dmPortalURL,
+							portalDate: resolvedSnapshotDate,
+							sourceMode: dmSourceMode,
+						},
+					},
+				];
+
+				return okAsync(files);
+			})
+			.orElse((error) => {
+				if (error._tag === "FetchError" && error.status === 404) {
+					return okAsync<DiscoveredFile[]>([]);
+				}
+				return errAsync(error);
 			});
-		}
-
-		return [
-			{
-				url: dmPriceListURL,
-				filename: urlFilename,
-				type: "xlsx",
-				size,
-				lastModified: modTime,
-				metadata: {
-					source: "dm_web",
-					discoveredAt: new Date().toISOString(),
-					portalUrl: dmPortalURL,
-					portalDate: resolvedSnapshotDate,
-					sourceMode: dmSourceMode,
-				},
-			},
-		];
 	}
 
-	async fetch(file: DiscoveredFile): Promise<FetchedFile> {
+	fetch(file: DiscoveredFile): ResultAsync<FetchedFile, FetchError> {
 		if (file.url.startsWith("file://")) {
 			const filePath = file.url.replace("file://", "");
-			const content = await fs.readFile(filePath);
-			return {
+			return ResultAsync.fromPromise(fs.readFile(filePath), (error) =>
+				fetchError({
+					url: file.url,
+					message:
+						error instanceof Error ? error.message : "Failed to read file",
+					retryable: false,
+					attempts: 1,
+					cause: error,
+				}),
+			).map((content) => ({
 				discovered: file,
 				content,
 				hash: computeHash(content),
-			};
+			}));
 		}
 		return super.fetch(file);
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult> {
+	): ResultAsync<ParseResult, FetchError> {
 		const storeIdentifier = dmNationalStoreIdentifier;
 		const isWebFormat =
 			filename.includes("vlada-oznacavanje") || filename.includes("cijenik-");
@@ -224,19 +259,19 @@ export class DmAdapter extends BaseXlsxAdapter {
 			skipEmptyRows: true,
 		});
 
-		let result = await super.parse(content, filename, options);
-		if (result.validRows === 0 && result.errors.length > 0) {
-			this.setParserOptions({
-				columnMapping: dmLocalColumnMappingAlt,
-				hasHeader: true,
-				headerRowCount: 0,
-				defaultStoreIdentifier: storeIdentifier,
-				skipEmptyRows: true,
-			});
-			result = await super.parse(content, filename, options);
-		}
-
-		return result;
+		return super.parse(content, filename, options).andThen((result) => {
+			if (result.validRows === 0 && result.errors.length > 0) {
+				this.setParserOptions({
+					columnMapping: dmLocalColumnMappingAlt,
+					hasHeader: true,
+					headerRowCount: 0,
+					defaultStoreIdentifier: storeIdentifier,
+					skipEmptyRows: true,
+				});
+				return super.parse(content, filename, options);
+			}
+			return okAsync(result);
+		});
 	}
 
 	extractStoreIdentifier(_file: DiscoveredFile): StoreIdentifier | null {

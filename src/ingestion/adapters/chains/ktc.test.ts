@@ -9,11 +9,13 @@ describe("KtcAdapter barcode cleanup", () => {
 			"Test proizvod;10,99;'3850104017537'",
 		].join("\n");
 
-		const result = await adapter.parse(
+		const parseResult = await adapter.parse(
 			Buffer.from(csv, "utf-8"),
 			"TRGOVINA-PJ06-1-20260203-071002.csv",
 		);
 
+		expect(parseResult.isOk()).toBe(true);
+		const result = parseResult._unsafeUnwrap();
 		expect(result.rows).toHaveLength(1);
 		expect(result.rows[0]?.barcodes).toEqual(["3850104017537"]);
 	});
@@ -25,11 +27,13 @@ describe("KtcAdapter barcode cleanup", () => {
 			"Test proizvod;10,99;'abc', '3850104017537', 3850104017537, ''",
 		].join("\n");
 
-		const result = await adapter.parse(
+		const parseResult = await adapter.parse(
 			Buffer.from(csv, "utf-8"),
 			"TRGOVINA-PJ06-1-20260203-071002.csv",
 		);
 
+		expect(parseResult.isOk()).toBe(true);
+		const result = parseResult._unsafeUnwrap();
 		expect(result.rows).toHaveLength(1);
 		expect(result.rows[0]?.barcodes).toEqual(["3850104017537"]);
 		expect(

@@ -1,3 +1,6 @@
+import type { ResultAsync } from "neverthrow";
+import type { FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../errors";
 import type {
 	DiscoveredFile,
 	ExpandedFile,
@@ -15,13 +18,15 @@ export interface ChainAdapter {
 	slug: string;
 	name: string;
 	supportedTypes: FileType[];
-	discover(targetDate?: string): Promise<DiscoveredFile[]>;
-	fetch(file: DiscoveredFile): Promise<FetchedFile>;
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified>;
+	fetch(file: DiscoveredFile): ResultAsync<FetchedFile, FetchError>;
 	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult>;
+	): ResultAsync<ParseResult, FetchError>;
 	extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null;
 	validateRow(row: NormalizedRow): NormalizedRowValidation;
 	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null;

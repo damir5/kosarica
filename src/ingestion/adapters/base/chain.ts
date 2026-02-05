@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import { ResultAsync, err, errAsync, ok, okAsync } from "neverthrow";
+import type { Result } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type {
 	DiscoveredFile,
 	FetchedFile,
@@ -112,70 +116,96 @@ export class BaseChainAdapter {
 		return this.config.baseUrl;
 	}
 
-	async discover(_targetDate?: string): Promise<DiscoveredFile[]> {
-		const response = await this.fetchWithRetry(this.config.baseUrl);
-		if (!response.ok) {
-			throw new Error(
-				`Failed to fetch ${this.name} portal: status ${response.status}`,
-			);
-		}
+	discover(
+		_targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
+		return this.fetchWithRetry(this.config.baseUrl)
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.text(), (e) =>
+					fetchError({
+						url: this.config.baseUrl,
+						message: e instanceof Error ? e.message : "Failed to read response",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.andThen((html) => {
+				const extensions = this.getDiscoverableExtensions();
+				const extensionPattern = extensions.join("|");
+				const linkPattern = new RegExp(
+					`href=["']([^"']*\\.(?:${extensionPattern})(?:\\?[^"']*)?)["']`,
+					"gi",
+				);
 
-		const html = await response.text();
-		const extensions = this.getDiscoverableExtensions();
-		const extensionPattern = extensions.join("|");
-		const linkPattern = new RegExp(
-			`href=["']([^"']*\\.(?:${extensionPattern})(?:\\?[^"']*)?)["']`,
-			"gi",
-		);
+				const matches = html.matchAll(linkPattern);
+				const seen = new Set<string>();
+				const files: DiscoveredFile[] = [];
 
-		const matches = html.matchAll(linkPattern);
-		const seen = new Set<string>();
-		const files: DiscoveredFile[] = [];
+				for (const match of matches) {
+					const href = match[1];
+					if (!href || seen.has(href)) {
+						continue;
+					}
+					seen.add(href);
 
-		for (const match of matches) {
-			const href = match[1];
-			if (!href || seen.has(href)) {
-				continue;
-			}
-			seen.add(href);
+					const fileUrl = resolveUrl(this.config.baseUrl, href);
+					const filename = this.extractFilenameFromUrl(fileUrl);
+					const type = this.detectFileType(filename);
 
-			const fileUrl = resolveUrl(this.config.baseUrl, href);
-			const filename = this.extractFilenameFromUrl(fileUrl);
-			const type = this.detectFileType(filename);
+					files.push({
+						url: fileUrl,
+						filename,
+						type,
+						metadata: {
+							source: `${this.slug}_portal`,
+							discoveredAt: new Date().toISOString(),
+						},
+					});
+				}
 
-			files.push({
-				url: fileUrl,
-				filename,
-				type,
-				metadata: {
-					source: `${this.slug}_portal`,
-					discoveredAt: new Date().toISOString(),
-				},
+				return okAsync(files);
 			});
-		}
-
-		return files;
 	}
 
-	async fetch(file: DiscoveredFile): Promise<FetchedFile> {
-		const response = await this.fetchWithRetry(file.url);
-		if (!response.ok) {
-			throw new Error(`Failed to fetch file ${file.url}: ${response.status}`);
-		}
-		const buffer = Buffer.from(await response.arrayBuffer());
-		return {
-			discovered: file,
-			content: buffer,
-			hash: computeSha256(buffer),
-		};
+	fetch(file: DiscoveredFile): ResultAsync<FetchedFile, FetchError> {
+		return this.fetchWithRetry(file.url)
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.arrayBuffer(), (e) =>
+					fetchError({
+						url: file.url,
+						message:
+							e instanceof Error ? e.message : "Failed to read response body",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.map((arrayBuffer) => {
+				const buffer = Buffer.from(arrayBuffer);
+				return {
+					discovered: file,
+					content: buffer,
+					hash: computeSha256(buffer),
+				};
+			});
 	}
 
-	async parse(
+	parse(
 		_content: Buffer,
 		_filename: string,
 		_options?: ParseOptions,
-	): Promise<ParseResult> {
-		throw new Error("Parse method must be implemented by subclass");
+	): ResultAsync<ParseResult, FetchError> {
+		return errAsync(
+			fetchError({
+				url: "",
+				message: "Parse method must be implemented by subclass",
+				retryable: false,
+				attempts: 0,
+			}),
+		);
 	}
 
 	extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null {
@@ -297,9 +327,15 @@ export class BaseChainAdapter {
 		return cleanName;
 	}
 
-	protected async fetchWithRetry(url: string): Promise<Response> {
-		let lastError: Error | undefined;
+	protected fetchWithRetry(url: string): ResultAsync<Response, FetchError> {
+		return new ResultAsync(this._fetchWithRetryImpl(url));
+	}
+
+	private async _fetchWithRetryImpl(
+		url: string,
+	): Promise<Result<Response, FetchError>> {
 		let lastStatus = 0;
+		let lastErrorMsg = "";
 
 		for (
 			let attempt = 0;
@@ -319,14 +355,22 @@ export class BaseChainAdapter {
 
 				lastStatus = response.status;
 				if (response.ok) {
-					return response;
+					return ok(response);
 				}
 
 				if (
 					!isRetryableStatus(response.status) ||
 					attempt === this.rateLimitConfig.maxRetries
 				) {
-					return response;
+					return err(
+						fetchError({
+							url,
+							status: response.status,
+							message: `HTTP ${response.status}: ${response.statusText}`,
+							retryable: isRetryableStatus(response.status),
+							attempts: attempt + 1,
+						}),
+					);
 				}
 
 				const retryAfter = response.headers.get("Retry-After") ?? undefined;
@@ -340,7 +384,7 @@ export class BaseChainAdapter {
 						: calculateBackoff(attempt, this.rateLimitConfig);
 				await sleep(delay);
 			} catch (error) {
-				lastError = error instanceof Error ? error : new Error(String(error));
+				lastErrorMsg = error instanceof Error ? error.message : String(error);
 				if (attempt === this.rateLimitConfig.maxRetries) {
 					break;
 				}
@@ -349,10 +393,17 @@ export class BaseChainAdapter {
 			}
 		}
 
-		throw new Error(
-			`Failed to fetch ${url} after ${this.rateLimitConfig.maxRetries + 1} attempts` +
-				(lastStatus ? ` (HTTP ${lastStatus})` : "") +
-				(lastError ? `: ${lastError.message}` : ""),
+		return err(
+			fetchError({
+				url,
+				status: lastStatus || undefined,
+				message:
+					`Failed to fetch ${url} after ${this.rateLimitConfig.maxRetries + 1} attempts` +
+					(lastStatus ? ` (HTTP ${lastStatus})` : "") +
+					(lastErrorMsg ? `: ${lastErrorMsg}` : ""),
+				retryable: true,
+				attempts: this.rateLimitConfig.maxRetries + 1,
+			}),
 		);
 	}
 }

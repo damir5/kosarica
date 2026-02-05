@@ -1,3 +1,7 @@
+import { ResultAsync, err, ok } from "neverthrow";
+import type { Result } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile, ParseResult } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
@@ -61,7 +65,15 @@ export class KtcAdapter extends BaseCsvAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
+		return new ResultAsync(this.discoverImpl(targetDate));
+	}
+
+	private async discoverImpl(
+		targetDate?: string,
+	): Promise<Result<DiscoveredFile[], FetchError | IngestionClassified>> {
 		const discovered: DiscoveredFile[] = [];
 		const seenUrls = new Set<string>();
 		let filterDate = targetDate || this.discoveryDate;
@@ -69,12 +81,33 @@ export class KtcAdapter extends BaseCsvAdapter {
 			filterDate = new Date().toISOString().slice(0, 10);
 		}
 
-		const portalUrl = await this.resolvePortalUrl();
-		const response = await this.fetchWithRetry(portalUrl);
-		if (!response.ok) {
-			throw new Error(`Failed to fetch KTC portal: status ${response.status}`);
+		const portalUrlResult = await this.resolvePortalUrl();
+		if (portalUrlResult.isErr()) {
+			return err(portalUrlResult.error);
 		}
-		const html = await response.text();
+		const portalUrl = portalUrlResult.value;
+
+		const responseResult = await this.fetchWithRetry(portalUrl);
+		if (responseResult.isErr()) {
+			return err(responseResult.error);
+		}
+		const response = responseResult.value;
+		let html = "";
+		try {
+			html = await response.text();
+		} catch (error) {
+			return err(
+				fetchError({
+					url: portalUrl,
+					message:
+						error instanceof Error ? error.message : "Failed to read response",
+					retryable: false,
+					attempts: 1,
+					cause: error,
+				}),
+			);
+		}
+
 		const storePattern = /poslovnica=([^"&]+)/g;
 		const stores: string[] = [];
 		const seenStores = new Set<string>();
@@ -89,11 +122,29 @@ export class KtcAdapter extends BaseCsvAdapter {
 
 		for (const storeName of stores) {
 			const storeUrl = `${portalUrl}?poslovnica=${encodeURIComponent(storeName)}`;
-			const storeResponse = await this.fetchWithRetry(storeUrl);
-			if (!storeResponse.ok) {
-				continue;
+			const storeResponseResult = await this.fetchWithRetry(storeUrl);
+			if (storeResponseResult.isErr()) {
+				if (storeResponseResult.error.status) {
+					continue;
+				}
+				return err(storeResponseResult.error);
 			}
-			const storeHtml = await storeResponse.text();
+			const storeResponse = storeResponseResult.value;
+			let storeHtml = "";
+			try {
+				storeHtml = await storeResponse.text();
+			} catch (error) {
+				return err(
+					fetchError({
+						url: storeUrl,
+						message:
+							error instanceof Error ? error.message : "Failed to read response",
+						retryable: false,
+						attempts: 1,
+						cause: error,
+					}),
+				);
+			}
 			const csvPattern = /href="([^"]*\.csv)"/gi;
 			let csvMatch: RegExpExecArray | null;
 			while ((csvMatch = csvPattern.exec(storeHtml)) !== null) {
@@ -135,28 +186,39 @@ export class KtcAdapter extends BaseCsvAdapter {
 			);
 		}
 
-		return discovered;
+		return ok(discovered);
 	}
 
-	private async resolvePortalUrl(): Promise<string> {
+	private resolvePortalUrl(): ResultAsync<string, FetchError> {
+		return new ResultAsync(this.resolvePortalUrlImpl());
+	}
+
+	private async resolvePortalUrlImpl(): Promise<Result<string, FetchError>> {
 		const urlsToTry = new Set<string>([
 			this.baseUrl(),
 			...KtcAdapter.portalUrls,
 		]);
 		let lastError: string | undefined;
+		let lastUrl: string | undefined;
 		for (const url of urlsToTry) {
-			try {
-				const response = await this.fetchWithRetry(url);
-				if (response.ok) {
-					return url;
-				}
-				lastError = `status ${response.status} from ${url}`;
-			} catch (error) {
-				lastError = error instanceof Error ? error.message : String(error);
+			lastUrl = url;
+			const responseResult = await this.fetchWithRetry(url);
+			if (responseResult.isOk()) {
+				return ok(url);
+			}
+			if (responseResult.error.status) {
+				lastError = `status ${responseResult.error.status} from ${url}`;
+			} else {
+				lastError = responseResult.error.message;
 			}
 		}
-		throw new Error(
-			`Failed to resolve KTC portal URL: ${lastError ?? "unknown"}`,
+		return err(
+			fetchError({
+				url: lastUrl ?? this.baseUrl(),
+				message: `Failed to resolve KTC portal URL: ${lastError ?? "unknown"}`,
+				retryable: true,
+				attempts: urlsToTry.size,
+			}),
 		);
 	}
 

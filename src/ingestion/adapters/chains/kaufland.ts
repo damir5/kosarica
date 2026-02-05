@@ -1,3 +1,6 @@
+import { ResultAsync, errAsync, okAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
@@ -72,7 +75,9 @@ export class KauflandAdapter extends BaseCsvAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		const discovered: DiscoveredFile[] = [];
 		const seen = new Set<string>();
 
@@ -83,44 +88,60 @@ export class KauflandAdapter extends BaseCsvAdapter {
 
 		const parts = date.split("-");
 		if (parts.length !== 3) {
-			throw new Error(`Invalid date format: ${date} (expected YYYY-MM-DD)`);
+			return errAsync(
+				fetchError({
+					url: kauflandAssetAPIURL,
+					message: `Invalid date format: ${date} (expected YYYY-MM-DD)`,
+					retryable: false,
+					attempts: 0,
+				}),
+			);
 		}
 		const targetPattern = `${parts[2]}${parts[1]}${parts[0]}`;
 
-		const response = await this.fetchWithRetry(kauflandAssetAPIURL);
-		if (!response.ok) {
-			throw new Error(
-				`Failed to fetch Kaufland asset API: status ${response.status}`,
-			);
-		}
-		const assets = (await response.json()) as KauflandAsset[];
+		return this.fetchWithRetry(kauflandAssetAPIURL)
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.json(), (e) =>
+					fetchError({
+						url: kauflandAssetAPIURL,
+						message:
+							e instanceof Error ? e.message : "Failed to parse JSON response",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.andThen((data) => {
+				const assets = data as KauflandAsset[];
 
-		for (const asset of assets) {
-			const filename = asset.label;
-			const dateMatch = filename.match(/_(\d{8})_/);
-			if (!dateMatch?.[1] || dateMatch[1] !== targetPattern) {
-				continue;
-			}
-			const fileUrl = `https://www.kaufland.hr${asset.path}`;
-			if (seen.has(fileUrl)) {
-				continue;
-			}
-			seen.add(fileUrl);
-			discovered.push({
-				url: fileUrl,
-				filename,
-				type: "csv",
-				lastModified: new Date(date),
-				metadata: {
-					source: "kaufland_api",
-					discoveredAt: new Date().toISOString(),
-					portalDate: date,
-					fileDatePattern: dateMatch[1],
-				},
+				for (const asset of assets) {
+					const filename = asset.label;
+					const dateMatch = filename.match(/_(\d{8})_/);
+					if (!dateMatch?.[1] || dateMatch[1] !== targetPattern) {
+						continue;
+					}
+					const fileUrl = `https://www.kaufland.hr${asset.path}`;
+					if (seen.has(fileUrl)) {
+						continue;
+					}
+					seen.add(fileUrl);
+					discovered.push({
+						url: fileUrl,
+						filename,
+						type: "csv",
+						lastModified: new Date(date),
+						metadata: {
+							source: "kaufland_api",
+							discoveredAt: new Date().toISOString(),
+							portalDate: date,
+							fileDatePattern: dateMatch[1],
+						},
+					});
+				}
+
+				return okAsync(discovered);
 			});
-		}
-
-		return discovered;
 	}
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {

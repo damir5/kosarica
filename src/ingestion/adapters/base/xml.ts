@@ -1,3 +1,5 @@
+import { ResultAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
 import { type XmlFieldMapping, XmlParser } from "../../parsers/xml";
 import type {
 	DiscoveredFile,
@@ -48,64 +50,76 @@ export class BaseXmlAdapter extends BaseChainAdapter {
 		}
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		_options?: ParseOptions,
-	): Promise<ParseResult> {
-		const storeIdentifier = this.extractStoreIdentifierFromFilename(filename);
-		let lastResult: ParseResult | null = null;
+	): ResultAsync<ParseResult, FetchError> {
+		return ResultAsync.fromPromise(
+			Promise.resolve().then(() => {
+				const storeIdentifier = this.extractStoreIdentifierFromFilename(filename);
+				let lastResult: ParseResult | null = null;
 
-		for (const itemsPath of this.itemPaths) {
-			const parser = new XmlParser({
-				itemsPath,
-				fieldMapping: this.fieldMapping,
-				defaultStoreIdentifier: storeIdentifier,
-				attributePrefix: "@_",
-				encoding: "auto",
-			});
-			const result = parser.parseWithItemsPath(
-				content,
-				itemsPath,
-				this.fieldMapping,
-				storeIdentifier,
-			);
-			lastResult = result;
-			if (result.validRows > 0) {
-				return result;
-			}
-		}
-
-		if (this.altMapping) {
-			for (const itemsPath of this.itemPaths) {
-				const parser = new XmlParser({
-					itemsPath,
-					fieldMapping: this.altMapping,
-					defaultStoreIdentifier: storeIdentifier,
-					attributePrefix: "@_",
-					encoding: "auto",
-				});
-				const result = parser.parseWithItemsPath(
-					content,
-					itemsPath,
-					this.altMapping,
-					storeIdentifier,
-				);
-				lastResult = result;
-				if (result.validRows > 0) {
-					return result;
+				for (const itemsPath of this.itemPaths) {
+					const parser = new XmlParser({
+						itemsPath,
+						fieldMapping: this.fieldMapping,
+						defaultStoreIdentifier: storeIdentifier,
+						attributePrefix: "@_",
+						encoding: "auto",
+					});
+					const result = parser.parseWithItemsPath(
+						content,
+						itemsPath,
+						this.fieldMapping,
+						storeIdentifier,
+					);
+					lastResult = result;
+					if (result.validRows > 0) {
+						return result;
+					}
 				}
-			}
-		}
 
-		return (
-			lastResult ?? {
-				rows: [],
-				errors: [],
-				warnings: [],
-				totalRows: 0,
-				validRows: 0,
-			}
+				if (this.altMapping) {
+					for (const itemsPath of this.itemPaths) {
+						const parser = new XmlParser({
+							itemsPath,
+							fieldMapping: this.altMapping,
+							defaultStoreIdentifier: storeIdentifier,
+							attributePrefix: "@_",
+							encoding: "auto",
+						});
+						const result = parser.parseWithItemsPath(
+							content,
+							itemsPath,
+							this.altMapping,
+							storeIdentifier,
+						);
+						lastResult = result;
+						if (result.validRows > 0) {
+							return result;
+						}
+					}
+				}
+
+				return (
+					lastResult ?? {
+						rows: [],
+						errors: [],
+						warnings: [],
+						totalRows: 0,
+						validRows: 0,
+					}
+				);
+			}),
+			(e) =>
+				fetchError({
+					url: filename,
+					message: e instanceof Error ? e.message : "XML parse failed",
+					retryable: false,
+					attempts: 0,
+					cause: e,
+				}),
 		);
 	}
 

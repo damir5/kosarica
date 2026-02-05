@@ -1,3 +1,6 @@
+import { ResultAsync, okAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
 import type {
@@ -66,7 +69,9 @@ export class LidlAdapter extends BaseCsvAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		const discovered: DiscoveredFile[] = [];
 		const seen = new Set<string>();
 		let filterDate = targetDate || this.discoveryDate;
@@ -74,49 +79,57 @@ export class LidlAdapter extends BaseCsvAdapter {
 			filterDate = new Date().toISOString().slice(0, 10);
 		}
 
-		const response = await this.fetchWithRetry(this.baseUrl());
-		if (!response.ok) {
-			throw new Error(`Failed to fetch Lidl portal: status ${response.status}`);
-		}
-		const html = await response.text();
+		return this.fetchWithRetry(this.baseUrl())
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.text(), (e) =>
+					fetchError({
+						url: this.baseUrl(),
+						message: e instanceof Error ? e.message : "Failed to read response",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.andThen((html) => {
+				const patterns = [
+					/href=["'](https:\/\/tvrtka\.lidl\.hr\/content\/download\/\d+\/fileupload\/([^"']+\.zip))["']/g,
+					/href=["'](\/content\/download\/\d+\/fileupload\/([^"']+\.zip))["']/g,
+				];
 
-		const patterns = [
-			/href=["'](https:\/\/tvrtka\.lidl\.hr\/content\/download\/\d+\/fileupload\/([^"']+\.zip))["']/g,
-			/href=["'](\/content\/download\/\d+\/fileupload\/([^"']+\.zip))["']/g,
-		];
-
-		for (const pattern of patterns) {
-			let match: RegExpExecArray | null;
-			while ((match = pattern.exec(html)) !== null) {
-				const rawUrl = match[1];
-				const filename = match[2];
-				const fileUrl = rawUrl.startsWith("http")
-					? rawUrl
-					: `https://tvrtka.lidl.hr${rawUrl}`;
-				if (seen.has(fileUrl)) {
-					continue;
+				for (const pattern of patterns) {
+					let match: RegExpExecArray | null;
+					while ((match = pattern.exec(html)) !== null) {
+						const rawUrl = match[1];
+						const filename = match[2];
+						const fileUrl = rawUrl.startsWith("http")
+							? rawUrl
+							: `https://tvrtka.lidl.hr${rawUrl}`;
+						if (seen.has(fileUrl)) {
+							continue;
+						}
+						seen.add(fileUrl);
+						const fileDate = this.extractDateFromFilename(filename);
+						if (filterDate && fileDate && fileDate !== filterDate) {
+							continue;
+						}
+						const lastModified = fileDate ? new Date(fileDate) : undefined;
+						discovered.push({
+							url: fileUrl,
+							filename,
+							type: "zip",
+							lastModified,
+							metadata: {
+								source: "lidl_portal",
+								discoveredAt: new Date().toISOString(),
+								portalDate: fileDate,
+							},
+						});
+					}
 				}
-				seen.add(fileUrl);
-				const fileDate = this.extractDateFromFilename(filename);
-				if (filterDate && fileDate && fileDate !== filterDate) {
-					continue;
-				}
-				const lastModified = fileDate ? new Date(fileDate) : undefined;
-				discovered.push({
-					url: fileUrl,
-					filename,
-					type: "zip",
-					lastModified,
-					metadata: {
-						source: "lidl_portal",
-						discoveredAt: new Date().toISOString(),
-						portalDate: fileDate,
-					},
-				});
-			}
-		}
 
-		return discovered;
+				return okAsync(discovered);
+			});
 	}
 
 	async expandZip(content: Buffer, filename: string): Promise<ExpandedFile[]> {
@@ -124,13 +137,14 @@ export class LidlAdapter extends BaseCsvAdapter {
 		return expanded.filter((file) => file.type === "csv");
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult> {
-		const result = await super.parse(content, filename, options);
-		return this.postprocessMultipleGtins(result);
+	): ResultAsync<ParseResult, FetchError> {
+		return super
+			.parse(content, filename, options)
+			.map((result) => this.postprocessMultipleGtins(result));
 	}
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {

@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
+import { ResultAsync, err, errAsync, ok, okAsync } from "neverthrow";
+import type { Result } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
 import type {
@@ -80,7 +84,9 @@ export class PlodineAdapter extends BaseCsvAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		const discovered: DiscoveredFile[] = [];
 		const seen = new Set<string>();
 
@@ -91,110 +97,150 @@ export class PlodineAdapter extends BaseCsvAdapter {
 
 		const parts = date.split("-");
 		if (parts.length !== 3) {
-			throw new Error(`Invalid date format: ${date} (expected YYYY-MM-DD)`);
+			return errAsync(
+				fetchError({
+					url: "",
+					message: `Invalid date format: ${date} (expected YYYY-MM-DD)`,
+					retryable: false,
+					attempts: 0,
+				}),
+			);
 		}
 		const targetPattern = `${parts[2]}_${parts[1]}_${parts[0]}`;
 
-		const html = await this.fetchPortalHtml();
+		return this.fetchPortalHtml().andThen((html) => {
+			const patterns = [
+				/href=["']([^"']*cjenik[^"']*\.zip(?:\?[^"']*)?)["']/gi,
+				/href=["']([^"']*cjenici[^"']*\.zip(?:\?[^"']*)?)["']/gi,
+				/href=["'](https:\/\/[^"']*\/cjenici\/cjeniki_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
+				/href=["'](https:\/\/[^"']*\/cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
+				/href=["']([^"']*cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
+			];
 
-		const patterns = [
-			/href=["']([^"']*cjenik[^"']*\.zip(?:\?[^"']*)?)["']/gi,
-			/href=["']([^"']*cjenici[^"']*\.zip(?:\?[^"']*)?)["']/gi,
-			/href=["'](https:\/\/[^"']*\/cjenici\/cjeniki_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
-			/href=["'](https:\/\/[^"']*\/cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
-			/href=["']([^"']*cjenici_(\d{2}_\d{2}_\d{4})_\d{2}_\d{2}_\d{2}\.zip)["']/gi,
-		];
-
-		for (const pattern of patterns) {
-			let match: RegExpExecArray | null;
-			while ((match = pattern.exec(html)) !== null) {
-				const rawUrl = match[1];
-				const fileDatePattern =
-					match[2] ?? extractDatePatternFromText(rawUrl) ?? "";
-				if (fileDatePattern && fileDatePattern !== targetPattern) {
-					continue;
+			for (const pattern of patterns) {
+				let match: RegExpExecArray | null;
+				while ((match = pattern.exec(html)) !== null) {
+					const rawUrl = match[1];
+					const fileDatePattern =
+						match[2] ?? extractDatePatternFromText(rawUrl) ?? "";
+					if (fileDatePattern && fileDatePattern !== targetPattern) {
+						continue;
+					}
+					const fileUrl = rawUrl.startsWith("http")
+						? rawUrl
+						: `https://www.plodine.hr${rawUrl}`;
+					if (seen.has(fileUrl)) {
+						continue;
+					}
+					seen.add(fileUrl);
+					const filename = fileUrl.slice(fileUrl.lastIndexOf("/") + 1);
+					discovered.push({
+						url: fileUrl,
+						filename,
+						type: "zip",
+						lastModified: new Date(date),
+						metadata: {
+							source: "plodine_portal",
+							discoveredAt: new Date().toISOString(),
+							portalDate: date,
+							fileDatePattern,
+						},
+					});
 				}
-				const fileUrl = rawUrl.startsWith("http")
-					? rawUrl
-					: `https://www.plodine.hr${rawUrl}`;
-				if (seen.has(fileUrl)) {
-					continue;
+				if (discovered.length > 0) {
+					break;
 				}
-				seen.add(fileUrl);
-				const filename = fileUrl.slice(fileUrl.lastIndexOf("/") + 1);
-				discovered.push({
-					url: fileUrl,
-					filename,
-					type: "zip",
-					lastModified: new Date(date),
-					metadata: {
-						source: "plodine_portal",
-						discoveredAt: new Date().toISOString(),
-						portalDate: date,
-						fileDatePattern,
-					},
-				});
 			}
-			if (discovered.length > 0) {
-				break;
-			}
-		}
 
-		return discovered;
+			return okAsync(discovered);
+		});
 	}
 
-	private async fetchPortalHtml(): Promise<string> {
+	private fetchPortalHtml(): ResultAsync<string, FetchError> {
+		return new ResultAsync(this.fetchPortalHtmlImpl());
+	}
+
+	private async fetchPortalHtmlImpl(): Promise<Result<string, FetchError>> {
 		const urlsToTry = new Set<string>([
 			this.baseUrl(),
 			...PlodineAdapter.portalUrls,
 		]);
 		let lastError: string | undefined;
+		let lastUrl: string | undefined;
 
 		for (const url of urlsToTry) {
-			try {
-				const response = await this.fetchWithRetry(url);
-				if (!response.ok) {
-					lastError = `status ${response.status} from ${url}`;
-					continue;
-				}
-				return await response.text();
-			} catch (error) {
-				lastError = error instanceof Error ? error.message : String(error);
+			lastUrl = url;
+			const responseResult = await this.fetchWithRetry(url);
+			if (responseResult.isOk()) {
 				try {
-					const fallback = await requestWithRelaxedTls(url);
-					if (fallback.status >= 200 && fallback.status < 300) {
-						return fallback.body.toString("utf-8");
-					}
-					lastError = `status ${fallback.status} from ${url}`;
-				} catch (fallbackError) {
-					lastError =
-						fallbackError instanceof Error
-							? fallbackError.message
-							: String(fallbackError);
+					const html = await responseResult.value.text();
+					return ok(html);
+				} catch (error) {
+					lastError = error instanceof Error ? error.message : String(error);
 				}
+			} else if (responseResult.error.status) {
+				lastError = `status ${responseResult.error.status} from ${url}`;
+				continue;
+			} else {
+				lastError = responseResult.error.message;
+			}
+
+			try {
+				const fallback = await requestWithRelaxedTls(url);
+				if (fallback.status >= 200 && fallback.status < 300) {
+					return ok(fallback.body.toString("utf-8"));
+				}
+				lastError = `status ${fallback.status} from ${url}`;
+			} catch (fallbackError) {
+				lastError =
+					fallbackError instanceof Error
+						? fallbackError.message
+						: String(fallbackError);
 			}
 		}
 
-		throw new Error(
-			`Failed to fetch Plodine portal: ${lastError ?? "unknown"}`,
+		return err(
+			fetchError({
+				url: lastUrl ?? this.baseUrl(),
+				message: `Failed to fetch Plodine portal: ${lastError ?? "unknown"}`,
+				retryable: true,
+				attempts: urlsToTry.size,
+			}),
 		);
 	}
 
-	async fetch(file: DiscoveredFile): Promise<FetchedFile> {
-		try {
-			return await super.fetch(file);
-		} catch {
-			const fallback = await requestWithRelaxedTls(file.url);
-			if (fallback.status < 200 || fallback.status >= 300) {
-				throw new Error(`Failed to fetch file ${file.url}: ${fallback.status}`);
-			}
-			const content = fallback.body;
-			return {
-				discovered: file,
-				content,
-				hash: createHash("sha256").update(content).digest("hex"),
-			};
-		}
+	fetch(file: DiscoveredFile): ResultAsync<FetchedFile, FetchError> {
+		return super.fetch(file).orElse(() =>
+			ResultAsync.fromPromise(requestWithRelaxedTls(file.url), (error) =>
+				fetchError({
+					url: file.url,
+					message:
+						error instanceof Error
+							? error.message
+							: "Failed to fetch file with relaxed TLS",
+					retryable: false,
+					attempts: 1,
+					cause: error,
+				}),
+			).andThen((fallback) => {
+				if (fallback.status < 200 || fallback.status >= 300) {
+					return errAsync(
+						fetchError({
+							url: file.url,
+							message: `Failed to fetch file ${file.url}: ${fallback.status}`,
+							retryable: false,
+							attempts: 1,
+						}),
+					);
+				}
+				const content = fallback.body;
+				return okAsync({
+					discovered: file,
+					content,
+					hash: createHash("sha256").update(content).digest("hex"),
+				});
+			}),
+		);
 	}
 
 	async expandZip(content: Buffer, filename: string): Promise<ExpandedFile[]> {
@@ -207,11 +253,11 @@ export class PlodineAdapter extends BaseCsvAdapter {
 		return processed.filter((file) => file.type === "csv");
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult> {
+	): ResultAsync<ParseResult, FetchError> {
 		const preprocessed = this.preprocessCsvContent(content);
 		return super.parse(preprocessed, filename, options);
 	}

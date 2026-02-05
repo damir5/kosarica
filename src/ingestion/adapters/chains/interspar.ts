@@ -1,4 +1,6 @@
-import { IngestionClassifiedError } from "@/ingestion/errors";
+import { ResultAsync, errAsync, okAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import { ingestionClassified, type IngestionClassified } from "@/ingestion/errors";
 import {
 	compareDateKeys,
 	formatDateParts,
@@ -83,7 +85,9 @@ export class IntersparAdapter extends BaseCsvAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		let date = targetDate || this.discoveryDate;
 		if (!date) {
 			date = new Date().toISOString().slice(0, 10);
@@ -91,60 +95,79 @@ export class IntersparAdapter extends BaseCsvAdapter {
 		const dateForApi = date.replace(/-/g, "");
 		const apiUrl = `https://www.spar.hr/datoteke_cjenici/Cjenik${dateForApi}.json`;
 
-		const response = await this.fetchWithRetry(apiUrl);
-		if (!response.ok) {
-			if (response.status === 404) {
-				const noDataState = getIntersparNoDataState(date);
-				if (noDataState.retryAt) {
-					throw new IngestionClassifiedError({
-						status: "completed",
-						statusType: "source_not_published_yet",
-						statusSeverity: "warning",
-						statusReason: `Interspar index not published yet for ${date}; retry scheduled hourly until ${INTERSPAR_PUBLISH_CUTOFF_HOUR}:00 ${ZAGREB_TIMEZONE}`,
-						retryAt: noDataState.retryAt,
-						metadata: {
-							targetDate: date,
-							sourceUrl: apiUrl,
-							cutoffHourLocal: INTERSPAR_PUBLISH_CUTOFF_HOUR,
-							timezone: ZAGREB_TIMEZONE,
-						},
-					});
+		return this.fetchWithRetry(apiUrl)
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.json(), (e) =>
+					fetchError({
+						url: apiUrl,
+						message:
+							e instanceof Error ? e.message : "Failed to parse JSON response",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.andThen((data) => {
+				const parsed = data as IntersparJsonResponse;
+				if (!parsed.files || parsed.files.length === 0) {
+					return okAsync<DiscoveredFile[]>([]);
 				}
 
-				throw new IngestionClassifiedError({
-					status: "completed",
-					statusType: "source_no_data",
-					statusSeverity: "warning",
-					statusReason: `Interspar index not published for ${date} by ${INTERSPAR_PUBLISH_CUTOFF_HOUR}:00 ${ZAGREB_TIMEZONE}`,
+				const files: DiscoveredFile[] = parsed.files.map((file) => ({
+					url: file.URL,
+					filename: file.name,
+					type: "csv",
+					lastModified: new Date(date),
 					metadata: {
-						targetDate: date,
-						sourceUrl: apiUrl,
-						cutoffHourLocal: INTERSPAR_PUBLISH_CUTOFF_HOUR,
-						timezone: ZAGREB_TIMEZONE,
+						source: "interspar_json_api",
+						discoveredAt: new Date().toISOString(),
+						portalDate: date,
+						sha: file.SHA,
 					},
-				});
-			}
-			throw new Error(
-				`Failed to fetch Interspar JSON API: status ${response.status}`,
-			);
-		}
-		const data = (await response.json()) as IntersparJsonResponse;
-		if (!data.files || data.files.length === 0) {
-			return [];
-		}
+				}));
 
-		return data.files.map((file) => ({
-			url: file.URL,
-			filename: file.name,
-			type: "csv",
-			lastModified: new Date(date),
-			metadata: {
-				source: "interspar_json_api",
-				discoveredAt: new Date().toISOString(),
-				portalDate: date,
-				sha: file.SHA,
-			},
-		}));
+				return okAsync(files);
+			})
+			.orElse((error) => {
+				if (error._tag === "FetchError" && error.status === 404) {
+					const noDataState = getIntersparNoDataState(date);
+					if (noDataState.retryAt) {
+						return errAsync(
+							ingestionClassified({
+								status: "completed",
+								statusType: "source_not_published_yet",
+								statusSeverity: "warning",
+								statusReason: `Interspar index not published yet for ${date}; retry scheduled hourly until ${INTERSPAR_PUBLISH_CUTOFF_HOUR}:00 ${ZAGREB_TIMEZONE}`,
+								retryAt: noDataState.retryAt,
+								metadata: {
+									targetDate: date,
+									sourceUrl: apiUrl,
+									cutoffHourLocal: INTERSPAR_PUBLISH_CUTOFF_HOUR,
+									timezone: ZAGREB_TIMEZONE,
+								},
+							}),
+						);
+					}
+
+					return errAsync(
+						ingestionClassified({
+							status: "completed",
+							statusType: "source_no_data",
+							statusSeverity: "warning",
+							statusReason: `Interspar index not published for ${date} by ${INTERSPAR_PUBLISH_CUTOFF_HOUR}:00 ${ZAGREB_TIMEZONE}`,
+							metadata: {
+								targetDate: date,
+								sourceUrl: apiUrl,
+								cutoffHourLocal: INTERSPAR_PUBLISH_CUTOFF_HOUR,
+								timezone: ZAGREB_TIMEZONE,
+							},
+						}),
+					);
+				}
+
+				return errAsync(error);
+			});
 	}
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {

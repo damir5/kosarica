@@ -1,3 +1,5 @@
+import { ResultAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
 import {
 	newHeaderIndex,
 	newNumericIndex,
@@ -48,17 +50,33 @@ export class BaseXlsxAdapter extends BaseChainAdapter {
 		this.xlsxParser.setAlternativeMapping(cfg.alternativeColumnMapping);
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		_options?: ParseOptions,
-	): Promise<ParseResult> {
-		const processed = this.preprocessContent(content);
-		const storeIdentifier =
-			this.defaultStoreIdentifier ||
-			this.extractStoreIdentifierFromFilename(filename);
-		const result = this.xlsxParser.parseWithStoreId(processed, storeIdentifier);
-		return this.postprocessResult(result);
+	): ResultAsync<ParseResult, FetchError> {
+		return ResultAsync.fromPromise(
+			Promise.resolve().then(() => {
+				const processed = this.preprocessContent(content);
+				const storeIdentifier =
+					this.defaultStoreIdentifier ||
+					this.extractStoreIdentifierFromFilename(filename);
+				const result = this.xlsxParser.parseWithStoreId(
+					processed,
+					storeIdentifier,
+				);
+				return result;
+			}),
+			(e) =>
+				fetchError({
+					url: filename,
+					message: e instanceof Error ? e.message : "XLSX parse failed",
+					retryable: false,
+					attempts: 0,
+					cause: e,
+				}),
+		)
+			.map((result) => this.postprocessResult(result));
 	}
 
 	protected preprocessContent(content: Buffer): Buffer {

@@ -1,3 +1,6 @@
+import { ResultAsync, okAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
 import type {
@@ -76,7 +79,9 @@ export class EurospinAdapter extends BaseCsvAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		const discovered: DiscoveredFile[] = [];
 		const seen = new Set<string>();
 		let date = targetDate || this.discoveryDate;
@@ -84,46 +89,53 @@ export class EurospinAdapter extends BaseCsvAdapter {
 			date = new Date().toISOString().slice(0, 10);
 		}
 
-		const response = await this.fetchWithRetry(this.baseUrl());
-		if (!response.ok) {
-			throw new Error(
-				`Failed to fetch Eurospin portal: status ${response.status}`,
-			);
-		}
-		const html = await response.text();
-		const optionPattern =
-			/<option[^>]*value=["']([^"']*cjenik_[^"']*\.zip)["'][^>]*>([^<]*)<\/option>/gi;
-		let match: RegExpExecArray | null;
-		while ((match = optionPattern.exec(html)) !== null) {
-			const rawUrl = match[1];
-			let filename = match[2]?.trim();
-			const fileUrl = this.resolveUrl(rawUrl);
-			if (seen.has(fileUrl)) {
-				continue;
-			}
-			seen.add(fileUrl);
-			if (!filename) {
-				filename = this.extractFilenameFromUrl(fileUrl);
-			}
-			const fileDate = this.extractDateFromFilename(filename);
-			if (date && fileDate && fileDate !== date) {
-				continue;
-			}
-			const lastModified = fileDate ? new Date(fileDate) : undefined;
-			discovered.push({
-				url: fileUrl,
-				filename,
-				type: "zip",
-				lastModified,
-				metadata: {
-					source: "eurospin_portal",
-					discoveredAt: new Date().toISOString(),
-					portalDate: fileDate,
-				},
-			});
-		}
+		return this.fetchWithRetry(this.baseUrl())
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.text(), (e) =>
+					fetchError({
+						url: this.baseUrl(),
+						message: e instanceof Error ? e.message : "Failed to read response",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.andThen((html) => {
+				const optionPattern =
+					/<option[^>]*value=["']([^"']*cjenik_[^"']*\.zip)["'][^>]*>([^<]*)<\/option>/gi;
+				let match: RegExpExecArray | null;
+				while ((match = optionPattern.exec(html)) !== null) {
+					const rawUrl = match[1];
+					let filename = match[2]?.trim();
+					const fileUrl = this.resolveUrl(rawUrl);
+					if (seen.has(fileUrl)) {
+						continue;
+					}
+					seen.add(fileUrl);
+					if (!filename) {
+						filename = this.extractFilenameFromUrl(fileUrl);
+					}
+					const fileDate = this.extractDateFromFilename(filename);
+					if (date && fileDate && fileDate !== date) {
+						continue;
+					}
+					const lastModified = fileDate ? new Date(fileDate) : undefined;
+					discovered.push({
+						url: fileUrl,
+						filename,
+						type: "zip",
+						lastModified,
+						metadata: {
+							source: "eurospin_portal",
+							discoveredAt: new Date().toISOString(),
+							portalDate: fileDate,
+						},
+					});
+				}
 
-		return discovered;
+				return okAsync(discovered);
+			});
 	}
 
 	async expandZip(content: Buffer, filename: string): Promise<ExpandedFile[]> {
@@ -131,11 +143,11 @@ export class EurospinAdapter extends BaseCsvAdapter {
 		return expanded.filter((file) => file.type === "csv");
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult> {
+	): ResultAsync<ParseResult, FetchError> {
 		return super.parse(content, filename, options);
 	}
 

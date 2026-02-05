@@ -33,11 +33,13 @@ describe("StudenacAdapter", () => {
   </ProdajniObjekt>
 </Proizvodi>`;
 
-		const result = await adapter.parse(
+		const parseResult = await adapter.parse(
 			Buffer.from(xml, "utf-8"),
 			"SUPERMARKET-Test-T123-265-2026-02-03.xml",
 		);
 
+		expect(parseResult.isOk()).toBe(true);
+		const result = parseResult._unsafeUnwrap();
 		expect(result.totalRows).toBe(3);
 		expect(result.validRows).toBe(3);
 		expect(result.errors).toHaveLength(0);
@@ -73,11 +75,13 @@ describe("StudenacAdapter", () => {
   </ProdajniObjekt>
 </Proizvodi>`;
 
-		const result = await adapter.parse(
+		const parseResult = await adapter.parse(
 			Buffer.from(xml, "utf-8"),
 			"SUPERMARKET-Test-T321-265-2026-02-03.xml",
 		);
 
+		expect(parseResult.isOk()).toBe(true);
+		const result = parseResult._unsafeUnwrap();
 		expect(result.totalRows).toBe(1);
 		expect(result.validRows).toBe(1);
 		expect(result.errors).toHaveLength(0);

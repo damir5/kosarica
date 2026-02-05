@@ -16,3 +16,14 @@ export class IngestionClassifiedError extends Error {
 		this.classification = classification;
 	}
 }
+
+export interface IngestionClassified {
+	readonly _tag: "IngestionClassified";
+	readonly classification: IngestionErrorClassification;
+}
+
+export function ingestionClassified(
+	classification: IngestionErrorClassification,
+): IngestionClassified {
+	return { _tag: "IngestionClassified", classification };
+}

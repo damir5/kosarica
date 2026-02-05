@@ -1,3 +1,6 @@
+import type { ResultAsync } from "neverthrow";
+import type { FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import type {
 	DiscoveredFile,
@@ -56,26 +59,29 @@ export class MetroAdapter extends BaseCsvAdapter {
 		});
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult> {
+	): ResultAsync<ParseResult, FetchError> {
 		const preprocessed = this.preprocessCsvContent(content);
 		return super.parse(preprocessed, filename, options);
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		const filterDate = targetDate || new Date().toISOString().slice(0, 10);
-		const files = await super.discover(targetDate);
-		return files.filter((file) => {
-			const fileDate = this.extractDateFromFilename(file.filename);
-			if (fileDate) {
-				file.lastModified = new Date(fileDate);
-				file.metadata = { ...file.metadata, portalDate: fileDate };
-			}
-			return !filterDate || fileDate === filterDate;
-		});
+		return super.discover(targetDate).map((files) =>
+			files.filter((file) => {
+				const fileDate = this.extractDateFromFilename(file.filename);
+				if (fileDate) {
+					file.lastModified = new Date(fileDate);
+					file.metadata = { ...file.metadata, portalDate: fileDate };
+				}
+				return !filterDate || fileDate === filterDate;
+			}),
+		);
 	}
 
 	extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null {

@@ -1,3 +1,6 @@
+import { ResultAsync, okAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type { XmlFieldMapping } from "../../parsers/xml";
 import { expandZip } from "../../parsers/zip";
 import type {
@@ -94,7 +97,9 @@ export class StudenacAdapter extends BaseXmlAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		const discovered: DiscoveredFile[] = [];
 		const seen = new Set<string>();
 		let filterDate = targetDate || this.discoveryDate;
@@ -102,68 +107,76 @@ export class StudenacAdapter extends BaseXmlAdapter {
 			filterDate = new Date().toISOString().slice(0, 10);
 		}
 
-		const response = await this.fetchWithRetry(this.baseUrl());
-		if (!response.ok) {
-			throw new Error(
-				`Failed to fetch Studenac portal: status ${response.status}`,
-			);
-		}
-		const html = await response.text();
-		const pattern = /href=["']([^"']*\.zip(?:\?[^"']*)?)["']/gi;
-		let match: RegExpExecArray | null;
-		while ((match = pattern.exec(html)) !== null) {
-			const href = match[1];
-			const fileUrl = this.resolveUrl(href);
-			if (seen.has(fileUrl)) {
-				continue;
-			}
-			seen.add(fileUrl);
-			const filename = this.extractFilenameFromUrl(fileUrl);
-			const fileDate = this.extractDateFromFilename(filename);
-			if (filterDate && fileDate && fileDate !== filterDate) {
-				continue;
-			}
-			const lastModified = fileDate ? new Date(fileDate) : undefined;
-			discovered.push({
-				url: fileUrl,
-				filename,
-				type: "zip",
-				lastModified,
-				metadata: {
-					source: "studenac_portal",
-					discoveredAt: new Date().toISOString(),
-					portalDate: fileDate,
-				},
-			});
-		}
+		return this.fetchWithRetry(this.baseUrl())
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.text(), (e) =>
+					fetchError({
+						url: this.baseUrl(),
+						message: e instanceof Error ? e.message : "Failed to read response",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.andThen((html) => {
+				const pattern = /href=["']([^"']*\.zip(?:\?[^"']*)?)["']/gi;
+				let match: RegExpExecArray | null;
+				while ((match = pattern.exec(html)) !== null) {
+					const href = match[1];
+					const fileUrl = this.resolveUrl(href);
+					if (seen.has(fileUrl)) {
+						continue;
+					}
+					seen.add(fileUrl);
+					const filename = this.extractFilenameFromUrl(fileUrl);
+					const fileDate = this.extractDateFromFilename(filename);
+					if (filterDate && fileDate && fileDate !== filterDate) {
+						continue;
+					}
+					const lastModified = fileDate ? new Date(fileDate) : undefined;
+					discovered.push({
+						url: fileUrl,
+						filename,
+						type: "zip",
+						lastModified,
+						metadata: {
+							source: "studenac_portal",
+							discoveredAt: new Date().toISOString(),
+							portalDate: fileDate,
+						},
+					});
+				}
 
-		return discovered;
+				return okAsync(discovered);
+			});
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult> {
-		const result = await super.parse(content, filename, options);
-		const storeId = this.extractStoreIdentifierFromFilename(filename);
+	): ResultAsync<ParseResult, FetchError> {
+		return super.parse(content, filename, options).map((result) => {
+			const storeId = this.extractStoreIdentifierFromFilename(filename);
 
-		for (const row of result.rows) {
-			if (!row.storeIdentifier && storeId) {
-				row.storeIdentifier = storeId;
+			for (const row of result.rows) {
+				if (!row.storeIdentifier && storeId) {
+					row.storeIdentifier = storeId;
+				}
+				// Fallback rows use akcija as the main price; treat equal/higher discount
+				// values as invalid discount metadata instead of producing warnings.
+				if (
+					row.price !== null &&
+					row.discountPrice !== undefined &&
+					row.discountPrice >= row.price
+				) {
+					row.discountPrice = undefined;
+				}
 			}
-			// Fallback rows use akcija as the main price; treat equal/higher discount
-			// values as invalid discount metadata instead of producing warnings.
-			if (
-				row.price !== null &&
-				row.discountPrice !== undefined &&
-				row.discountPrice >= row.price
-			) {
-				row.discountPrice = undefined;
-			}
-		}
 
-		return result;
+			return result;
+		});
 	}
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {

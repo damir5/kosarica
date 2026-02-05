@@ -1,3 +1,6 @@
+import { ResultAsync, okAsync } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import { parsePrice } from "../../parsers/price";
 import type { XmlFieldMapping } from "../../parsers/xml";
 import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
@@ -53,7 +56,9 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 		this.discoveryDate = date;
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
 		const discovered: DiscoveredFile[] = [];
 		const seen = new Set<string>();
 		let filterDate = targetDate || this.discoveryDate;
@@ -61,59 +66,67 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 			filterDate = new Date().toISOString().slice(0, 10);
 		}
 
-		const response = await this.fetchWithRetry(this.baseUrl());
-		if (!response.ok) {
-			throw new Error(
-				`Failed to fetch Trgocentar portal: status ${response.status}`,
-			);
-		}
-		const html = await response.text();
-		const xmlPattern = /href=["']([^"']*\.xml(?:\?[^"']*)?)["']/gi;
-		let match: RegExpExecArray | null;
-		while ((match = xmlPattern.exec(html)) !== null) {
-			const href = match[1];
-			const fileUrl = href.startsWith("http")
-				? href
-				: `${this.baseUrl()}/${href.replace(/^\//, "")}`;
-			if (seen.has(fileUrl)) {
-				continue;
-			}
-			seen.add(fileUrl);
-			const filename = this.extractFilenameFromUrl(fileUrl);
-			const fileDate = this.extractDateFromFilename(filename);
-			if (filterDate && fileDate && fileDate !== filterDate) {
-				continue;
-			}
-			const lastModified = fileDate ? new Date(fileDate) : undefined;
-			discovered.push({
-				url: fileUrl,
-				filename,
-				type: "xml",
-				lastModified,
-				metadata: {
-					source: "trgocentar_portal",
-					discoveredAt: new Date().toISOString(),
-					portalDate: fileDate,
-				},
-			});
-		}
+		return this.fetchWithRetry(this.baseUrl())
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.text(), (e) =>
+					fetchError({
+						url: this.baseUrl(),
+						message: e instanceof Error ? e.message : "Failed to read response",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.andThen((html) => {
+				const xmlPattern = /href=["']([^"']*\.xml(?:\?[^"']*)?)["']/gi;
+				let match: RegExpExecArray | null;
+				while ((match = xmlPattern.exec(html)) !== null) {
+					const href = match[1];
+					const fileUrl = href.startsWith("http")
+						? href
+						: `${this.baseUrl()}/${href.replace(/^\//, "")}`;
+					if (seen.has(fileUrl)) {
+						continue;
+					}
+					seen.add(fileUrl);
+					const filename = this.extractFilenameFromUrl(fileUrl);
+					const fileDate = this.extractDateFromFilename(filename);
+					if (filterDate && fileDate && fileDate !== filterDate) {
+						continue;
+					}
+					const lastModified = fileDate ? new Date(fileDate) : undefined;
+					discovered.push({
+						url: fileUrl,
+						filename,
+						type: "xml",
+						lastModified,
+						metadata: {
+							source: "trgocentar_portal",
+							discoveredAt: new Date().toISOString(),
+							portalDate: fileDate,
+						},
+					});
+				}
 
-		return discovered;
+				return okAsync(discovered);
+			});
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult> {
-		const result = await super.parse(content, filename, options);
-		for (const row of result.rows) {
-			const anchorPrice = this.extractDynamicAnchorPrice(row.rawData);
-			if (anchorPrice !== undefined) {
-				row.anchorPrice = anchorPrice;
+	): ResultAsync<ParseResult, FetchError> {
+		return super.parse(content, filename, options).map((result) => {
+			for (const row of result.rows) {
+				const anchorPrice = this.extractDynamicAnchorPrice(row.rawData);
+				if (anchorPrice !== undefined) {
+					row.anchorPrice = anchorPrice;
+				}
 			}
-		}
-		return result;
+			return result;
+		});
 	}
 
 	private extractDynamicAnchorPrice(rawData: string): number | undefined {

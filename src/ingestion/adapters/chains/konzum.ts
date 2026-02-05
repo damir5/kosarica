@@ -1,3 +1,7 @@
+import { ResultAsync, err, ok } from "neverthrow";
+import type { Result } from "neverthrow";
+import { fetchError, type FetchError } from "@/lib/errors";
+import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
@@ -48,7 +52,15 @@ export class KonzumAdapter extends BaseCsvAdapter {
 		});
 	}
 
-	async discover(targetDate?: string): Promise<DiscoveredFile[]> {
+	discover(
+		targetDate?: string,
+	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
+		return new ResultAsync(this.discoverImpl(targetDate));
+	}
+
+	private async discoverImpl(
+		targetDate?: string,
+	): Promise<Result<DiscoveredFile[], FetchError | IngestionClassified>> {
 		const discovered: DiscoveredFile[] = [];
 		const seen = new Set<string>();
 		const date = targetDate || new Date().toISOString().slice(0, 10);
@@ -56,11 +68,29 @@ export class KonzumAdapter extends BaseCsvAdapter {
 
 		for (let page = 1; page <= maxPages; page += 1) {
 			const pageUrl = `${this.baseUrl()}?date=${date}&page=${page}`;
-			const response = await this.fetchWithRetry(pageUrl);
-			if (!response.ok) {
-				break;
+			const responseResult = await this.fetchWithRetry(pageUrl);
+			if (responseResult.isErr()) {
+				if (responseResult.error.status) {
+					break;
+				}
+				return err(responseResult.error);
 			}
-			const html = await response.text();
+			const response = responseResult.value;
+			let html = "";
+			try {
+				html = await response.text();
+			} catch (error) {
+				return err(
+					fetchError({
+						url: pageUrl,
+						message:
+							error instanceof Error ? error.message : "Failed to read response",
+						retryable: false,
+						attempts: 1,
+						cause: error,
+					}),
+				);
+			}
 			const pattern =
 				/href=["'](\/cjenici\/download\?title=([^"'&]+)[^"']*)["']/g;
 			let match: RegExpExecArray | null;
@@ -99,14 +129,14 @@ export class KonzumAdapter extends BaseCsvAdapter {
 			}
 		}
 
-		return discovered;
+		return ok(discovered);
 	}
 
-	async parse(
+	parse(
 		content: Buffer,
 		filename: string,
 		options?: ParseOptions,
-	): Promise<ParseResult> {
+	): ResultAsync<ParseResult, FetchError> {
 		return super.parse(content, filename, options);
 	}
 
