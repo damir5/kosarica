@@ -27,7 +27,7 @@ async function main() {
 		ORDER BY chain_slug, category
 	`);
 
-	const rawRows = (rawCategoriesResult as { rows?: Array<Record<string, unknown>> }).rows ?? [];
+	const rawRows = (Array.isArray(rawCategoriesResult) ? rawCategoriesResult : (rawCategoriesResult as { rows?: Array<Record<string, unknown>> }).rows ?? []) as Array<Record<string, unknown>>;
 
 	console.log(`\n=== Category Backfill ===`);
 	console.log(`Found ${rawRows.length} distinct (chain, category) pairs to process.\n`);
@@ -71,7 +71,7 @@ async function main() {
 	const productCategoriesResult = await db.execute(sql`
 		SELECT DISTINCT category FROM products WHERE category IS NOT NULL
 	`);
-	const productRows = (productCategoriesResult as { rows?: Array<Record<string, unknown>> }).rows ?? [];
+	const productRows = (Array.isArray(productCategoriesResult) ? productCategoriesResult : (productCategoriesResult as { rows?: Array<Record<string, unknown>> }).rows ?? []) as Array<Record<string, unknown>>;
 	let productsUpdated = 0;
 
 	for (const row of productRows) {
@@ -112,7 +112,7 @@ async function main() {
 		GROUP BY category
 		ORDER BY cnt DESC
 	`);
-	const verifyRows = (verifyResult as { rows?: Array<Record<string, unknown>> }).rows ?? [];
+	const verifyRows = (Array.isArray(verifyResult) ? verifyResult : (verifyResult as { rows?: Array<Record<string, unknown>> }).rows ?? []) as Array<Record<string, unknown>>;
 	console.log(`\n=== Category Distribution ===`);
 	for (const row of verifyRows) {
 		console.log(`  ${String(row.category ?? "(null)").padEnd(30)} ${row.cnt}`);

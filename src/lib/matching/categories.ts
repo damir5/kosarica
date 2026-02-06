@@ -26,9 +26,9 @@ interface CategoryRule {
  * Subcategory is preserved from raw if non-null, otherwise set from rule.
  */
 const CATEGORY_RULES: CategoryRule[] = [
-	// Piće
+	// Piće — includes Mojibake variants where chars are stripped
 	{
-		patterns: ["pice", "pica"],
+		patterns: ["pice", "pica", "pie", "pia"],
 		category: "Piće",
 	},
 	// Hrana
@@ -36,14 +36,14 @@ const CATEGORY_RULES: CategoryRule[] = [
 		patterns: ["hrana", "prehrana"],
 		category: "Hrana",
 	},
-	// Sredstva za čišćenje
+	// Sredstva za čišćenje — includes Mojibake "sredstva za ienie" and DM variant
 	{
-		patterns: ["sredstva za ciscenje", "sredstva za ci"],
+		patterns: ["sredstva za ciscenje", "sredstva za ci", "sredstva za", "pranje rublja i ci"],
 		category: "Sredstva za čišćenje",
 	},
-	// Kućanstvo / proizvodi za kućanstvo
+	// Kućanstvo / proizvodi za kućanstvo / domaćinstvo
 	{
-		patterns: ["kucanstvo", "proizvodi za ku"],
+		patterns: ["kucanstvo", "proizvodi za ku", "domacinstvo"],
 		category: "Kućanstvo",
 	},
 	// Toaletne potrepštine
@@ -83,8 +83,20 @@ const CATEGORY_RULES: CategoryRule[] = [
 		subcategory: "Tijelo",
 	},
 	{
-		patterns: ["kozmetika"],
+		patterns: ["kozmetika", "drogerija"],
 		category: "Kozmetika",
+	},
+	// Mirisi (DM) → Kozmetika/Mirisi
+	{
+		patterns: ["mirisi"],
+		category: "Kozmetika",
+		subcategory: "Mirisi",
+	},
+	// Usta/zubi (DM) → Kozmetika/Oralna higijena
+	{
+		patterns: ["usta/zubi", "usta"],
+		category: "Kozmetika",
+		subcategory: "Oralna higijena",
 	},
 ];
 

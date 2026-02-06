@@ -473,8 +473,7 @@ export async function runBarcodeMatching(options?: {
 		ORDER BY rib.barcode
 	`);
 
-	const rows = ((result as { rows?: unknown[] }).rows ??
-		[]) as RetailerItemRow[];
+	const rows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as RetailerItemRow[];
 	const barcodeItems = new Map<string, RetailerItem[]>();
 	let skipped = 0;
 
@@ -618,8 +617,7 @@ export async function runTrigramMatching(options?: {
 		LIMIT ${batchSize}
 	`);
 
-	const itemRows = ((itemsResult as { rows?: unknown[] }).rows ??
-		[]) as RetailerItemRow[];
+	const itemRows = (Array.isArray(itemsResult) ? itemsResult : (itemsResult as { rows?: unknown[] }).rows ?? []) as RetailerItemRow[];
 
 	const result: TrigramMatchingResult = {
 		runId,
@@ -660,8 +658,7 @@ export async function runTrigramMatching(options?: {
 			LIMIT ${maxCandidates}
 		`);
 
-		const candidateRows = ((candidatesResult as { rows?: unknown[] }).rows ??
-			[]) as ProductCandidateRow[];
+		const candidateRows = (Array.isArray(candidatesResult) ? candidatesResult : (candidatesResult as { rows?: unknown[] }).rows ?? []) as ProductCandidateRow[];
 		const candidates = parseCandidateRows(candidateRows);
 
 		if (candidates.length === 0) {

@@ -9,7 +9,7 @@
   - victoria logs or openobserve
   - google analytics
 
-
+https://github.com/leeoniya/uPlot
 
 ## UX
 https://claudecodeplugins.dev/category/design-ux

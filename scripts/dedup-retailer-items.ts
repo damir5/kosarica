@@ -87,7 +87,7 @@ async function findDuplicateGroups(
 			HAVING COUNT(*) > 1
 		`);
 
-		const rows = (result as { rows?: Array<Record<string, unknown>> }).rows ?? [];
+		const rows = (Array.isArray(result) ? result : (result as { rows?: Array<Record<string, unknown>> }).rows ?? []) as Array<Record<string, unknown>>;
 		for (const row of rows) {
 			groups.push({
 				chainSlug: row.chain_slug as string,
@@ -286,7 +286,7 @@ async function reportCounts(): Promise<void> {
 		ORDER BY active DESC
 	`);
 
-	const rows = (result as { rows?: Array<Record<string, unknown>> }).rows ?? [];
+	const rows = (Array.isArray(result) ? result : (result as { rows?: Array<Record<string, unknown>> }).rows ?? []) as Array<Record<string, unknown>>;
 	console.log("\n=== Retailer Items Report ===");
 	console.log("Chain             | Active    | Merged    | Total");
 	console.log("------------------|-----------|-----------|----------");

@@ -7,7 +7,7 @@
  * Usage: DATABASE_URL=... npx tsx scripts/backfill-units.ts
  */
 
-import { sql } from "drizzle-orm";
+import { and, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "@/db";
 import { retailerItems } from "@/db/schema";
 import { parseUnit } from "@/lib/matching/normalize";
@@ -39,9 +39,11 @@ async function main() {
 			})
 			.from(retailerItems)
 			.where(
-				sql`${retailerItems.mergedIntoId} IS NULL
-					AND ${retailerItems.normalizedUnit} IS NULL
-					AND (${retailerItems.unitOverrideBy} IS NULL)`,
+				and(
+					isNull(retailerItems.mergedIntoId),
+					isNull(retailerItems.normalizedUnit),
+					isNull(retailerItems.unitOverrideBy),
+				),
 			)
 			.limit(BATCH_SIZE);
 
@@ -139,7 +141,7 @@ async function main() {
 		ORDER BY total DESC
 	`);
 
-	const verifyRows = (verifyResult as { rows?: Array<Record<string, unknown>> }).rows ?? [];
+	const verifyRows = (Array.isArray(verifyResult) ? verifyResult : (verifyResult as { rows?: Array<Record<string, unknown>> }).rows ?? []) as Array<Record<string, unknown>>;
 	console.log("\n=== Unit Coverage by Chain ===");
 	console.log("Chain             | Total     | Has Unit  | %");
 	console.log("------------------|-----------|-----------|------");
