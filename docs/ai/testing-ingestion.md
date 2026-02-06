@@ -10,6 +10,7 @@ Provide these inputs before execution:
 - `date_start`: `YYYY-MM-DD`
 - `date_end`: `YYYY-MM-DD`
 - `chains`: list of chain slugs or `all`
+- `worker_count`: positive integer (`1` = app worker only, `2+` = start extra workers)
 - `trigger_matching_crons`: `true` or `false` (default `true`)
 
 Default values if not provided:
@@ -17,6 +18,10 @@ Default values if not provided:
 - `reset_mode=full_reset`
 - `chains=all`
 - `trigger_matching_crons=true`
+
+Worker count rule:
+- Bots MUST explicitly ask the user: `How many workers should I start for this run?`
+- Do not assume a default unless the user already gave one.
 
 Supported chains:
 
@@ -44,6 +49,9 @@ Bots must repeatedly publish detailed progress to the user during execution, not
 - Current step name and status (`in_progress`, `completed`, `blocked`)
 - Elapsed time since run start
 - Date range and chains being processed
+- Worker setup:
+  - target worker count
+  - active worker process count
 - Current ingestion progress:
   - scheduled tasks count
   - task queue status breakdown (`pending`, `running`, `completed`, `failed`)
@@ -78,6 +86,39 @@ mise run dev
 ```
 
 Keep `mise run dev` running during the whole test run.
+
+## Step 1b: Configure Worker Count (Required)
+Before scheduling ingestion, ask the user how many workers to run.
+
+- `worker_count=1`: no extra action, use the worker started by the app.
+- `worker_count>1`: start `worker_count - 1` extra workers in background.
+
+Example command for one extra worker:
+```bash
+WORKER_ID=manual-worker-2 mise exec node@24 -- pnpm exec tsx scripts/run-worker.ts > log/worker-2.log 2>&1 &
+echo $! >> /tmp/kosarica-worker-pids.txt
+```
+
+Example command for multiple workers:
+```bash
+mkdir -p log
+: > /tmp/kosarica-worker-pids.txt
+for i in $(seq 2 "${worker_count}"); do
+  WORKER_ID="manual-worker-${i}" mise exec node@24 -- pnpm exec tsx scripts/run-worker.ts > "log/worker-${i}.log" 2>&1 &
+  echo $! >> /tmp/kosarica-worker-pids.txt
+done
+```
+
+After startup, verify worker fanout:
+```bash
+psql "$DATABASE_URL" -c "
+SELECT status, count(*)
+FROM task_queue
+WHERE task_type = 'ingestion'
+GROUP BY status
+ORDER BY status;
+"
+```
 
 ## Step 2: Prepare State (Reset or Keep)
 ### Option A: Full reset (recommended)
@@ -177,6 +218,13 @@ ORDER BY chain_slug, status;
 ```
 
 Proceed when ingestion has no `pending`/`running` tasks.
+
+After ingestion completes, stop extra workers (if any):
+```bash
+if [ -f /tmp/kosarica-worker-pids.txt ]; then
+  xargs -r kill < /tmp/kosarica-worker-pids.txt
+fi
+```
 
 ## Step 7: Manually Trigger Post-Ingestion Cron Jobs
 If `trigger_matching_crons=true`, open `/admin/cron` and trigger jobs in order:

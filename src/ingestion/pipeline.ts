@@ -18,7 +18,11 @@ import { getChainConfig } from "@/ingestion/adapters/config";
 import { getAdapter } from "@/ingestion/adapters/registry";
 import type { ChainAdapter } from "@/ingestion/adapters/types";
 import { IngestionClassifiedError } from "@/ingestion/errors";
-import { type ParquetPriceRow, writePricesParquet } from "@/ingestion/parquet";
+import {
+	createPricesParquetAppender,
+	type ParquetPriceRow,
+	type PricesParquetAppender,
+} from "@/ingestion/parquet";
 import type {
 	DiscoveredFile,
 	NormalizedRow,
@@ -72,6 +76,7 @@ interface IngestionPerformanceConfig {
 	itemWriteBatchSize: number;
 	itemWriteRetryMax: number;
 	itemWriteRetryBaseMs: number;
+	parquetMaxPendingWrites: number;
 }
 
 interface ValidRowForPersistence {
@@ -88,6 +93,7 @@ interface ProcessedFileResult {
 	failedRows: number;
 	errorCount: number;
 	parquetRows: ParquetPriceRow[];
+	itemIdsToIndex: string[];
 	itemResolveMs: number;
 	itemInsertMs: number;
 	itemMetadataUpdateMs: number;
@@ -191,13 +197,13 @@ function parsePositiveIntEnv(name: string, fallback: number): number {
 
 function getIngestionPerformanceConfig(): IngestionPerformanceConfig {
 	return {
-		fileConcurrency: parsePositiveIntEnv("INGESTION_FILE_CONCURRENCY", 3),
+		fileConcurrency: parsePositiveIntEnv("INGESTION_FILE_CONCURRENCY", 4),
 		dbBatchSize: parsePositiveIntEnv("INGESTION_DB_BATCH_SIZE", 1000),
 		progressUpdateIntervalMs: parsePositiveIntEnv(
 			"INGESTION_PROGRESS_UPDATE_INTERVAL_MS",
 			5000,
 		),
-		itemWriteShards: parsePositiveIntEnv("INGESTION_ITEM_WRITE_SHARDS", 2),
+		itemWriteShards: parsePositiveIntEnv("INGESTION_ITEM_WRITE_SHARDS", 3),
 		itemWriteBatchSize: parsePositiveIntEnv(
 			"INGESTION_ITEM_WRITE_BATCH_SIZE",
 			500,
@@ -206,6 +212,10 @@ function getIngestionPerformanceConfig(): IngestionPerformanceConfig {
 		itemWriteRetryBaseMs: parsePositiveIntEnv(
 			"INGESTION_ITEM_WRITE_RETRY_BASE_MS",
 			50,
+		),
+		parquetMaxPendingWrites: parsePositiveIntEnv(
+			"INGESTION_PARQUET_MAX_PENDING_WRITES",
+			3,
 		),
 	};
 }
@@ -1475,10 +1485,14 @@ async function processIngestionFile(options: {
 		}
 
 		// Normalize category for new items
-		const normalizedCat = normalizeCategory(row.category ?? null, row.subcategory ?? null);
+		const normalizedCat = normalizeCategory(
+			row.category ?? null,
+			row.subcategory ?? null,
+		);
 		if (normalizedCat) {
 			row.category = normalizedCat.category;
-			row.subcategory = row.subcategory || normalizedCat.subcategory || undefined;
+			row.subcategory =
+				row.subcategory || normalizedCat.subcategory || undefined;
 		}
 
 		if (row.priceStatus === "available") {
@@ -1663,6 +1677,7 @@ async function processIngestionFile(options: {
 		failedRows: fileFailedRows,
 		errorCount: fileErrorCount,
 		parquetRows: localParquetRows,
+		itemIdsToIndex: [...new Set(itemIds)],
 		itemResolveMs,
 		itemInsertMs,
 		itemMetadataUpdateMs,
@@ -1771,7 +1786,7 @@ export async function runIngestion(
 	let tempDirPath: string | null = null;
 	const performanceConfig = getIngestionPerformanceConfig();
 
-	const parquetRows: ParquetPriceRow[] = [];
+	const itemIdsForSearchIndex = new Set<string>();
 	const storeCache = new Map<string, string>();
 	const storeResolveInFlight = new Map<string, Promise<string>>();
 	const itemState: ItemPersistenceState = {
@@ -1785,6 +1800,46 @@ export async function runIngestion(
 	const itemWriteSharder = createItemWriteSharder(
 		performanceConfig.itemWriteShards,
 	);
+	const parquetKey = buildParquetKey(chainSlug, targetDate);
+	let parquetRowsWritten = 0;
+	let parquetDurationMs = 0;
+	let parquetAppenderPromise: Promise<PricesParquetAppender> | null = null;
+	const pendingParquetWrites = new Set<Promise<void>>();
+
+	const getParquetAppender = (): Promise<PricesParquetAppender> => {
+		if (!parquetAppenderPromise) {
+			parquetAppenderPromise = createPricesParquetAppender(parquetKey);
+		}
+		return parquetAppenderPromise;
+	};
+
+	const scheduleParquetWrite = async (
+		rows: ParquetPriceRow[],
+	): Promise<void> => {
+		if (rows.length === 0) {
+			return;
+		}
+
+		parquetRowsWritten += rows.length;
+		const parquetAppendStartedAt = Date.now();
+		const writePromise = (async () => {
+			const parquetAppender = await getParquetAppender();
+			await parquetAppender.appendRows(rows);
+			parquetDurationMs += Date.now() - parquetAppendStartedAt;
+		})();
+
+		pendingParquetWrites.add(writePromise);
+		void writePromise.finally(() => {
+			pendingParquetWrites.delete(writePromise);
+		});
+
+		if (
+			pendingParquetWrites.size >=
+			performanceConfig.parquetMaxPendingWrites
+		) {
+			await Promise.race(pendingParquetWrites);
+		}
+	};
 
 	try {
 		const adapter = getAdapter(chainSlug as never);
@@ -1956,7 +2011,12 @@ export async function runIngestion(
 				priceAvailabilityTotals.unavailableNonPositiveRows +=
 					processed.priceAvailability.unavailableNonPositiveRows;
 				processedFiles += 1;
-				parquetRows.push(...processed.parquetRows);
+
+				for (const itemId of processed.itemIdsToIndex) {
+					itemIdsForSearchIndex.add(itemId);
+				}
+
+				await scheduleParquetWrite(processed.parquetRows);
 
 				if ((index + 1) % 10 === 0 || index + 1 === filesToProcess.length) {
 					log.info("Processing files", {
@@ -1971,22 +2031,22 @@ export async function runIngestion(
 				await maybeUpdateProgress(false);
 			},
 		);
+		if (pendingParquetWrites.size > 0) {
+			await Promise.all(Array.from(pendingParquetWrites));
+		}
 		await maybeUpdateProgress(true);
 		const processingDurationMs = Date.now() - processingStartedAt;
 
-		let parquetDurationMs = 0;
 		let searchIndexDurationMs = 0;
-		if (parquetRows.length > 0) {
-			const parquetStartedAt = Date.now();
-			const parquetKey = buildParquetKey(chainSlug, targetDate);
-			await writePricesParquet(parquetKey, parquetRows);
+		if (parquetRowsWritten > 0) {
+			const parquetFinalizeStartedAt = Date.now();
+			const parquetAppender = await getParquetAppender();
+			await parquetAppender.close();
 			await recordParquetFile(chainSlug, targetDate, parquetKey);
-			parquetDurationMs = Date.now() - parquetStartedAt;
+			parquetDurationMs += Date.now() - parquetFinalizeStartedAt;
 
 			const searchIndexStartedAt = Date.now();
-			const itemIdsToIndex = [
-				...new Set(parquetRows.map((row) => row.retailer_item_id)),
-			];
+			const itemIdsToIndex = Array.from(itemIdsForSearchIndex);
 
 			try {
 				await indexRetailerItemsBatch(itemIdsToIndex);
@@ -2080,6 +2140,17 @@ export async function runIngestion(
 			runId,
 			error: errorToObject(error),
 		});
+
+		if (parquetAppenderPromise) {
+			try {
+				const parquetAppender = await parquetAppenderPromise;
+				await parquetAppender.close();
+			} catch (closeError) {
+				log.warn("Failed to close parquet writer after ingestion error", {
+					error: errorToObject(closeError),
+				});
+			}
+		}
 
 		// Leave temp directory on error for debugging
 		if (tempDirPath) {

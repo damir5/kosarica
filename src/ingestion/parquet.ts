@@ -3,7 +3,11 @@ import path from "node:path";
 import { zstdCompressSync, zstdDecompressSync } from "node:zlib";
 import { PARQUET_COMPRESSION_METHODS } from "@dsnp/parquetjs/dist/lib/compression";
 import type { ParquetCompression } from "@dsnp/parquetjs/dist/parquet";
-import { ParquetSchema, ParquetWriter } from "@dsnp/parquetjs/dist/parquet";
+import {
+	ParquetSchema,
+	ParquetWriter,
+	type WriterOptions,
+} from "@dsnp/parquetjs/dist/parquet";
 import { resolveStoragePath } from "@/lib/storage";
 
 export interface ParquetPriceRow {
@@ -81,22 +85,73 @@ const PRICE_SCHEMA = new ParquetSchema({
 	brand: { type: "UTF8", optional: true, compression: PARQUET_COMPRESSION },
 });
 
+export interface PricesParquetAppender {
+	appendRows(rows: ParquetPriceRow[]): Promise<void>;
+	close(): Promise<{ filePath: string; rowCount: number }>;
+}
+
+async function openParquetWriter(
+	filePath: string,
+): Promise<ParquetWriter> {
+	const options: WriterOptions = {};
+	return ParquetWriter.openFile(PRICE_SCHEMA, filePath, options);
+}
+
+export async function createPricesParquetAppender(
+	storageKey: string,
+): Promise<PricesParquetAppender> {
+	const filePath = resolveStoragePath(storageKey);
+	await mkdir(path.dirname(filePath), { recursive: true });
+
+	const writer = await openParquetWriter(filePath);
+	let rowCount = 0;
+	let closed = false;
+	let writeQueue: Promise<void> = Promise.resolve();
+
+	const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
+		const next = writeQueue.then(operation);
+		writeQueue = next.then(
+			() => undefined,
+			() => undefined,
+		);
+		return next;
+	};
+
+	return {
+		async appendRows(rows: ParquetPriceRow[]): Promise<void> {
+			if (rows.length === 0) {
+				return;
+			}
+
+			await enqueue(async () => {
+				if (closed) {
+					throw new Error("Cannot append rows after parquet writer is closed");
+				}
+
+				for (const row of rows) {
+					await writer.appendRow(row as Record<string, unknown>);
+				}
+				rowCount += rows.length;
+			});
+		},
+
+		async close(): Promise<{ filePath: string; rowCount: number }> {
+			return enqueue(async () => {
+				if (!closed) {
+					await writer.close();
+					closed = true;
+				}
+				return { filePath, rowCount };
+			});
+		},
+	};
+}
+
 export async function writePricesParquet(
 	storageKey: string,
 	rows: ParquetPriceRow[],
 ): Promise<{ filePath: string; rowCount: number }> {
-	const filePath = resolveStoragePath(storageKey);
-	await mkdir(path.dirname(filePath), { recursive: true });
-
-	const writer = await ParquetWriter.openFile(PRICE_SCHEMA, filePath, {});
-
-	try {
-		for (const row of rows) {
-			await writer.appendRow(row as Record<string, unknown>);
-		}
-	} finally {
-		await writer.close();
-	}
-
-	return { filePath, rowCount: rows.length };
+	const appender = await createPricesParquetAppender(storageKey);
+	await appender.appendRows(rows);
+	return appender.close();
 }

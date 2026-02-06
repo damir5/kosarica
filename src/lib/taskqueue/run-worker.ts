@@ -12,6 +12,14 @@ import { rerunIngestionRun, runIngestion } from "@/ingestion/pipeline";
 import { scheduleTask } from "./index";
 import { TaskQueueWorker } from "./worker";
 
+function parsePositiveIntEnv(name: string, fallback: number): number {
+	const raw = process.env[name];
+	if (!raw) return fallback;
+	const parsed = Number.parseInt(raw, 10);
+	if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+	return parsed;
+}
+
 export function createTaskQueueWorker(options?: {
 	workerId?: string;
 	maxTasks?: number;
@@ -22,12 +30,14 @@ export function createTaskQueueWorker(options?: {
 		process.env.WORKER_ID ??
 		process.env.HOSTNAME ??
 		`node-${process.pid}`;
+	const defaultMaxTasks = parsePositiveIntEnv("WORKER_MAX_TASKS", 8);
+	const defaultPollDelay = parsePositiveIntEnv("WORKER_POLL_DELAY_MS", 2000);
 
 	const worker = new TaskQueueWorker({
 		workerId,
 		taskTypes: ["ingestion", "rerun", "cleanup", "clickhouse"],
-		maxTasks: options?.maxTasks ?? 5,
-		pollDelay: options?.pollDelay ?? 5000,
+		maxTasks: options?.maxTasks ?? defaultMaxTasks,
+		pollDelay: options?.pollDelay ?? defaultPollDelay,
 	});
 
 	worker.registerHandler("ingestion", async (task) => {
