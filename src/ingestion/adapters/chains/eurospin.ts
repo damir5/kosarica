@@ -1,5 +1,5 @@
-import { ResultAsync, okAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { okAsync, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
@@ -8,6 +8,7 @@ import type {
 	ExpandedFile,
 	ParseOptions,
 	ParseResult,
+	StoreMetadata,
 } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
@@ -178,5 +179,33 @@ export class EurospinAdapter extends BaseCsvAdapter {
 			return `${match[3]}-${match[2]}-${match[1]}`;
 		}
 		return "";
+	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+		if (!identifier) {
+			return null;
+		}
+
+		const parts = identifier.split("-");
+
+		if (parts.length < 5) {
+			return {
+				name: `${this.name} ${identifier}`,
+			};
+		}
+
+		const city = parts[3]?.trim() || "";
+		const street = parts[2]?.replace(/_/g, " ").trim() || "";
+		const postalCode = parts[4]?.trim() || "";
+
+		const storeName = city ? `${this.name} ${city}` : this.name;
+
+		return {
+			name: storeName,
+			address: street || undefined,
+			city: city || undefined,
+			postalCode: postalCode || undefined,
+		};
 	}
 }

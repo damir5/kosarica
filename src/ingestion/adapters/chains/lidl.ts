@@ -1,5 +1,5 @@
-import { ResultAsync, okAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { okAsync, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
@@ -8,6 +8,7 @@ import type {
 	ExpandedFile,
 	ParseOptions,
 	ParseResult,
+	StoreMetadata,
 } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
@@ -191,6 +192,17 @@ export class LidlAdapter extends BaseCsvAdapter {
 			return `${match[3]}-${match[2]}-${match[1]}`;
 		}
 		return "";
+	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+		if (!identifier) {
+			return null;
+		}
+
+		return {
+			name: `${this.name} ${identifier}`,
+		};
 	}
 }
 

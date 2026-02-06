@@ -25,6 +25,8 @@ import type {
 	ParseResult,
 	PriceUnavailableReason,
 } from "@/ingestion/types";
+import { normalizeCategory } from "@/lib/matching/categories";
+import { computeNameHash, parseUnit } from "@/lib/matching/normalize";
 import { indexRetailerItemsBatch } from "@/lib/search";
 import {
 	buildArchiveKey,
@@ -108,6 +110,7 @@ interface FileToProcess {
 interface ItemPersistenceState {
 	cacheByExternalId: Map<string, string>;
 	cacheByBarcode: Map<string, string>;
+	cacheByNameHash: Map<string, string>;
 	updatedItemIds: Set<string>;
 	knownItemBarcodePairs: Set<string>;
 	batchSize: number;
@@ -512,6 +515,10 @@ function barcodeCacheKey(chainSlug: string, barcode: string): string {
 	return `${chainSlug}:barcode:${barcode}`;
 }
 
+function nameHashCacheKey(chainSlug: string, nameHash: string): string {
+	return `${chainSlug}:namehash:${nameHash}`;
+}
+
 function normalizeExternalId(externalId?: string): string | null {
 	if (!externalId) {
 		return null;
@@ -589,6 +596,42 @@ async function loadItemsByBarcodes(
 	return matches;
 }
 
+async function loadItemsByNameHash(
+	chainSlug: string,
+	nameHashes: string[],
+	batchSize: number,
+): Promise<Map<string, string>> {
+	const matches = new Map<string, string>();
+	if (nameHashes.length === 0) {
+		return matches;
+	}
+
+	const db = getDatabase();
+	for (const chunk of chunkArray(nameHashes, batchSize)) {
+		const rows = await db
+			.select({
+				id: retailerItems.id,
+				normalizedNameHash: retailerItems.normalizedNameHash,
+			})
+			.from(retailerItems)
+			.where(
+				and(
+					eq(retailerItems.chainSlug, chainSlug),
+					inArray(retailerItems.normalizedNameHash, chunk),
+					sql`${retailerItems.mergedIntoId} IS NULL`,
+				),
+			)
+			.orderBy(retailerItems.createdAt);
+		for (const row of rows) {
+			if (row.normalizedNameHash && !matches.has(row.normalizedNameHash)) {
+				matches.set(row.normalizedNameHash, row.id);
+			}
+		}
+	}
+
+	return matches;
+}
+
 async function updateRetailerItemMetadataBatch(
 	updates: Array<{ itemId: string; row: NormalizedRow }>,
 	archiveId: string | null,
@@ -636,7 +679,7 @@ async function updateRetailerItemMetadataBatch(
 function buildNewItemCandidateKey(
 	externalId: string | null,
 	barcodes: string[],
-	rowIndex: number,
+	name: string,
 ): string {
 	if (externalId) {
 		return `external:${externalId}`;
@@ -645,7 +688,9 @@ function buildNewItemCandidateKey(
 	if (firstBarcode) {
 		return `barcode:${firstBarcode}`;
 	}
-	return `row:${rowIndex}`;
+	const hash = computeNameHash(name);
+	if (!hash) return `row:${Date.now()}-${Math.random()}`;
+	return `name:${hash}`;
 }
 
 function buildItemWriteKey(
@@ -742,6 +787,35 @@ async function resolveRetailerItemsForRows(
 		state.cacheByBarcode.set(barcodeCacheKey(chainSlug, barcode), itemId);
 	}
 
+	// Name-hash resolution for items without externalId and without barcodes
+	const knownNameHashes = new Map<string, string>();
+	const missingNameHashes = new Set<string>();
+	for (const rowEntry of rows) {
+		const externalId = normalizeExternalId(rowEntry.row.externalId);
+		if (externalId) continue;
+		if (rowEntry.row.barcodes.length > 0) continue;
+		const nameHash = computeNameHash(rowEntry.row.name);
+		if (!nameHash) continue;
+		const cached = state.cacheByNameHash.get(
+			nameHashCacheKey(chainSlug, nameHash),
+		);
+		if (cached) {
+			knownNameHashes.set(nameHash, cached);
+		} else {
+			missingNameHashes.add(nameHash);
+		}
+	}
+
+	const loadedNameHashes = await loadItemsByNameHash(
+		chainSlug,
+		Array.from(missingNameHashes),
+		state.batchSize,
+	);
+	for (const [nameHash, itemId] of loadedNameHashes) {
+		knownNameHashes.set(nameHash, itemId);
+		state.cacheByNameHash.set(nameHashCacheKey(chainSlug, nameHash), itemId);
+	}
+
 	type NewItemCandidate = {
 		provisionalId: string;
 		externalId: string | null;
@@ -767,6 +841,13 @@ async function resolveRetailerItemsForRows(
 					break;
 				}
 			}
+			// Fall back to name-hash lookup
+			if (!resolvedItemId && rowEntry.row.barcodes.length === 0) {
+				const nameHash = computeNameHash(rowEntry.row.name);
+				if (nameHash) {
+					resolvedItemId = knownNameHashes.get(nameHash) ?? null;
+				}
+			}
 		}
 
 		if (resolvedItemId) {
@@ -789,7 +870,7 @@ async function resolveRetailerItemsForRows(
 		const candidateKey = buildNewItemCandidateKey(
 			externalId,
 			rowEntry.row.barcodes,
-			index,
+			rowEntry.row.name,
 		);
 		const existingCandidate = newCandidates.get(candidateKey);
 		if (existingCandidate) {
@@ -840,26 +921,43 @@ async function resolveRetailerItemsForRows(
 	)) {
 		const insertStartedAt = Date.now();
 		await db.insert(retailerItems).values(
-			chunk.map((candidate) => ({
-				id: candidate.provisionalId,
-				name: candidate.row.name,
-				externalId: null,
-				description: candidate.row.description,
-				category: candidate.row.category,
-				subcategory: candidate.row.subcategory,
-				brand: candidate.row.brand,
-				unit: candidate.row.unit,
-				unitQuantity: candidate.row.unitQuantity,
-				imageUrl: candidate.row.imageUrl,
-				barcode: candidate.row.barcodes[0] ?? null,
-				chainSlug,
-				archiveId,
-				createdAt: new Date(),
-			})),
+			chunk.map((candidate) => {
+				const parsed = parseUnit(
+					candidate.row.unit ?? null,
+					candidate.row.unitQuantity ?? null,
+					candidate.row.name,
+				);
+				return {
+					id: candidate.provisionalId,
+					name: candidate.row.name,
+					externalId: null,
+					description: candidate.row.description,
+					category: candidate.row.category,
+					subcategory: candidate.row.subcategory,
+					brand: candidate.row.brand,
+					unit: candidate.row.unit,
+					unitQuantity: candidate.row.unitQuantity,
+					imageUrl: candidate.row.imageUrl,
+					barcode: candidate.row.barcodes[0] ?? null,
+					chainSlug,
+					archiveId,
+					normalizedNameHash: computeNameHash(candidate.row.name),
+					normalizedUnit: parsed?.unit ?? null,
+					normalizedQuantity: parsed?.quantity ?? null,
+					createdAt: new Date(),
+				};
+			}),
 		);
 		itemInsertMs += Date.now() - insertStartedAt;
 		for (const candidate of chunk) {
 			createdItemIds.add(candidate.provisionalId);
+			const nameHash = computeNameHash(candidate.row.name);
+			if (nameHash) {
+				state.cacheByNameHash.set(
+					nameHashCacheKey(chainSlug, nameHash),
+					candidate.provisionalId,
+				);
+			}
 			for (const barcode of candidate.row.barcodes) {
 				state.cacheByBarcode.set(
 					barcodeCacheKey(chainSlug, barcode),
@@ -875,22 +973,32 @@ async function resolveRetailerItemsForRows(
 		const insertedRows = await db
 			.insert(retailerItems)
 			.values(
-				chunk.map((candidate) => ({
-					id: candidate.provisionalId,
-					name: candidate.row.name,
-					externalId: candidate.externalId,
-					description: candidate.row.description,
-					category: candidate.row.category,
-					subcategory: candidate.row.subcategory,
-					brand: candidate.row.brand,
-					unit: candidate.row.unit,
-					unitQuantity: candidate.row.unitQuantity,
-					imageUrl: candidate.row.imageUrl,
-					barcode: candidate.row.barcodes[0] ?? null,
-					chainSlug,
-					archiveId,
-					createdAt: new Date(),
-				})),
+				chunk.map((candidate) => {
+					const parsed = parseUnit(
+						candidate.row.unit ?? null,
+						candidate.row.unitQuantity ?? null,
+						candidate.row.name,
+					);
+					return {
+						id: candidate.provisionalId,
+						name: candidate.row.name,
+						externalId: candidate.externalId,
+						description: candidate.row.description,
+						category: candidate.row.category,
+						subcategory: candidate.row.subcategory,
+						brand: candidate.row.brand,
+						unit: candidate.row.unit,
+						unitQuantity: candidate.row.unitQuantity,
+						imageUrl: candidate.row.imageUrl,
+						barcode: candidate.row.barcodes[0] ?? null,
+						chainSlug,
+						archiveId,
+						normalizedNameHash: computeNameHash(candidate.row.name),
+						normalizedUnit: parsed?.unit ?? null,
+						normalizedQuantity: parsed?.quantity ?? null,
+						createdAt: new Date(),
+					};
+				}),
 			)
 			.onConflictDoNothing({
 				target: [retailerItems.chainSlug, retailerItems.externalId],
@@ -1366,6 +1474,13 @@ async function processIngestionFile(options: {
 			fileWarningRows += 1;
 		}
 
+		// Normalize category for new items
+		const normalizedCat = normalizeCategory(row.category ?? null, row.subcategory ?? null);
+		if (normalizedCat) {
+			row.category = normalizedCat.category;
+			row.subcategory = row.subcategory || normalizedCat.subcategory || undefined;
+		}
+
 		if (row.priceStatus === "available") {
 			priceAvailability.availableRows += 1;
 		} else {
@@ -1662,6 +1777,7 @@ export async function runIngestion(
 	const itemState: ItemPersistenceState = {
 		cacheByExternalId: new Map<string, string>(),
 		cacheByBarcode: new Map<string, string>(),
+		cacheByNameHash: new Map<string, string>(),
 		updatedItemIds: new Set<string>(),
 		knownItemBarcodePairs: new Set<string>(),
 		batchSize: performanceConfig.itemWriteBatchSize,

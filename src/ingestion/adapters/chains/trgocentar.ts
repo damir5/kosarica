@@ -1,9 +1,14 @@
-import { ResultAsync, okAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { okAsync, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import { parsePrice } from "../../parsers/price";
 import type { XmlFieldMapping } from "../../parsers/xml";
-import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
+import type {
+	DiscoveredFile,
+	ParseOptions,
+	ParseResult,
+	StoreMetadata,
+} from "../../types";
 import { BaseXmlAdapter } from "../base/xml";
 import { chainConfigs } from "../config";
 
@@ -175,6 +180,31 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 			return `${euMatch[3]}-${euMatch[2]}-${euMatch[1]}`;
 		}
 		return "";
+	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+		if (!identifier) {
+			return null;
+		}
+
+		const parts = identifier.split("_");
+		if (parts.length < 3) {
+			return {
+				name: `${this.name} ${identifier}`,
+			};
+		}
+
+		const street = parts[1]?.replace(/_/g, " ")?.trim() || "";
+		const city = parts[2]?.trim() || "";
+
+		const storeName = city ? `${this.name} ${city}` : this.name;
+
+		return {
+			name: storeName,
+			address: street || undefined,
+			city: city || undefined,
+		};
 	}
 }
 

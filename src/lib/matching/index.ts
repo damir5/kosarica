@@ -9,6 +9,7 @@ import {
 	productMatchRejections,
 	products,
 } from "@/db/schema";
+import { removeDiacritics, normalizeWhitespace } from "@/lib/matching/normalize";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 import { createLogger } from "@/utils/logger";
@@ -97,31 +98,6 @@ const GENERIC_BRANDS = [
 	"private label",
 	"own brand",
 ];
-
-const CROATIAN_MAP: Array<[RegExp, string]> = [
-	[/\u010d/g, "c"], // č
-	[/\u010c/g, "C"], // Č
-	[/\u0107/g, "c"], // ć
-	[/\u0106/g, "C"], // Ć
-	[/\u0111/g, "dj"], // đ
-	[/\u0110/g, "Dj"], // Đ
-	[/\u0161/g, "s"], // š
-	[/\u0160/g, "S"], // Š
-	[/\u017e/g, "z"], // ž
-	[/\u017d/g, "Z"], // Ž
-];
-
-function removeDiacritics(value: string): string {
-	let result = value;
-	for (const [pattern, replacement] of CROATIAN_MAP) {
-		result = result.replace(pattern, replacement);
-	}
-	return result.normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC");
-}
-
-function normalizeWhitespace(value: string): string {
-	return value.trim().replace(/\s+/g, " ");
-}
 
 function isGenericBrand(brand: string): boolean {
 	const normalized = normalizeWhitespace(brand).toLowerCase();
@@ -459,6 +435,7 @@ export async function runBarcodeMatching(options?: {
 			JOIN retailer_items ri ON ri.id = rib.retailer_item_id
 			WHERE rib.barcode IS NOT NULL
 				AND rib.barcode != ''
+				AND ri.merged_into_id IS NULL
 				AND NOT EXISTS (
 					SELECT 1 FROM product_links pl WHERE pl.retailer_item_id = ri.id
 				)
@@ -484,7 +461,8 @@ export async function runBarcodeMatching(options?: {
 		FROM retailer_item_barcodes rib
 		JOIN retailer_items ri ON ri.id = rib.retailer_item_id
 		JOIN target_barcodes tb ON tb.barcode = rib.barcode
-		WHERE NOT EXISTS (
+		WHERE ri.merged_into_id IS NULL
+		AND NOT EXISTS (
 			SELECT 1 FROM product_links pl WHERE pl.retailer_item_id = ri.id
 		)
 		AND NOT EXISTS (
@@ -629,7 +607,8 @@ export async function runTrigramMatching(options?: {
 			ri.external_id,
 			'' as barcode
 		FROM retailer_items ri
-		WHERE NOT EXISTS (
+		WHERE ri.merged_into_id IS NULL
+		AND NOT EXISTS (
 			SELECT 1 FROM product_links pl WHERE pl.retailer_item_id = ri.id
 		)
 		AND NOT EXISTS (

@@ -1,5 +1,5 @@
-import { ResultAsync, okAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { okAsync, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { XmlFieldMapping } from "../../parsers/xml";
 import { expandZip } from "../../parsers/zip";
@@ -8,6 +8,7 @@ import type {
 	ExpandedFile,
 	ParseOptions,
 	ParseResult,
+	StoreMetadata,
 } from "../../types";
 import { BaseXmlAdapter } from "../base/xml";
 import { chainConfigs } from "../config";
@@ -223,6 +224,42 @@ export class StudenacAdapter extends BaseXmlAdapter {
 			return `${euMatch[3]}-${euMatch[2]}-${euMatch[1]}`;
 		}
 		return "";
+	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+		if (!identifier) {
+			return null;
+		}
+
+		const parts = identifier.split("-");
+		if (parts.length < 2) {
+			return {
+				name: `${this.name} ${identifier}`,
+			};
+		}
+
+		const streetCityPart = parts[0];
+		const streetCityParts = streetCityPart.split("_");
+
+		let city = "";
+		let street = "";
+
+		if (streetCityParts.length >= 2) {
+			const cityIndex = streetCityParts.length - 1;
+			city = streetCityParts[cityIndex]?.trim() || "";
+
+			const streetParts = streetCityParts.slice(0, cityIndex);
+			street = streetParts.join(" ").replace(/_/g, " ").trim();
+		}
+
+		const storeName = city ? `${this.name} ${city}` : this.name;
+
+		return {
+			name: storeName,
+			address: street || undefined,
+			city: city || undefined,
+		};
 	}
 }
 

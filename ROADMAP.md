@@ -9,9 +9,17 @@
   - victoria logs or openobserve
   - google analytics
 
-https://www.reddit.com/r/ClaudeAI/comments/1qgdg6v/finally_get_1500_users_on_my_vibe_coded_app_heres/
 
-- allow points/work to replace payments for premium features (eg price watchers)
+
+## UX
+https://claudecodeplugins.dev/category/design-ux
+- joker, mobile ux, researcher
+
+https://www.claudepluginhub.com/plugins/aws-solutions-library-samples-ux-design-assets-claude-code-plugins-plugins-ux-design
+https://github.com/wondelai/skills
+
+
+- allow points/performing work to replace payments for premium features (eg price watchers)
   - images
   - post promo content - twitter/instagram/facebook
 - eg free can watch 1-3 catalog items, for more need better account

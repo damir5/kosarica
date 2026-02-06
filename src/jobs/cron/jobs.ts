@@ -8,6 +8,7 @@
 
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
 import { barcodeMatchingHandler } from "./handlers/barcode-matching";
+import { trigramMatchingHandler } from "./handlers/trigram-matching";
 import { tempCleanupHandler } from "./handlers/temp-cleanup";
 import { registerCronJob } from "./registry";
 
@@ -46,6 +47,16 @@ export function registerAllCronJobs(): void {
 		timezone: "UTC",
 		taskType: "cleanup",
 		handler: barcodeMatchingHandler,
+	});
+
+	// Trigram matching after barcode matching
+	registerCronJob({
+		id: "trigram-matching",
+		name: "Trigram Product Matching",
+		cronExpression: "0 10 * * *", // 10 AM UTC, after barcode at 9 AM
+		timezone: "UTC",
+		taskType: "matching",
+		handler: trigramMatchingHandler,
 	});
 
 	// Add more jobs here as needed:

@@ -8,6 +8,7 @@ import {
 	index,
 	integer,
 	pgTable,
+	real,
 	serial,
 	smallint,
 	text,
@@ -205,6 +206,18 @@ export const retailerItems = pgTable(
 		archiveId: text("archive_id").references(() => archives.id, {
 			onDelete: "set null",
 		}),
+		// Dedup: normalized name hash for items without externalId
+		normalizedNameHash: text("normalized_name_hash"),
+		// Soft-delete dedup: points to the surviving item after merge
+		mergedIntoId: text("merged_into_id").references(
+			(): AnyPgColumn => retailerItems.id,
+		),
+		// Override protection: tracks who set category/unit values
+		categoryOverrideBy: text("category_override_by"), // 'manual', 'ai', 'auto', null
+		unitOverrideBy: text("unit_override_by"), // 'manual', 'ai', 'auto', null
+		// Normalized unit data
+		normalizedUnit: text("normalized_unit"), // "kg", "l", "kom"
+		normalizedQuantity: real("normalized_quantity"), // 0.5, 1.98
 	},
 	(table) => ({
 		barcodeIdx: index("retailer_item_barcodes_barcode_idx").on(table.barcode),
@@ -213,6 +226,15 @@ export const retailerItems = pgTable(
 		chainExternalIdUnique: uniqueIndex(
 			"retailer_items_chain_slug_external_id_unique",
 		).on(table.chainSlug, table.externalId),
+		// Index for name-hash dedup lookups
+		chainNameHashIdx: index("retailer_items_chain_name_hash_idx").on(
+			table.chainSlug,
+			table.normalizedNameHash,
+		),
+		// Index for filtering out merged items (used by all matching queries)
+		mergedIntoIdx: index("retailer_items_merged_into_id_idx").on(
+			table.mergedIntoId,
+		),
 	}),
 );
 
@@ -259,6 +281,8 @@ export const products = pgTable("products", {
 	unit: text("unit"),
 	unitQuantity: text("unit_quantity"),
 	imageUrl: text("image_url"),
+	normalizedUnit: text("normalized_unit"), // "kg", "l", "kom"
+	normalizedQuantity: real("normalized_quantity"),
 	createdAt: timestamp("created_at").defaultNow(),
 	updatedAt: timestamp("updated_at").defaultNow(),
 });

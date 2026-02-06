@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
-import { ResultAsync, err, errAsync, ok, okAsync } from "neverthrow";
 import type { Result } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { err, errAsync, ok, okAsync, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import { expandZip } from "../../parsers/zip";
@@ -13,6 +13,7 @@ import type {
 	FetchedFile,
 	ParseOptions,
 	ParseResult,
+	StoreMetadata,
 } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
@@ -279,6 +280,27 @@ export class PlodineAdapter extends BaseCsvAdapter {
 		text = text.replace(/",([0-9])/g, '"0,$1');
 		return Buffer.from(text);
 	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+		if (!identifier) {
+			return null;
+		}
+
+		const city = identifier.trim();
+		const storeName = city
+			? `${this.name} ${capitalizeFirst(city)}`
+			: this.name;
+
+		return {
+			name: storeName,
+		};
+	}
+}
+
+function capitalizeFirst(str: string): string {
+	if (!str) return str;
+	return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function extractDatePatternFromText(text: string): string | undefined {
