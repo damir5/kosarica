@@ -270,19 +270,27 @@ TRIGGER: After single-store optimization, showing split potential
 
 ## A/B Testing Priority Matrix
 
-| Test | Impact | Confidence | Ease | ICE Score | Priority |
-|------|--------|-----------|------|-----------|----------|
-| Landing page headline variations | 9 | 7 | 9 | 25 | **P0** |
-| Onboarding: inline search vs signup-first | 9 | 8 | 7 | 24 | **P0** |
-| Pricing page: with/without annual option | 8 | 7 | 9 | 24 | **P0** |
-| Trial: 7-day vs 14-day | 7 | 6 | 10 | 23 | **P1** |
-| Paywall: savings-framed vs feature-framed | 8 | 7 | 8 | 23 | **P1** |
-| Ad Boost: prominent vs subtle placement | 8 | 7 | 8 | 23 | **P1** |
-| Ad Boost: 24h vs 48h duration | 7 | 6 | 10 | 23 | **P1** |
-| Free alert: 1 alert vs 0 alerts | 8 | 8 | 9 | 25 | **P0** |
-| Search results: card vs dense list | 7 | 6 | 7 | 20 | **P1** |
-| Weekly report: email vs push vs both | 6 | 5 | 8 | 19 | **P2** |
-| Gamification: with/without points | 6 | 5 | 5 | 16 | **P2** |
+> **REVIEW FIX:** Codex recommended formalizing each test with hypothesis, primary metric, guardrails, and sample requirements.
+
+| Test | Hypothesis | Primary Metric | ICE | Priority |
+|------|-----------|---------------|-----|----------|
+| Landing headline variations | "Specific savings amount beats generic 'compare prices'" | Landing → First Search (%) | 25 | **P0** |
+| Onboarding: search-first vs signup-first | "Showing value before signup increases account creation" | Search → Account (%) | 24 | **P0** |
+| Free alert: 1 alert vs 0 alerts | "1 free alert increases W1 retention via notification hook" | W1 retention (%) | 25 | **P0** |
+| Pricing: with/without annual option | "Annual discount option increases subscription rate" | Free → Paid (%) | 24 | **P0** |
+| Paywall: savings-framed vs feature-framed | "'You'd save €11' beats 'Get split basket'" | Paywall → Upgrade (%) | 23 | **P1** |
+| Ad Boost: prominent vs subtle | "Showing Ad Boost alongside paywall increases engagement" | Ad completions/day | 23 | **P1** |
+| Ad Boost: 24h vs 48h duration | "48h boost reduces ad fatigue while maintaining revenue" | Boost → Plus conversion (%) | 23 | **P1** |
+| Trial: 7d vs 14d | "14d trial increases conversion (more time to form habit)" | Trial → Paid (%) | 23 | **P1** |
+| Search: card vs dense list | "Dense list converts better for power users" | Items added to list (%) | 20 | **P1** |
+| Digest: email vs push vs both | "Saturday push digest has highest open rate" | Notification open rate (%) | 19 | **P2** |
+| Gamification: with/without points | "Points increase daily active usage" | DAU/MAU ratio | 16 | **P2** |
+
+**Guardrails for all tests:**
+- Min 95% confidence before declaring winner
+- Run for at least 1 full week (capture weekend shopping behavior)
+- Monitor guardrail metrics: uninstall rate, support tickets, NPS
+- Min sample: 1,000 users per variant for conversion tests, 200 for engagement tests
 
 ---
 
@@ -404,6 +412,36 @@ Revenue (3 streams):
 
 ---
 
+## Review-Identified Gaps (To Address)
+
+> Items surfaced by Gemini 3 Pro and GPT-5.2 Codex that affect conversion strategy.
+
+### Legal/GDPR (Codex — P0 for launch)
+- Cookie consent banner (required in EU)
+- Ad tracking consent (separate from functional cookies)
+- Right to data export/deletion
+- Subscription transparency: clear cancellation flow, price display with VAT
+- Price comparison disclaimer: "Prices sourced from official retailer publications. May not reflect in-store loyalty prices."
+
+### Unit Economics Model (Codex — P1)
+Document these before seeking investment:
+- **CAC by channel:** Meta ads, Google, organic/PR, referral
+- **LTV by tier:** Free (ad revenue only), Plus, Premium
+- **Payback period:** months to recoup CAC per user
+- **Churn cost:** revenue lost per churned paid user
+- Run sensitivity analysis: base / optimistic / pessimistic scenarios
+
+### Lifecycle CRM Flows (Codex — P2)
+Design these email/push sequences:
+- **Day 1-7:** Onboarding drip (one tip per day)
+- **Day 14 no-activity:** "Still saving without us?" re-engagement
+- **Trial ending (Day 5/7):** Savings recap + "here's what you'll lose"
+- **Paid → Free downgrade:** "Your alerts are paused" + win-back offer
+- **30 days inactive:** "We saved others €X while you were away"
+- **Anniversary:** "1 year with us! You saved €X total"
+
+---
+
 *Document generated: 2026-02-06*
-*Version: 1.0-draft*
-*Status: Ready for cross-model review and human approval*
+*Version: 1.1 — Post-review revision*
+*Status: Reviewed by Gemini 3 Pro + GPT-5.2 Codex. Critical fixes applied.*
