@@ -15,6 +15,7 @@ import { startWorker } from "@/lib/taskqueue/run-worker";
 import type { TaskQueueWorker } from "@/lib/taskqueue/worker";
 import { initTelemetry, shutdownTelemetry } from "@/telemetry";
 import { createLogger } from "@/utils/logger";
+import { getReleaseMetadata } from "@/utils/release";
 import {
 	ensureRequestContext,
 	extractRequestId,
@@ -39,6 +40,7 @@ setupTelemetry().catch((error) => {
 });
 
 const logger = createLogger("app");
+const release = getReleaseMetadata();
 
 const globalState = globalThis as unknown as {
 	__kosaricaBackgroundStarted?: boolean;
@@ -77,7 +79,7 @@ async function initServer(): Promise<void> {
  * Graceful shutdown handler.
  * Stops the scheduler, closes database connections, and shuts down OpenTelemetry.
  */
-async function shutdown(signal: string): Promise<void> {
+async function shutdown(signal: string, exitCode = 0): Promise<void> {
 	logger.info(`Received ${signal}, shutting down gracefully...`);
 
 	try {
@@ -106,12 +108,23 @@ async function shutdown(signal: string): Promise<void> {
 		logger.error("Error shutting down telemetry", { error });
 	}
 
-	process.exit(0);
+	process.exit(exitCode);
 }
 
 // Register shutdown handlers
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM", 0));
+process.on("SIGINT", () => shutdown("SIGINT", 0));
+process.on("unhandledRejection", (reason) => {
+	logger.error(
+		"Unhandled promise rejection",
+		{ release: release.release },
+		reason,
+	);
+});
+process.on("uncaughtException", (error) => {
+	logger.error("Uncaught exception", { release: release.release }, error);
+	void shutdown("uncaughtException", 1);
+});
 
 // Initialize on module load
 initServer().catch((error) => {

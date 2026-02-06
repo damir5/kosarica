@@ -10,6 +10,7 @@
  */
 
 import type { Span } from "@opentelemetry/api";
+import { getReleaseMetadata } from "@/utils/release";
 
 type NodeSDKType = import("@opentelemetry/sdk-node").NodeSDK;
 
@@ -59,31 +60,39 @@ export interface TelemetryConfig {
 	serviceVersion?: string;
 	/** Deployment environment */
 	environment?: string;
+	/** OTLP transport protocol */
+	protocol?: "grpc";
 }
 
-/**
- * Default configuration values
- */
-const DEFAULT_CONFIG = {
-	enabled: process.env.OTEL_EXPORTER_OTLP_ENDPOINT !== "",
-	endpoint:
-		process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "opentelemetry-collector:4317",
-	serviceName: process.env.OTEL_SERVICE_NAME || "kosarica-nodejs",
-	serviceVersion: process.env.VERSION || process.env.GIT_COMMIT || "1.0.0",
-	environment: process.env.NODE_ENV || process.env.BUILD_ENV || "production",
-} as const satisfies TelemetryConfig;
+function normalizeEndpoint(endpoint: string): string {
+	const trimmed = endpoint.trim();
+	if (
+		trimmed.startsWith("http://") ||
+		trimmed.startsWith("https://") ||
+		trimmed.startsWith("dns://")
+	) {
+		return trimmed;
+	}
+	return `http://${trimmed}`;
+}
 
 /**
  * Get telemetry configuration from environment variables
  */
 export function getTelemetryConfig(): TelemetryConfig {
+	const release = getReleaseMetadata();
+	const configuredEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+	const isEnabled = configuredEndpoint !== "";
+
 	return {
-		enabled: process.env.OTEL_EXPORTER_OTLP_ENDPOINT !== "",
-		endpoint:
-			process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "opentelemetry-collector:4317",
+		enabled: isEnabled,
+		endpoint: normalizeEndpoint(
+			configuredEndpoint || "opentelemetry-collector:4317",
+		),
 		serviceName: process.env.OTEL_SERVICE_NAME || "kosarica-nodejs",
-		serviceVersion: process.env.VERSION || process.env.GIT_COMMIT || "1.0.0",
-		environment: process.env.NODE_ENV || process.env.BUILD_ENV || "production",
+		serviceVersion: release.release,
+		environment: release.environment,
+		protocol: "grpc",
 	};
 }
 
@@ -103,7 +112,7 @@ export function getTelemetryConfig(): TelemetryConfig {
 export async function initTelemetry(
 	config: Partial<TelemetryConfig> = {},
 ): Promise<NodeSDKType | null> {
-	const finalConfig = { ...DEFAULT_CONFIG, ...config };
+	const finalConfig = { ...getTelemetryConfig(), ...config };
 
 	// Return null if telemetry is not enabled
 	if (!finalConfig.enabled) {
@@ -137,12 +146,12 @@ export async function initTelemetry(
 
 	// Create trace exporter
 	const traceExporter = new OTLPTraceExporter({
-		url: `http://${finalConfig.endpoint}`,
+		url: finalConfig.endpoint,
 	});
 
 	// Create metric exporter with periodic reader
 	const metricExporter = new OTLPMetricExporter({
-		url: `http://${finalConfig.endpoint}`,
+		url: finalConfig.endpoint,
 	});
 
 	const metricReader = new PeriodicExportingMetricReader({

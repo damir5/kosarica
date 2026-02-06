@@ -4,12 +4,24 @@ import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { createFileRoute } from "@tanstack/react-router";
+import * as z from "zod";
 import router from "@/orpc/router";
 import { TodoSchema } from "@/orpc/schema";
 import { createLogger } from "@/utils/logger";
+import { getReleaseMetadata } from "@/utils/release";
 import { extractRequestId, runWithContext } from "@/utils/request-context";
 
 const log = createLogger("http");
+const release = getReleaseMetadata();
+
+const ClientErrorPayloadSchema = z.object({
+	errorType: z.enum(["error", "unhandledrejection", "router", "react"]),
+	message: z.string().min(1).max(2048),
+	stack: z.string().max(16384).optional(),
+	path: z.string().min(1).max(1024),
+	release: z.string().min(1).max(128),
+	userAgent: z.string().min(1).max(512),
+});
 
 const handler = new OpenAPIHandler(router, {
 	interceptors: [
@@ -57,10 +69,14 @@ const handler = new OpenAPIHandler(router, {
 
 async function handle({ request }: { request: Request }) {
 	const requestId = extractRequestId(request);
+	const url = new URL(request.url);
+
+	if (url.pathname === "/api/client-errors") {
+		return handleClientErrorIngest(request, requestId);
+	}
 
 	return runWithContext(requestId, async () => {
 		const start = Date.now();
-		const url = new URL(request.url);
 
 		log.info("Request started", {
 			method: request.method,
@@ -82,6 +98,55 @@ async function handle({ request }: { request: Request }) {
 		});
 
 		return result;
+	});
+}
+
+async function handleClientErrorIngest(
+	request: Request,
+	requestId: string,
+): Promise<Response> {
+	if (request.method !== "POST") {
+		return new Response("Method Not Allowed", { status: 405 });
+	}
+
+	return runWithContext(requestId, async () => {
+		try {
+			const rawBody = await request.text();
+			if (rawBody.length > 20_000) {
+				log.warn("Dropped oversized client error payload", {
+					maxBytes: 20_000,
+					receivedBytes: rawBody.length,
+				});
+				return new Response(null, { status: 204 });
+			}
+
+			const parsedJson: unknown = JSON.parse(rawBody);
+			const parsed = ClientErrorPayloadSchema.safeParse(parsedJson);
+			if (!parsed.success) {
+				log.warn("Invalid client error payload", {
+					issues: parsed.error.issues.map((issue) => ({
+						message: issue.message,
+						path: issue.path.join("."),
+					})),
+				});
+				return new Response(null, { status: 204 });
+			}
+
+			const payload = parsed.data;
+			log.error("Client runtime error captured", {
+				clientErrorType: payload.errorType,
+				clientPath: payload.path,
+				clientMessage: payload.message,
+				clientStack: payload.stack,
+				clientRelease: payload.release,
+				serverRelease: release.release,
+				userAgent: payload.userAgent,
+			});
+		} catch (error) {
+			log.error("Failed to ingest client error payload", undefined, error);
+		}
+
+		return new Response(null, { status: 204 });
 	});
 }
 

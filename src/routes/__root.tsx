@@ -7,8 +7,14 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { Component, useEffect } from "react";
 import { Toaster } from "sonner";
+import {
+	installGlobalClientErrorHandlers,
+	reportClientError,
+} from "@/lib/client-observability";
 import { checkSetupRequired } from "@/lib/auth-server";
+import { initPostHog } from "@/lib/posthog";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -85,7 +91,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 			</head>
 			<body>
-				{children}
+				<RootErrorBoundary>{children}</RootErrorBoundary>
+				<ClientObservabilityBridge />
 				<Toaster richColors position="top-right" />
 				<TanStackDevtools
 					config={{
@@ -103,4 +110,39 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			</body>
 		</html>
 	);
+}
+
+class RootErrorBoundary extends Component<
+	{ children: React.ReactNode },
+	{ hasError: boolean }
+> {
+	override state = { hasError: false };
+
+	override componentDidCatch(error: Error): void {
+		this.setState({ hasError: true });
+		void reportClientError("react", error);
+	}
+
+	override render() {
+		if (this.state.hasError) {
+			return (
+				<div className="mx-auto max-w-2xl p-6 text-center">
+					<h1 className="font-semibold text-2xl">Something went wrong</h1>
+					<p className="mt-3 text-muted-foreground">
+						An unexpected client error was captured. Please refresh the page.
+					</p>
+				</div>
+			);
+		}
+		return this.props.children;
+	}
+}
+
+function ClientObservabilityBridge() {
+	useEffect(() => {
+		initPostHog();
+		return installGlobalClientErrorHandlers();
+	}, []);
+
+	return null;
 }

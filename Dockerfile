@@ -58,17 +58,37 @@ COPY . .
 ARG BUILD_TIME
 ARG GIT_COMMIT
 ARG BUILD_ENV=production
+ARG APP_VERSION=0.1.0
+ARG APP_RELEASE
 
 # Set build environment variables
 ENV BUILD_TIME=${BUILD_TIME}
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV BUILD_ENV=${BUILD_ENV}
+ENV APP_VERSION=${APP_VERSION}
+ENV APP_RELEASE=${APP_RELEASE}
 
 # Build application
 RUN pnpm build
 
+# Keep client sourcemaps private while preserving server sourcemaps for Node symbolication.
+RUN RELEASE_DIR="/app/sourcemaps/${APP_RELEASE:-${GIT_COMMIT}}" && \
+    mkdir -p "$RELEASE_DIR/client" && \
+    find /app/dist/client -type f -name "*.map" -print0 | \
+      while IFS= read -r -d '' map_file; do \
+        relative_path="${map_file#/app/dist/client/}"; \
+        mkdir -p "$RELEASE_DIR/client/$(dirname "$relative_path")"; \
+        mv "$map_file" "$RELEASE_DIR/client/$relative_path"; \
+      done
+
 # Stage 3: Runtime
 FROM ubuntu:24.04 AS runtime
+
+ARG BUILD_TIME
+ARG GIT_COMMIT
+ARG BUILD_ENV=production
+ARG APP_VERSION=0.1.0
+ARG APP_RELEASE
 
 # Install runtime dependencies
 RUN apt-get update && \
@@ -96,6 +116,7 @@ WORKDIR /app
 
 # Copy built application from build stage
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/sourcemaps ./sourcemaps
 COPY --from=build /app/package.json /app/pnpm-lock.yaml ./
 
 # Install production dependencies only using pnpm for consistency
@@ -120,6 +141,13 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV LOG_LEVEL=info
+ENV NODE_OPTIONS=--enable-source-maps
+ENV BUILD_TIME=${BUILD_TIME}
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV BUILD_ENV=${BUILD_ENV}
+ENV APP_VERSION=${APP_VERSION}
+ENV APP_RELEASE=${APP_RELEASE}
+ENV SOURCEMAP_STORAGE_PATH=/app/sourcemaps
 
 # Start application
 CMD ["node", "dist/server/index.js"]

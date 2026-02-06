@@ -95,6 +95,18 @@ function AdminConfigPage() {
 									description="Deployment environment"
 									icon={<Globe className="h-4 w-4" />}
 								/>
+								<MetricCard
+									title="App Version"
+									value={data.buildInfo.appVersion}
+									description="Semantic version"
+									icon={<Info className="h-4 w-4" />}
+								/>
+								<MetricCard
+									title="App Release"
+									value={data.buildInfo.appRelease}
+									description="Immutable release identifier"
+									icon={<Info className="h-4 w-4" />}
+								/>
 							</div>
 						</section>
 

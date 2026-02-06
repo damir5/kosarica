@@ -121,6 +121,8 @@ Run `mise run test` for all available test commands.
 | [API.md](docs/architecture/API.md) | Complete API endpoint reference |
 | [DATABASE.md](docs/architecture/DATABASE.md) | Schema authority and migration workflow |
 | [DEPLOYMENT.md](docs/architecture/DEPLOYMENT.md) | Deployment and operations runbooks |
+| [LIMITED-PROD-CHECKLIST.md](docs/architecture/LIMITED-PROD-CHECKLIST.md) | Limited-production server + secrets checklist |
+| [RELEASE-AND-SOURCEMAPS.md](docs/architecture/RELEASE-AND-SOURCEMAPS.md) | Release metadata, sourcemap policy, blue/green runbook |
 | [AI Ingestion Testing Playbook](docs/ai/testing-ingestion.md) | Repeatable AI-driven ingestion testing workflow |
 
 ## Supported Chains

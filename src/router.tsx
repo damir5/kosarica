@@ -1,5 +1,6 @@
 import { createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import { reportClientError } from "@/lib/client-observability";
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 
 // Import the generated route tree
@@ -14,8 +15,10 @@ export const getRouter = () => {
 		context: {
 			...rqContext,
 		},
-
 		defaultPreload: "intent",
+		defaultOnCatch: (error) => {
+			void reportClientError("router", error);
+		},
 	});
 
 	setupRouterSsrQueryIntegration({

@@ -22,8 +22,11 @@ env:
     NODE_ENV: production
     PORT: 3000
     LOG_LEVEL: info
-    OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector:4317
+    NODE_OPTIONS: --enable-source-maps
+    OTEL_EXPORTER_OTLP_ENDPOINT: opentelemetry-collector:4317
     OTEL_SERVICE_NAME: kosarica-nodejs
+    APP_VERSION: 0.1.0
+    APP_RELEASE: ${GIT_COMMIT}
   secret:
     # Secret env vars
     - POSTGRES_USER
@@ -47,6 +50,8 @@ builder:
     BUILD_TIME: ${BUILD_TIME}
     GIT_COMMIT: ${GIT_COMMIT}
     BUILD_ENV: production
+    APP_VERSION: 0.1.0
+    APP_RELEASE: ${GIT_COMMIT}
 
 # Deployment options
 deploy:
@@ -63,6 +68,7 @@ deploy:
   volumes:
     - /app/data:/app/data
     - /app/logs:/app/logs
+    - /var/lib/kosarica/sourcemaps:/app/sourcemaps
 
   # Stop old container after starting new one
   stop_wait_time: 30
@@ -92,7 +98,7 @@ accessories:
 
   # OpenTelemetry Collector
   opentelemetry-collector:
-    image: otel/opentelemetry-collector:latest
+    image: otel/opentelemetry-collector-contrib:latest
     host: ${KAMAL_HOST}
     ports:
       - "4317:4317"

@@ -368,7 +368,6 @@ If scaling needed:
 
 ## Additional Documentation
 
-- [Docker Deployment Guide](./DEPLOYMENT-DOCKER.md) - Detailed Docker setup
-- [Kamal Deployment Guide](./DEPLOYMENT-KAMAL.md) - Kamal-specific operations
-- [Observability Guide](./OBSERVABILITY.md) - Monitoring and logging setup
-- [Troubleshooting](./TROUBLESHOOTING.md) - Common issues and solutions
+- [Limited Production Checklist](./LIMITED-PROD-CHECKLIST.md) - Server bootstrap, secrets, keys, and go-live checks
+- [Release and Sourcemaps](./RELEASE-AND-SOURCEMAPS.md) - Release ID contract, sourcemap handling, blue/green runbook
+- [ClickHouse Migration](./clickhouse-migration.md) - ClickHouse operational workflow

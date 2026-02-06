@@ -16,6 +16,8 @@
 - [API](./architecture/API.md)
 - [Database](./architecture/DATABASE.md)
 - [Deployment](./architecture/DEPLOYMENT.md)
+- [Limited Production Checklist](./architecture/LIMITED-PROD-CHECKLIST.md)
+- [Release and Sourcemaps](./architecture/RELEASE-AND-SOURCEMAPS.md)
 - [Codebase Architecture](./architecture/codebase/ARCHITECTURE.md)
 - [Codebase Structure](./architecture/codebase/STRUCTURE.md)
 - [Codebase Stack](./architecture/codebase/STACK.md)

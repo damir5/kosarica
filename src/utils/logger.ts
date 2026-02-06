@@ -5,6 +5,7 @@
 
 import pino from "pino";
 import { serializeError } from "serialize-error";
+import { getReleaseMetadata } from "./release";
 import { getRequestId } from "./request-context";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -278,6 +279,8 @@ function createFilteredDestination(_loggerType?: LoggerType) {
  * Create pino configuration for a specific logger type
  */
 function createPinoConfig(loggerType?: LoggerType): pino.LoggerOptions {
+	const release = getReleaseMetadata();
+
 	return {
 		level: (process.env.LOG_LEVEL as LogLevel) ?? "info",
 		formatters: {
@@ -307,6 +310,9 @@ function createPinoConfig(loggerType?: LoggerType): pino.LoggerOptions {
 		},
 		base: {
 			service: "kosarica-nodejs",
+			release: release.release,
+			serviceVersion: release.version,
+			environment: release.environment,
 		},
 		timestamp: () => `,"time":${Date.now()}`,
 		mixin: () => {

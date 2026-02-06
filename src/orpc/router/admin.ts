@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { getServerConfig } from "@/config/serverConfig";
+import { getReleaseMetadata } from "@/utils/release";
 import { procedure } from "../base";
 
 // Helper function to mask sensitive values
@@ -18,12 +19,15 @@ function maskSensitiveValue(key: string, value: string | undefined): string {
 
 export const getConfigInfo = procedure.input(z.object({})).handler(async () => {
 	const config = getServerConfig();
+	const release = getReleaseMetadata();
 
 	// Build info from environment (set at build time via vite.config.ts)
 	const buildInfo = {
-		buildTime: process.env.BUILD_TIME || "N/A",
-		gitCommit: process.env.GIT_COMMIT || "N/A",
-		environment: process.env.BUILD_ENV || process.env.NODE_ENV || "N/A",
+		buildTime: release.buildTime,
+		gitCommit: release.commit,
+		environment: release.environment,
+		appVersion: release.version,
+		appRelease: release.release,
 	};
 
 	// Client config (all VITE_ prefixed variables)

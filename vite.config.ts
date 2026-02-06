@@ -7,14 +7,34 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
 
 const buildEnv = process.env.BUILD_ENV || process.env.NODE_ENV || 'development'
+const appVersion = process.env.APP_VERSION || process.env.npm_package_version || '0.1.0'
+
+const getSourcemapMode = (): boolean | 'hidden' | 'inline' => {
+  const fromEnv = process.env.CLIENT_SOURCEMAP_MODE
+  if (fromEnv === 'hidden' || fromEnv === 'inline') {
+    return fromEnv
+  }
+  if (fromEnv === 'false') {
+    return false
+  }
+  if (fromEnv === 'true') {
+    return true
+  }
+
+  // Keep server sourcemaps resolvable in production and local builds.
+  return true
+}
 
 // Generate build metadata at build time
 const getBuildMetadata = () => {
   try {
     const buildTime = new Date().toISOString()
     const gitCommit = execSync('git rev-parse HEAD').toString().trim().slice(0, 8)
+    const appRelease = process.env.APP_RELEASE || `${appVersion}+${gitCommit}`
 
     return {
+      appRelease,
+      appVersion,
       buildTime,
       gitCommit,
       environment: buildEnv,
@@ -22,6 +42,8 @@ const getBuildMetadata = () => {
   } catch (error) {
     console.warn('Warning: Could not generate build metadata:', error)
     return {
+      appRelease: process.env.APP_RELEASE || `${appVersion}+unknown`,
+      appVersion,
       buildTime: new Date().toISOString(),
       gitCommit: 'unknown',
       environment: buildEnv,
@@ -33,9 +55,14 @@ const buildMetadata = getBuildMetadata()
 
 const config = defineConfig({
   define: {
+    'process.env.APP_RELEASE': JSON.stringify(buildMetadata.appRelease),
+    'process.env.APP_VERSION': JSON.stringify(buildMetadata.appVersion),
     'process.env.BUILD_TIME': JSON.stringify(buildMetadata.buildTime),
     'process.env.GIT_COMMIT': JSON.stringify(buildMetadata.gitCommit),
     'process.env.BUILD_ENV': JSON.stringify(buildMetadata.environment),
+  },
+  build: {
+    sourcemap: getSourcemapMode(),
   },
   server: {
     port: Number(process.env.PORT ?? 3002),
