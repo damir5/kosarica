@@ -195,7 +195,7 @@ export class EurospinAdapter extends BaseCsvAdapter {
 			};
 		}
 
-		const city = parts[3]?.trim() || "";
+		const city = parts[3]?.replace(/_/g, " ").trim() || "";
 		const street = parts[2]?.replace(/_/g, " ").trim() || "";
 		const postalCode = parts[4]?.trim() || "";
 

@@ -117,29 +117,62 @@ function calculatePhotonConfidence(
 ): "high" | "medium" | "low" {
 	const osm_type = props.osm_type;
 	const osm_value = props.osm_value;
+	const hasInputCity = Boolean(input.city?.trim());
 
 	// High confidence: exact address match (house/building)
-	if (osm_type === "N" && ["house", "building"].includes(osm_value || "")) {
+	if (
+		osm_type === "N" &&
+		["house", "building"].includes(osm_value || "") &&
+		(hasInputCity ? citiesMatch(props, input) : true)
+	) {
 		return "high";
 	}
 
 	// Check if city matches
-	const resultCity = props.city || props.town || props.village;
-	const cityMatches =
-		resultCity &&
-		input.city &&
-		resultCity.toLowerCase().includes(input.city.toLowerCase());
+	const cityMatches = citiesMatch(props, input);
+	const hasStreet = Boolean(props.street?.trim());
+	const isStreetLevel = ["street", "road", "shop", "amenity"].includes(
+		osm_value || "",
+	);
 
-	// Medium confidence: street-level or city matches
-	if (
-		["street", "road", "shop", "amenity"].includes(osm_value || "") ||
-		cityMatches
-	) {
+	// Medium confidence: plausible street-level match.
+	if ((hasStreet || isStreetLevel) && (cityMatches || !hasInputCity)) {
 		return "medium";
 	}
 
-	// Low confidence: city-level or worse
+	// Low confidence: city-only match or unknown quality.
+	if (cityMatches) {
+		return "low";
+	}
+
 	return "low";
+}
+
+function normalizeLocationPart(value: string): string {
+	return value
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.toLowerCase()
+		.trim();
+}
+
+function citiesMatch(props: PhotonProperties, input: GeocodingInput): boolean {
+	const resultCity = props.city || props.town || props.village;
+	const inputCity = input.city;
+	if (!resultCity || !inputCity) {
+		return false;
+	}
+
+	const normalizedResultCity = normalizeLocationPart(resultCity);
+	const normalizedInputCity = normalizeLocationPart(inputCity);
+	if (!normalizedResultCity || !normalizedInputCity) {
+		return false;
+	}
+
+	return (
+		normalizedResultCity.includes(normalizedInputCity) ||
+		normalizedInputCity.includes(normalizedResultCity)
+	);
 }
 
 /**

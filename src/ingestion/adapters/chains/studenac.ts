@@ -240,17 +240,29 @@ export class StudenacAdapter extends BaseXmlAdapter {
 		}
 
 		const streetCityPart = parts[0];
-		const streetCityParts = streetCityPart.split("_");
+		const streetCityParts = streetCityPart
+			.split("_")
+			.map((part) => part.trim())
+			.filter(Boolean);
 
-		let city = "";
 		let street = "";
+		let city = "";
 
 		if (streetCityParts.length >= 2) {
-			const cityIndex = streetCityParts.length - 1;
-			city = streetCityParts[cityIndex]?.trim() || "";
+			const splitIndex = getStreetCitySplitIndex(streetCityParts);
+			let streetParts = streetCityParts.slice(0, splitIndex);
+			let cityParts = streetCityParts.slice(splitIndex);
 
-			const streetParts = streetCityParts.slice(0, cityIndex);
-			street = streetParts.join(" ").replace(/_/g, " ").trim();
+			if (streetParts.length === 0 || cityParts.length === 0) {
+				streetParts = streetCityParts.slice(
+					0,
+					Math.max(1, streetCityParts.length - 1),
+				);
+				cityParts = streetCityParts.slice(streetParts.length);
+			}
+
+			street = streetParts.join(" ").replace(/\s+/g, " ").trim();
+			city = cityParts.join(" ").replace(/\s+/g, " ").trim();
 		}
 
 		const storeName = city ? `${this.name} ${city}` : this.name;
@@ -273,6 +285,16 @@ function extractPriceWithFallback(
 		return regularPrice;
 	}
 	return valueFromRecord(item, fallbackKey);
+}
+
+function getStreetCitySplitIndex(parts: string[]): number {
+	const houseNumberIndex = parts.findLastIndex(
+		(part, index) => index < parts.length - 1 && /^\d+[A-Za-z]?$/i.test(part),
+	);
+	if (houseNumberIndex >= 0) {
+		return houseNumberIndex + 1;
+	}
+	return 1;
 }
 
 function valueFromRecord(record: Record<string, unknown>, key: string): string {

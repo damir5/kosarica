@@ -195,8 +195,44 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 			};
 		}
 
-		const street = parts[1]?.replace(/_/g, " ")?.trim() || "";
-		const city = parts[2]?.trim() || "";
+		// Find the index of the store ID (pattern: P\d{3})
+		const storeIdIndex = parts.findIndex((part) => /^P\d{3}$/.test(part));
+
+		if (storeIdIndex === -1) {
+			return {
+				name: `${this.name} ${identifier}`,
+			};
+		}
+
+		const locationParts = parts
+			.slice(0, storeIdIndex)
+			.map((part) => part.trim())
+			.filter(Boolean);
+
+		if (locationParts.length < 2) {
+			return {
+				name: `${this.name} ${identifier}`,
+			};
+		}
+
+		const splitIndex = getStreetCitySplitIndex(locationParts);
+		let streetParts = locationParts.slice(0, splitIndex);
+		let cityParts = locationParts.slice(splitIndex);
+
+		// Fallback if heuristic split fails.
+		if (streetParts.length === 0 || cityParts.length === 0) {
+			streetParts = locationParts.slice(0, Math.max(1, locationParts.length - 1));
+			cityParts = locationParts.slice(streetParts.length);
+		}
+
+		let postalCode: string | undefined;
+		if (cityParts[0] && /^\d{5}$/.test(cityParts[0])) {
+			postalCode = cityParts[0];
+			cityParts = cityParts.slice(1);
+		}
+
+		const street = streetParts.join(" ").replace(/\s+/g, " ").trim() || "";
+		const city = cityParts.join(" ").replace(/\s+/g, " ").trim() || "";
 
 		const storeName = city ? `${this.name} ${city}` : this.name;
 
@@ -204,8 +240,30 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 			name: storeName,
 			address: street || undefined,
 			city: city || undefined,
+			postalCode,
 		};
 	}
+}
+
+function getStreetCitySplitIndex(parts: string[]): number {
+	// If a house number token exists, street usually ends there.
+	const houseNumberIndex = parts.findLastIndex(
+		(part, index) =>
+			index < parts.length - 1 &&
+			!isPostalCodeToken(part) &&
+			/^\d+[A-Za-z]?$/i.test(part),
+	);
+
+	if (houseNumberIndex >= 0) {
+		return houseNumberIndex + 1;
+	}
+
+	// No obvious house number: keep first token as street and rest as city.
+	return 1;
+}
+
+function isPostalCodeToken(part: string): boolean {
+	return /^\d{5}$/.test(part);
 }
 
 function valueFromRecord(record: Record<string, unknown>, key: string): string {

@@ -91,4 +91,20 @@ describe("StudenacAdapter", () => {
 		expect(result.rows[0]?.discountPrice).toBe(400);
 		expect(result.rows[0]?.storeIdentifier).toBe("321");
 	});
+
+	it("extracts full multi-word city from filename metadata", () => {
+		const adapter = new StudenacAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/Ul.I.Kukuljevića_Sakcinskog_12_SVETI_KRIŽ_ZAČRETJE-1350-257-2026-01-26-07-00-15-098306.xml",
+			filename:
+				"Ul.I.Kukuljevića_Sakcinskog_12_SVETI_KRIŽ_ZAČRETJE-1350-257-2026-01-26-07-00-15-098306.xml",
+			type: "xml",
+		});
+
+		expect(metadata).toEqual({
+			name: "Studenac SVETI KRIŽ ZAČRETJE",
+			address: "Ul.I.Kukuljevića Sakcinskog 12",
+			city: "SVETI KRIŽ ZAČRETJE",
+		});
+	});
 });
