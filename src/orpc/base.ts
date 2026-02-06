@@ -53,10 +53,9 @@ function isValidationError(error: unknown): boolean {
 }
 
 /**
- * Base procedure with error logging middleware.
- * Use this instead of importing `os` directly.
+ * Shared error-logging middleware. Logs non-validation errors.
  */
-export const procedure = os.use(async ({ next, path }) => {
+const errorLogging = os.use(async ({ next, path }) => {
 	try {
 		return await next();
 	} catch (error) {
@@ -71,62 +70,71 @@ export const procedure = os.use(async ({ next, path }) => {
 });
 
 /**
+ * Shared middleware that resolves the authenticated user from the session.
+ * Used by both authProcedure and superadminProcedure.
+ */
+const resolveAuthUser = errorLogging.use(async ({ next }) => {
+	const headers = getRequestHeaders();
+	if (!headers) {
+		throw new Error("Authentication required");
+	}
+
+	const auth = getAuth();
+	const session = await auth.api.getSession({
+		headers: headers as unknown as Headers,
+	});
+
+	if (!session) {
+		throw new Error("Authentication required");
+	}
+
+	const db = getDb();
+	const [userRecord] = await db
+		.select()
+		.from(user)
+		.where(eq(user.id, session.user.id));
+
+	if (!userRecord) {
+		throw new Error("User not found");
+	}
+
+	return await next({
+		context: { session, user: userRecord },
+	});
+});
+
+/**
+ * Base procedure with error logging middleware.
+ * Use this instead of importing `os` directly.
+ */
+export const procedure = errorLogging;
+
+/**
+ * Procedure that requires the current session to belong to any authenticated user.
+ * Throws an error if the user is not authenticated.
+ *
+ * Usage: `authProcedure` instead of `procedure` for user-gated endpoints
+ */
+export const authProcedure = resolveAuthUser;
+
+/**
  * Procedure that requires the current session to belong to a superadmin.
  * Throws an error if the user is not authenticated or not a superadmin.
  *
  * Usage: `superadminProcedure` instead of `procedure`
  */
-export const superadminProcedure = os
-	.use(async ({ next, path }) => {
-		try {
-			return await next();
-		} catch (error) {
-			if (!isValidationError(error)) {
-				log.error(`Procedure failed: ${path.join(".")}`, {
-					path: path.join("."),
-					error: errorToObject(error),
-				});
-			}
-			throw error;
-		}
-	})
-	.use(async ({ next }) => {
-		const headers = getRequestHeaders();
-		if (!headers) {
-			throw new Error("Authentication required");
-		}
-
-		const auth = getAuth();
-		const session = await auth.api.getSession({
-			headers: headers as unknown as Headers,
-		});
-
-		if (!session) {
-			throw new Error("Authentication required");
-		}
-
-		const db = getDb();
-		const [userRecord] = await db
-			.select()
-			.from(user)
-			.where(eq(user.id, session.user.id));
-
-		if (!userRecord) {
-			throw new Error("User not found");
-		}
-
+export const superadminProcedure = resolveAuthUser.use(
+	async ({ next, context }) => {
+		const { user: userRecord } = context as AuthenticatedContext;
 		if (userRecord.role !== "superadmin") {
 			throw new Error("Superadmin role required");
 		}
-
-		// Pass user context to the handler
-		return await next({
-			context: { session, user: userRecord },
-		});
-	});
+		return await next();
+	},
+);
 
 /**
- * Context type added by superadminProcedure middleware
+ * Context type added by superadminProcedure / authProcedure middleware
  */
 export interface AuthenticatedContext {
 	session: {

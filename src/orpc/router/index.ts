@@ -1,4 +1,5 @@
 import { getConfigInfo } from "./admin";
+import * as alerts from "./alerts";
 import * as basket from "./basket";
 import {
 	getCategories,
@@ -21,6 +22,7 @@ import {
 	triggerBarcodeMatching,
 	triggerTrigramMatching,
 } from "./products";
+import { getProductPrices } from "./products-public";
 import * as search from "./search";
 import { getSettings, updateSettings } from "./settings";
 import {
@@ -59,6 +61,16 @@ import {
 export default {
 	listTodos,
 	addTodo,
+	catalogPrices: {
+		list: listCatalogPrices,
+		getStoresByChain,
+		getCategories,
+	},
+	stores: {
+		list: listStores,
+		get: getStore,
+		getDetail: getStoreDetail,
+	},
 	basket: {
 		optimizeSingle: basket.optimizeSingle,
 		optimizeMulti: basket.optimizeMulti,
@@ -73,6 +85,15 @@ export default {
 	search: {
 		autocomplete: search.autocomplete,
 		search: search.search,
+	},
+	products: {
+		get: getProductPrices,
+	},
+	alerts: {
+		list: alerts.listAlerts,
+		create: alerts.createAlert,
+		delete: alerts.deleteAlert,
+		history: alerts.alertHistory,
 	},
 	admin: {
 		getConfigInfo,

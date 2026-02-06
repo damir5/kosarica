@@ -4,6 +4,8 @@ import type { ComponentType } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { ThemeToggle } from "../domain/theme-toggle";
+
 export function PublicHeader() {
 	return (
 		<header
@@ -19,26 +21,28 @@ export function PublicHeader() {
 					data-slot="public-header-nav"
 					className="hidden items-center gap-1 md:flex"
 				>
-					{/* Routes not yet registered — cast will be removed once public routes are added */}
-					<NavLink to={"/search" as string} icon={Search} label="Traži" />
+					<NavLink to="/search" icon={Search} label="Traži" />
 					<NavLink
-						to={"/basket" as string}
+						to="/basket"
 						icon={ShoppingBasket}
 						label="Košarica"
 					/>
-					<NavLink to={"/alerts" as string} icon={Bell} label="Alarmi" />
+					<NavLink to="/alerts" icon={Bell} label="Alarmi" />
 				</nav>
 
-				<Link
-					to={"/profile" as string}
-					className={cn(
-						"flex size-9 items-center justify-center rounded-full",
-						"text-tk-text-secondary transition-colors hover:bg-tk-surface-alt hover:text-tk-text",
-					)}
-					aria-label="Profil"
-				>
-					<User className="size-5" />
-				</Link>
+				<div className="flex items-center gap-1">
+					<ThemeToggle />
+					<Link
+						to="/profile"
+						className={cn(
+							"flex size-9 items-center justify-center rounded-full",
+							"text-tk-text-secondary transition-colors hover:bg-tk-surface-alt hover:text-tk-text",
+						)}
+						aria-label="Profil"
+					>
+						<User className="size-5" />
+					</Link>
+				</div>
 			</div>
 		</header>
 	);

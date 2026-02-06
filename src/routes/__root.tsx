@@ -5,12 +5,10 @@ import {
 	HeadContent,
 	redirect,
 	Scripts,
-	useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { Toaster } from "sonner";
 import { checkSetupRequired } from "@/lib/auth-server";
-import Header from "../components/Header";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -18,13 +16,20 @@ interface MyRouterContext {
 	queryClient: QueryClient;
 }
 
+/**
+ * Inline script that applies the persisted theme before first paint,
+ * preventing a flash of wrong-theme content (FOUC).
+ */
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("tk-theme");if(t==="dark"||(t==="system"||!t)&&matchMedia("(prefers-color-scheme:dark)").matches)document.documentElement.classList.add("dark")}catch(e){}})()`;
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	beforeLoad: async ({ location }) => {
-		// Skip check for setup, login, and API routes
+		// Skip check for setup, login, API, and all non-admin routes
 		if (
 			location.pathname === "/setup" ||
 			location.pathname === "/login" ||
-			location.pathname.startsWith("/api/")
+			location.pathname.startsWith("/api/") ||
+			!location.pathname.startsWith("/admin")
 		) {
 			return;
 		}
@@ -73,16 +78,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-	const pathname = useRouterState({ select: (s) => s.location.pathname });
-	const isAdminRoute = pathname.startsWith("/admin");
-
 	return (
-		<html lang="en">
+		<html lang="hr">
 			<head>
 				<HeadContent />
+				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 			</head>
 			<body>
-				{!isAdminRoute && <Header />}
 				{children}
 				<Toaster richColors position="top-right" />
 				<TanStackDevtools

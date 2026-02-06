@@ -11,13 +11,19 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PublicRouteRouteImport } from './routes/_public/route'
 import { Route as AdminRouteRouteImport } from './routes/_admin/route'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as PublicIndexRouteImport } from './routes/_public.index'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
+import { Route as PublicSearchRouteImport } from './routes/_public.search'
+import { Route as PublicProfileRouteImport } from './routes/_public.profile'
+import { Route as PublicBasketRouteImport } from './routes/_public.basket'
+import { Route as PublicAlertsRouteImport } from './routes/_public.alerts'
 import { Route as AdminAdminRouteImport } from './routes/_admin.admin'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index'
 import { Route as ApiRpcSplatRouteImport } from './routes/api.rpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
+import { Route as PublicProductProductIdRouteImport } from './routes/_public.product.$productId'
 import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users'
 import { Route as AdminAdminTaskQueueRouteImport } from './routes/_admin.admin.task-queue'
 import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stores'
@@ -44,19 +50,43 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PublicRouteRoute = PublicRouteRouteImport.update({
+  id: '/_public',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRouteRoute = AdminRouteRouteImport.update({
   id: '/_admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
+const PublicIndexRoute = PublicIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => PublicRouteRoute,
 } as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PublicSearchRoute = PublicSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicProfileRoute = PublicProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicBasketRoute = PublicBasketRouteImport.update({
+  id: '/basket',
+  path: '/basket',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicAlertsRoute = PublicAlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => PublicRouteRoute,
 } as any)
 const AdminAdminRoute = AdminAdminRouteImport.update({
   id: '/admin',
@@ -77,6 +107,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PublicProductProductIdRoute = PublicProductProductIdRouteImport.update({
+  id: '/product/$productId',
+  path: '/product/$productId',
+  getParentRoute: () => PublicRouteRoute,
 } as any)
 const AdminAdminUsersRoute = AdminAdminUsersRouteImport.update({
   id: '/users',
@@ -158,10 +193,14 @@ const AdminAdminIngestionRunIdFileIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof PublicIndexRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/admin': typeof AdminAdminRouteWithChildren
+  '/alerts': typeof PublicAlertsRoute
+  '/basket': typeof PublicBasketRoute
+  '/profile': typeof PublicProfileRoute
+  '/search': typeof PublicSearchRoute
   '/api/$': typeof ApiSplatRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/admin/clickhouse': typeof AdminAdminClickhouseRoute
@@ -171,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
   '/admin/task-queue': typeof AdminAdminTaskQueueRoute
   '/admin/users': typeof AdminAdminUsersRoute
+  '/product/$productId': typeof PublicProductProductIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/admin/': typeof AdminAdminIndexRoute
@@ -183,9 +223,13 @@ export interface FileRoutesByFullPath {
   '/admin/ingestion/$runId/$fileId': typeof AdminAdminIngestionRunIdFileIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/': typeof PublicIndexRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/alerts': typeof PublicAlertsRoute
+  '/basket': typeof PublicBasketRoute
+  '/profile': typeof PublicProfileRoute
+  '/search': typeof PublicSearchRoute
   '/api/$': typeof ApiSplatRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/admin/clickhouse': typeof AdminAdminClickhouseRoute
@@ -193,6 +237,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/task-queue': typeof AdminAdminTaskQueueRoute
   '/admin/users': typeof AdminAdminUsersRoute
+  '/product/$productId': typeof PublicProductProductIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/admin': typeof AdminAdminIndexRoute
@@ -206,12 +251,17 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
   '/_admin': typeof AdminRouteRouteWithChildren
+  '/_public': typeof PublicRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/_admin/admin': typeof AdminAdminRouteWithChildren
+  '/_public/alerts': typeof PublicAlertsRoute
+  '/_public/basket': typeof PublicBasketRoute
+  '/_public/profile': typeof PublicProfileRoute
+  '/_public/search': typeof PublicSearchRoute
   '/api/$': typeof ApiSplatRoute
+  '/_public/': typeof PublicIndexRoute
   '/_admin/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/_admin/admin/clickhouse': typeof AdminAdminClickhouseRoute
   '/_admin/admin/cron': typeof AdminAdminCronRoute
@@ -220,6 +270,7 @@ export interface FileRoutesById {
   '/_admin/admin/stores': typeof AdminAdminStoresRouteWithChildren
   '/_admin/admin/task-queue': typeof AdminAdminTaskQueueRoute
   '/_admin/admin/users': typeof AdminAdminUsersRoute
+  '/_public/product/$productId': typeof PublicProductProductIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/_admin/admin/': typeof AdminAdminIndexRoute
@@ -238,6 +289,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/admin'
+    | '/alerts'
+    | '/basket'
+    | '/profile'
+    | '/search'
     | '/api/$'
     | '/admin/catalog-prices'
     | '/admin/clickhouse'
@@ -247,6 +302,7 @@ export interface FileRouteTypes {
     | '/admin/stores'
     | '/admin/task-queue'
     | '/admin/users'
+    | '/product/$productId'
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/admin/'
@@ -262,6 +318,10 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/setup'
+    | '/alerts'
+    | '/basket'
+    | '/profile'
+    | '/search'
     | '/api/$'
     | '/admin/catalog-prices'
     | '/admin/clickhouse'
@@ -269,6 +329,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/task-queue'
     | '/admin/users'
+    | '/product/$productId'
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/admin'
@@ -281,12 +342,17 @@ export interface FileRouteTypes {
     | '/admin/ingestion/$runId/$fileId'
   id:
     | '__root__'
-    | '/'
     | '/_admin'
+    | '/_public'
     | '/login'
     | '/setup'
     | '/_admin/admin'
+    | '/_public/alerts'
+    | '/_public/basket'
+    | '/_public/profile'
+    | '/_public/search'
     | '/api/$'
+    | '/_public/'
     | '/_admin/admin/catalog-prices'
     | '/_admin/admin/clickhouse'
     | '/_admin/admin/cron'
@@ -295,6 +361,7 @@ export interface FileRouteTypes {
     | '/_admin/admin/stores'
     | '/_admin/admin/task-queue'
     | '/_admin/admin/users'
+    | '/_public/product/$productId'
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/_admin/admin/'
@@ -308,8 +375,8 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
+  PublicRouteRoute: typeof PublicRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
   ApiSplatRoute: typeof ApiSplatRoute
@@ -333,6 +400,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_public': {
+      id: '/_public'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PublicRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_admin': {
       id: '/_admin'
       path: ''
@@ -340,12 +414,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
+    '/_public/': {
+      id: '/_public/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof PublicIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
     }
     '/api/$': {
       id: '/api/$'
@@ -353,6 +427,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/$'
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_public/search': {
+      id: '/_public/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof PublicSearchRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/profile': {
+      id: '/_public/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof PublicProfileRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/basket': {
+      id: '/_public/basket'
+      path: '/basket'
+      fullPath: '/basket'
+      preLoaderRoute: typeof PublicBasketRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/alerts': {
+      id: '/_public/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof PublicAlertsRouteImport
+      parentRoute: typeof PublicRouteRoute
     }
     '/_admin/admin': {
       id: '/_admin/admin'
@@ -381,6 +483,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_public/product/$productId': {
+      id: '/_public/product/$productId'
+      path: '/product/$productId'
+      fullPath: '/product/$productId'
+      preLoaderRoute: typeof PublicProductProductIdRouteImport
+      parentRoute: typeof PublicRouteRoute
     }
     '/_admin/admin/users': {
       id: '/_admin/admin/users'
@@ -574,9 +683,31 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
   AdminRouteRouteChildren,
 )
 
+interface PublicRouteRouteChildren {
+  PublicAlertsRoute: typeof PublicAlertsRoute
+  PublicBasketRoute: typeof PublicBasketRoute
+  PublicProfileRoute: typeof PublicProfileRoute
+  PublicSearchRoute: typeof PublicSearchRoute
+  PublicIndexRoute: typeof PublicIndexRoute
+  PublicProductProductIdRoute: typeof PublicProductProductIdRoute
+}
+
+const PublicRouteRouteChildren: PublicRouteRouteChildren = {
+  PublicAlertsRoute: PublicAlertsRoute,
+  PublicBasketRoute: PublicBasketRoute,
+  PublicProfileRoute: PublicProfileRoute,
+  PublicSearchRoute: PublicSearchRoute,
+  PublicIndexRoute: PublicIndexRoute,
+  PublicProductProductIdRoute: PublicProductProductIdRoute,
+}
+
+const PublicRouteRouteWithChildren = PublicRouteRoute._addFileChildren(
+  PublicRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
+  PublicRouteRoute: PublicRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
   ApiSplatRoute: ApiSplatRoute,

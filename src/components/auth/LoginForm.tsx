@@ -10,7 +10,7 @@ export function LoginForm() {
 	const [loading, setLoading] = useState(false);
 	const [passkeyAvailable, setPasskeyAvailable] = useState(false);
 	const location = useRouterState({ select: (s) => s.location });
-	const redirectParam = new URLSearchParams(location.search).get("redirect");
+	const redirectParam = new URLSearchParams(location.searchStr).get("redirect");
 	const redirectTo =
 		redirectParam?.startsWith("/") && !redirectParam.startsWith("//")
 			? redirectParam

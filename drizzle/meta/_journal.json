@@ -43,6 +43,13 @@
       "when": 1770343379509,
       "tag": "0005_naive_the_captain",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770374317846,
+      "tag": "0006_rich_stature",
+      "breakpoints": true
     }
   ]
 }

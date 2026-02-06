@@ -922,3 +922,37 @@ export const searchIndex = pgTable(
 		categoryIdx: index("search_index_category_idx").on(table.category),
 	}),
 );
+
+// ============================================================================
+// Price Alerts: user-defined price notifications
+// ============================================================================
+
+export const priceAlerts = pgTable(
+	"price_alerts",
+	{
+		id: cuid2("pal").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		productId: text("product_id")
+			.notNull()
+			.references(() => products.id, { onDelete: "cascade" }),
+		targetPrice: integer("target_price").notNull(), // cents
+		direction: text("direction").notNull(), // 'below' | 'above'
+		status: text("status").notNull().default("active"), // 'active' | 'triggered' | 'disabled'
+		triggeredAt: timestamp("triggered_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		userIdx: index("price_alerts_user_id_idx").on(table.userId),
+		productIdx: index("price_alerts_product_id_idx").on(table.productId),
+		statusIdx: index("price_alerts_status_idx").on(table.status),
+		userProductUnique: uniqueIndex("price_alerts_user_product_unique").on(
+			table.userId,
+			table.productId,
+			table.direction,
+		),
+	}),
+);

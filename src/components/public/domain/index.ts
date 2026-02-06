@@ -1,3 +1,8 @@
+export {
+	BasketOptimizationResults,
+	type StoreAllocationResult,
+	type SingleStoreResultItem,
+} from "./basket-optimization-results";
 export { CategoryGrid, type CategoryGridProps } from "./category-grid";
 export { CategoryIcon } from "./category-icon";
 export { DataFreshnessBadge } from "./data-freshness-badge";
@@ -31,3 +36,4 @@ export {
 export { Sparkline } from "./sparkline";
 export { StoreChip, storeChipVariants } from "./store-chip";
 export { STORE_COLORS, type StoreSlug } from "./store-colors";
+export { ThemeToggle } from "./theme-toggle";
