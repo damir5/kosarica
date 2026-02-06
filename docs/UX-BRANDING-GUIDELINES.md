@@ -1231,23 +1231,96 @@ This creates a powerful loop: engagement → points → premium features → mor
 
 ### Tier Summary
 
-| Feature | Free | Plus (€2,99/mj) | Premium (€5,99/mj) |
-|---------|------|-----------------|-------------------|
-| Search & compare | Unlimited | Unlimited | Unlimited |
-| Shopping lists | 1 | Unlimited | Unlimited |
-| Price alerts | 0 | 5 active | Unlimited |
-| Basket optimization | Basic (1 store) | Basic (1 store) | Split-basket (multi-store) |
-| Price history | 7 days | 30 days | Full history |
-| Barcode scan | 3/day | Unlimited | Unlimited |
-| Ads | Yes | No | No |
-| Family sharing | No | No | Up to 5 |
-| Dietary filters | No | No | Yes |
-| Smart Points exchange | No | Yes | Yes |
-| Priority support | No | No | Yes |
+| Feature | Free | Free + Ad Boost (24h) | Plus (€2,99/mj) | Premium (€5,99/mj) |
+|---------|------|----------------------|-----------------|-------------------|
+| Search & compare | Unlimited | Unlimited | Unlimited | Unlimited |
+| Shopping lists | 1 | 3 | Unlimited | Unlimited |
+| Price alerts | 1 active | 3 active | 5 active | Unlimited |
+| Basket optimization | Basic (1 store) | Basic (1 store) | Basic (1 store) | Split-basket (multi-store) |
+| Price history | 7 days | 30 days | 30 days | Full history |
+| Barcode scan | 3/day | 10/day | Unlimited | Unlimited |
+| Split basket preview | See savings amount | See savings amount | See savings amount | Full split + routing |
+| Ads | Yes | Just watched one :) | No | No |
+| Family sharing | No | No | No | Up to 5 |
+| Dietary filters | No | No | No | Yes |
+| Smart Points exchange | No | No | Yes | Yes |
+| Priority support | No | No | No | Yes |
+
+**Key free tier change:** Free users get **1 active price alert**. This lets them experience the notification loop — the most powerful habit-forming feature. Once they feel the dopamine of "your item just dropped!" they'll want more.
+
+### Ad Boost: "Watch Ad, Get 24h Upgrade"
+
+A third monetization path alongside subscriptions and Smart Points. Especially effective for students and pensioners who won't pay but will trade attention.
+
+**How it works:**
+- User hits a feature limit (2nd alert, 4th scan, etc.)
+- Instead of just "Upgrade to Plus", they also see: **"Pogledaj oglas → otključaj na 24h"**
+- User watches a 15-30 second rewarded video ad
+- For the next 24 hours, they get "Ad Boost" tier features
+- Timer visible in UI: "Ad Boost: još 18h 32min"
+- When it expires, gentle nudge: "Boost istekao. [Gledaj opet] ili [Nadogradi na Plus]"
+
+**Why this works:**
+- Removes the "I can't afford it" objection entirely
+- Creates a daily re-engagement loop (come back to re-boost)
+- Users who watch ads daily are worth ~€1-3/mo in ad revenue anyway
+- Converts some ad-watchers to subscribers (tired of daily ads)
+- Feels fair and user-controlled — "you choose how to pay"
+
+**UX design:**
+
+```
+┌─────────────────────────────────────────┐
+│  Trebaš više? Odaberi kako:             │
+│                                         │
+│  ┌── BESPLATNO ──────────────────────┐  │
+│  │ ▶️ Pogledaj oglas (30 sek)        │  │
+│  │   Otključaj 24h:                  │  │
+│  │   • 3 liste  • 3 alarma           │  │
+│  │   • 10 skenova  • 30 dana povijest│  │
+│  └───────────────────────────────────┘  │
+│                                         │
+│  ┌── PLUS ───────────────────────────┐  │
+│  │ Sve od Ad Boost + neograničeno    │  │
+│  │ €2,99/mj · Bez reklama zauvijek  │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+│  [Ne sad, hvala →]                      │
+└─────────────────────────────────────────┘
+```
+
+**After watching ad:**
+
+```
+┌─────────────────────────────────────────┐
+│  ⚡ Ad Boost aktivan!                   │
+│  ─────────────────────────── ⏱ 23:59:44 │
+│                                         │
+│  Otključano do sutra:                   │
+│  ✅ 3 liste  ✅ 3 alarma               │
+│  ✅ 10 skenova  ✅ 30d povijest         │
+│                                         │
+│  Umoran od gledanja reklama?            │
+│  [Plus = zauvijek bez reklama — €2,99]  │
+└─────────────────────────────────────────┘
+```
+
+**Business rules:**
+- Max 1 Ad Boost per 24h period (prevents abuse, maintains ad value)
+- Timer starts from the moment the ad completes
+- If user subscribes to Plus during active Boost, subscription starts immediately (no stacking)
+- Ad Boost does NOT include Premium-only features (split basket, dietary filters, family)
+- Track: ad completion rate, boost-to-subscription conversion, daily boost users
+
+**Ad partner considerations:**
+- Rewarded video (Google AdMob, Meta Audience Network, or Unity Ads)
+- 15-30 second non-skippable for the value exchange to feel fair
+- No gambling, alcohol, or competitor ads (pharmacy/supplements OK)
+- Fallback: if no ad available, grant boost anyway (maintain trust)
 
 ### Paywall Strategy: "Show Value, Then Ask"
 
-**Principle:** Never block core functionality. Always show what the user WOULD get, then gate it.
+**Principle:** Never block core functionality. Always show what the user WOULD get, then gate it. Always offer three paths: **Ad Boost (free), Smart Points, or Subscribe**.
 
 **Example — Price History:**
 ```
@@ -1262,6 +1335,7 @@ Free users see:
 │   €0,99. S Plus pretplatom,     │
 │   vidjet ćeš kad se ponavlja."  │
 │                                 │
+│  [▶️ Pogledaj oglas → 30 dana]   │
 │  [Otključaj s Plus — €2,99/mj]  │
 │  [Otključaj s 50 bodova]        │
 └─────────────────────────────────┘
@@ -1284,25 +1358,30 @@ Free users see:
 │   Premium se isplati za 3 dana."│
 │                                 │
 │  [Isprobaj Premium 7 dana FREE] │
+│  [▶️ Oglas → vidi split 24h]    │
 └─────────────────────────────────┘
 ```
 
 ### Conversion Triggers
 
-| Trigger | When | What User Sees |
-|---------|------|---------------|
-| List limit reached | Creating 2nd list | "Upgrade to Plus for unlimited lists" |
-| Alert limit reached | Setting 6th alert | "Plus lets you watch more" |
-| Scan limit | 4th daily scan | "Unlimited scans with Plus" |
-| Split basket teaser | After any optimization | "Split across stores saves €X more" |
-| Savings milestone | After €50 saved (free) | "Imagine how much more with Premium" |
-| Friend referral | Any time | "Refer 3 friends → 1 month Plus free" |
+Every limit-hit shows **three options**: Ad Boost (instant, free), Smart Points (if available), Subscribe (permanent).
+
+| Trigger | When | Free Path | Paid Path |
+|---------|------|-----------|-----------|
+| Alert limit | Setting 2nd alert | "Pogledaj oglas → 3 alarma 24h" | "Plus: 5 alarma zauvijek" |
+| List limit | Creating 2nd list | "Pogledaj oglas → 3 liste 24h" | "Plus: neograničeno" |
+| Scan limit | 4th daily scan | "Pogledaj oglas → 10 skenova 24h" | "Plus: neograničeno" |
+| History limit | Scrolling past 7 days | "Pogledaj oglas → 30 dana 24h" | "Plus: 30 dana / Premium: sve" |
+| Split basket teaser | After optimization | "Pogledaj oglas → vidi split 24h" | "Premium: split zauvijek" |
+| Savings milestone | After €50 saved | — | "Zamisli koliko više s Premium" |
+| Friend referral | Any time | — | "Pozovi 3 prijatelja → 1 mj Plus" |
+| Ad Boost expired | 24h after boost | "Gledaj opet?" | "Umoran od reklama? Plus = €2,99" |
 
 ### Objection / Counter-Objection Framework
 
 | Objection | Counter-Objection |
 |-----------|------------------|
-| "€2,99 is too much" | "If you save €5/week (which most users do), Plus pays for itself in the first week" |
+| "€2,99 is too much" | "If you save €5/week (which most users do), Plus pays for itself in the first week. Or watch one ad daily for 24h access — completely free." |
 | "The free version is enough" | "You're right — it is useful. Plus just automates the savings you're already finding manually." |
 | "I'll forget to cancel" | "Cancel anytime with one tap. No contracts, no tricks. You keep access until the period ends." |
 | "I don't trust small apps with my card" | "Payment processed securely through Apple/Google. We never see your card details." |

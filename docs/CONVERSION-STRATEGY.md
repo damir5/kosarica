@@ -36,8 +36,10 @@
                      ▼
                   REVENUE
          ┌───────────────────────┐
+         │  Free → Ad Boost      │ Target: 20% daily boosters
          │  Free → Plus          │ Target: 5% (30d)
          │  Free → Premium       │ Target: 1.5% (30d)
+         │  Ad Boost → Plus      │ Target: 10% of daily boosters
          └──────────┬────────────┘
                     ▼
                   REFERRAL
@@ -138,13 +140,16 @@ Tri koraka do pametne kupovine:
 │              │              │              │
 │ ✅ Pretraži  │ ✅ Sve Free  │ ✅ Sve Plus  │
 │ ✅ 1 lista   │ ✅ ∞ lista   │ ✅ Split     │
-│ ✅ Osnovno   │ ✅ 5 alarma  │ ✅ ∞ alarmi  │
-│ ❌ Alarmi   │ ✅ Bez reklam │ ✅ Povijest  │
-│ ❌ Povijest │ ✅ ∞ skenova │ ✅ Obitelj   │
+│ ✅ 1 alarm   │ ✅ 5 alarma  │ ✅ ∞ alarmi  │
+│ ✅ 3 skena   │ ✅ Bez reklam │ ✅ Povijest  │
+│ 🎬 Ad Boost │ ✅ ∞ skenova │ ✅ Obitelj   │
 │              │              │              │
 │ [Započni     │ [Isprobaj    │ [Isprobaj    │
 │  besplatno]  │  7 dana FREE]│  7 dana FREE]│
 └──────────────┴──────────────┴──────────────┘
+
+  ✅ Free uključuje 1 alarm — jer znamo da ćeš htjeti više
+  🎬 Pogledaj oglas → otključaj više na 24h, besplatno
 
       Prosječna ušteda: €22/mj
       Plus se isplati za 4 dana korištenja
@@ -272,6 +277,9 @@ TRIGGER: After single-store optimization, showing split potential
 | Pricing page: with/without annual option | 8 | 7 | 9 | 24 | **P0** |
 | Trial: 7-day vs 14-day | 7 | 6 | 10 | 23 | **P1** |
 | Paywall: savings-framed vs feature-framed | 8 | 7 | 8 | 23 | **P1** |
+| Ad Boost: prominent vs subtle placement | 8 | 7 | 8 | 23 | **P1** |
+| Ad Boost: 24h vs 48h duration | 7 | 6 | 10 | 23 | **P1** |
+| Free alert: 1 alert vs 0 alerts | 8 | 8 | 9 | 25 | **P0** |
 | Search results: card vs dense list | 7 | 6 | 7 | 20 | **P1** |
 | Weekly report: email vs push vs both | 6 | 5 | 8 | 19 | **P2** |
 | Gamification: with/without points | 6 | 5 | 5 | 16 | **P2** |
@@ -359,19 +367,40 @@ more media coverage → Loop repeats
 ```
 Month 6 target: 50,000 WAU → ~80,000 registered users
 
-Revenue:
-  Plus (5%):    4,000 × €2.99 = €11,960/mo
-  Premium (1.5%): 1,200 × €5.99 = €7,188/mo
-  Ads (free tier): ~€2,000/mo (CPM basis)
+Revenue (3 streams):
 
-  Total: ~€21,148/mo
-  Annual run rate: ~€253,776
+  Subscriptions:
+    Plus (5%):      4,000 × €2.99 = €11,960/mo
+    Premium (1.5%): 1,200 × €5.99 = €7,188/mo
+
+  Rewarded Ads (Ad Boost):
+    Daily boosters (~20% of free = ~14,800 users):
+    ~14,800 × 20 sessions/mo × €0.01 eCPM = ~€2,960/mo
+    (conservative — rewarded video eCPM typically €5-15)
+
+  Display Ads (free non-boosters):
+    ~€1,500/mo (banner CPM on remaining free users)
+
+  Total: ~€23,608/mo
+  Annual run rate: ~€283,296
+
+  Ad Boost → Plus conversion pipeline:
+    If 10% of daily boosters convert to Plus over 6mo:
+    +1,480 × €2.99 = +€4,425/mo additional recurring
 
   Break-even estimate:
   Hosting + API costs: ~€3,000/mo
+  Ad network fees: ~€500/mo
   Marketing: ~€5,000/mo
   Team: depends on structure
 ```
+
+**Why Ad Boost improves overall economics:**
+- Captures revenue from users who'd never subscribe (~70% of users)
+- Acts as a "trial" that converts some to paid (tired of daily ads)
+- Keeps free users engaged daily (re-boost loop)
+- Higher eCPM than banners (rewarded video = €5-15 vs banner = €0.50-2)
+- Users feel the exchange is fair — they chose to watch
 
 ---
 
