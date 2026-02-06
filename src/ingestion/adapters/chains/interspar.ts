@@ -11,7 +11,7 @@ import {
 } from "@/ingestion/time";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
-import type { DiscoveredFile } from "../../types";
+import type { DiscoveredFile, StoreMetadata } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
 
@@ -203,6 +203,37 @@ export class IntersparAdapter extends BaseCsvAdapter {
 		}
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const baseName = file.filename.replace(/\.(csv|CSV)$/i, "");
+		const parts = baseName.split("_").filter(Boolean);
+		if (parts.length < 6) {
+			const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+			return identifier ? { name: `${this.name} ${identifier}` } : null;
+		}
+
+		const storeCode = this.extractStoreIdentifierFromFilename(file.filename);
+		const storeCodeIndex = parts.findLastIndex((part) => part === storeCode);
+		const codeAnchorIndex = parts.findIndex((part, index) => {
+			return index > 1 && index < Math.max(0, storeCodeIndex) && /^\d{5}$/.test(part);
+		});
+
+		const cityToken = parts[1] ?? "";
+		const addressTokens =
+			codeAnchorIndex > 2
+				? parts.slice(2, codeAnchorIndex)
+				: parts.slice(2, Math.max(2, storeCodeIndex));
+
+		const city = normalizeIntersparPart(cityToken);
+		const address = normalizeIntersparPart(addressTokens.join(" "));
+		const storeName = city ? `${this.name} ${city}` : `${this.name} ${storeCode}`;
+
+		return {
+			name: storeName.trim(),
+			address: address || undefined,
+			city: city || undefined,
+		};
+	}
 }
 
 function getIntersparNoDataState(targetDate: string): {
@@ -220,4 +251,12 @@ function getIntersparNoDataState(targetDate: string): {
 	}
 
 	return {};
+}
+
+function normalizeIntersparPart(value: string): string {
+	if (!value) return "";
+	return value
+		.replace(/_/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
 }

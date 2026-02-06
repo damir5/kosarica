@@ -7,6 +7,7 @@ import type {
 	ParseOptions,
 	ParseResult,
 	StoreIdentifier,
+	StoreMetadata,
 } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
@@ -117,5 +118,47 @@ export class MetroAdapter extends BaseCsvAdapter {
 			return `S${match[1]}`;
 		}
 		return "";
+	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const baseName = file.filename.replace(/\.(csv|CSV)$/i, "");
+		const storeCode = this.extractStoreCodeFromFilename(file.filename);
+		if (!storeCode) {
+			return { name: this.name };
+		}
+
+		const marker = `_${storeCode}_`;
+		const markerIndex = baseName.indexOf(marker);
+		if (markerIndex < 0) {
+			return { name: `${this.name} ${storeCode}` };
+		}
+
+		const encodedLocation = baseName.slice(markerIndex + marker.length);
+		const decodedLocation = decodeMetroSegment(encodedLocation)
+			.replace(/_/g, " ")
+			.replace(/\s+/g, " ")
+			.trim();
+		const locationParts = decodedLocation
+			.split(",")
+			.map((part) => part.trim())
+			.filter(Boolean);
+
+		const address = locationParts[0] ?? "";
+		const city = locationParts[locationParts.length - 1] ?? "";
+		const storeName = city ? `${this.name} ${city}` : `${this.name} ${storeCode}`;
+
+		return {
+			name: storeName,
+			address: address || undefined,
+			city: city || undefined,
+		};
+	}
+}
+
+function decodeMetroSegment(value: string): string {
+	try {
+		return decodeURIComponent(value);
+	} catch {
+		return value;
 	}
 }

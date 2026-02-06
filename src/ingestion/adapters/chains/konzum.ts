@@ -3,7 +3,12 @@ import { err, ok, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
-import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
+import type {
+	DiscoveredFile,
+	ParseOptions,
+	ParseResult,
+	StoreMetadata,
+} from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
 
@@ -154,6 +159,36 @@ export class KonzumAdapter extends BaseCsvAdapter {
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
 
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const baseName = file.filename.replace(/\.(csv|CSV)$/i, "");
+		const parts = baseName
+			.split(",")
+			.map((part) => part.trim())
+			.filter(Boolean);
+		const storeCode = this.extractStoreIdentifierFromFilename(file.filename);
+
+		// Common Konzum pattern: "...,<store_code>,<city/address>,..."
+		const codeIndex = parts.findIndex((part) => part === storeCode);
+		if (codeIndex >= 0) {
+			const cityCandidate = parts[codeIndex + 1] ?? "";
+			const addressCandidate = parts[codeIndex + 2] ?? "";
+			if (cityCandidate || addressCandidate) {
+				const city = normalizeKonzumPart(cityCandidate);
+				const address = normalizeKonzumPart(addressCandidate);
+				const storeName = city ? `${this.name} ${city}` : `${this.name} ${storeCode}`;
+				return {
+					name: storeName,
+					address: address || undefined,
+					city: city || undefined,
+				};
+			}
+		}
+
+		return {
+			name: `${this.name} ${storeCode || baseName}`,
+		};
+	}
+
 	private resolveUrl(href: string): string {
 		if (href.startsWith("http://") || href.startsWith("https://")) {
 			return href;
@@ -187,4 +222,8 @@ export class KonzumAdapter extends BaseCsvAdapter {
 		}
 		return "";
 	}
+}
+
+function normalizeKonzumPart(value: string): string {
+	return value.replace(/_/g, " ").replace(/\s+/g, " ").trim();
 }

@@ -2,7 +2,7 @@ import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
-import type { DiscoveredFile } from "../../types";
+import type { DiscoveredFile, StoreMetadata } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
 
@@ -155,4 +155,51 @@ export class KauflandAdapter extends BaseCsvAdapter {
 		}
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const baseName = file.filename.replace(/\.(csv|CSV)$/i, "");
+		const parts = baseName.split("_").filter(Boolean);
+		if (parts.length < 6) {
+			const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+			return identifier ? { name: `${this.name} ${identifier}` } : null;
+		}
+
+		const locationParts = parts.slice(1, -3);
+		if (locationParts.length < 2) {
+			const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+			return { name: `${this.name} ${identifier || baseName}` };
+		}
+
+		const splitIndex = getStreetCitySplitIndex(locationParts);
+		let streetParts = locationParts.slice(0, splitIndex);
+		let cityParts = locationParts.slice(splitIndex);
+		if (streetParts.length === 0 || cityParts.length === 0) {
+			streetParts = locationParts.slice(0, locationParts.length - 1);
+			cityParts = locationParts.slice(locationParts.length - 1);
+		}
+
+		const address = normalizeKauflandPart(streetParts.join(" "));
+		const city = normalizeKauflandPart(cityParts.join(" "));
+		const storeName = city ? `${this.name} ${city}` : this.name;
+
+		return {
+			name: storeName,
+			address: address || undefined,
+			city: city || undefined,
+		};
+	}
+}
+
+function getStreetCitySplitIndex(parts: string[]): number {
+	const houseNumberIndex = parts.findLastIndex(
+		(part, index) => index < parts.length - 1 && /^\d+[A-Za-z]?$/i.test(part),
+	);
+	if (houseNumberIndex >= 0) {
+		return houseNumberIndex + 1;
+	}
+	return parts.length - 1;
+}
+
+function normalizeKauflandPart(value: string): string {
+	return value.replace(/_/g, " ").replace(/\s+/g, " ").trim();
 }
