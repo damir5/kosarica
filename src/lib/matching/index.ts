@@ -49,6 +49,8 @@ interface RetailerItemRow {
 	chain_slug: string | null;
 	external_id: string | null;
 	barcode: string;
+	normalized_unit: string | null;
+	normalized_quantity: number | null;
 }
 
 interface RetailerItem {
@@ -62,6 +64,8 @@ interface RetailerItem {
 	chainSlug: string;
 	externalId: string;
 	barcode: string;
+	normalizedUnit: string | null;
+	normalizedQuantity: number | null;
 }
 
 interface ProductCandidateRow {
@@ -73,6 +77,8 @@ interface ProductCandidateRow {
 	unit_quantity: string | null;
 	image_url: string | null;
 	sim_score: number | string;
+	normalized_unit: string | null;
+	normalized_quantity: number | null;
 }
 
 interface Candidate {
@@ -86,6 +92,8 @@ interface Candidate {
 		unit: string | null;
 		unitQuantity: string | null;
 		imageUrl: string | null;
+		normalizedUnit: string | null;
+		normalizedQuantity: number | null;
 	};
 }
 
@@ -329,6 +337,36 @@ function hasPrivateLabelConflict(
 	return false;
 }
 
+export function checkUnitQuantityMismatch(
+	item: { normalizedUnit: string | null; normalizedQuantity: number | null },
+	candidate: { normalizedUnit: string | null; normalizedQuantity: number | null },
+): string {
+	// If either side is missing unit info, don't flag
+	if (!item.normalizedUnit || !candidate.normalizedUnit) {
+		return "";
+	}
+
+	// Unit type mismatch (e.g. kg vs l)
+	if (item.normalizedUnit !== candidate.normalizedUnit) {
+		return "trgm_unit_type_mismatch";
+	}
+
+	// Same unit — check quantity ratio if both have quantities
+	if (
+		item.normalizedQuantity != null &&
+		item.normalizedQuantity > 0 &&
+		candidate.normalizedQuantity != null &&
+		candidate.normalizedQuantity > 0
+	) {
+		const ratio = item.normalizedQuantity / candidate.normalizedQuantity;
+		if (ratio > 2 || ratio < 0.5) {
+			return "trgm_quantity_mismatch";
+		}
+	}
+
+	return "";
+}
+
 function mapRetailerItem(row: RetailerItemRow): RetailerItem {
 	return {
 		id: row.id,
@@ -341,6 +379,8 @@ function mapRetailerItem(row: RetailerItemRow): RetailerItem {
 		chainSlug: row.chain_slug ?? "",
 		externalId: row.external_id ?? "",
 		barcode: row.barcode,
+		normalizedUnit: row.normalized_unit ?? null,
+		normalizedQuantity: row.normalized_quantity ?? null,
 	};
 }
 
@@ -360,6 +400,8 @@ function parseCandidateRows(rows: ProductCandidateRow[]): Candidate[] {
 				unit: row.unit,
 				unitQuantity: row.unit_quantity,
 				imageUrl: row.image_url,
+				normalizedUnit: row.normalized_unit ?? null,
+				normalizedQuantity: row.normalized_quantity ?? null,
 			},
 		}))
 		.filter((candidate) => Number.isFinite(candidate.similarity));
@@ -604,7 +646,9 @@ export async function runTrigramMatching(options?: {
 			ri.image_url,
 			ri.chain_slug,
 			ri.external_id,
-			'' as barcode
+			'' as barcode,
+			ri.normalized_unit,
+			ri.normalized_quantity
 		FROM retailer_items ri
 		WHERE ri.merged_into_id IS NULL
 		AND NOT EXISTS (
@@ -636,6 +680,7 @@ export async function runTrigramMatching(options?: {
 		}
 		const textHash = hashText(normalizedText);
 
+		const itemCategory = item.category || null;
 		const candidatesResult = await db.execute(sql`
 			SELECT
 				p.id,
@@ -645,6 +690,8 @@ export async function runTrigramMatching(options?: {
 				p.unit,
 				p.unit_quantity,
 				p.image_url,
+				p.normalized_unit,
+				p.normalized_quantity,
 				similarity(
 					lower(concat_ws(' ', p.name, p.brand)),
 					lower(${normalizedText})
@@ -654,6 +701,11 @@ export async function runTrigramMatching(options?: {
 				lower(concat_ws(' ', p.name, p.brand)),
 				lower(${normalizedText})
 			) > ${minSimilarity}
+			AND (
+				p.category IS NULL
+				OR ${itemCategory} IS NULL
+				OR p.category = ${itemCategory}
+			)
 			ORDER BY sim_score DESC, p.name
 			LIMIT ${maxCandidates}
 		`);
@@ -718,6 +770,15 @@ export async function runTrigramMatching(options?: {
 
 			if (!bestCandidate || bestCandidate.similarity < reviewThreshold) {
 				result.noMatch += 1;
+				return;
+			}
+
+			const unitQtyFlag = checkUnitQuantityMismatch(item, bestCandidate.product);
+			if (unitQtyFlag) {
+				await queueForReview(tx, item.id);
+				await flagTopCandidate(tx, item.id, unitQtyFlag);
+				result.queuedForReview += 1;
+				result.processed += 1;
 				return;
 			}
 
