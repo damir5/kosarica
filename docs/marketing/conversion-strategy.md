@@ -1,6 +1,6 @@
 # Conversion & Growth Strategy
 
-> Companion document to [UX-BRANDING-GUIDELINES.md](./UX-BRANDING-GUIDELINES.md)
+> Companion document to [UX-BRANDING-GUIDELINES.md](./ux-branding-guidelines.md)
 
 ---
 
@@ -446,8 +446,8 @@ Design these email/push sequences:
 
 ## Related Documents
 
-- [AI Bot & Community Strategy](./AI-BOT-STRATEGY.md) — Bot-driven growth loops, community marketing, content automation pipeline
-- [UX & Branding Guidelines](./UX-BRANDING-GUIDELINES.md) — Brand voice, design system, screen designs
+- [AI Bot & Community Strategy](../ai/bot-strategy.md) — Bot-driven growth loops, community marketing, content automation pipeline
+- [UX & Branding Guidelines](./ux-branding-guidelines.md) — Brand voice, design system, screen designs
 
 ---
 

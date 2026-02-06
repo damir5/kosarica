@@ -2,7 +2,7 @@
 
 **Version:** 1.2 — Post-review revision with Codex v2 marketing insights
 **Date:** 2026-02-06
-**Status:** Reviewed by GPT-5.3 Codex (v1) + GPT-5.2 Codex (v2, marketing focus) + Gemini 3 Pro (see docs/reviews/)
+**Status:** Reviewed by GPT-5.3 Codex (v1) + GPT-5.2 Codex (v2, marketing focus) + Gemini 3 Pro (see docs/archive/reviews/)
 
 ---
 
@@ -994,4 +994,4 @@ Note: Cross-channel overlap estimated at 30-40%. Track unique users, not raw fol
 
 ---
 
-*See also: [UX-BRANDING-GUIDELINES.md](./UX-BRANDING-GUIDELINES.md) | [CONVERSION-STRATEGY.md](./CONVERSION-STRATEGY.md)*
+*See also: [UX-BRANDING-GUIDELINES.md](../marketing/ux-branding-guidelines.md) | [CONVERSION-STRATEGY.md](../marketing/conversion-strategy.md)*

@@ -3,7 +3,7 @@
 **Version:** 1.0 — Initial draft
 **Date:** 2026-02-06
 **Status:** Draft — pending review
-**Companion doc:** [AI-BOT-STRATEGY.md](./AI-BOT-STRATEGY.md) (autonomous bot deployment — separate concern)
+**Companion doc:** [bot-strategy.md](../ai/bot-strategy.md) (autonomous bot deployment — separate concern)
 
 ---
 
@@ -27,7 +27,7 @@
 
 ### Why Copilot, Not Autopilot
 
-The [AI-BOT-STRATEGY.md](./AI-BOT-STRATEGY.md) covers deploying Pametnjaković as an autonomous bot across community channels. That strategy is valuable post-launch when content volume demands automation.
+The [bot-strategy.md](../ai/bot-strategy.md) covers deploying Pametnjaković as an autonomous bot across community channels. That strategy is valuable post-launch when content volume demands automation.
 
 **This document covers a different approach: AI as your marketing copilot.**
 
@@ -159,7 +159,7 @@ Create all accounts in one session. Reserve handles early — even for platforms
 
 ### 3.3 Content Safety Rules
 
-Inherited from [AI-BOT-STRATEGY.md](./AI-BOT-STRATEGY.md):
+Inherited from [bot-strategy.md](../ai/bot-strategy.md):
 
 1. **LLM never touches price numbers.** All prices come from deterministic template slot-filling against ClickHouse data.
 2. **Every post includes data timestamp and source.** Example: "Cijene iz službenih cjenika, ažurirano 5.2.2026. 06:00 UTC"
@@ -1390,7 +1390,7 @@ Features:
 
 ---
 
-## Relationship to AI-BOT-STRATEGY.md
+## Relationship to bot-strategy.md
 
 These two documents are **complementary, not competing:**
 

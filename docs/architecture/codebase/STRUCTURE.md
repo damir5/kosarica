@@ -4,7 +4,7 @@
 ```
 kosarica/
 ├── drizzle/              # Database migrations
-├── doc/                  # Documentation
+├── docs/                 # Documentation
 ├── public/               # Static assets
 ├── scripts/              # Dev scripts
 ├── services/             # Backend services

@@ -624,8 +624,11 @@ function main() {
 		report += "\n```sql\n" + result.sql + "\n```\n\n";
 	}
 
-	require("node:fs").writeFileSync("/workspace/shop.md", report);
-	console.log("Report written to shop.md");
+	const fs = require("node:fs");
+	const outputPath = "/workspace/docs/archive/notes/shop.md";
+	fs.mkdirSync("/workspace/docs/archive/notes", { recursive: true });
+	fs.writeFileSync(outputPath, report);
+	console.log(`Report written to ${outputPath}`);
 }
 
 main();

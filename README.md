@@ -112,13 +112,16 @@ Run `mise run test` for all available test commands.
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](doc/planning/codebase/ARCHITECTURE.md) | System architecture, data flow, state machines |
-| [STRUCTURE.md](doc/planning/codebase/STRUCTURE.md) | Directory layout and file organization |
-| [STACK.md](doc/planning/codebase/STACK.md) | Technology stack and tooling |
-| [INTEGRATIONS.md](doc/planning/codebase/INTEGRATIONS.md) | Go service integration and circuit breaker |
-| [API.md](doc/planning/API.md) | Complete API endpoint reference |
-| [DATABASE.md](doc/planning/DATABASE.md) | Schema authority and migration workflow |
-| [DEPLOYMENT.md](doc/planning/DEPLOYMENT.md) | Deployment and operations runbooks |
+| [Documentation Index](docs/README.md) | Entry point for all docs sections |
+| [Roadmap](docs/product/roadmap.md) | Product priorities and milestones |
+| [ARCHITECTURE.md](docs/architecture/codebase/ARCHITECTURE.md) | System architecture, data flow, state machines |
+| [STRUCTURE.md](docs/architecture/codebase/STRUCTURE.md) | Directory layout and file organization |
+| [STACK.md](docs/architecture/codebase/STACK.md) | Technology stack and tooling |
+| [INTEGRATIONS.md](docs/architecture/codebase/INTEGRATIONS.md) | Go service integration and circuit breaker |
+| [API.md](docs/architecture/API.md) | Complete API endpoint reference |
+| [DATABASE.md](docs/architecture/DATABASE.md) | Schema authority and migration workflow |
+| [DEPLOYMENT.md](docs/architecture/DEPLOYMENT.md) | Deployment and operations runbooks |
+| [AI Ingestion Testing Playbook](docs/ai/testing-ingestion.md) | Repeatable AI-driven ingestion testing workflow |
 
 ## Supported Chains
 
