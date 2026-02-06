@@ -42,9 +42,12 @@ describe("normalizeCategory", () => {
 	});
 
 	it("normalizes Mojibake piće (replacement chars)", () => {
-		// After stripping \uFFFD, "Pi\uFFFDa" → "Pia" which is too garbled to match.
-		// Only well-formed variants are mapped.
-		expect(normalizeCategory("Pi\uFFFDa")).toBeNull();
+		// After stripping \uFFFD, "Pi\uFFFDa" -> "Pia", which is intentionally
+		// accepted as a mojibake variant for Piće.
+		expect(normalizeCategory("Pi\uFFFDa")).toEqual({
+			category: "Piće",
+			subcategory: null,
+		});
 	});
 
 	it("normalizes KOZMETIKA", () => {

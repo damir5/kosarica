@@ -124,7 +124,10 @@ async function chooseTestDatabaseUrl(configuredUrl: string): Promise<string> {
 /**
  * Verify ClickHouse is available (warning only, don't fail for unit tests).
  */
-async function verifyClickHouse(): Promise<void> {
+async function verifyClickHouse(): Promise<{
+	available: boolean;
+	clickhouseUrl: string;
+}> {
 	const clickhouseUrl =
 		process.env.CLICKHOUSE_URL || "http://ade-clickhouse-test.orb.local:8123";
 
@@ -134,6 +137,7 @@ async function verifyClickHouse(): Promise<void> {
 		});
 		if (response.ok) {
 			console.log(`ClickHouse available at ${clickhouseUrl}`);
+			return { available: true, clickhouseUrl };
 		} else {
 			console.warn(
 				`WARNING: ClickHouse ping returned ${response.status} at ${clickhouseUrl}`,
@@ -148,6 +152,32 @@ async function verifyClickHouse(): Promise<void> {
 			"  ClickHouse integration tests may fail. Run 'mise run test-all' to auto-start test services.",
 		);
 	}
+	return { available: false, clickhouseUrl };
+}
+
+/**
+ * Apply ClickHouse migrations for integration tests.
+ */
+async function applyClickHouseMigrations(clickhouseUrl: string): Promise<void> {
+	console.log("Running ClickHouse migrations (pnpm clickhouse:migrate)...");
+	await new Promise<void>((resolve, reject) => {
+		exec(
+			"pnpm clickhouse:migrate",
+			{
+				cwd: process.cwd(),
+				env: {
+					...process.env,
+					CLICKHOUSE_URL: clickhouseUrl,
+				},
+			},
+			(err: ExecException | null, stdout: string, stderr: string) => {
+				if (stdout) process.stdout.write(stdout);
+				if (stderr) process.stderr.write(stderr);
+				if (err) return reject(err);
+				resolve();
+			},
+		);
+	});
 }
 
 /**
@@ -262,8 +292,11 @@ export default async function globalSetup() {
 	await cleanupTestDatabase(chosenUrl);
 	await applyMigrations();
 
-	// Verify ClickHouse availability (warning only, don't fail)
-	await verifyClickHouse();
+	// Ensure ClickHouse schema is ready when ClickHouse is reachable.
+	const clickhouseStatus = await verifyClickHouse();
+	if (clickhouseStatus.available) {
+		await applyClickHouseMigrations(clickhouseStatus.clickhouseUrl);
+	}
 
 	console.log("Global test setup complete.");
 }
