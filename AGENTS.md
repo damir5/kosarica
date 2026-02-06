@@ -340,4 +340,4 @@ Use `knowledge/playbooks/catalog-playbook.md` and `knowledge/playbooks/stores-pl
 - Run logging/reporting and changelog protocol
 - Low-confidence escalation (peer-agent review then human queue)
 - Store enrichment/geocoding loop and writing durable store knowledge for future deploys
-- Croatian-first agent communication in knowledge/store loops, with optional spellcheck/grammar tooling before handoff
+- Language policy for loops: technical communication in English; user-facing catalog/store content in Croatian, with optional spellcheck/grammar tooling before handoff

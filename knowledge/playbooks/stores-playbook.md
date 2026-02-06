@@ -4,8 +4,9 @@ This playbook covers long-running store enrichment/geocoding quality loops.
 
 ## Language Requirement
 
-- Agent outputs, report notes, and human-facing escalation packets MUST be written in Croatian (`hr-HR`), unless a human explicitly asks for another language.
-- Keep raw store source fields unchanged; only explanatory text and annotations should be written in Croatian.
+- All technical communication MUST be in English (analysis notes, implementation notes, operational reports, escalation reasoning, commit messages).
+- User-facing data content MUST be in Croatian (`hr-HR`) (for example store-facing labels, canonical display names shown to users, human-visible data text).
+- Keep raw store source fields unchanged unless there is an explicit normalization/mapping rule.
 - Before finalizing larger text updates, agents may use spellcheck/grammar tools (for example `hunspell`, `aspell`, LanguageTool, or equivalent IDE tooling) and should log that validation step in `commands_run`.
 
 ## 1) Connection Setup
