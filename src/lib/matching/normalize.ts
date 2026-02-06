@@ -63,6 +63,7 @@ export const CONFIDENCE_RANK: Record<string, number> = {
 	verified: 5,
 	manual: 4,
 	ai: 3,
+	knowledge: 3,
 	heuristic: 2,
 	barcode: 2,
 	auto: 1,

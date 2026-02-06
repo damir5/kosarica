@@ -1,0 +1,21 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Knowledge catalog product taxonomy"
+taxonomy:
+  dairy:
+    - milk-fresh
+    - milk-uht
+    - yogurt
+  beverages:
+    - water
+    - cola
+  staples:
+    - eggs
+    - flour
+    - sugar
+    - oil
+    - bread
+    - butter
+    - coffee

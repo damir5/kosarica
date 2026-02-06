@@ -1,0 +1,11 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Interspar naming quirks"
+chain: "interspar"
+naming_conventions:
+  - "Often includes premium descriptors"
+common_abbreviations:
+  org: "organic"
+private_label_brands: ["despar", "spar-budget"]

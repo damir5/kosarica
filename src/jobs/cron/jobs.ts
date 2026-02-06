@@ -8,6 +8,7 @@
 
 import { barcodeMatchingHandler } from "./handlers/barcode-matching";
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
+import { knowledgeMatchingHandler } from "./handlers/knowledge-matching";
 import { semanticMatchingHandler } from "./handlers/semantic-matching";
 import { tempCleanupHandler } from "./handlers/temp-cleanup";
 import { trigramMatchingHandler } from "./handlers/trigram-matching";
@@ -38,6 +39,16 @@ export function registerAllCronJobs(): void {
 		timezone: "UTC",
 		taskType: "cleanup",
 		handler: tempCleanupHandler,
+	});
+
+	// Knowledge catalog matching before barcode matching
+	registerCronJob({
+		id: "knowledge-matching",
+		name: "Knowledge Product Matching",
+		cronExpression: "30 8 * * *", // 8:30 AM UTC, before barcode at 9 AM
+		timezone: "UTC",
+		taskType: "matching",
+		handler: knowledgeMatchingHandler,
 	});
 
 	// Barcode matching after daily ingestion window

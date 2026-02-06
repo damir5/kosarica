@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kosarica.local/knowledge/store-geocode.schema.json",
+  "type": "object",
+  "required": ["_meta", "entries"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "updated_at", "updated_by", "description"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string" },
+        "updated_by": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "canonical_key",
+          "latitude",
+          "longitude",
+          "confidence",
+          "updated_at"
+        ],
+        "properties": {
+          "canonical_key": { "type": "string", "minLength": 1 },
+          "chain_slug": { "type": "string", "minLength": 1 },
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "city": { "type": "string" },
+          "postal_code": { "type": "string" },
+          "latitude": { "type": "string" },
+          "longitude": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "source": { "type": "string" },
+          "updated_at": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

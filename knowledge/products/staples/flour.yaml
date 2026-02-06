@@ -1,0 +1,15 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Flour canonical products"
+products:
+  - canonical_key: "flour-wheat-t550-1kg"
+    display_name: "Pšenično brašno T-550 1 kg"
+    product_type: "flour"
+    category: "staples"
+    attributes:
+      volume_value: 1
+      volume_unit: "kg"
+      grade: "T-550"
+    known_brands: ["podravka", "k-plus", "despar", "k-classic"]

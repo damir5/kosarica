@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kosarica.local/knowledge/dashboard-latest.schema.json",
+  "type": "object",
+  "required": ["generated_at", "loop_state", "metrics", "alerts"],
+  "properties": {
+    "generated_at": { "type": "string", "minLength": 1 },
+    "loop_state": { "type": "object" },
+    "metrics": { "type": "object" },
+    "alerts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["at", "severity", "metric", "value", "threshold", "message"],
+        "properties": {
+          "at": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["warning", "critical"] },
+          "metric": { "type": "string", "minLength": 1 },
+          "value": { "type": "number" },
+          "threshold": { "type": "number" },
+          "message": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

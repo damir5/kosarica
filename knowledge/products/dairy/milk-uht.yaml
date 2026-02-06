@@ -1,0 +1,26 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "UHT milk canonical products"
+products:
+  - canonical_key: "milk-uht-2.8-1l"
+    display_name: "Trajno mlijeko 2,8% 1 l"
+    product_type: "milk-uht"
+    category: "dairy"
+    attributes:
+      fat_percent: 2.8
+      volume_value: 1
+      volume_unit: "l"
+      packaging: "tetrapak"
+    known_brands: ["dukat", "vindija", "milbona", "pilos"]
+  - canonical_key: "milk-uht-3.2-1l"
+    display_name: "Trajno mlijeko 3,2% 1 l"
+    product_type: "milk-uht"
+    category: "dairy"
+    attributes:
+      fat_percent: 3.2
+      volume_value: 1
+      volume_unit: "l"
+      packaging: "tetrapak"
+    known_brands: ["dukat", "vindija", "k-plus", "despar"]

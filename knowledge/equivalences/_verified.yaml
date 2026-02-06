@@ -1,0 +1,30 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Verified cross-chain equivalences"
+equivalences:
+  - canonical_key: "milk-fresh-3.2-1.75l"
+    items:
+      - chain: "konzum"
+        name_pattern: "MLIJEKO SV.3,2% Z BREG.1,75 L"
+        barcode: "3858892402557"
+      - chain: "lidl"
+        name_pattern: "Z bregov svježe mlijeko 3,2% 1,75 l PET"
+  - canonical_key: "cola-classic-2l"
+    items:
+      - chain: "konzum"
+        name_pattern: "COCA COLA 2 L"
+        barcode: "5449000000996"
+      - chain: "kaufland"
+        name_pattern: "Coca-Cola 2L PET"
+      - chain: "interspar"
+        name_pattern: "Coca Cola Classic 2 l"
+  - canonical_key: "eggs-m-10kom"
+    items:
+      - chain: "konzum"
+        name_pattern: "JAJA M 10/1"
+      - chain: "plodine"
+        name_pattern: "Jaja razred M 10 kom"
+      - chain: "metro"
+        name_pattern: "Jaja M klasa 10 kom"

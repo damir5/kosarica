@@ -1,0 +1,14 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Sugar canonical products"
+products:
+  - canonical_key: "sugar-white-1kg"
+    display_name: "Šećer bijeli kristal 1 kg"
+    product_type: "sugar"
+    category: "staples"
+    attributes:
+      volume_value: 1
+      volume_unit: "kg"
+    known_brands: ["k-plus", "despar", "k-classic", "metro-chef"]

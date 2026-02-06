@@ -1,0 +1,18 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Candidate equivalences pending human review"
+equivalences:
+  - canonical_key: "water-still-1.5l"
+    items:
+      - chain: "konzum"
+        name_pattern: "JANA PRIRODNA VODA 1,5L"
+      - chain: "studenac"
+        name_pattern: "Jana negazirana voda 1.5 l"
+  - canonical_key: "flour-wheat-t550-1kg"
+    items:
+      - chain: "dm"
+        name_pattern: "Pšenično brašno tip 550 1 kg"
+      - chain: "ktc"
+        name_pattern: "Brašno pšenično glatko T-550 1kg"

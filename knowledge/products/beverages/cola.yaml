@@ -1,0 +1,15 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Cola canonical products"
+products:
+  - canonical_key: "cola-classic-2l"
+    display_name: "Cola classic 2 l"
+    product_type: "cola"
+    category: "beverages"
+    attributes:
+      volume_value: 2
+      volume_unit: "l"
+      packaging: "pet"
+    known_brands: ["coca-cola", "k-plus", "spar-budget"]

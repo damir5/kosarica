@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kosarica.local/knowledge/store-aliases.schema.json",
+  "type": "object",
+  "required": ["_meta", "entries"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "updated_at", "updated_by", "description"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string" },
+        "updated_by": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["alias", "canonical_key", "updated_at"],
+        "properties": {
+          "alias": { "type": "string", "minLength": 1 },
+          "canonical_key": { "type": "string", "minLength": 1 },
+          "chain_slug": { "type": "string" },
+          "type": { "type": "string", "enum": ["name", "address", "store_identifier", "other"] },
+          "updated_at": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

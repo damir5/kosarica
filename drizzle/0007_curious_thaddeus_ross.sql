@@ -1,0 +1,2 @@
+ALTER TABLE "products" ADD COLUMN "canonical_key" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "products_canonical_key_idx" ON "products" USING btree ("canonical_key") WHERE canonical_key IS NOT NULL;

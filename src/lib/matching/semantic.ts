@@ -12,6 +12,7 @@ import {
 	productMatchCandidates,
 	productMatchRejections,
 } from "@/db/schema";
+import { loadCatalog } from "@/lib/knowledge/loader";
 import { embedQuery, embedTexts, preparePassageText } from "@/lib/embeddings";
 import { prepareQueryText } from "@/lib/embeddings/text";
 import { normalizeWhitespace } from "@/lib/matching/normalize";
@@ -97,6 +98,12 @@ export async function runSemanticMatching(options?: {
 		embeddingsComputed: 0,
 		embeddingFailures: 0,
 	};
+
+	try {
+		await loadCatalog();
+	} catch (error) {
+		log.warn("Knowledge catalog unavailable for semantic matching", { error });
+	}
 
 	// Phase 1: Embed products missing embeddings
 	const productsToEmbed = await db.execute(sql`
@@ -238,6 +245,7 @@ export async function runSemanticMatching(options?: {
 				p.unit,
 				p.unit_quantity,
 				p.image_url,
+				p.canonical_key,
 				p.normalized_unit,
 				p.normalized_quantity,
 				1 - (p.embedding <=> ${vectorStr}::vector) as sim_score

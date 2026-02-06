@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kosarica.local/knowledge/loop-state.schema.json",
+  "type": "object",
+  "required": ["_meta", "state"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "updated_at", "updated_by", "description"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string", "minLength": 1 },
+        "updated_by": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "state": {
+      "type": "object",
+      "required": [
+        "shard_count",
+        "global_loop_number",
+        "next_shard",
+        "completed_shards",
+        "active_agents",
+        "last_full_sweep_completed_at"
+      ],
+      "properties": {
+        "shard_count": { "type": "integer", "minimum": 1 },
+        "global_loop_number": { "type": "integer", "minimum": 0 },
+        "next_shard": { "type": "integer", "minimum": 0 },
+        "completed_shards": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "active_agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["agent_id", "shard", "heartbeat_at"],
+            "properties": {
+              "agent_id": { "type": "string", "minLength": 1 },
+              "shard": { "type": "integer", "minimum": 0 },
+              "heartbeat_at": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "last_full_sweep_completed_at": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

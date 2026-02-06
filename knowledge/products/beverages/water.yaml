@@ -1,0 +1,24 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Water canonical products"
+products:
+  - canonical_key: "water-still-1.5l"
+    display_name: "Voda negazirana 1,5 l"
+    product_type: "water"
+    category: "beverages"
+    attributes:
+      volume_value: 1.5
+      volume_unit: "l"
+      packaging: "pet"
+    known_brands: ["jana", "jamnica", "k-plus", "spar-budget"]
+  - canonical_key: "water-sparkling-1.5l"
+    display_name: "Gazirana voda 1,5 l"
+    product_type: "water"
+    category: "beverages"
+    attributes:
+      volume_value: 1.5
+      volume_unit: "l"
+      packaging: "pet"
+    known_brands: ["jamnica", "jana", "k-classic"]

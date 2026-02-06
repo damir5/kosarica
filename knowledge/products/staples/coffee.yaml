@@ -1,0 +1,14 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Coffee canonical products"
+products:
+  - canonical_key: "coffee-ground-500g"
+    display_name: "Mljevena kava 500 g"
+    product_type: "coffee"
+    category: "staples"
+    attributes:
+      volume_value: 500
+      volume_unit: "g"
+    known_brands: ["franck", "k-plus", "k-classic", "despar"]

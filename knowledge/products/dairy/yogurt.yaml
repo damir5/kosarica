@@ -1,0 +1,16 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Yogurt canonical products"
+products:
+  - canonical_key: "yogurt-plain-2.8-180g"
+    display_name: "Jogurt čašica 2,8% 180 g"
+    product_type: "yogurt"
+    category: "dairy"
+    attributes:
+      fat_percent: 2.8
+      volume_value: 180
+      volume_unit: "g"
+      packaging: "cup"
+    known_brands: ["dukat", "vindija", "milbona", "pilos"]

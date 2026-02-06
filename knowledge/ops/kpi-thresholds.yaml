@@ -1,0 +1,13 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Thresholds for quality KPI alerts"
+thresholds:
+  unlinked_items_max: 5000
+  pending_product_review_max: 1000
+  pending_product_review_oldest_hours_max: 72
+  candidate_equivalences_max: 2000
+  stores_needs_review_max: 200
+  stores_ungeocoded_active_max: 100
+  loop_shards_missing_max: 16

@@ -1,0 +1,11 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Kaufland naming quirks"
+chain: "kaufland"
+naming_conventions:
+  - "Frequently includes unit in compact format"
+common_abbreviations:
+  kom: "komad"
+private_label_brands: ["k-classic"]

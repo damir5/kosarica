@@ -241,6 +241,18 @@ For CLI scripts where console output is user-facing:
 
 The codebase uses `neverthrow` `Result`/`ResultAsync` types for type-safe error handling in adapters and infrastructure wrappers. Do NOT use try/catch in these layers — return typed errors instead.
 
+### MUST (Enforced)
+
+- In these boundary paths, `throw` is forbidden:
+  - `src/ingestion/adapters/**`
+  - `src/lib/safe-db.ts`
+  - `src/lib/safe-fetch.ts`
+  - `src/lib/safe-storage.ts`
+  - `src/lib/store-enrichment.ts`
+  - `src/lib/geocoding.ts`
+- Use `Result` / `ResultAsync` and typed errors from `src/lib/errors.ts`.
+- Run `pnpm validate:neverthrow` before handoff.
+
 ### Error types (`src/lib/errors.ts`)
 
 Discriminated union with `_tag` field:
@@ -316,3 +328,15 @@ const discoveredFiles = discoverResult.value;
 - Do NOT add no-op `.orElse()` chains that just pass errors through
 - `IngestionClassified` (value type) is for Result errors; `IngestionClassifiedError` (class) is for pipeline catch blocks — both coexist
 
+---
+
+## Agent Loop Operations (Knowledge + Stores)
+
+Use `knowledge/AGENT-PLAYBOOK.md` as the operational source of truth for:
+
+- DB connection and knowledge catalog access
+- YAML-owned loop state (`knowledge/ops/loop-state.yaml`) instead of DB loop-state tables
+- Deterministic loop coverage across all retailer items over repeated runs
+- Run logging/reporting and changelog protocol
+- Low-confidence escalation (peer-agent review then human queue)
+- Store enrichment/geocoding loop and writing durable store knowledge for future deploys

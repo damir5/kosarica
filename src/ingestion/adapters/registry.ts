@@ -38,9 +38,10 @@ function createAdapter(chainId: ChainID): ChainAdapter {
 			return new MetroAdapter();
 		case "trgocentar":
 			return new TrgocentarAdapter();
-		default:
-			throw new Error(`Unsupported chain: ${chainId}`);
 	}
+
+	const exhaustive: never = chainId;
+	return exhaustive;
 }
 
 export function getAdapter(chainId: ChainID): ChainAdapter {

@@ -64,7 +64,8 @@ export async function processEnrichStore(
 			.update(storeEnrichmentTasks)
 			.set({ status: "failed", errorMessage: "Store not found" })
 			.where(eq(storeEnrichmentTasks.id, taskId));
-		throw new Error(`Store not found: ${storeId}`);
+		log.warn("Store not found for enrichment", { storeId, taskId, taskType });
+		return;
 	}
 
 	try {
@@ -179,7 +180,16 @@ export async function processEnrichStore(
 			}
 
 			default:
-				throw new Error(`Unknown enrichment task type: ${taskType}`);
+				await ctx.db
+					.update(storeEnrichmentTasks)
+					.set({
+						status: "failed",
+						errorMessage: `Unknown enrichment task type: ${taskType}`,
+						updatedAt: new Date(),
+					})
+					.where(eq(storeEnrichmentTasks.id, taskId));
+				log.warn("Unknown enrichment task type", { storeId, taskId, taskType });
+				return;
 		}
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
@@ -191,6 +201,11 @@ export async function processEnrichStore(
 				updatedAt: new Date(),
 			})
 			.where(eq(storeEnrichmentTasks.id, taskId));
-		throw error;
+		log.error("Store enrichment task failed", {
+			storeId,
+			taskId,
+			taskType,
+			error,
+		});
 	}
 }

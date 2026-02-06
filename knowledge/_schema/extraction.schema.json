@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kosarica.local/knowledge/extraction.schema.json",
+  "type": "object",
+  "required": ["_meta", "product_type_rules", "attribute_rules"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "updated_at", "updated_by", "description"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "product_type_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "product_type", "patterns"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "product_type": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "patterns": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "anti_patterns": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "flags": {
+            "type": "string",
+            "pattern": "^[dgimsuvy]*$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "attribute_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "attribute", "pattern", "target_group"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "attribute": { "type": "string", "minLength": 1 },
+          "pattern": { "type": "string", "minLength": 1 },
+          "flags": {
+            "type": "string",
+            "pattern": "^[dgimsuvy]*$"
+          },
+          "target_group": { "type": "string", "minLength": 1 },
+          "transform": {
+            "type": "string",
+            "enum": ["number", "lowercase", "boolean", "raw"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

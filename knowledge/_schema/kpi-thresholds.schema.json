@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kosarica.local/knowledge/kpi-thresholds.schema.json",
+  "type": "object",
+  "required": ["_meta", "thresholds"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "updated_at", "updated_by", "description"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string", "minLength": 1 },
+        "updated_by": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "thresholds": {
+      "type": "object",
+      "required": [
+        "unlinked_items_max",
+        "pending_product_review_max",
+        "pending_product_review_oldest_hours_max",
+        "candidate_equivalences_max",
+        "stores_needs_review_max",
+        "stores_ungeocoded_active_max",
+        "loop_shards_missing_max"
+      ],
+      "properties": {
+        "unlinked_items_max": { "type": "number", "minimum": 0 },
+        "pending_product_review_max": { "type": "number", "minimum": 0 },
+        "pending_product_review_oldest_hours_max": { "type": "number", "minimum": 0 },
+        "candidate_equivalences_max": { "type": "number", "minimum": 0 },
+        "stores_needs_review_max": { "type": "number", "minimum": 0 },
+        "stores_ungeocoded_active_max": { "type": "number", "minimum": 0 },
+        "loop_shards_missing_max": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

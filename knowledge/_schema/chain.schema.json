@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kosarica.local/knowledge/chain.schema.json",
+  "type": "object",
+  "required": [
+    "_meta",
+    "chain",
+    "naming_conventions",
+    "common_abbreviations",
+    "private_label_brands"
+  ],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "updated_at", "updated_by", "description"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "chain": {
+      "type": "string",
+      "enum": [
+        "konzum",
+        "lidl",
+        "plodine",
+        "interspar",
+        "kaufland",
+        "studenac",
+        "eurospin",
+        "dm",
+        "ktc",
+        "metro",
+        "trgocentar"
+      ]
+    },
+    "naming_conventions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "common_abbreviations": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "private_label_brands": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+    }
+  },
+  "additionalProperties": false
+}

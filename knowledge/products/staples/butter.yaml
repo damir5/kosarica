@@ -1,0 +1,15 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Butter canonical products"
+products:
+  - canonical_key: "butter-82-250g"
+    display_name: "Maslac 82% m.m. 250 g"
+    product_type: "butter"
+    category: "staples"
+    attributes:
+      fat_percent: 82
+      volume_value: 250
+      volume_unit: "g"
+    known_brands: ["dukat", "vindija", "milbona", "pilos"]

@@ -1,0 +1,12 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Ledo brand"
+company:
+  id: ledo-company
+  name: Ledo plus d.o.o.
+brands:
+  - id: ledo
+    name: Ledo
+    aliases: ["ledo"]

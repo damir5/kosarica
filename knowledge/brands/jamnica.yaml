@@ -1,0 +1,15 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Jamnica beverage brands"
+company:
+  id: jamnica-company
+  name: Jamnica plus d.o.o.
+brands:
+  - id: jamnica
+    name: Jamnica
+    aliases: ["jamnica"]
+  - id: jana
+    name: Jana
+    aliases: ["jana"]

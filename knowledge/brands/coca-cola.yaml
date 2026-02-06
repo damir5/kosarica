@@ -1,0 +1,18 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Coca-Cola portfolio"
+company:
+  id: coca-cola-company
+  name: The Coca-Cola Company
+brands:
+  - id: coca-cola
+    name: Coca-Cola
+    aliases: ["coca cola", "coca-cola", "cocacola"]
+  - id: fanta
+    name: Fanta
+    aliases: ["fanta"]
+  - id: sprite
+    name: Sprite
+    aliases: ["sprite"]

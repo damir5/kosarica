@@ -271,22 +271,31 @@ export const retailerItemBarcodes = pgTable(
 // Canonical Catalog: products, product_aliases, product_links, product_relations
 // ============================================================================
 
-export const products = pgTable("products", {
-	id: cuid2("prd").primaryKey(),
-	name: text("name").notNull(),
-	description: text("description"),
-	category: text("category"),
-	subcategory: text("subcategory"),
-	brand: text("brand"),
-	unit: text("unit"),
-	unitQuantity: text("unit_quantity"),
-	imageUrl: text("image_url"),
-	normalizedUnit: text("normalized_unit"), // "kg", "l", "kom"
-	normalizedQuantity: real("normalized_quantity"),
-	embedding: pgVector("embedding", 1024),
-	createdAt: timestamp("created_at").defaultNow(),
-	updatedAt: timestamp("updated_at").defaultNow(),
-});
+export const products = pgTable(
+	"products",
+	{
+		id: cuid2("prd").primaryKey(),
+		name: text("name").notNull(),
+		description: text("description"),
+		category: text("category"),
+		subcategory: text("subcategory"),
+		brand: text("brand"),
+		unit: text("unit"),
+		unitQuantity: text("unit_quantity"),
+		imageUrl: text("image_url"),
+		normalizedUnit: text("normalized_unit"), // "kg", "l", "kom"
+		normalizedQuantity: real("normalized_quantity"),
+		canonicalKey: text("canonical_key"),
+		embedding: pgVector("embedding", 1024),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
+	},
+	(table) => ({
+		canonicalKeyIdx: uniqueIndex("products_canonical_key_idx")
+			.on(table.canonicalKey)
+			.where(sql`canonical_key IS NOT NULL`),
+	}),
+);
 
 export const productAliases = pgTable("product_aliases", {
 	id: cuid2("pal").primaryKey(),

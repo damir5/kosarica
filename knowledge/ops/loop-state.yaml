@@ -1,0 +1,12 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "YAML-owned loop state for multi-agent shard sweeps"
+state:
+  shard_count: 64
+  global_loop_number: 0
+  next_shard: 0
+  completed_shards: []
+  active_agents: []
+  last_full_sweep_completed_at: null

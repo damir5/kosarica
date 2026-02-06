@@ -10,6 +10,13 @@ import {
 	products,
 } from "@/db/schema";
 import {
+	areSameBrandFamily,
+	resolveBrand,
+} from "@/lib/knowledge/brand-resolver";
+import { extractProductAttributes } from "@/lib/knowledge/extractor";
+import { getCachedCatalog, loadCatalog } from "@/lib/knowledge/loader";
+import type { KnowledgeCatalog } from "@/lib/knowledge/types";
+import {
 	normalizeWhitespace,
 	removeDiacritics,
 } from "@/lib/matching/normalize";
@@ -79,6 +86,7 @@ export interface ProductCandidateRow {
 	unit: string | null;
 	unit_quantity: string | null;
 	image_url: string | null;
+	canonical_key: string | null;
 	sim_score: number | string;
 	normalized_unit: string | null;
 	normalized_quantity: number | null;
@@ -95,6 +103,7 @@ export interface Candidate {
 		unit: string | null;
 		unitQuantity: string | null;
 		imageUrl: string | null;
+		canonicalKey: string | null;
 		normalizedUnit: string | null;
 		normalizedQuantity: number | null;
 	};
@@ -112,7 +121,17 @@ const GENERIC_BRANDS = [
 
 export function isGenericBrand(brand: string): boolean {
 	const normalized = normalizeWhitespace(brand).toLowerCase();
-	return GENERIC_BRANDS.includes(normalized);
+	if (GENERIC_BRANDS.includes(normalized)) {
+		return true;
+	}
+
+	const catalog = getCachedCatalog();
+	if (!catalog) {
+		return false;
+	}
+
+	const resolved = resolveBrand(brand, catalog);
+	return resolved?.isPrivateLabel ?? false;
 }
 
 function stringSimilarity(a: string, b: string): number {
@@ -331,6 +350,14 @@ export function hasPrivateLabelConflict(
 		candidate.product.brand &&
 		!isGenericBrand(candidate.product.brand)
 	) {
+		const catalog = getCachedCatalog();
+		if (
+			catalog &&
+			areSameBrandFamily(item.brand, candidate.product.brand, catalog)
+		) {
+			return false;
+		}
+
 		const itemBrand = removeDiacritics(item.brand).toLowerCase();
 		const candidateBrand = removeDiacritics(
 			candidate.product.brand,
@@ -338,6 +365,29 @@ export function hasPrivateLabelConflict(
 		return itemBrand !== candidateBrand;
 	}
 	return false;
+}
+
+function applyProductTypeBoost(
+	candidates: Candidate[],
+	extractedProductType: string | null,
+): Candidate[] {
+	if (!extractedProductType) {
+		return candidates;
+	}
+
+	for (const candidate of candidates) {
+		const candidateKey = candidate.product.canonicalKey;
+		if (
+			candidateKey &&
+			(candidateKey === extractedProductType ||
+				candidateKey.startsWith(`${extractedProductType}-`))
+		) {
+			candidate.similarity = Math.min(1, candidate.similarity + 0.1);
+		}
+	}
+
+	candidates.sort((a, b) => b.similarity - a.similarity);
+	return candidates;
 }
 
 export function checkUnitQuantityMismatch(
@@ -406,6 +456,7 @@ export function parseCandidateRows(rows: ProductCandidateRow[]): Candidate[] {
 				unit: row.unit,
 				unitQuantity: row.unit_quantity,
 				imageUrl: row.image_url,
+				canonicalKey: row.canonical_key ?? null,
 				normalizedUnit: row.normalized_unit ?? null,
 				normalizedQuantity: row.normalized_quantity ?? null,
 			},
@@ -643,6 +694,12 @@ export async function runTrigramMatching(options?: {
 	const maxCandidates = options?.maxCandidates ?? 5;
 	const minSimilarity = options?.minSimilarity ?? 0.1;
 	const runId = generatePrefixedId("run");
+	let knowledgeCatalog: KnowledgeCatalog | null = null;
+	try {
+		knowledgeCatalog = await loadCatalog();
+	} catch (error) {
+		log.warn("Knowledge catalog unavailable for trigram matching", { error });
+	}
 
 	const db = getDb();
 	const itemsResult = await db.execute(sql`
@@ -688,6 +745,14 @@ export async function runTrigramMatching(options?: {
 	for (const row of itemRows) {
 		const item = mapRetailerItem(row);
 		const normalizedText = normalizeForMatching(item);
+		const extractedProductType = knowledgeCatalog
+			? extractProductAttributes(
+					item.name,
+					item.brand,
+					item.category,
+					knowledgeCatalog,
+				).productType
+			: null;
 		if (!normalizedText) {
 			result.noMatch += 1;
 			continue;
@@ -704,6 +769,7 @@ export async function runTrigramMatching(options?: {
 				p.unit,
 				p.unit_quantity,
 				p.image_url,
+				p.canonical_key,
 				p.normalized_unit,
 				p.normalized_quantity,
 				similarity(
@@ -729,7 +795,10 @@ export async function runTrigramMatching(options?: {
 				? candidatesResult
 				: ((candidatesResult as { rows?: unknown[] }).rows ?? [])
 		) as ProductCandidateRow[];
-		const candidates = parseCandidateRows(candidateRows);
+		const candidates = applyProductTypeBoost(
+			parseCandidateRows(candidateRows),
+			extractedProductType,
+		);
 
 		if (candidates.length === 0) {
 			result.noMatch += 1;
@@ -837,3 +906,5 @@ export async function runTrigramMatching(options?: {
 
 export type { SemanticMatchingResult } from "./semantic";
 export { runSemanticMatching } from "./semantic";
+export type { KnowledgeMatchingResult } from "./knowledge";
+export { runKnowledgeMatching } from "./knowledge";

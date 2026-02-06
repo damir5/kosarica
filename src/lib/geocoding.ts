@@ -60,9 +60,16 @@ export async function geocodeAddress(
 	});
 
 	if (!response.ok) {
-		throw new Error(
-			`Geocoding API error: ${response.status} ${response.statusText}`,
-		);
+		return {
+			found: false,
+			confidence: "low",
+			provider: "photon",
+			raw: {
+				error: `Geocoding API error: ${response.status} ${response.statusText}`,
+				status: response.status,
+				statusText: response.statusText,
+			},
+		};
 	}
 
 	const data = (await response.json()) as PhotonResponse;
@@ -155,9 +162,15 @@ export async function reverseGeocode(
 	});
 
 	if (!response.ok) {
-		throw new Error(
-			`Reverse geocoding API error: ${response.status} ${response.statusText}`,
-		);
+		return {
+			displayName: "",
+			address: {},
+			raw: {
+				error: `Reverse geocoding API error: ${response.status} ${response.statusText}`,
+				status: response.status,
+				statusText: response.statusText,
+			},
+		};
 	}
 
 	const result = (await response.json()) as NominatimReverseResult;

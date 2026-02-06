@@ -1,0 +1,19 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Vindija and sub-brands"
+company:
+  id: vindija
+  name: Vindija d.d.
+brands:
+  - id: vindija
+    name: Vindija
+    aliases: ["vindija"]
+    sub_brands:
+      - id: z-bregov
+        name: Z bregov
+        aliases: ["z bregov", "zbregov", "z breg."]
+      - id: abeceda
+        name: Abeceda
+        aliases: ["abeceda"]

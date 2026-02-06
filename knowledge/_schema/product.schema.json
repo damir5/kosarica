@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kosarica.local/knowledge/product.schema.json",
+  "type": "object",
+  "required": ["_meta", "products"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "updated_at", "updated_by", "description"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "products": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "canonical_key",
+          "display_name",
+          "product_type",
+          "category",
+          "attributes",
+          "known_brands"
+        ],
+        "properties": {
+          "canonical_key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]*[a-z0-9]$"
+          },
+          "display_name": { "type": "string", "minLength": 1 },
+          "product_type": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "category": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "attributes": {
+            "type": "object",
+            "properties": {
+              "fat_percent": { "type": "number" },
+              "volume_value": { "type": "number", "exclusiveMinimum": 0 },
+              "volume_unit": { "type": "string", "enum": ["l", "ml", "kg", "g", "kom"] },
+              "packaging": { "type": "string" },
+              "grade": { "type": "string" },
+              "organic": { "type": "boolean" },
+              "count": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": true
+          },
+          "known_brands": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

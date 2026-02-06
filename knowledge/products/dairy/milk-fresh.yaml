@@ -1,0 +1,26 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Fresh milk canonical products"
+products:
+  - canonical_key: "milk-fresh-3.2-1.75l"
+    display_name: "Svježe mlijeko 3,2% 1,75 l"
+    product_type: "milk-fresh"
+    category: "dairy"
+    attributes:
+      fat_percent: 3.2
+      volume_value: 1.75
+      volume_unit: "l"
+      packaging: "pet"
+    known_brands: ["z-bregov", "dukat", "milbona", "pilos"]
+  - canonical_key: "milk-fresh-2.8-1l"
+    display_name: "Svježe mlijeko 2,8% 1 l"
+    product_type: "milk-fresh"
+    category: "dairy"
+    attributes:
+      fat_percent: 2.8
+      volume_value: 1
+      volume_unit: "l"
+      packaging: "tetrapak"
+    known_brands: ["dukat", "vindija", "milbona", "pilos"]

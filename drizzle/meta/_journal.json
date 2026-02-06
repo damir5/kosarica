@@ -50,6 +50,13 @@
       "when": 1770374317846,
       "tag": "0006_rich_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770378421404,
+      "tag": "0007_curious_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }

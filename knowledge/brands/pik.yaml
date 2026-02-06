@@ -1,0 +1,12 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "PIK brand"
+company:
+  id: pik-company
+  name: PIK Vrbovec plus d.o.o.
+brands:
+  - id: pik
+    name: PIK
+    aliases: ["pik", "pik vrbovec"]

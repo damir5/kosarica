@@ -1,0 +1,31 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Beverage extraction rules"
+product_type_rules:
+  - id: "water"
+    product_type: "water"
+    patterns:
+      - "\\b(voda|mineralna)\\b"
+      - "\\b(gazirana|negazirana)\\b"
+    flags: "iu"
+  - id: "cola"
+    product_type: "cola"
+    patterns:
+      - "\\bcola\\b"
+      - "\\bcoca[- ]?cola\\b"
+    flags: "iu"
+attribute_rules:
+  - id: "volume"
+    attribute: "volume"
+    pattern: "(?<value>\\d+(?:[\\.,]\\d+)?)\\s*(?<unit>l|lt|lit|ltr|ml)\\b"
+    target_group: "value"
+    transform: "number"
+    flags: "iu"
+  - id: "sparkling"
+    attribute: "sparkling"
+    pattern: "(?<sparkling>gazirana|negazirana)"
+    target_group: "sparkling"
+    transform: "lowercase"
+    flags: "iu"

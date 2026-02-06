@@ -1,0 +1,16 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Franck coffee brands"
+company:
+  id: franck
+  name: Franck d.d.
+brands:
+  - id: franck
+    name: Franck
+    aliases: ["franck"]
+    sub_brands:
+      - id: ciglica
+        name: Ciglica
+        aliases: ["ciglica", "franck ciglica"]

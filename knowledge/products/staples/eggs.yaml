@@ -1,0 +1,15 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Egg canonical products"
+products:
+  - canonical_key: "eggs-m-10kom"
+    display_name: "Jaja razred M 10 kom"
+    product_type: "eggs"
+    category: "staples"
+    attributes:
+      count: 10
+      volume_unit: "kom"
+      grade: "M"
+    known_brands: ["k-plus", "despar", "k-classic", "milbona"]

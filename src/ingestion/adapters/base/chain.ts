@@ -80,15 +80,25 @@ export class BaseChainAdapter {
 	protected fileExtensionPattern: RegExp;
 	protected rateLimiter: RateLimiter;
 	protected rateLimitConfig: RateLimitConfig;
+	protected initializationError: FetchError | null;
 
 	constructor(cfg: BaseAdapterConfig) {
-		if (!cfg.supportedTypes.length) {
-			throw new Error(`${cfg.slug}: supportedTypes cannot be empty`);
-		}
+		const configuredTypes = cfg.supportedTypes.length
+			? cfg.supportedTypes
+			: cfg.chainConfig.supportedTypes;
+		this.initializationError =
+			configuredTypes.length === 0
+				? fetchError({
+						url: cfg.chainConfig.baseUrl,
+						message: `${cfg.slug}: supportedTypes cannot be empty`,
+						retryable: false,
+						attempts: 0,
+					})
+				: null;
 
 		this.slug = cfg.slug;
 		this.name = cfg.name;
-		this.supportedTypes = cfg.supportedTypes;
+		this.supportedTypes = configuredTypes.length > 0 ? configuredTypes : ["csv"];
 		this.config = cfg.chainConfig;
 
 		this.fileExtensionPattern = cfg.fileExtensionPattern ?? /\.(csv|CSV)$/;
@@ -119,6 +129,10 @@ export class BaseChainAdapter {
 	discover(
 		_targetDate?: string,
 	): ResultAsync<DiscoveredFile[], FetchError | IngestionClassified> {
+		if (this.initializationError) {
+			return errAsync(this.initializationError);
+		}
+
 		return this.fetchWithRetry(this.config.baseUrl)
 			.andThen((response) =>
 				ResultAsync.fromPromise(response.text(), (e) =>
@@ -170,6 +184,10 @@ export class BaseChainAdapter {
 	}
 
 	fetch(file: DiscoveredFile): ResultAsync<FetchedFile, FetchError> {
+		if (this.initializationError) {
+			return errAsync(this.initializationError);
+		}
+
 		return this.fetchWithRetry(file.url)
 			.andThen((response) =>
 				ResultAsync.fromPromise(response.arrayBuffer(), (e) =>
@@ -198,6 +216,10 @@ export class BaseChainAdapter {
 		_filename: string,
 		_options?: ParseOptions,
 	): ResultAsync<ParseResult, FetchError> {
+		if (this.initializationError) {
+			return errAsync(this.initializationError);
+		}
+
 		return errAsync(
 			fetchError({
 				url: "",

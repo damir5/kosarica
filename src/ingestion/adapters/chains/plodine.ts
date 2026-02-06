@@ -324,7 +324,7 @@ async function requestWithRelaxedTls(
 	redirects = 0,
 ): Promise<{ status: number; body: Buffer }> {
 	if (redirects > 5) {
-		throw new Error(`Too many redirects while fetching ${url}`);
+		return Promise.reject(new Error(`Too many redirects while fetching ${url}`));
 	}
 
 	const parsed = new URL(url);

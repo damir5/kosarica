@@ -1,0 +1,37 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Private label brands by chain"
+company:
+  id: private-labels
+  name: Private Labels
+brands:
+  - id: k-plus
+    name: K Plus
+    aliases: ["k plus", "k-plus", "kplus"]
+    private_label_for: konzum
+  - id: milbona
+    name: Milbona
+    aliases: ["milbona"]
+    private_label_for: lidl
+  - id: pilos
+    name: Pilos
+    aliases: ["pilos"]
+    private_label_for: lidl
+  - id: spar-budget
+    name: S-Budget
+    aliases: ["s budget", "s-budget", "spar budget"]
+    private_label_for: interspar
+  - id: k-classic
+    name: K-Classic
+    aliases: ["k classic", "k-classic"]
+    private_label_for: kaufland
+  - id: despar
+    name: Despar
+    aliases: ["despar"]
+    private_label_for: interspar
+  - id: metro-chef
+    name: Metro Chef
+    aliases: ["metro chef", "metro-chef"]
+    private_label_for: metro

@@ -1,0 +1,14 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Bread canonical products"
+products:
+  - canonical_key: "bread-white-500g"
+    display_name: "Bijeli kruh 500 g"
+    product_type: "bread"
+    category: "staples"
+    attributes:
+      volume_value: 500
+      volume_unit: "g"
+    known_brands: []

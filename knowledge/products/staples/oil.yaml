@@ -1,0 +1,14 @@
+_meta:
+  version: "1.0"
+  updated_at: "2026-02-06T00:00:00Z"
+  updated_by: "system"
+  description: "Oil canonical products"
+products:
+  - canonical_key: "oil-sunflower-1l"
+    display_name: "Suncokretovo ulje 1 l"
+    product_type: "oil"
+    category: "staples"
+    attributes:
+      volume_value: 1
+      volume_unit: "l"
+    known_brands: ["zvijezda", "k-plus", "despar", "k-classic"]
