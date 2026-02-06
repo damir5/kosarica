@@ -1,8 +1,8 @@
 # AI Bot & Community Strategy — Tvoja Košarica
 
-**Version:** 1.1 — Post-review revision
+**Version:** 1.2 — Post-review revision with Codex v2 marketing insights
 **Date:** 2026-02-06
-**Status:** Reviewed by GPT-5.3 Codex + Gemini 3 Pro (see docs/reviews/)
+**Status:** Reviewed by GPT-5.3 Codex (v1) + GPT-5.2 Codex (v2, marketing focus) + Gemini 3 Pro (see docs/reviews/)
 
 ---
 
@@ -68,7 +68,7 @@ Deploy "Pametnjaković" — the brand persona — as an AI-powered bot presence 
 | **Discord** | Tvoja Košarica | Server | Tech/student niche, bot commands | V1.5 (+3mo) |
 | **Reddit** | r/TvojaKosarica | Subreddit | Long-form analyses, weekly reports | V2.0 (+6mo) |
 
-> **Viber:** Investigate Viber Community/Channels API for 40+ demographic (higher penetration than Telegram in Croatia). Evaluate for V1.5.
+> **Viber (V1.5 — P0/P1 for 35+/45+ reach):** Viber has higher penetration than Telegram in Croatia for the 40+ demographic. It's the "family logistics" layer — especially for deal sharing. Create **Viber Community**: "Tvoja Košarica | Akcije u Hrvatskoj". Post 1-3 cards/week (Index + weekend + one standout deal). Pinned message: "Kako provjeravamo cijene (timestamp + izvor)". If Viber automation/API is hard, start with **manual posting** for first 30 days — don't block growth on tooling.
 
 ### 2.2 Discord Server Structure
 
@@ -158,7 +158,119 @@ TVOJA KOŠARICA
 
 ---
 
-## 3. Marketing Bot — Content Automation
+## 3. Marketing Bot — Content as Distribution Engine
+
+> **Codex v2 insight:** "The bot's #1 job is: Make savings shareable. Treat each post as a distribution asset, not content."
+
+### 3.0 Share Kit Generator (V1.0 — Highest Impact Feature)
+
+For every hero post, the bot produces a **multi-format share kit**:
+
+| Format | Purpose | Channel |
+|--------|---------|---------|
+| **Image card** | Visual price comparison (screenshot-native) | Telegram, Facebook, Viber |
+| **FB group post** | 5-7 lines, Clear Mode, source + timestamp + link | Facebook Groups (human-posted) |
+| **Forward text** | 2-3 lines, ultra-short, "send to spouse" | WhatsApp/Viber family groups |
+| **Moderator note** | "max 2-3x/tjedno; prijave netočnosti ovdje" | For FB group admin approval |
+
+This turns one piece of verified data into many organic reposts.
+
+### 3.0.1 Voice Mode Per Channel
+
+> **Codex v2 insight:** "In Croatia, Facebook group culture around prices is pragmatic. Sarcasm can backfire with 35+ demographic."
+
+| Channel Type | Voice Mode | Rationale |
+|-------------|-----------|-----------|
+| FB Groups / Viber / WhatsApp | **Clear Mode** — no persona, no jokes | Pragmatic audience, trust-first |
+| Own Telegram Channel / own FB Page | **Light Witty Mode** — Pametnjaković personality | Build brand memory in owned channels |
+| Blog / SEO pages | **Clear Mode** — factual, authoritative | Search intent is informational |
+
+### 3.0.2 Three Hero Formats (Repeat Weekly — Become Habits)
+
+| Format | Cadence | What It Contains |
+|--------|---------|-----------------|
+| **Deal Dana** | Daily (only if significance threshold met) | 1 standout deal + annualized savings calculation |
+| **Košarica Index** | Weekly (Monday) | Cheapest chain this week + 3 biggest movers + 1 surprise |
+| **Inflacija Hrane** | Monthly (1st) | Press-ready charts + 5-line "explain like I'm busy" summary |
+
+### 3.0.3 Facebook Groups — P0 Acquisition Channel
+
+> **Codex v2 insight:** "FB groups are your app store. You need an explicit ops playbook."
+
+Facebook Groups are the #1 organic acquisition lever for grocery deals in Croatia. They require **human posting** (not bot) — FB groups need authentic presence.
+
+**1) Target group types (search + admin outreach):**
+- Deal-focused: "akcije", "popusti", "kuponi", "štednja"
+- City/regional: "Zagreb", "Split", "Rijeka", "Osijek" + "mame" groups
+- Chain-specific: Lidl/Kaufland/Konzum "akcije" communities
+
+**2) Posting package (make it easy for group admins to say yes):**
+- 1 image card + 5-7 lines text (Clear Mode) + source/timestamp + link
+- Moderator note: "objavljujemo max 2-3x/tjedno; prijave netočnosti ovdje"
+- Offer: "Možemo prilagoditi objave vašoj grupi (grad/lanac)"
+
+**3) Cadence that matches shopping behavior:**
+
+| Day/Time | Content | Rationale |
+|----------|---------|-----------|
+| Wed/Thu | "Vikend se planira" — pre-shopping planning | Families plan weekend shops mid-week |
+| Fri 16:00-20:00 | "Vikend ponude" spike | Peak deal-hunting before weekend |
+| Sun evening | "Planiraj tjedan" — weekly Index | Plan next week's shops |
+
+**4) Comment strategy (where trust is won):**
+- Bot (via human account) **never argues** in comments
+- Responds with: restate numbers + timestamp + link + correction flow
+- Example: "Cijene su iz službenog cjenika od 5.2. 06:00 UTC. Ako je cijena u vašem dućanu drugačija, javite nam → link"
+
+**Growth funnel:** FB group posts → link clicks → Telegram/WhatsApp opt-ins → app usage
+
+### 3.0.4 Three Viral Growth Loops
+
+> **Codex v2 insight:** "KPIs mention loops, but the mechanics are not specified."
+
+**Loop 1: "Deal card → share → new follower → next card"**
+- Every card includes: "Podijeli u grupu / pošalji doma"
+- Each card uses a **trackable short link** (per post; ideally per channel)
+- Landing page offers: "Dobivaj vikend ponude" → Telegram/Viber/WhatsApp choice
+- Metric: viral coefficient (new users per share) — target K > 0.3
+
+**Loop 2: "Košarica Index → local pride argument → comments → forwards"**
+- People love ranking fights: "Lidl je opet najjeftiniji" / "Konzum je pljačka"
+- Design Index posts to invite non-toxic debate:
+  - "Koji lanac je vama najbliži i zašto?"
+  - "Koju namirnicu ste primijetili da je poskupila?"
+- Emotion drives sharing → organic reach multiplier
+
+**Loop 3: "Community scout → recognition → more scouts"**
+- UGC creates belonging (retention) + increases distribution surface (acquisition)
+- Minimal V1.0 version (no complex reliability scoring yet):
+  - "Deal scout tjedna" shoutout on Telegram + FB Page
+  - Simple submission: "pošalji link cjenika / screenshot" (not raw typed prices)
+  - Bot replies with thanks + public credit when verified
+
+### 3.0.5 Trust Narrative — Turn Data Quality Into Marketing
+
+> **Codex v2 insight:** "Monthly 'How accurate were we?' post — turn data quality into public marketing."
+
+Monthly transparency post format:
+
+```
+📊 KOLIKO SMO BILI TOČNI? — Siječanj 2026.
+
+Ukupno objava:        127
+Potvrđeno točno:      124 (97,6%)
+Ispravljeno:            3 (2,4%)
+Korisničke prijave:    12
+Prosječno kašnjenje:   < 4 sata
+
+Pametnjaković kaže: "Pogriješio sam 3 puta
+ovaj mjesec. Ali sam sve ispravio isti dan.
+Koliko magazina može reći isto?"
+
+Prijavite netočnost → /prijavi
+```
+
+This builds trust through radical transparency and differentiates from competitors who don't publish accuracy metrics.
 
 ### 3.1 Brand Voice in Bot Messages
 
@@ -603,7 +715,8 @@ da ću vam uštedjeti novac. Evo, počnimo."
 | Telegram Channel | Daily deal card, weekly recap, monthly report | 1/day max |
 | Facebook Page | Visual price cards, shareable infographics | 3-5/week |
 | Blog | SEO price pages, inflation reports, savings guides | 2-3/week |
-| Facebook Groups | Share valuable content (human-reviewed, not spam) | 2-3/week |
+| Facebook Groups | Human-posted deal cards + Clear Mode text (P0 acquisition) | 2-3/week |
+| Viber Community | Weekly Index + weekend deals + standout deal cards | 1-3/week |
 | Media/PR | Generate press-ready inflation reports + media kit | Monthly |
 | Influencers | Generate personalized savings data for partnerships | As needed |
 
@@ -857,7 +970,20 @@ Note: Cross-channel overlap estimated at 30-40%. Track unique users, not raw fol
 | Blog → App signup | `?utm_source=blog&utm_medium=seo` |
 | Content share → New user | Trackable links per deal post |
 
-### 11.5 Growth Loop Metrics
+### 11.5 Retention Metrics
+
+> **Codex v2 addition:** Distribution and content metrics are not enough — track habit formation.
+
+| Metric | Target | Why It Matters |
+|--------|--------|---------------|
+| 7-day active (opened/clicked in last 7d) | >40% of subscribers | Proxy for habit formation |
+| 30-day active | >25% of subscribers | Long-term retention health |
+| Weekly digest opt-in rate | >60% of subscribers | Shows intentional engagement |
+| Forward/share rate per post | >5% | Measures earned distribution |
+| Repeat clickers (clicked 2+ posts/week) | >15% of subscribers | Power users driving K-factor |
+| Unsubscribe rate per post | <0.5% | Content quality / frequency check |
+
+### 11.6 Growth Loop Metrics
 
 | Loop | Key Metric | Target |
 |------|-----------|--------|

@@ -112,4 +112,48 @@ Based on both reviewers flagging scope and channel issues:
 
 ---
 
-*Consensus generated from independent reviews by GPT-5.3 Codex and Gemini 3 Pro (GitHub Copilot).*
+---
+
+## CODEX V2 REVIEW (GPT-5.2, Marketing Focus)
+
+After v1.1 fixes, Codex re-scored: **6.9/10** (up from 5.5). Key new insights:
+
+### Bot's #1 Job: "Make Savings Shareable"
+Every post should be a **distribution asset**, not just content:
+- Screenshot-native (image cards)
+- Forward-native (short, "send to spouse" friendly)
+- Argument-proof (source + timestamp + chain + savings)
+- Copy-pasteable (prewritten group post text)
+
+### "Share Kit Generator" — Highest-Impact Missing Feature
+For every hero post, bot produces:
+1. Image card (visual price comparison)
+2. FB group post text (5-7 lines, Clear Mode)
+3. Viber/WhatsApp forward text (2-3 lines, ultra-short)
+4. Moderator note ("max 2-3x/tjedno; prijave netočnosti ovdje")
+
+### 3 Hero Formats (Repeat Forever)
+1. **Deal dana** — only when meaningful; includes annualized savings
+2. **Košarica Index** (weekly) — cheapest chain + 3 biggest movers + 1 surprise
+3. **Inflacija hrane** (monthly) — charts + 5-line summary
+
+### Voice Mode Per Channel
+- FB Groups / Viber / WhatsApp → **Clear Mode** (no sarcasm — 35+ demographic)
+- Telegram / own FB Page → **Light Witty Mode**
+
+### Facebook Groups = P0 Acquisition Channel
+- Target: "akcije", "popusti", city groups, "mame" groups, chain-specific groups
+- Cadence: Wed/Thu (pre-shop), Fri 16-20 (weekend deals), Sun evening (plan week)
+- Human-posted (not bot) — FB groups need authentic presence
+
+### 3 Viral Growth Loops
+1. Deal card → share → new follower → next card (trackable short links)
+2. Košarica Index → "local pride argument" → comments → forwards
+3. Community scout → recognition → more scouts (UGC)
+
+### Trust Narrative
+Monthly "How accurate were we?" post — turn data quality into public marketing.
+
+---
+
+*Consensus generated from independent reviews by GPT-5.3 Codex (v1), GPT-5.2 Codex (v2), and Gemini 3 Pro (GitHub Copilot).*
