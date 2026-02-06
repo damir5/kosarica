@@ -18,4 +18,21 @@ describe("PlodineAdapter store metadata extraction", () => {
 			postalCode: "10380",
 		});
 	});
+
+	it("extracts metadata from filename with parenthesized city token", () => {
+		const adapter = new PlodineAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/SUPERMARKET_CARLOTTE_GRISI_1_52466_NOVIGRAD(CITTANOVA)_076_256_25012026015128.csv",
+			filename:
+				"SUPERMARKET_CARLOTTE_GRISI_1_52466_NOVIGRAD(CITTANOVA)_076_256_25012026015128.csv",
+			type: "csv",
+		});
+
+		expect(metadata).toEqual({
+			name: "Plodine NOVIGRAD(CITTANOVA)",
+			address: "CARLOTTE GRISI 1",
+			city: "NOVIGRAD(CITTANOVA)",
+			postalCode: "52466",
+		});
+	});
 });

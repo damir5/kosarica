@@ -16,4 +16,19 @@ describe("KauflandAdapter store metadata extraction", () => {
 			city: "Zagreb",
 		});
 	});
+
+	it("extracts multi-word city from another real filename", () => {
+		const adapter = new KauflandAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/Supermarket_Zagrebacka_ulica_67_Dugo_Selo_5030_19012026_7-30.csv",
+			filename: "Supermarket_Zagrebacka_ulica_67_Dugo_Selo_5030_19012026_7-30.csv",
+			type: "csv",
+		});
+
+		expect(metadata).toEqual({
+			name: "Kaufland Dugo Selo",
+			address: "Zagrebacka ulica 67",
+			city: "Dugo Selo",
+		});
+	});
 });

@@ -17,4 +17,20 @@ describe("MetroAdapter store metadata extraction", () => {
 			city: "DUBROVNIK",
 		});
 	});
+
+	it("extracts city with suffix from encoded segment", () => {
+		const adapter = new MetroAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/cash_and_carry_prodavaonica_METRO_20260119T0630_S11_SLAVONSKA_AVENIJA_71%2C_ZAGREB_-_SESVETE.csv",
+			filename:
+				"cash_and_carry_prodavaonica_METRO_20260119T0630_S11_SLAVONSKA_AVENIJA_71%2C_ZAGREB_-_SESVETE.csv",
+			type: "csv",
+		});
+
+		expect(metadata).toEqual({
+			name: "Metro ZAGREB - SESVETE",
+			address: "SLAVONSKA AVENIJA 71",
+			city: "ZAGREB - SESVETE",
+		});
+	});
 });

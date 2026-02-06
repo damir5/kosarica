@@ -17,4 +17,20 @@ describe("IntersparAdapter store metadata extraction", () => {
 			city: "zagreb",
 		});
 	});
+
+	it("extracts metadata from another real filename pattern", () => {
+		const adapter = new IntersparAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/supermarket_osijek_svilajska_ulica_35b_87171_esp_os_svilajska_0281_20260206_0330.csv",
+			filename:
+				"supermarket_osijek_svilajska_ulica_35b_87171_esp_os_svilajska_0281_20260206_0330.csv",
+			type: "csv",
+		});
+
+		expect(metadata).toEqual({
+			name: "Interspar osijek",
+			address: "svilajska ulica 35b",
+			city: "osijek",
+		});
+	});
 });

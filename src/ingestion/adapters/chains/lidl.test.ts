@@ -14,4 +14,18 @@ describe("LidlAdapter store metadata extraction", () => {
 			name: "Lidl 112",
 		});
 	});
+
+	it("keeps supermarket code when filename includes address and city", () => {
+		const adapter = new LidlAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/Supermarket 184_Jadranska magistrala_1a_23210_Biograd na Moru_1_02.02.2026_7.15h.csv",
+			filename:
+				"Supermarket 184_Jadranska magistrala_1a_23210_Biograd na Moru_1_02.02.2026_7.15h.csv",
+			type: "csv",
+		});
+
+		expect(metadata).toEqual({
+			name: "Lidl 184",
+		});
+	});
 });
