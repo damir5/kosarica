@@ -13,3 +13,6 @@ entries:
   - at: "2026-02-06T00:00:00Z"
     by: "system"
     change: "Added YAML-based loop-state ops files and KPI dashboard+alert scripts (`knowledge:kpi`, `knowledge:kpi:strict`)"
+  - at: "2026-02-06T00:00:00Z"
+    by: "system"
+    change: "Split combined agent playbook into `knowledge/playbooks/catalog-playbook.md` and `knowledge/playbooks/stores-playbook.md`"

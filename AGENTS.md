@@ -332,7 +332,7 @@ const discoveredFiles = discoverResult.value;
 
 ## Agent Loop Operations (Knowledge + Stores)
 
-Use `knowledge/AGENT-PLAYBOOK.md` as the operational source of truth for:
+Use `knowledge/playbooks/catalog-playbook.md` and `knowledge/playbooks/stores-playbook.md` as the operational source of truth for:
 
 - DB connection and knowledge catalog access
 - YAML-owned loop state (`knowledge/ops/loop-state.yaml`) instead of DB loop-state tables
