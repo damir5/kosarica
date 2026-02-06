@@ -11,6 +11,10 @@
 
 https://github.com/leeoniya/uPlot
 
+
+- self hosted sentry replacement since we have no budget - user monitoring, errors, behaviour, ...
+
+
 ## UX
 https://claudecodeplugins.dev/category/design-ux
 - joker, mobile ux, researcher
@@ -39,34 +43,6 @@ https://github.com/wondelai/skills
 - agent price analysis - trends/oportunities/ - blog - daily/weekly
 - agent/claw - reddit channel, discord, telegram, whatsapp-control-channel for me
 - ai matching alerting me of new stuff
-
-## AI Bot & Community (see docs/AI-BOT-STRATEGY.md)
-
-### V1.0 (Ship with MVP)
-- Telegram channel (@TvojaKosarica) + group — automated daily deals, weekly reports
-- Discord server — structured channels, bot posting, price check commands
-- Reddit r/TvojaKosarica — automated weekly/monthly analyses
-- Content automation: daily ingestion → anomaly detection → LLM content gen → multi-channel posting
-- Data freshness monitoring + admin alerting
-- Helpdesk FAQ bot + bug report pipeline
-- Blog SEO content generation (price pages, inflation reports)
-- Platform: OpenClaw/miniclawd (TypeScript/Bun)
-
-### V1.5 (+3 months)
-- Audience-segmented content (families/students/pensioners/professionals)
-- Feature request voting system
-- Instagram/X automated posting (image gen)
-
-### V2.0 (+6 months)
-- User reliability scoring for crowdsourced data (Paparazzo)
-- Personalized deal recommendations via bot DM
-- Shopping list building via Telegram
-
-### Pre-Launch Marketing (Day -90 to Day 0)
-- Phase 1 (Day -90): Seed community with pure value content (no app mention)
-- Phase 2 (Day -60): Introduce Pametnjaković persona, tease app, waitlist
-- Phase 3 (Day -30): Countdown, beta invites, influencer outreach, media kit
-
 
 [reports / stats]
 - barcode matching

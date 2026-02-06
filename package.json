@@ -110,6 +110,7 @@
     "@vitejs/plugin-react": "^5.1.2",
     "commander": "^14.0.2",
     "dotenv": "^17.2.3",
+    "playwright": "^1.58.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
