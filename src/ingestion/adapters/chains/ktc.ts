@@ -3,7 +3,7 @@ import { err, ok, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
-import type { DiscoveredFile, ParseResult } from "../../types";
+import type { DiscoveredFile, ParseResult, StoreMetadata } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
 
@@ -329,6 +329,18 @@ export class KtcAdapter extends BaseCsvAdapter {
 		} catch {
 			return fileUrl;
 		}
+	}
+
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+		if (!identifier) {
+			return null;
+		}
+
+		const normalizedIdentifier = identifier.replace(/-\d+$/, "");
+		return {
+			name: `${this.name} ${normalizedIdentifier}`,
+		};
 	}
 }
 

@@ -282,18 +282,29 @@ export class PlodineAdapter extends BaseCsvAdapter {
 	}
 
 	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
-		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
-		if (!identifier) {
-			return null;
+		const parsed = parsePlodineMetadataFromFilename(file.filename);
+		if (!parsed) {
+			const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+			if (!identifier) {
+				return null;
+			}
+			const city = identifier.trim();
+			const storeName = city
+				? `${this.name} ${capitalizeFirst(city)}`
+				: this.name;
+			return {
+				name: storeName,
+			};
 		}
 
-		const city = identifier.trim();
-		const storeName = city
-			? `${this.name} ${capitalizeFirst(city)}`
+		const storeName = parsed.city
+			? `${this.name} ${capitalizeFirst(parsed.city)}`
 			: this.name;
-
 		return {
 			name: storeName,
+			address: parsed.address || undefined,
+			city: parsed.city || undefined,
+			postalCode: parsed.postalCode || undefined,
 		};
 	}
 }
@@ -301,6 +312,46 @@ export class PlodineAdapter extends BaseCsvAdapter {
 function capitalizeFirst(str: string): string {
 	if (!str) return str;
 	return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function parsePlodineMetadataFromFilename(
+	filename: string,
+): { address: string; city: string; postalCode: string } | null {
+	const baseName = filename.replace(/\.(csv|CSV)$/i, "");
+	const parts = baseName.split("_");
+	if (parts.length < 8 || parts[0]?.toUpperCase() !== "SUPERMARKET") {
+		return null;
+	}
+
+	const timestampIndex = parts.length - 1;
+	const batchIndex = parts.length - 2;
+	const storeCodeIndex = parts.length - 3;
+	if (
+		!/^\d{8,14}$/.test(parts[timestampIndex] ?? "") ||
+		!/^\d{2,3}$/.test(parts[batchIndex] ?? "") ||
+		!/^\d{2,3}$/.test(parts[storeCodeIndex] ?? "")
+	) {
+		return null;
+	}
+
+	const postalCodeIndex = parts.findIndex(
+		(part, index) => index > 0 && index < storeCodeIndex && /^\d{5}$/.test(part),
+	);
+	if (postalCodeIndex < 2) {
+		return null;
+	}
+
+	const postalCode = parts[postalCodeIndex] ?? "";
+	const streetParts = parts.slice(1, postalCodeIndex);
+	const cityParts = parts.slice(postalCodeIndex + 1, storeCodeIndex);
+	const address = streetParts.join(" ").replace(/\s+/g, " ").trim();
+	const city = cityParts.join(" ").replace(/\s+/g, " ").trim();
+
+	if (!address || !city || !/^\d{5}$/.test(postalCode)) {
+		return null;
+	}
+
+	return { address, city, postalCode };
 }
 
 function extractDatePatternFromText(text: string): string | undefined {

@@ -42,4 +42,17 @@ describe("KtcAdapter barcode cleanup", () => {
 			),
 		).toHaveLength(2);
 	});
+
+	it("normalizes store name from PJ identifier", () => {
+		const adapter = new KtcAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/TRGOVINA-PJ50-1-20260203-071002.csv",
+			filename: "TRGOVINA-PJ50-1-20260203-071002.csv",
+			type: "csv",
+		});
+
+		expect(metadata).toEqual({
+			name: "KTC PJ50",
+		});
+	});
 });

@@ -200,8 +200,18 @@ export class LidlAdapter extends BaseCsvAdapter {
 			return null;
 		}
 
+		const normalizedIdentifier = identifier.replace(/\.(zip|csv)$/i, "").trim();
+		const supermarketCodeMatch = normalizedIdentifier.match(
+			/^supermarket\s+(\d+)$/i,
+		);
+		if (supermarketCodeMatch?.[1]) {
+			return {
+				name: `${this.name} ${supermarketCodeMatch[1]}`,
+			};
+		}
+
 		return {
-			name: `${this.name} ${identifier}`,
+			name: `${this.name} ${normalizedIdentifier}`,
 		};
 	}
 }
