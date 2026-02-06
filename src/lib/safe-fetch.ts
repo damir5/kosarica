@@ -1,6 +1,6 @@
-import { ResultAsync, err, ok } from "neverthrow";
 import type { Result } from "neverthrow";
-import { fetchError, type FetchError } from "./errors";
+import { err, ok, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "./errors";
 
 export interface SafeFetchOptions {
 	maxRetries?: number;
@@ -19,7 +19,11 @@ function isRetryableStatus(status: number): boolean {
 	return status === 429 || status >= 500;
 }
 
-function calculateBackoff(attempt: number, initialMs: number, maxMs: number): number {
+function calculateBackoff(
+	attempt: number,
+	initialMs: number,
+	maxMs: number,
+): number {
 	const exponential = initialMs * 2 ** attempt;
 	const capped = Math.min(exponential, maxMs);
 	return capped + Math.random() * 0.25 * capped;
@@ -43,7 +47,10 @@ function calculateRateLimitBackoff(
 	return capped + Math.random() * 0.25 * capped;
 }
 
-export function safeFetch(url: string, options?: SafeFetchOptions): ResultAsync<Response, FetchError> {
+export function safeFetch(
+	url: string,
+	options?: SafeFetchOptions,
+): ResultAsync<Response, FetchError> {
 	const maxRetries = options?.maxRetries ?? 3;
 	const initialBackoffMs = options?.initialBackoffMs ?? 100;
 	const maxBackoffMs = options?.maxBackoffMs ?? 30_000;
@@ -51,7 +58,9 @@ export function safeFetch(url: string, options?: SafeFetchOptions): ResultAsync<
 	const minInterval = 1000 / requestsPerSecond;
 	let lastRequestTime = 0;
 
-	async function attempt(attemptNum: number): Promise<Result<Response, FetchError>> {
+	async function attempt(
+		attemptNum: number,
+	): Promise<Result<Response, FetchError>> {
 		const now = Date.now();
 		const elapsed = now - lastRequestTime;
 		if (elapsed < minInterval) {
@@ -88,7 +97,12 @@ export function safeFetch(url: string, options?: SafeFetchOptions): ResultAsync<
 			const retryAfter = response.headers.get("Retry-After") ?? undefined;
 			const delay =
 				response.status === 429
-					? calculateRateLimitBackoff(attemptNum, initialBackoffMs, maxBackoffMs, retryAfter)
+					? calculateRateLimitBackoff(
+							attemptNum,
+							initialBackoffMs,
+							maxBackoffMs,
+							retryAfter,
+						)
 					: calculateBackoff(attemptNum, initialBackoffMs, maxBackoffMs);
 			await sleep(delay);
 			return attempt(attemptNum + 1);
@@ -104,7 +118,11 @@ export function safeFetch(url: string, options?: SafeFetchOptions): ResultAsync<
 					}),
 				);
 			}
-			const delay = calculateBackoff(attemptNum, initialBackoffMs, maxBackoffMs);
+			const delay = calculateBackoff(
+				attemptNum,
+				initialBackoffMs,
+				maxBackoffMs,
+			);
 			await sleep(delay);
 			return attempt(attemptNum + 1);
 		}

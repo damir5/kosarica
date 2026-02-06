@@ -1,12 +1,15 @@
-import { ResultAsync, errAsync, okAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
-import { ingestionClassified, type IngestionClassified } from "@/ingestion/errors";
+import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import {
+	type IngestionClassified,
+	ingestionClassified,
+} from "@/ingestion/errors";
 import {
 	compareDateKeys,
 	formatDateParts,
 	getTimezoneDateParts,
 	ZAGREB_TIMEZONE,
 } from "@/ingestion/time";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";

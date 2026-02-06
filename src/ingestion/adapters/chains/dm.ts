@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
-import { ResultAsync, errAsync, okAsync } from "neverthrow";
+import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import * as XLSX from "xlsx";
-import { fetchError, type FetchError } from "@/lib/errors";
-import { ingestionClassified, type IngestionClassified } from "@/ingestion/errors";
+import {
+	type IngestionClassified,
+	ingestionClassified,
+} from "@/ingestion/errors";
 import { formatDateInTimezone, ZAGREB_TIMEZONE } from "@/ingestion/time";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { XlsxColumnMapping } from "../../parsers/xlsx";
 import type {
 	DiscoveredFile,

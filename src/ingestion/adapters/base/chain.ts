@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { ResultAsync, err, errAsync, ok, okAsync } from "neverthrow";
 import type { Result } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { err, errAsync, ok, okAsync, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type {
 	DiscoveredFile,

@@ -1,5 +1,5 @@
 import { ResultAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { type FetchError, fetchError } from "@/lib/errors";
 import { type XmlFieldMapping, XmlParser } from "../../parsers/xml";
 import type {
 	DiscoveredFile,
@@ -57,7 +57,8 @@ export class BaseXmlAdapter extends BaseChainAdapter {
 	): ResultAsync<ParseResult, FetchError> {
 		return ResultAsync.fromPromise(
 			Promise.resolve().then(() => {
-				const storeIdentifier = this.extractStoreIdentifierFromFilename(filename);
+				const storeIdentifier =
+					this.extractStoreIdentifierFromFilename(filename);
 				let lastResult: ParseResult | null = null;
 
 				for (const itemsPath of this.itemPaths) {

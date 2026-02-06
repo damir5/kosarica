@@ -1,12 +1,15 @@
 import { ResultAsync } from "neverthrow";
-import { dbError, isDeadlock, isUniqueViolation, type DbError } from "./errors";
+import { type DbError, dbError, isDeadlock, isUniqueViolation } from "./errors";
 
 export function extractPgCode(error: unknown): string | undefined {
 	if (error === null || typeof error !== "object") {
 		return undefined;
 	}
 
-	if ("code" in error && typeof (error as { code?: unknown }).code === "string") {
+	if (
+		"code" in error &&
+		typeof (error as { code?: unknown }).code === "string"
+	) {
 		return (error as { code: string }).code;
 	}
 

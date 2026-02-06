@@ -125,12 +125,14 @@ function parseCroatianNumber(raw: string): number {
 /**
  * Multi-pack regex: "6x330ml", "6 x 330 ml"
  */
-const MULTIPACK_RE = /^(\d+)\s*[xX×]\s*(\d+[.,]?\d*)\s*(kg|g|gr|l|lt|lit|ltr|ml|kom)\b/i;
+const MULTIPACK_RE =
+	/^(\d+)\s*[xX×]\s*(\d+[.,]?\d*)\s*(kg|g|gr|l|lt|lit|ltr|ml|kom)\b/i;
 
 /**
  * Embedded quantity+unit in a single field: "500g", "1.5l", "1,5 kg"
  */
-const EMBEDDED_QTY_UNIT_RE = /^(\d+[.,]?\d*)\s*(kg|g|gr|l|lt|lit|ltr|ml|kom|ko|pz|pcs|komad)\b/i;
+const EMBEDDED_QTY_UNIT_RE =
+	/^(\d+[.,]?\d*)\s*(kg|g|gr|l|lt|lit|ltr|ml|kom|ko|pz|pcs|komad)\b/i;
 
 /**
  * Extract quantity+unit from product name.
@@ -140,7 +142,8 @@ const NAME_QTY_UNIT_RE = /(\d+[.,]?\d*)\s*(kg|g|gr|l|lt|lit|ltr|ml|kom)\b/i;
 /**
  * Multi-pack in product name: "6x330ml"
  */
-const NAME_MULTIPACK_RE = /(\d+)\s*[xX×]\s*(\d+[.,]?\d*)\s*(kg|g|gr|l|lt|lit|ltr|ml|kom)\b/i;
+const NAME_MULTIPACK_RE =
+	/(\d+)\s*[xX×]\s*(\d+[.,]?\d*)\s*(kg|g|gr|l|lt|lit|ltr|ml|kom)\b/i;
 
 /**
  * Parse unit information from raw fields and product name.
@@ -227,7 +230,10 @@ function tryParseEmbedded(raw: string): ParsedUnit | null {
 	return buildQtyUnitResult(match[1], match[2]);
 }
 
-function buildQtyUnitResult(qtyStr: string, unitStr: string): ParsedUnit | null {
+function buildQtyUnitResult(
+	qtyStr: string,
+	unitStr: string,
+): ParsedUnit | null {
 	const qty = parseCroatianNumber(qtyStr);
 	if (!Number.isFinite(qty) || qty <= 0) return null;
 

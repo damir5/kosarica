@@ -6,7 +6,7 @@
  * and chain-specific subcategory conventions (e.g. DM).
  */
 
-import { removeDiacritics, normalizeWhitespace } from "./normalize";
+import { normalizeWhitespace, removeDiacritics } from "./normalize";
 
 export interface NormalizedCategory {
 	category: string;
@@ -38,7 +38,12 @@ const CATEGORY_RULES: CategoryRule[] = [
 	},
 	// Sredstva za čišćenje — includes Mojibake "sredstva za ienie" and DM variant
 	{
-		patterns: ["sredstva za ciscenje", "sredstva za ci", "sredstva za", "pranje rublja i ci"],
+		patterns: [
+			"sredstva za ciscenje",
+			"sredstva za ci",
+			"sredstva za",
+			"pranje rublja i ci",
+		],
 		category: "Sredstva za čišćenje",
 	},
 	// Kućanstvo / proizvodi za kućanstvo / domaćinstvo

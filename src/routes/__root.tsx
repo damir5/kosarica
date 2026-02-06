@@ -44,13 +44,27 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "TanStack Start Starter",
+				title: "Tvoja Košarica",
 			},
 		],
 		links: [
 			{
 				rel: "stylesheet",
 				href: appCss,
+			},
+			{
+				rel: "preload",
+				href: "/fonts/SpaceGrotesk-Variable.woff2",
+				as: "font",
+				type: "font/woff2",
+				crossOrigin: "anonymous",
+			},
+			{
+				rel: "preload",
+				href: "/fonts/JetBrainsMono-Variable.woff2",
+				as: "font",
+				type: "font/woff2",
+				crossOrigin: "anonymous",
 			},
 		],
 	}),

@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 
 @import 'tw-animate-css';
+@import './styles/fonts.css';
+@import './styles/public-tokens.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -126,6 +128,36 @@ code {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ── Tvoja Košarica public tokens ──────────── */
+  --color-tk-bg: var(--tk-bg, #FAFAF8);
+  --color-tk-surface: var(--tk-surface, #FFFFFF);
+  --color-tk-surface-alt: var(--tk-surface-alt, #F5F5F0);
+  --color-tk-text: var(--tk-text, #0A0C14);
+  --color-tk-text-secondary: var(--tk-text-secondary, #5A5D6B);
+  --color-tk-text-tertiary: var(--tk-text-tertiary, #9498A6);
+  --color-tk-accent: var(--tk-accent, #16A34A);
+  --color-tk-accent-hover: var(--tk-accent-hover, #15803D);
+  --color-tk-accent-light: var(--tk-accent-light, #DCFCE7);
+  --color-tk-accent-foreground: var(--tk-accent-foreground, #FFFFFF);
+  --color-tk-border: var(--tk-border, #E8E8E3);
+  --color-tk-border-strong: var(--tk-border-strong, #D4D4CC);
+  --color-tk-deal-best: var(--tk-deal-best, #16A34A);
+  --color-tk-deal-best-bg: var(--tk-deal-best-bg, #F0FDF4);
+  --color-tk-deal-good: var(--tk-deal-good, #65A30D);
+  --color-tk-deal-good-bg: var(--tk-deal-good-bg, #F7FEE7);
+  --color-tk-deal-neutral: var(--tk-deal-neutral, #9498A6);
+  --color-tk-deal-neutral-bg: var(--tk-deal-neutral-bg, #F5F5F0);
+  --color-tk-deal-bad: var(--tk-deal-bad, #EA580C);
+  --color-tk-deal-bad-bg: var(--tk-deal-bad-bg, #FFF7ED);
+  --color-tk-deal-worst: var(--tk-deal-worst, #DC2626);
+  --color-tk-deal-worst-bg: var(--tk-deal-worst-bg, #FEF2F2);
+  --font-tk-sans: var(--tk-font-sans, system-ui, sans-serif);
+  --font-tk-mono: var(--tk-font-mono, ui-monospace, monospace);
+  --font-tk-display: var(--tk-font-display, Georgia, serif);
+  --shadow-tk-sm: var(--tk-shadow-sm, 0 1px 2px rgba(10, 12, 20, 0.04));
+  --shadow-tk-md: var(--tk-shadow-md, 0 2px 8px rgba(10, 12, 20, 0.06));
+  --shadow-tk-lg: var(--tk-shadow-lg, 0 8px 24px rgba(10, 12, 20, 0.08));
 }
 
 @layer base {

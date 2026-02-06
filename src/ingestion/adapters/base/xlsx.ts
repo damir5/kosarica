@@ -1,5 +1,5 @@
 import { ResultAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { type FetchError, fetchError } from "@/lib/errors";
 import {
 	newHeaderIndex,
 	newNumericIndex,
@@ -75,8 +75,7 @@ export class BaseXlsxAdapter extends BaseChainAdapter {
 					attempts: 0,
 					cause: e,
 				}),
-		)
-			.map((result) => this.postprocessResult(result));
+		).map((result) => this.postprocessResult(result));
 	}
 
 	protected preprocessContent(content: Buffer): Buffer {

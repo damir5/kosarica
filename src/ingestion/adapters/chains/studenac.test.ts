@@ -51,7 +51,9 @@ describe("StudenacAdapter", () => {
 		expect(fallbackRow?.priceStatus).toBe("available");
 		expect(fallbackRow?.discountPrice).toBeUndefined();
 
-		const missingPriceRow = result.rows.find((row) => row.externalId === "1003");
+		const missingPriceRow = result.rows.find(
+			(row) => row.externalId === "1003",
+		);
 		expect(missingPriceRow).toBeDefined();
 		expect(missingPriceRow?.price).toBeNull();
 		expect(missingPriceRow?.priceStatus).toBe("unavailable");

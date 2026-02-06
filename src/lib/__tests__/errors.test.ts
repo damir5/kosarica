@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
 	dbError,
 	fetchError,
-	storageError,
 	isDeadlock,
 	isUniqueViolation,
+	storageError,
 	toLogContext,
 } from "../errors";
 

@@ -87,11 +87,24 @@ async function run() {
     // 4. Set Dates
     console.log('Setting dates...');
     await page.waitForSelector('input#range-start', { timeout: 5000 });
-    await page.fill('input#range-start', '2026-01-01');
+    await page.fill('input#range-start', '2026-01-07');
     await page.fill('input#range-end', '2026-02-06');
     await page.keyboard.press('Tab'); // Trigger blur/change
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(EVIDENCE_DIR, 'task-4-date-range-set.png') });
+
+
+    // Helper to wait for enabled/disabled
+    const waitForState = async (locator, state, timeout = 30000) => {
+        const startTime = Date.now();
+        while (Date.now() - startTime < timeout) {
+            const disabled = await locator.isDisabled();
+            if (state === 'enabled' && !disabled) return true;
+            if (state === 'disabled' && disabled) return true;
+            await page.waitForTimeout(500);
+        }
+        throw new Error(`Timeout waiting for ${state}`);
+    };
 
     // 5. Trigger Chains
     console.log('Triggering chains...');
@@ -99,33 +112,39 @@ async function run() {
       console.log(`Triggering ${chain}...`);
       // Try to find button by text (Capitalized)
       const chainName = chain.charAt(0).toUpperCase() + chain.slice(1);
-      // Special cases?
-      // konzum -> Konzum
-      // dm -> DM? Or Dm?
       let namePattern = new RegExp(chain, 'i');
-      if (chain === 'dm') namePattern = /DM/i; // DM might be uppercase
+      if (chain === 'dm') namePattern = /DM/i;
       
       const btn = page.getByRole('button', { name: namePattern }).first();
       
-      if (await btn.count() > 0) {
-          if (await btn.isDisabled()) {
-              console.log(`${chain} button is disabled.`);
-          } else {
-              await btn.click();
-              console.log(`Clicked ${chain}`);
-          }
-      } else {
-        console.error(`Button for ${chain} not found!`);
-        // Fallback: look for data-chain just in case
-        const btnData = page.locator(`button[data-chain="${chain}"]`);
-        if (await btnData.count() > 0) {
-            await btnData.click();
-            console.log(`Clicked ${chain} (via data attr)`);
-        }
+      if (await btn.count() === 0) {
+         console.error(`Button for ${chain} not found!`);
+         continue;
+      }
+
+      // Wait for button to be enabled (in case previous chain is still running)
+      try {
+          await waitForState(btn, 'enabled', 60000);
+      } catch (e) {
+          console.log(`${chain} button did not become enabled in time. Skipping.`);
+          continue;
+      }
+
+      await btn.click();
+      console.log(`Clicked ${chain}`);
+
+      // Wait for it to become disabled (processing started)
+      try {
+        await waitForState(btn, 'disabled', 5000);
+        console.log(`${chain} processing started (buttons disabled)...`);
+        
+        // Wait for it to become enabled again (processing finished)
+        await waitForState(btn, 'enabled', 120000); // 2 minutes for 37 requests
+        console.log(`${chain} processing finished.`);
+      } catch (e) {
+        console.warn(`State change tracking failed for ${chain}:`, e.message);
       }
       
-      // Wait for success message toast or indicator
-      await page.waitForTimeout(3000); 
       await page.screenshot({ path: path.join(EVIDENCE_DIR, `task-4-triggered-${chain}.png`) });
     }
 

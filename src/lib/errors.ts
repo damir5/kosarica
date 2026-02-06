@@ -21,7 +21,14 @@ export interface FetchError {
 
 export interface StorageError {
 	readonly _tag: "StorageError";
-	readonly operation: "get" | "put" | "delete" | "list" | "exists" | "getInfo" | "getChecksum";
+	readonly operation:
+		| "get"
+		| "put"
+		| "delete"
+		| "list"
+		| "exists"
+		| "getInfo"
+		| "getChecksum";
 	readonly key: string;
 	readonly message: string;
 	readonly cause?: unknown;

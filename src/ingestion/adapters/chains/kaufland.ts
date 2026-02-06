@@ -1,5 +1,5 @@
-import { ResultAsync, errAsync, okAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile } from "../../types";

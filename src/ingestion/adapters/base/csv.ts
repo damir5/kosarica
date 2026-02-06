@@ -1,5 +1,5 @@
 import { ResultAsync } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { type FetchError, fetchError } from "@/lib/errors";
 import { type CsvColumnMapping, CsvParser } from "../../parsers/csv";
 import type { ParseOptions, ParseResult } from "../../types";
 import { type BaseAdapterConfig, BaseChainAdapter } from "./chain";
@@ -50,7 +50,8 @@ export class BaseCsvAdapter extends BaseChainAdapter {
 		return ResultAsync.fromPromise(
 			Promise.resolve().then(() => {
 				const processed = this.preprocessContent(content);
-				const storeIdentifier = this.extractStoreIdentifierFromFilename(filename);
+				const storeIdentifier =
+					this.extractStoreIdentifierFromFilename(filename);
 				const result = this.csvParser.parseWithStoreId(
 					processed,
 					storeIdentifier,
@@ -65,8 +66,7 @@ export class BaseCsvAdapter extends BaseChainAdapter {
 					attempts: 0,
 					cause: e,
 				}),
-		)
-			.map((result) => this.postprocessResult(result));
+		).map((result) => this.postprocessResult(result));
 	}
 
 	protected preprocessContent(content: Buffer): Buffer {

@@ -46,7 +46,8 @@ export const barcodeMatchingHandler: CronJobHandler = {
 			suspiciousFlags += result.suspiciousFlags;
 			skipped += result.skipped;
 
-			const progress = result.newProducts + result.newLinks + result.suspiciousFlags;
+			const progress =
+				result.newProducts + result.newLinks + result.suspiciousFlags;
 			if (progress === 0) {
 				break;
 			}

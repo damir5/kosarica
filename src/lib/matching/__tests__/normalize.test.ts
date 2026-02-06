@@ -42,9 +42,7 @@ describe("normalizeProductName", () => {
 	});
 
 	it("strips parentheses and special chars", () => {
-		expect(normalizeProductName("Kruh (bijeli) - 1kg")).toBe(
-			"kruh bijeli 1kg",
-		);
+		expect(normalizeProductName("Kruh (bijeli) - 1kg")).toBe("kruh bijeli 1kg");
 	});
 });
 
@@ -274,16 +272,16 @@ describe("calculateUnitPriceCents", () => {
 
 	it("calculates price per liter", () => {
 		// 330ml at 500 cents → ~1515 cents per liter
-		expect(
-			calculateUnitPriceCents(500, { unit: "l", quantity: 0.33 }),
-		).toBe(1515);
+		expect(calculateUnitPriceCents(500, { unit: "l", quantity: 0.33 })).toBe(
+			1515,
+		);
 	});
 
 	it("handles piece pricing", () => {
 		// 6-pack at 3000 cents → 500 cents per piece
-		expect(
-			calculateUnitPriceCents(3000, { unit: "kom", quantity: 6 }),
-		).toBe(500);
+		expect(calculateUnitPriceCents(3000, { unit: "kom", quantity: 6 })).toBe(
+			500,
+		);
 	});
 
 	it("returns 0 for zero quantity", () => {

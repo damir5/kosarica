@@ -1,0 +1,110 @@
+/* ============================================================
+   Tvoja Košarica — Public site design tokens
+   Scoped under .tk-public to prevent admin breakage.
+   ============================================================ */
+
+.tk-public {
+	/* ── Fonts ───────────────────────────────────── */
+	--tk-font-sans: "Space Grotesk", system-ui, sans-serif;
+	--tk-font-mono: "JetBrains Mono", ui-monospace, monospace;
+	--tk-font-display: "Instrument Serif", Georgia, serif;
+
+	/* ── Background & Surface ───────────────────── */
+	--tk-bg: #fafaf8;
+	--tk-surface: #ffffff;
+	--tk-surface-alt: #f5f5f0;
+
+	/* ── Text ────────────────────────────────────── */
+	--tk-text: #0a0c14;
+	--tk-text-secondary: #5a5d6b;
+	--tk-text-tertiary: #9498a6;
+
+	/* ── Accent (green) ─────────────────────────── */
+	--tk-accent: #16a34a;
+	--tk-accent-hover: #15803d;
+	--tk-accent-light: #dcfce7;
+	--tk-accent-foreground: #ffffff;
+
+	/* ── Deal spectrum ──────────────────────────── */
+	--tk-deal-best: #16a34a;
+	--tk-deal-best-bg: #f0fdf4;
+	--tk-deal-good: #65a30d;
+	--tk-deal-good-bg: #f7fee7;
+	--tk-deal-neutral: #9498a6;
+	--tk-deal-neutral-bg: #f5f5f0;
+	--tk-deal-bad: #ea580c;
+	--tk-deal-bad-bg: #fff7ed;
+	--tk-deal-worst: #dc2626;
+	--tk-deal-worst-bg: #fef2f2;
+
+	/* ── Store brand colors ─────────────────────── */
+	--tk-store-konzum: #e31e24;
+	--tk-store-lidl: #0050aa;
+	--tk-store-plodine: #f7941d;
+	--tk-store-kaufland: #e30613;
+	--tk-store-spar: #00874a;
+	--tk-store-studenac: #0066b2;
+	--tk-store-eurospin: #ffd100;
+	--tk-store-tommy: #c8102e;
+	--tk-store-ktc: #1a5ca1;
+	--tk-store-dm: #002f5f;
+	--tk-store-interspar: #00874a;
+
+	/* ── Borders ────────────────────────────────── */
+	--tk-border: #e8e8e3;
+	--tk-border-strong: #d4d4cc;
+
+	/* ── Radii ──────────────────────────────────── */
+	--tk-radius-sm: 6px;
+	--tk-radius-md: 10px;
+	--tk-radius-lg: 14px;
+	--tk-radius-xl: 20px;
+	--tk-radius-full: 9999px;
+
+	/* ── Shadows ────────────────────────────────── */
+	--tk-shadow-sm: 0 1px 2px rgba(10, 12, 20, 0.04);
+	--tk-shadow-md:
+		0 2px 8px rgba(10, 12, 20, 0.06), 0 1px 2px rgba(10, 12, 20, 0.04);
+	--tk-shadow-lg:
+		0 8px 24px rgba(10, 12, 20, 0.08), 0 2px 8px rgba(10, 12, 20, 0.04);
+
+	/* ── Motion ─────────────────────────────────── */
+	--tk-ease: cubic-bezier(0.22, 1, 0.36, 1);
+	--tk-duration-fast: 150ms;
+	--tk-duration-normal: 250ms;
+	--tk-duration-slow: 400ms;
+}
+
+/* ── Dark mode overrides ─────────────────────── */
+.dark .tk-public {
+	--tk-bg: #0c0d11;
+	--tk-surface: #16171d;
+	--tk-surface-alt: #1e1f26;
+
+	--tk-text: #ededef;
+	--tk-text-secondary: #9498a6;
+	--tk-text-tertiary: #5a5d6b;
+
+	--tk-accent: #22c55e;
+	--tk-accent-hover: #16a34a;
+	--tk-accent-light: #14532d;
+	--tk-accent-foreground: #0c0d11;
+
+	--tk-deal-best: #22c55e;
+	--tk-deal-best-bg: #14532d33;
+	--tk-deal-good: #84cc16;
+	--tk-deal-good-bg: #365314;
+	--tk-deal-neutral: #5a5d6b;
+	--tk-deal-neutral-bg: #1e1f26;
+	--tk-deal-bad: #fb923c;
+	--tk-deal-bad-bg: #431407;
+	--tk-deal-worst: #ef4444;
+	--tk-deal-worst-bg: #450a0a;
+
+	--tk-border: #2a2b33;
+	--tk-border-strong: #3a3b44;
+
+	--tk-shadow-sm: none;
+	--tk-shadow-md: none;
+	--tk-shadow-lg: none;
+}

@@ -1,6 +1,6 @@
-import { ResultAsync, err, ok } from "neverthrow";
 import type { Result } from "neverthrow";
-import { fetchError, type FetchError } from "@/lib/errors";
+import { err, ok, ResultAsync } from "neverthrow";
+import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
 import type { DiscoveredFile, ParseOptions, ParseResult } from "../../types";
@@ -84,7 +84,9 @@ export class KonzumAdapter extends BaseCsvAdapter {
 					fetchError({
 						url: pageUrl,
 						message:
-							error instanceof Error ? error.message : "Failed to read response",
+							error instanceof Error
+								? error.message
+								: "Failed to read response",
 						retryable: false,
 						attempts: 1,
 						cause: error,
