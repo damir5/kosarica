@@ -442,6 +442,15 @@ Design these email/push sequences:
 
 ---
 
+---
+
+## Related Documents
+
+- [AI Bot & Community Strategy](./AI-BOT-STRATEGY.md) — Bot-driven growth loops, community marketing, content automation pipeline
+- [UX & Branding Guidelines](./UX-BRANDING-GUIDELINES.md) — Brand voice, design system, screen designs
+
+---
+
 *Document generated: 2026-02-06*
 *Version: 1.1 — Post-review revision*
 *Status: Reviewed by Gemini 3 Pro + GPT-5.2 Codex. Critical fixes applied.*

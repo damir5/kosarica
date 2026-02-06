@@ -2007,6 +2007,15 @@ Focus: Search → List → Save → Alert. One loop, done perfectly.
 
 ---
 
+---
+
+## Related Documents
+
+- [AI Bot & Community Strategy](./AI-BOT-STRATEGY.md) — Pametnjaković bot persona on external platforms (Telegram, Discord, Reddit), content automation, data quality monitoring, pre-launch marketing
+- [Conversion & Growth Strategy](./CONVERSION-STRATEGY.md) — Funnels, A/B testing, monetization, growth loops
+
+---
+
 *Document generated: 2026-02-06*
 *Version: 1.1 — Post-review revision*
 *Status: Reviewed by Gemini 3 Pro + GPT-5.2 Codex (see docs/reviews/)*
