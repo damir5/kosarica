@@ -1,7 +1,7 @@
 services:
-  # Dev PostgreSQL (persistent)
+  # Dev PostgreSQL (persistent) — pgvector image for vector similarity search
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     profiles: ["dev"]
     container_name: ade-postgres
     environment:
@@ -18,9 +18,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # Test PostgreSQL (ephemeral)
+  # Test PostgreSQL (ephemeral) — pgvector image for vector similarity search
   postgres-test:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     profiles: ["test"]
     container_name: ade-postgres-test
     environment:

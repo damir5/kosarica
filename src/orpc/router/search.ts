@@ -1,4 +1,6 @@
 import * as z from "zod";
+import { embedQuery, isModelLoaded } from "@/lib/embeddings";
+import { prepareQueryText } from "@/lib/embeddings/text";
 import { autocompleteSearch, fullSearch } from "@/lib/search/queries";
 import { procedure } from "../base";
 
@@ -62,11 +64,22 @@ export const search = procedure
 		}),
 	)
 	.handler(async ({ input }) => {
+		// Compute query embedding if model is loaded (graceful degradation)
+		let queryEmbedding: number[] | undefined;
+		if (isModelLoaded()) {
+			try {
+				queryEmbedding = await embedQuery(prepareQueryText(input.query));
+			} catch {
+				// Fall back to FTS+trigram only
+			}
+		}
+
 		const { results, total } = await fullSearch(
 			input.query,
 			input.limit,
 			input.offset,
 			input.filters,
+			queryEmbedding,
 		);
 
 		return {

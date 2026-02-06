@@ -58,3 +58,57 @@ export function cuid2(prefix: string, options: Cuid2Options = {}) {
 		generatePrefixedId(prefix, { timeSortable }),
 	);
 }
+
+/**
+ * Creates a pgvector column with a specified number of dimensions.
+ * Uses vector(N) SQL type for pgvector extension.
+ *
+ * @param name - Column name in the database
+ * @param dimensions - Number of vector dimensions (e.g. 1024 for BGE-M3)
+ */
+export function pgVector(name: string, dimensions: number) {
+	function validateVector(value: number[]): number[] {
+		if (value.length !== dimensions) {
+			throw new Error(
+				`Invalid vector dimension for ${name}: expected ${dimensions}, got ${value.length}`,
+			);
+		}
+		for (const component of value) {
+			if (!Number.isFinite(component)) {
+				throw new Error(
+					`Invalid vector value for ${name}: non-finite component`,
+				);
+			}
+		}
+		return value;
+	}
+
+	function parseVector(value: unknown): number[] {
+		if (typeof value === "string") {
+			const trimmed = value.replace(/^\[/, "").replace(/\]$/, "").trim();
+			if (trimmed === "") {
+				return [];
+			}
+			return trimmed.split(",").map((component) => Number(component));
+		}
+		if (Array.isArray(value)) {
+			return value.map((component) => Number(component));
+		}
+		throw new Error(
+			`Invalid vector payload for ${name}: expected string or array`,
+		);
+	}
+
+	return customType<{ data: number[]; driverValue: string }>({
+		dataType() {
+			return `vector(${dimensions})`;
+		},
+		toDriver(value: number[]): string {
+			const vector = validateVector(value);
+			return `[${vector.join(",")}]`;
+		},
+		fromDriver(value: unknown): number[] {
+			return validateVector(parseVector(value));
+		},
+	})(name);
+}

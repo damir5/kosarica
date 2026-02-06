@@ -6,10 +6,11 @@
  * when the instance becomes the leader.
  */
 
-import { dailyIngestionHandler } from "./handlers/daily-ingestion";
 import { barcodeMatchingHandler } from "./handlers/barcode-matching";
-import { trigramMatchingHandler } from "./handlers/trigram-matching";
+import { dailyIngestionHandler } from "./handlers/daily-ingestion";
+import { semanticMatchingHandler } from "./handlers/semantic-matching";
 import { tempCleanupHandler } from "./handlers/temp-cleanup";
+import { trigramMatchingHandler } from "./handlers/trigram-matching";
 import { registerCronJob } from "./registry";
 
 /**
@@ -57,6 +58,16 @@ export function registerAllCronJobs(): void {
 		timezone: "UTC",
 		taskType: "matching",
 		handler: trigramMatchingHandler,
+	});
+
+	// Semantic matching after trigram matching
+	registerCronJob({
+		id: "semantic-matching",
+		name: "Semantic Product Matching",
+		cronExpression: "0 11 * * *", // 11 AM UTC, after trigram at 10 AM
+		timezone: "UTC",
+		taskType: "matching",
+		handler: semanticMatchingHandler,
 	});
 
 	// Add more jobs here as needed:

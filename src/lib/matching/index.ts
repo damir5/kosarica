@@ -9,7 +9,10 @@ import {
 	productMatchRejections,
 	products,
 } from "@/db/schema";
-import { removeDiacritics, normalizeWhitespace } from "@/lib/matching/normalize";
+import {
+	normalizeWhitespace,
+	removeDiacritics,
+} from "@/lib/matching/normalize";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 import { createLogger } from "@/utils/logger";
@@ -38,7 +41,7 @@ export interface TrigramMatchingResult {
 	noMatch: number;
 }
 
-interface RetailerItemRow {
+export interface RetailerItemRow {
 	id: string;
 	name: string;
 	brand: string | null;
@@ -53,7 +56,7 @@ interface RetailerItemRow {
 	normalized_quantity: number | null;
 }
 
-interface RetailerItem {
+export interface RetailerItem {
 	id: string;
 	name: string;
 	brand: string;
@@ -68,7 +71,7 @@ interface RetailerItem {
 	normalizedQuantity: number | null;
 }
 
-interface ProductCandidateRow {
+export interface ProductCandidateRow {
 	id: string;
 	name: string;
 	brand: string | null;
@@ -81,7 +84,7 @@ interface ProductCandidateRow {
 	normalized_quantity: number | null;
 }
 
-interface Candidate {
+export interface Candidate {
 	productId: string;
 	similarity: number;
 	product: {
@@ -107,7 +110,7 @@ const GENERIC_BRANDS = [
 	"own brand",
 ];
 
-function isGenericBrand(brand: string): boolean {
+export function isGenericBrand(brand: string): boolean {
 	const normalized = normalizeWhitespace(brand).toLowerCase();
 	return GENERIC_BRANDS.includes(normalized);
 }
@@ -318,7 +321,7 @@ function pickBestItem(items: RetailerItem[]): RetailerItem {
 	return best;
 }
 
-function hasPrivateLabelConflict(
+export function hasPrivateLabelConflict(
 	item: RetailerItem,
 	candidate: Candidate,
 ): boolean {
@@ -339,7 +342,10 @@ function hasPrivateLabelConflict(
 
 export function checkUnitQuantityMismatch(
 	item: { normalizedUnit: string | null; normalizedQuantity: number | null },
-	candidate: { normalizedUnit: string | null; normalizedQuantity: number | null },
+	candidate: {
+		normalizedUnit: string | null;
+		normalizedQuantity: number | null;
+	},
 ): string {
 	// If either side is missing unit info, don't flag
 	if (!item.normalizedUnit || !candidate.normalizedUnit) {
@@ -367,7 +373,7 @@ export function checkUnitQuantityMismatch(
 	return "";
 }
 
-function mapRetailerItem(row: RetailerItemRow): RetailerItem {
+export function mapRetailerItem(row: RetailerItemRow): RetailerItem {
 	return {
 		id: row.id,
 		name: row.name,
@@ -384,7 +390,7 @@ function mapRetailerItem(row: RetailerItemRow): RetailerItem {
 	};
 }
 
-function parseCandidateRows(rows: ProductCandidateRow[]): Candidate[] {
+export function parseCandidateRows(rows: ProductCandidateRow[]): Candidate[] {
 	return rows
 		.map((row) => ({
 			productId: row.id,
@@ -407,7 +413,7 @@ function parseCandidateRows(rows: ProductCandidateRow[]): Candidate[] {
 		.filter((candidate) => Number.isFinite(candidate.similarity));
 }
 
-async function queueForReview(
+export async function queueForReview(
 	transaction: DbTransaction,
 	retailerItemId: string,
 ): Promise<void> {
@@ -447,7 +453,7 @@ async function insertFlagCandidate(
 		});
 }
 
-async function flagTopCandidate(
+export async function flagTopCandidate(
 	transaction: DbTransaction,
 	retailerItemId: string,
 	flag: string,
@@ -515,7 +521,11 @@ export async function runBarcodeMatching(options?: {
 		ORDER BY rib.barcode
 	`);
 
-	const rows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as RetailerItemRow[];
+	const rows = (
+		Array.isArray(result)
+			? result
+			: ((result as { rows?: unknown[] }).rows ?? [])
+	) as RetailerItemRow[];
 	const barcodeItems = new Map<string, RetailerItem[]>();
 	let skipped = 0;
 
@@ -661,7 +671,11 @@ export async function runTrigramMatching(options?: {
 		LIMIT ${batchSize}
 	`);
 
-	const itemRows = (Array.isArray(itemsResult) ? itemsResult : (itemsResult as { rows?: unknown[] }).rows ?? []) as RetailerItemRow[];
+	const itemRows = (
+		Array.isArray(itemsResult)
+			? itemsResult
+			: ((itemsResult as { rows?: unknown[] }).rows ?? [])
+	) as RetailerItemRow[];
 
 	const result: TrigramMatchingResult = {
 		runId,
@@ -710,7 +724,11 @@ export async function runTrigramMatching(options?: {
 			LIMIT ${maxCandidates}
 		`);
 
-		const candidateRows = (Array.isArray(candidatesResult) ? candidatesResult : (candidatesResult as { rows?: unknown[] }).rows ?? []) as ProductCandidateRow[];
+		const candidateRows = (
+			Array.isArray(candidatesResult)
+				? candidatesResult
+				: ((candidatesResult as { rows?: unknown[] }).rows ?? [])
+		) as ProductCandidateRow[];
 		const candidates = parseCandidateRows(candidateRows);
 
 		if (candidates.length === 0) {
@@ -773,7 +791,10 @@ export async function runTrigramMatching(options?: {
 				return;
 			}
 
-			const unitQtyFlag = checkUnitQuantityMismatch(item, bestCandidate.product);
+			const unitQtyFlag = checkUnitQuantityMismatch(
+				item,
+				bestCandidate.product,
+			);
 			if (unitQtyFlag) {
 				await queueForReview(tx, item.id);
 				await flagTopCandidate(tx, item.id, unitQtyFlag);
@@ -813,3 +834,6 @@ export async function runTrigramMatching(options?: {
 
 	return result;
 }
+
+export type { SemanticMatchingResult } from "./semantic";
+export { runSemanticMatching } from "./semantic";

@@ -15,7 +15,7 @@ import {
 	timestamp,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { cuid2, typedJsonb } from "./custom-types";
+import { cuid2, pgVector, typedJsonb } from "./custom-types";
 import {
 	archiveMetadata,
 	cronJobPayload,
@@ -283,6 +283,7 @@ export const products = pgTable("products", {
 	imageUrl: text("image_url"),
 	normalizedUnit: text("normalized_unit"), // "kg", "l", "kom"
 	normalizedQuantity: real("normalized_quantity"),
+	embedding: pgVector("embedding", 1024),
 	createdAt: timestamp("created_at").defaultNow(),
 	updatedAt: timestamp("updated_at").defaultNow(),
 });

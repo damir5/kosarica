@@ -30,25 +30,107 @@ function getRows<T>(result: unknown): T[] {
 	return ((result as { rows?: unknown[] }).rows ?? []) as T[];
 }
 
-function buildFilterConditions(filters?: SearchFilters): SQL[] {
+const EMBEDDING_DIMENSIONS = 1024;
+
+function parseWeightEnv(name: string, fallback: number): number {
+	const raw = process.env[name];
+	if (!raw) {
+		return fallback;
+	}
+	const parsed = Number.parseFloat(raw);
+	if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+		return fallback;
+	}
+	return parsed;
+}
+
+const SEARCH_WEIGHT_FTS = parseWeightEnv("SEARCH_WEIGHT_FTS", 0.7);
+const SEARCH_WEIGHT_TRIGRAM = parseWeightEnv("SEARCH_WEIGHT_TRIGRAM", 0.3);
+const SEARCH_WEIGHT_FTS_WITH_VECTOR = parseWeightEnv(
+	"SEARCH_WEIGHT_FTS_WITH_VECTOR",
+	0.6,
+);
+const SEARCH_WEIGHT_TRIGRAM_WITH_VECTOR = parseWeightEnv(
+	"SEARCH_WEIGHT_TRIGRAM_WITH_VECTOR",
+	0.25,
+);
+const SEARCH_WEIGHT_VECTOR = parseWeightEnv("SEARCH_WEIGHT_VECTOR", 0.15);
+
+function buildFilterConditions(
+	filters?: SearchFilters,
+	aliased = false,
+): SQL[] {
 	const filterConditions: SQL[] = [];
 
 	if (filters?.entityTypes?.length) {
 		const validTypes = validateEntityTypes(filters.entityTypes);
 		if (validTypes.length > 0) {
-			filterConditions.push(sql`entity_type = ANY(${validTypes})`);
+			filterConditions.push(
+				aliased
+					? sql`s.entity_type = ANY(${validTypes})`
+					: sql`entity_type = ANY(${validTypes})`,
+			);
 		}
 	}
 
 	if (filters?.chainSlug) {
-		filterConditions.push(sql`chain_slug = ${filters.chainSlug}`);
+		filterConditions.push(
+			aliased
+				? sql`s.chain_slug = ${filters.chainSlug}`
+				: sql`chain_slug = ${filters.chainSlug}`,
+		);
 	}
 
 	if (filters?.category) {
-		filterConditions.push(sql`category = ${filters.category}`);
+		filterConditions.push(
+			aliased
+				? sql`s.category = ${filters.category}`
+				: sql`category = ${filters.category}`,
+		);
 	}
 
 	return filterConditions;
+}
+
+function hasValidQueryEmbedding(
+	queryEmbedding?: number[],
+): queryEmbedding is number[] {
+	if (!queryEmbedding || queryEmbedding.length !== EMBEDDING_DIMENSIONS) {
+		return false;
+	}
+	return queryEmbedding.every((component) => Number.isFinite(component));
+}
+
+function buildVectorSimilarityExpression(
+	hasVector: boolean,
+	vectorStr: string | null,
+): SQL {
+	if (!hasVector || vectorStr == null) {
+		return sql`0`;
+	}
+	return sql`COALESCE(
+		CASE
+			WHEN s.entity_type = 'product' AND p.embedding IS NOT NULL
+			THEN 1 - (p.embedding <=> ${vectorStr}::vector)
+			ELSE 0
+		END,
+	0)`;
+}
+
+function buildScoreExpression(
+	ftsWeight: number,
+	trigramWeight: number,
+	vectorWeight: number,
+	vectorSimilarityExpression: SQL,
+): SQL {
+	return sql`(
+		COALESCE(ts_rank_cd(s.search_vector, q.tsq, 32), 0) * ${ftsWeight} +
+		GREATEST(
+			similarity(s.title_normalized, q.nq),
+			similarity(s.body_normalized, q.nq) * 0.5
+		) * ${trigramWeight} +
+		${vectorSimilarityExpression} * ${vectorWeight}
+	)`;
 }
 
 export async function autocompleteSearch(
@@ -65,10 +147,10 @@ export async function autocompleteSearch(
 	const prefixPattern = `${escapeLikePattern(normalizedQuery)}%`;
 	const conditions: SQL[] = [
 		sql`(
-			autocomplete_text LIKE ${prefixPattern} ESCAPE '\\'
-			OR similarity(autocomplete_text, ${normalizedQuery}) > 0.3
-		)`,
-		...buildFilterConditions(filters),
+				s.autocomplete_text LIKE ${prefixPattern} ESCAPE '\\'
+				OR similarity(s.autocomplete_text, ${normalizedQuery}) > 0.3
+			)`,
+		...buildFilterConditions(filters, true),
 	];
 	const whereClause = sql.join(conditions, sql` AND `);
 
@@ -80,11 +162,11 @@ export async function autocompleteSearch(
 			title,
 			subtitle,
 			image_url as "imageUrl"
-		FROM search_index
+		FROM search_index s
 		WHERE ${whereClause}
 		ORDER BY
-			CASE WHEN autocomplete_text LIKE ${prefixPattern} ESCAPE '\\' THEN 0 ELSE 1 END,
-			similarity(autocomplete_text, ${normalizedQuery}) DESC,
+			CASE WHEN s.autocomplete_text LIKE ${prefixPattern} ESCAPE '\\' THEN 0 ELSE 1 END,
+			similarity(s.autocomplete_text, ${normalizedQuery}) DESC,
 			title
 		LIMIT ${limit}
 	`);
@@ -97,6 +179,7 @@ export async function fullSearch(
 	limit = 20,
 	offset = 0,
 	filters?: SearchFilters,
+	queryEmbedding?: number[],
 ): Promise<{ results: FullSearchResult[]; total: number }> {
 	const normalizedQuery = query.toLowerCase().trim();
 	if (normalizedQuery.length < 2) {
@@ -104,11 +187,40 @@ export async function fullSearch(
 	}
 
 	const db = getDb();
-	const filterConditions = buildFilterConditions(filters);
+	const filterConditions = buildFilterConditions(filters, true);
 	const filterClause =
 		filterConditions.length > 0
 			? sql`AND ${sql.join(filterConditions, sql` AND `)}`
 			: sql``;
+
+	const validQueryEmbedding = hasValidQueryEmbedding(queryEmbedding)
+		? queryEmbedding
+		: undefined;
+	const hasVector = validQueryEmbedding !== undefined;
+	const vectorStr = hasVector ? `[${validQueryEmbedding.join(",")}]` : null;
+
+	// Scoring weights: with vector boost vs without
+	const ftsWeight = hasVector
+		? SEARCH_WEIGHT_FTS_WITH_VECTOR
+		: SEARCH_WEIGHT_FTS;
+	const trigramWeight = hasVector
+		? SEARCH_WEIGHT_TRIGRAM_WITH_VECTOR
+		: SEARCH_WEIGHT_TRIGRAM;
+	const vectorWeight = hasVector ? SEARCH_WEIGHT_VECTOR : 0;
+	const vectorSimilarityExpression = buildVectorSimilarityExpression(
+		hasVector,
+		vectorStr,
+	);
+	const scoreExpression = buildScoreExpression(
+		ftsWeight,
+		trigramWeight,
+		vectorWeight,
+		vectorSimilarityExpression,
+	);
+
+	const productJoin = hasVector
+		? sql`LEFT JOIN products p ON s.entity_type = 'product' AND s.entity_id = p.id`
+		: sql``;
 
 	const searchQuery = sql`
 		WITH q AS (
@@ -123,25 +235,20 @@ export async function fullSearch(
 				s.entity_id,
 				s.chain_slug,
 				s.category,
-				s.title,
-				s.subtitle,
-				s.body,
-				s.image_url,
-				(
-					COALESCE(ts_rank_cd(s.search_vector, q.tsq, 32), 0) * 0.7 +
-					GREATEST(
-						similarity(s.title_normalized, q.nq),
-						similarity(s.body_normalized, q.nq) * 0.5
-					) * 0.3
-				) as score,
-				ts_headline('simple', s.title, q.tsq,
-					'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15'
-				) as title_highlight,
+					s.title,
+					s.subtitle,
+					s.body,
+					s.image_url,
+					${scoreExpression} as score,
+					ts_headline('simple', s.title, q.tsq,
+						'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15'
+					) as title_highlight,
 				ts_headline('simple', COALESCE(s.body, ''), q.tsq,
 					'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15'
 				) as body_highlight
 			FROM search_index s
 			CROSS JOIN q
+			${productJoin}
 			WHERE (
 				s.search_vector @@ q.tsq
 				OR s.title_normalized % q.nq
@@ -174,18 +281,13 @@ export async function fullSearch(
 			SELECT
 				websearch_to_tsquery('simple', ${normalizedQuery}) AS tsq,
 				${normalizedQuery} AS nq
-		)
-		SELECT COUNT(*) as total
-		FROM (
-			SELECT (
-				COALESCE(ts_rank_cd(s.search_vector, q.tsq, 32), 0) * 0.7 +
-				GREATEST(
-					similarity(s.title_normalized, q.nq),
-					similarity(s.body_normalized, q.nq) * 0.5
-				) * 0.3
-			) as score
-			FROM search_index s
-			CROSS JOIN q
+			)
+			SELECT COUNT(*) as total
+			FROM (
+				SELECT ${scoreExpression} as score
+				FROM search_index s
+				CROSS JOIN q
+				${productJoin}
 			WHERE (
 				s.search_vector @@ q.tsq
 				OR s.title_normalized % q.nq
