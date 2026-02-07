@@ -21,6 +21,12 @@ export interface SemanticLLMItem {
 	containerType: string | null;
 }
 
+export interface SemanticBatchPairInput {
+	pairId: string;
+	itemA: SemanticLLMItem;
+	itemB: SemanticLLMItem;
+}
+
 export interface SemanticVote {
 	modelId: string;
 	provider: "openai" | "claude" | "openrouter";

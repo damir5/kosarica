@@ -12,6 +12,7 @@ async function main() {
 		candidateSourceBatch: 1000,
 		candidateInsertLimit: 5000,
 		adjudicationBatchSize: 200,
+		llmPromptBatchSize: 25,
 		rebuildClusters: true,
 	});
 
@@ -19,6 +20,9 @@ async function main() {
 	console.log("\n=== Semantic Clustering Results ===");
 	console.log(`Features upserted: ${result.featuresUpserted}`);
 	console.log(`Candidates queued: ${result.candidatesQueued}`);
+	console.log(`Scoring auto-approved: ${result.scoringAutoApproved}`);
+	console.log(`Scoring auto-rejected: ${result.scoringAutoRejected}`);
+	console.log(`Scoring pending review: ${result.scoringPendingReview}`);
 	console.log(`Pairs adjudicated: ${result.pairsAdjudicated}`);
 	console.log(`Auto-approved: ${result.autoApproved}`);
 	console.log(`Auto-rejected: ${result.autoRejected}`);

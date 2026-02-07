@@ -41,6 +41,10 @@ export const semanticClusteringHandler: CronJobHandler = {
 			"SEMANTIC_CLUSTERING_ADJUDICATION_BATCH_SIZE",
 			200,
 		);
+		const llmPromptBatchSize = parsePositiveIntEnv(
+			"SEMANTIC_CLUSTERING_LLM_PROMPT_BATCH_SIZE",
+			25,
+		);
 
 		log.info("Starting scheduled semantic clustering", {
 			runId: context.runId,
@@ -50,11 +54,15 @@ export const semanticClusteringHandler: CronJobHandler = {
 			candidateSourceBatch,
 			candidateInsertLimit,
 			adjudicationBatchSize,
+			llmPromptBatchSize,
 		});
 
 		let batchesProcessed = 0;
 		let featuresUpserted = 0;
 		let candidatesQueued = 0;
+		let scoringAutoApproved = 0;
+		let scoringAutoRejected = 0;
+		let scoringPendingReview = 0;
 		let pairsAdjudicated = 0;
 		let autoApproved = 0;
 		let autoRejected = 0;
@@ -69,11 +77,15 @@ export const semanticClusteringHandler: CronJobHandler = {
 				candidateSourceBatch,
 				candidateInsertLimit,
 				adjudicationBatchSize,
+				llmPromptBatchSize,
 				rebuildClusters: true,
 			});
 			batchesProcessed += 1;
 			featuresUpserted += result.featuresUpserted;
 			candidatesQueued += result.candidatesQueued;
+			scoringAutoApproved += result.scoringAutoApproved;
+			scoringAutoRejected += result.scoringAutoRejected;
+			scoringPendingReview += result.scoringPendingReview;
 			pairsAdjudicated += result.pairsAdjudicated;
 			autoApproved += result.autoApproved;
 			autoRejected += result.autoRejected;
@@ -96,6 +108,9 @@ export const semanticClusteringHandler: CronJobHandler = {
 			batchesProcessed,
 			featuresUpserted,
 			candidatesQueued,
+			scoringAutoApproved,
+			scoringAutoRejected,
+			scoringPendingReview,
 			pairsAdjudicated,
 			autoApproved,
 			autoRejected,

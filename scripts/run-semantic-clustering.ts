@@ -29,18 +29,26 @@ async function main() {
 		"SEMANTIC_CLUSTERING_ADJUDICATION_BATCH_SIZE",
 		200,
 	);
+	const llmPromptBatchSize = parsePositiveIntEnv(
+		"SEMANTIC_CLUSTERING_LLM_PROMPT_BATCH_SIZE",
+		25,
+	);
 
 	const result = await runSemanticClusteringPipeline({
 		featureBatchSize,
 		candidateSourceBatch,
 		candidateInsertLimit,
 		adjudicationBatchSize,
+		llmPromptBatchSize,
 		rebuildClusters: true,
 	});
 
 	console.log("\n=== Semantic Clustering Pipeline ===");
 	console.log(`Features upserted: ${result.featuresUpserted}`);
 	console.log(`Candidates queued: ${result.candidatesQueued}`);
+	console.log(`Scoring auto-approved: ${result.scoringAutoApproved}`);
+	console.log(`Scoring auto-rejected: ${result.scoringAutoRejected}`);
+	console.log(`Scoring pending review: ${result.scoringPendingReview}`);
 	console.log(`Pairs adjudicated: ${result.pairsAdjudicated}`);
 	console.log(`Auto-approved: ${result.autoApproved}`);
 	console.log(`Auto-rejected: ${result.autoRejected}`);

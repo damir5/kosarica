@@ -36,6 +36,10 @@ async function main() {
 		"SEMANTIC_CLUSTERING_ADJUDICATION_BATCH_SIZE",
 		200,
 	);
+	const llmPromptBatchSize = parsePositiveIntEnv(
+		"SEMANTIC_CLUSTERING_LLM_PROMPT_BATCH_SIZE",
+		25,
+	);
 
 	let rounds = 0;
 	let totalFeatures = 0;
@@ -54,6 +58,7 @@ async function main() {
 			candidateSourceBatch,
 			candidateInsertLimit,
 			adjudicationBatchSize,
+			llmPromptBatchSize,
 			rebuildClusters: true,
 		});
 
@@ -66,7 +71,7 @@ async function main() {
 		totalErrors += result.systemErrors;
 
 		console.log(
-			`Round ${rounds}: features=${result.featuresUpserted}, candidates=${result.candidatesQueued}, adjudicated=${result.pairsAdjudicated}, approved=${result.autoApproved}, rejected=${result.autoRejected}, review=${result.pendingReview}, errors=${result.systemErrors}`,
+			`Round ${rounds}: features=${result.featuresUpserted}, candidates=${result.candidatesQueued}, scoreApproved=${result.scoringAutoApproved}, scoreRejected=${result.scoringAutoRejected}, scorePending=${result.scoringPendingReview}, adjudicated=${result.pairsAdjudicated}, approved=${result.autoApproved}, rejected=${result.autoRejected}, review=${result.pendingReview}, errors=${result.systemErrors}`,
 		);
 
 		if (

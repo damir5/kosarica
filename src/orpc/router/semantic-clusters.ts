@@ -161,6 +161,9 @@ export const triggerPipeline = superadminProcedure
 				candidateSourceBatch: z.number().int().min(1).max(100_000).optional(),
 				candidateInsertLimit: z.number().int().min(1).max(200_000).optional(),
 				adjudicationBatchSize: z.number().int().min(1).max(10_000).optional(),
+				llmPromptBatchSize: z.number().int().min(1).max(200).optional(),
+				semanticNeighborCount: z.number().int().min(1).max(1000).optional(),
+				lexicalNeighborCount: z.number().int().min(1).max(1000).optional(),
 				rebuildClusters: z.boolean().optional(),
 			})
 			.optional(),
@@ -171,6 +174,9 @@ export const triggerPipeline = superadminProcedure
 			candidateSourceBatch: input?.candidateSourceBatch,
 			candidateInsertLimit: input?.candidateInsertLimit,
 			adjudicationBatchSize: input?.adjudicationBatchSize,
+			llmPromptBatchSize: input?.llmPromptBatchSize,
+			semanticNeighborCount: input?.semanticNeighborCount,
+			lexicalNeighborCount: input?.lexicalNeighborCount,
 			rebuildClusters: input?.rebuildClusters,
 		});
 	});

@@ -68,6 +68,11 @@ async function main() {
 		"--adjudication-batch-size",
 		200,
 	);
+	const llmPromptBatchSize = parsePositiveIntArg(
+		argv,
+		"--llm-prompt-batch-size",
+		25,
+	);
 	const rebuildClusters = !parseBoolFlag(argv, "--no-rebuild-clusters");
 
 	const result = await runSemanticClusteringPipeline({
@@ -75,12 +80,16 @@ async function main() {
 		candidateSourceBatch,
 		candidateInsertLimit,
 		adjudicationBatchSize,
+		llmPromptBatchSize,
 		rebuildClusters,
 	});
 
 	console.log("Knowledge apply summary:");
 	console.log(`Features upserted: ${result.featuresUpserted}`);
 	console.log(`Candidates queued: ${result.candidatesQueued}`);
+	console.log(`Scoring auto-approved: ${result.scoringAutoApproved}`);
+	console.log(`Scoring auto-rejected: ${result.scoringAutoRejected}`);
+	console.log(`Scoring pending review: ${result.scoringPendingReview}`);
 	console.log(`Pairs adjudicated: ${result.pairsAdjudicated}`);
 	console.log(`Auto-approved: ${result.autoApproved}`);
 	console.log(`Auto-rejected: ${result.autoRejected}`);
