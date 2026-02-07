@@ -1,94 +1,96 @@
 /**
- * Manual Matching Script
+ * Manual semantic clustering loop.
  *
- * Runs barcode matching in a loop until no progress,
- * then runs trigram matching in a loop until no progress.
- *
- * Usage: DATABASE_URL=... npx tsx scripts/run-matching-manual.ts
+ * Usage: DATABASE_URL=... pnpm matching:clusters
  */
 
-import { runBarcodeMatching, runTrigramMatching } from "@/lib/matching";
+import { runSemanticClusteringPipeline } from "@/lib/semantic-clustering";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("matching");
 
+function parsePositiveIntEnv(name: string, fallback: number): number {
+	const raw = process.env[name];
+	if (!raw) {
+		return fallback;
+	}
+	const parsed = Number.parseInt(raw, 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 async function main() {
-	const startTime = Date.now();
-
-	// Phase 1: Barcode matching
-	console.log("\n=== Barcode Matching ===");
-	let barcodeRounds = 0;
-	let totalNewProducts = 0;
-	let totalNewLinks = 0;
-	let totalSuspiciousFlags = 0;
-	let totalSkipped = 0;
-
-	while (true) {
-		barcodeRounds++;
-		const result = await runBarcodeMatching({ batchSize: 1000 });
-
-		totalNewProducts += result.newProducts;
-		totalNewLinks += result.newLinks;
-		totalSuspiciousFlags += result.suspiciousFlags;
-		totalSkipped += result.skipped;
-
-		const progress =
-			result.newProducts + result.newLinks + result.suspiciousFlags;
-		console.log(
-			`  Round ${barcodeRounds}: +${result.newProducts} products, +${result.newLinks} links, ${result.suspiciousFlags} suspicious, ${result.skipped} skipped`,
-		);
-
-		if (progress === 0) {
-			console.log("  No more progress, stopping barcode matching.");
-			break;
-		}
-	}
-
-	console.log(`\nBarcode totals: ${totalNewProducts} products, ${totalNewLinks} links, ${totalSuspiciousFlags} suspicious, ${totalSkipped} skipped`);
-
-	// Phase 2: Trigram matching
-	console.log("\n=== Trigram Matching ===");
-	let trigramRounds = 0;
-	let totalProcessed = 0;
-	let totalHighConfidence = 0;
-	let totalQueuedForReview = 0;
-	let totalNoMatch = 0;
-
-	while (true) {
-		trigramRounds++;
-		const result = await runTrigramMatching({ batchSize: 200 });
-
-		totalProcessed += result.processed;
-		totalHighConfidence += result.highConfidence;
-		totalQueuedForReview += result.queuedForReview;
-		totalNoMatch += result.noMatch;
-
-		const progress = result.processed + result.noMatch;
-		console.log(
-			`  Round ${trigramRounds}: processed=${result.processed}, high=${result.highConfidence}, review=${result.queuedForReview}, noMatch=${result.noMatch}`,
-		);
-
-		if (progress === 0) {
-			console.log("  No more progress, stopping trigram matching.");
-			break;
-		}
-
-		// Safety limit
-		if (trigramRounds >= 100) {
-			console.log("  Reached max rounds limit (100), stopping.");
-			break;
-		}
-	}
-
-	const duration = Date.now() - startTime;
-	console.log(
-		`\nTrigram totals: ${totalProcessed} processed, ${totalHighConfidence} high-confidence, ${totalQueuedForReview} queued, ${totalNoMatch} no-match`,
+	const maxRounds = parsePositiveIntEnv("SEMANTIC_CLUSTERING_MAX_BATCHES", 20);
+	const featureBatchSize = parsePositiveIntEnv(
+		"SEMANTIC_CLUSTERING_FEATURE_BATCH_SIZE",
+		2000,
 	);
-	console.log(`\nTotal duration: ${Math.round(duration / 1000)}s`);
+	const candidateSourceBatch = parsePositiveIntEnv(
+		"SEMANTIC_CLUSTERING_CANDIDATE_SOURCE_BATCH",
+		1000,
+	);
+	const candidateInsertLimit = parsePositiveIntEnv(
+		"SEMANTIC_CLUSTERING_CANDIDATE_INSERT_LIMIT",
+		5000,
+	);
+	const adjudicationBatchSize = parsePositiveIntEnv(
+		"SEMANTIC_CLUSTERING_ADJUDICATION_BATCH_SIZE",
+		200,
+	);
+
+	let rounds = 0;
+	let totalFeatures = 0;
+	let totalCandidates = 0;
+	let totalAdjudicated = 0;
+	let totalApproved = 0;
+	let totalRejected = 0;
+	let totalReview = 0;
+	let totalErrors = 0;
+
+	console.log("\n=== Manual Semantic Clustering ===");
+	for (let i = 0; i < maxRounds; i += 1) {
+		rounds += 1;
+		const result = await runSemanticClusteringPipeline({
+			featureBatchSize,
+			candidateSourceBatch,
+			candidateInsertLimit,
+			adjudicationBatchSize,
+			rebuildClusters: true,
+		});
+
+		totalFeatures += result.featuresUpserted;
+		totalCandidates += result.candidatesQueued;
+		totalAdjudicated += result.pairsAdjudicated;
+		totalApproved += result.autoApproved;
+		totalRejected += result.autoRejected;
+		totalReview += result.pendingReview;
+		totalErrors += result.systemErrors;
+
+		console.log(
+			`Round ${rounds}: features=${result.featuresUpserted}, candidates=${result.candidatesQueued}, adjudicated=${result.pairsAdjudicated}, approved=${result.autoApproved}, rejected=${result.autoRejected}, review=${result.pendingReview}, errors=${result.systemErrors}`,
+		);
+
+		if (
+			result.featuresUpserted === 0 &&
+			result.candidatesQueued === 0 &&
+			result.pairsAdjudicated === 0
+		) {
+			console.log("No new work detected, stopping.");
+			break;
+		}
+	}
+
+	console.log(`\nRounds: ${rounds}`);
+	console.log(`Features upserted: ${totalFeatures}`);
+	console.log(`Candidates queued: ${totalCandidates}`);
+	console.log(`Pairs adjudicated: ${totalAdjudicated}`);
+	console.log(`Auto-approved: ${totalApproved}`);
+	console.log(`Auto-rejected: ${totalRejected}`);
+	console.log(`Pending review: ${totalReview}`);
+	console.log(`System errors: ${totalErrors}`);
 }
 
 main().catch((error) => {
-	log.error("Manual matching failed", { error });
+	log.error("Manual semantic clustering failed", { error });
 	console.error(error);
 	process.exit(1);
 });

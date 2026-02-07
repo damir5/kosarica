@@ -88,7 +88,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 		<html lang="hr">
 			<head>
 				<HeadContent />
-				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+				<script>{THEME_INIT_SCRIPT}</script>
 			</head>
 			<body>
 				<RootErrorBoundary>{children}</RootErrorBoundary>

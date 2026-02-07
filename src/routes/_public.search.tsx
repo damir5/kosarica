@@ -138,9 +138,9 @@ function SearchPage() {
 			<Section>
 				{isLoading ? (
 					<div className="space-y-3">
-						{Array.from({ length: 5 }).map((_, i) => (
+						{Array.from({ length: 5 }).map((_, index) => (
 							<TkSkeleton
-								key={`search-skeleton-${i}`}
+								key={index}
 								className="h-24 w-full"
 							/>
 						))}

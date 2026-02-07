@@ -64,9 +64,9 @@ function AlertsPage() {
 					Alarmi
 				</Heading>
 				<div className="space-y-3">
-					{Array.from({ length: 3 }).map((_, i) => (
+					{Array.from({ length: 3 }).map((_, index) => (
 						<TkSkeleton
-							key={`alert-skeleton-${i}`}
+							key={index}
 							className="h-20 w-full"
 						/>
 					))}

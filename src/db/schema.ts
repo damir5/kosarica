@@ -10,7 +10,6 @@ import {
 	pgTable,
 	real,
 	serial,
-	smallint,
 	text,
 	timestamp,
 	uniqueIndex,
@@ -266,81 +265,6 @@ export const retailerItemBarcodes = pgTable(
 		).on(table.retailerItemId, table.barcode),
 	}),
 );
-
-// ============================================================================
-// Canonical Catalog: products, product_aliases, product_links, product_relations
-// ============================================================================
-
-export const products = pgTable(
-	"products",
-	{
-		id: cuid2("prd").primaryKey(),
-		name: text("name").notNull(),
-		description: text("description"),
-		category: text("category"),
-		subcategory: text("subcategory"),
-		brand: text("brand"),
-		unit: text("unit"),
-		unitQuantity: text("unit_quantity"),
-		imageUrl: text("image_url"),
-		normalizedUnit: text("normalized_unit"), // "kg", "l", "kom"
-		normalizedQuantity: real("normalized_quantity"),
-		canonicalKey: text("canonical_key"),
-		embedding: pgVector("embedding", 1024),
-		createdAt: timestamp("created_at").defaultNow(),
-		updatedAt: timestamp("updated_at").defaultNow(),
-	},
-	(table) => ({
-		canonicalKeyIdx: uniqueIndex("products_canonical_key_idx")
-			.on(table.canonicalKey)
-			.where(sql`canonical_key IS NOT NULL`),
-	}),
-);
-
-export const productAliases = pgTable("product_aliases", {
-	id: cuid2("pal").primaryKey(),
-	productId: text("product_id")
-		.notNull()
-		.references(() => products.id, { onDelete: "cascade" }),
-	alias: text("alias").notNull(), // alternative name/variant
-	source: text("source"), // where this alias came from
-	createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const productLinks = pgTable(
-	"product_links",
-	{
-		id: cuid2("plk").primaryKey(),
-		productId: text("product_id")
-			.notNull()
-			.references(() => products.id, { onDelete: "cascade" }),
-		retailerItemId: text("retailer_item_id")
-			.notNull()
-			.references(() => retailerItems.id, { onDelete: "cascade" }),
-		confidence: text("confidence"), // 'auto', 'manual', 'verified'
-		createdAt: timestamp("created_at").defaultNow(),
-	},
-	(table) => ({
-		productRetailerItemUnique: uniqueIndex(
-			"product_links_product_retailer_item_unique",
-		).on(table.productId, table.retailerItemId),
-		// Unique constraint on retailer_item_id ensures 1:1 mapping
-		// (each retailer item -> exactly one product)
-		itemUniq: uniqueIndex("product_links_item_uniq").on(table.retailerItemId),
-	}),
-);
-
-export const productRelations = pgTable("product_relations", {
-	id: cuid2("prl").primaryKey(),
-	productId: text("product_id")
-		.notNull()
-		.references(() => products.id, { onDelete: "cascade" }),
-	relatedProductId: text("related_product_id")
-		.notNull()
-		.references(() => products.id, { onDelete: "cascade" }),
-	relationType: text("relation_type").notNull(), // 'variant', 'substitute', 'bundle', etc.
-	createdAt: timestamp("created_at").defaultNow(),
-});
 
 // ============================================================================
 // Archives: track all downloaded files
@@ -635,130 +559,179 @@ export const storeEnrichmentTasks = pgTable(
 );
 
 // ============================================================================
-// Product Matching: Match candidates, review queue, rejections, audit
+// Semantic Clustering V2: features, pair decisions, clusters
 // ============================================================================
 
-// Product match candidates - supports top-N suggestions per item with versioning
-export const productMatchCandidates = pgTable(
-	"product_match_candidates",
+export const retailerItemFeatures = pgTable(
+	"retailer_item_features",
 	{
-		id: cuid2("pmc").primaryKey(),
+		id: cuid2("rif").primaryKey(),
 		retailerItemId: text("retailer_item_id")
 			.notNull()
 			.references(() => retailerItems.id, { onDelete: "cascade" }),
-		candidateProductId: text("candidate_product_id").references(
-			() => products.id,
+		normalizedName: text("normalized_name").notNull(),
+		normalizedCategory: text("normalized_category"),
+		extractedBrand: text("extracted_brand"),
+		extractedAmount: real("extracted_amount"),
+		extractedUnit: text("extracted_unit"),
+		isCountItem: boolean("is_count_item").notNull().default(false),
+		isMultipack: boolean("is_multipack").notNull().default(false),
+		packAmount: integer("pack_amount").notNull().default(1),
+		unitAmount: real("unit_amount"),
+		totalAmount: real("total_amount"),
+		containerType: text("container_type"),
+		embedding: pgVector("embedding", 1024),
+		blockingKeys: text("blocking_keys").array(),
+		updatedAt: timestamp("updated_at").notNull().defaultNow(),
+	},
+	(table) => ({
+		itemUnique: uniqueIndex("retailer_item_features_item_uniq").on(
+			table.retailerItemId,
+		),
+		categoryBrandIdx: index("retailer_item_features_category_brand_idx").on(
+			table.normalizedCategory,
+			table.extractedBrand,
+		),
+		unitAmountIdx: index("retailer_item_features_unit_amount_idx").on(
+			table.extractedUnit,
+			table.totalAmount,
+		),
+	}),
+);
+
+export const semanticPairDecisions = pgTable(
+	"semantic_pair_decisions",
+	{
+		itemAId: text("item_a_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		itemBId: text("item_b_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		method: text("method").notNull(),
+		similarityScore: real("similarity_score"),
+		llmVerdict: text("llm_verdict"),
+		llmConfidence: real("llm_confidence"),
+		llmReasoning: text("llm_reasoning"),
+		votesJson: text("votes_json"),
+		consensusScore: real("consensus_score"),
+		humanVerdict: text("human_verdict"),
+		finalVerdict: text("final_verdict"),
+		finalConfidence: real("final_confidence"),
+		finalStatus: text("final_status").notNull().default("PENDING_REVIEW"),
+		systemError: text("system_error"),
+		reviewedBy: text("reviewed_by").references(() => user.id),
+		reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		pairUnique: uniqueIndex("semantic_pair_decisions_pair_uniq").on(
+			table.itemAId,
+			table.itemBId,
+		),
+		statusIdx: index("semantic_pair_decisions_status_idx").on(table.finalStatus),
+		llmVerdictIdx: index("semantic_pair_decisions_llm_verdict_idx").on(
+			table.llmVerdict,
+		),
+		methodIdx: index("semantic_pair_decisions_method_idx").on(table.method),
+	}),
+);
+
+export const productClusters = pgTable(
+	"product_clusters",
+	{
+		id: cuid2("pcl").primaryKey(),
+		clusterType: text("cluster_type").notNull(), // 'variant' | 'base'
+		canonicalName: text("canonical_name"),
+		representativeRetailerItemId: text(
+			"representative_retailer_item_id",
+		).references(() => retailerItems.id, {
+			onDelete: "set null",
+		}),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
+	},
+	(table) => ({
+		typeIdx: index("product_clusters_type_idx").on(table.clusterType),
+		repIdx: index("product_clusters_representative_item_idx").on(
+			table.representativeRetailerItemId,
+		),
+	}),
+);
+
+export const clusterMembers = pgTable(
+	"cluster_members",
+	{
+		id: cuid2("pcm").primaryKey(),
+		clusterId: text("cluster_id")
+			.notNull()
+			.references(() => productClusters.id, { onDelete: "cascade" }),
+		retailerItemId: text("retailer_item_id").references(() => retailerItems.id, {
+			onDelete: "cascade",
+		}),
+		variantClusterId: text("variant_cluster_id").references(
+			() => productClusters.id,
 			{
 				onDelete: "cascade",
 			},
 		),
-		similarity: text("similarity"), // stored as text to match real type in Go
-		matchType: text("match_type").notNull(), // 'barcode', 'ai', 'trgm', 'heuristic'
-		rank: smallint("rank").default(1), // 1 = best candidate
-		flags: text("flags"), // 'suspicious_barcode', 'private_label', etc.
-		// Versioning for invalidation
-		matchingRunId: text("matching_run_id"), // Which run generated this
-		modelVersion: text("model_version"), // e.g., 'text-embedding-3-small-v1'
-		normalizedTextHash: text("normalized_text_hash"), // Hash of input text for cache invalidation
-		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+		isCanonical: boolean("is_canonical").notNull().default(false),
+		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => ({
-		itemIdx: index("pmc_item_idx").on(table.retailerItemId),
-		typeIdx: index("pmc_type_idx").on(table.matchType),
-		// Prevent duplicate candidates per item
-		itemCandidateUniq: uniqueIndex("pmc_item_candidate_uniq").on(
-			table.retailerItemId,
-			table.candidateProductId,
-		),
-		// Unique rank per item
-		itemRankUniq: uniqueIndex("pmc_item_rank_uniq").on(
-			table.retailerItemId,
-			table.rank,
-		),
+		clusterIdx: index("cluster_members_cluster_idx").on(table.clusterId),
+		itemUnique: uniqueIndex("cluster_members_item_uniq")
+			.on(table.retailerItemId)
+			.where(sql`retailer_item_id IS NOT NULL`),
+		variantUnique: uniqueIndex("cluster_members_variant_uniq")
+			.on(table.variantClusterId)
+			.where(sql`variant_cluster_id IS NOT NULL`),
+		clusterItemUnique: uniqueIndex("cluster_members_cluster_item_unique")
+			.on(table.clusterId, table.retailerItemId)
+			.where(sql`retailer_item_id IS NOT NULL`),
+		clusterVariantUnique: uniqueIndex("cluster_members_cluster_variant_unique")
+			.on(table.clusterId, table.variantClusterId)
+			.where(sql`variant_cluster_id IS NOT NULL`),
 	}),
 );
 
-// Review queue with audit trail
-export const productMatchQueue = pgTable(
-	"product_match_queue",
+export const clusterRelations = pgTable(
+	"cluster_relations",
 	{
-		id: cuid2("pmq").primaryKey(),
-		retailerItemId: text("retailer_item_id")
+		id: cuid2("pcr").primaryKey(),
+		fromClusterId: text("from_cluster_id")
 			.notNull()
-			.references(() => retailerItems.id, { onDelete: "cascade" }),
-		status: text("status").default("pending"), // pending, approved, rejected, skipped
-		decision: text("decision"), // 'linked', 'new_product', 'no_match'
-		linkedProductId: text("linked_product_id").references(() => products.id),
-		reviewedBy: text("reviewed_by").references(() => user.id),
-		reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-		reviewNotes: text("review_notes"),
-		// Version for optimistic locking (prevents concurrent review conflicts)
-		version: integer("version").default(1),
-		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+			.references(() => productClusters.id, { onDelete: "cascade" }),
+		toClusterId: text("to_cluster_id")
+			.notNull()
+			.references(() => productClusters.id, { onDelete: "cascade" }),
+		relationshipType: text("relationship_type").notNull(), // MULTIPACK_VARIANT | SIZE_VARIANT | CONTAINER_VARIANT
+		confidence: real("confidence"),
+		reasoning: text("reasoning"),
+		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => ({
-		statusIdx: index("pmq_status_idx").on(table.status),
-		itemUniq: uniqueIndex("pmq_item_uniq").on(table.retailerItemId),
-	}),
-);
-
-// Scoped rejections - reject specific candidates, not global block
-export const productMatchRejections = pgTable(
-	"product_match_rejections",
-	{
-		retailerItemId: text("retailer_item_id")
-			.notNull()
-			.references(() => retailerItems.id, { onDelete: "cascade" }),
-		rejectedProductId: text("rejected_product_id")
-			.notNull()
-			.references(() => products.id, { onDelete: "cascade" }),
-		reason: text("reason"), // 'wrong_product', 'different_size', 'private_label', etc.
-		rejectedBy: text("rejected_by").references(() => user.id),
-		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-	},
-	(table) => ({
-		// Composite primary key on (retailerItemId, rejectedProductId)
-		pk: uniqueIndex("product_match_rejections_pk").on(
-			table.retailerItemId,
-			table.rejectedProductId,
+		fromIdx: index("cluster_relations_from_idx").on(table.fromClusterId),
+		toIdx: index("cluster_relations_to_idx").on(table.toClusterId),
+		pairUnique: uniqueIndex("cluster_relations_pair_uniq").on(
+			table.fromClusterId,
+			table.toClusterId,
 		),
 	}),
 );
 
-// Audit log - with proper FK
-export const productMatchAudit = pgTable(
-	"product_match_audit",
+export const llmDecisionCache = pgTable(
+	"llm_decision_cache",
 	{
-		id: bigserial({ mode: "bigint" }).primaryKey(),
-		queueId: text("queue_id")
-			.notNull()
-			.references(() => productMatchQueue.id, { onDelete: "cascade" }), // FK!
-		action: text("action").notNull(), // 'approved', 'rejected', 'created', 'unlinked'
-		userId: text("user_id").references(() => user.id),
-		previousState: text("previous_state"), // JSON stored as text
-		newState: text("new_state"), // JSON stored as text
-		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+		inputHash: text("input_hash").primaryKey(),
+		output: text("output").notNull(),
+		modelPlanHash: text("model_plan_hash").notNull(),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
 	},
 	(table) => ({
-		queueIdIdx: index("product_match_audit_queue_id_idx").on(table.queueId),
-		actionIdx: index("product_match_audit_action_idx").on(table.action),
-	}),
-);
-
-// Canonical barcodes - with nullable product_id for race-safe creation
-export const canonicalBarcodes = pgTable(
-	"canonical_barcodes",
-	{
-		barcode: text("barcode").primaryKey(),
-		productId: text("product_id").references(() => products.id, {
-			onDelete: "cascade",
-		}), // NULLABLE for placeholder pattern
-		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-	},
-	(table) => ({
-		productIdIdx: index("canonical_barcodes_product_id_idx").on(
-			table.productId,
-		),
+		updatedIdx: index("llm_decision_cache_updated_idx").on(table.updatedAt),
 	}),
 );
 
@@ -943,9 +916,16 @@ export const priceAlerts = pgTable(
 		userId: text("user_id")
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
-		productId: text("product_id")
-			.notNull()
-			.references(() => products.id, { onDelete: "cascade" }),
+		variantClusterId: text("variant_cluster_id").references(
+			() => productClusters.id,
+			{
+				onDelete: "cascade",
+			},
+		),
+		baseClusterId: text("base_cluster_id").references(() => productClusters.id, {
+			onDelete: "cascade",
+		}),
+		alertScope: text("alert_scope").notNull().default("variant"), // 'variant' | 'base'
 		targetPrice: integer("target_price").notNull(), // cents
 		direction: text("direction").notNull(), // 'below' | 'above'
 		status: text("status").notNull().default("active"), // 'active' | 'triggered' | 'disabled'
@@ -956,11 +936,21 @@ export const priceAlerts = pgTable(
 	},
 	(table) => ({
 		userIdx: index("price_alerts_user_id_idx").on(table.userId),
-		productIdx: index("price_alerts_product_id_idx").on(table.productId),
+		variantClusterIdx: index("price_alerts_variant_cluster_id_idx").on(
+			table.variantClusterId,
+		),
+		baseClusterIdx: index("price_alerts_base_cluster_id_idx").on(
+			table.baseClusterId,
+		),
 		statusIdx: index("price_alerts_status_idx").on(table.status),
-		userProductUnique: uniqueIndex("price_alerts_user_product_unique").on(
+		userVariantUnique: uniqueIndex("price_alerts_user_variant_unique").on(
 			table.userId,
-			table.productId,
+			table.variantClusterId,
+			table.direction,
+		),
+		userBaseUnique: uniqueIndex("price_alerts_user_base_unique").on(
+			table.userId,
+			table.baseClusterId,
 			table.direction,
 		),
 	}),

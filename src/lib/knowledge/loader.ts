@@ -1,19 +1,19 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
 import YAML from "yaml";
-import {
-	type BrandFile,
-	type BrandNode,
-	type ChainKnowledgeFile,
-	type CompiledAttributeRule,
-	type CompiledEquivalenceDefinition,
-	type CompiledExtractionRuleSet,
-	type CompiledProductTypeRule,
-	type EquivalenceFile,
-	type ExtractionFile,
-	type KnowledgeCatalog,
-	type ProductDefinition,
-	type ProductFile,
+import type {
+	BrandFile,
+	BrandNode,
+	ChainKnowledgeFile,
+	CompiledAttributeRule,
+	CompiledEquivalenceDefinition,
+	CompiledExtractionRuleSet,
+	CompiledProductTypeRule,
+	EquivalenceFile,
+	ExtractionFile,
+	KnowledgeCatalog,
+	ProductDefinition,
+	ProductFile,
 } from "./types";
 import { normalizeKnowledgeText } from "./utils";
 

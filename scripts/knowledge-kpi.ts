@@ -137,21 +137,21 @@ async function collectDashboard(
 			FROM retailer_items ri
 			WHERE ri.merged_into_id IS NULL
 			AND NOT EXISTS (
-				SELECT 1 FROM product_links pl WHERE pl.retailer_item_id = ri.id
+				SELECT 1 FROM cluster_members cm WHERE cm.retailer_item_id = ri.id
 			)
 		`),
 		countQuery(db, sql`
 			SELECT COUNT(*)::int AS count
-			FROM product_match_queue pmq
-			WHERE pmq.status = 'pending'
+			FROM semantic_pair_decisions spd
+			WHERE spd.final_status IN ('PENDING_REVIEW', 'SYSTEM_ERROR')
 		`),
 		numericQuery(db, sql`
 			SELECT COALESCE(
-				EXTRACT(EPOCH FROM (NOW() - MIN(pmq.created_at))) / 3600,
+				EXTRACT(EPOCH FROM (NOW() - MIN(spd.created_at))) / 3600,
 				0
 			)::float8 AS value
-			FROM product_match_queue pmq
-			WHERE pmq.status = 'pending'
+			FROM semantic_pair_decisions spd
+			WHERE spd.final_status IN ('PENDING_REVIEW', 'SYSTEM_ERROR')
 		`),
 		countQuery(db, sql`
 			SELECT COUNT(*)::int AS count

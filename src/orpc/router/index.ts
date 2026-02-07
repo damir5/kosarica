@@ -10,20 +10,15 @@ import * as clickhouse from "./clickhouse";
 import * as cron from "./cron";
 import * as ingestion from "./ingestion";
 import * as prices from "./prices";
-import {
-	approveMatch,
-	bulkApprove,
-	getPendingMatchCount,
-	getPendingMatches,
-	getStats,
-	rejectMatch,
-	resolveSuspicious,
-	searchProducts,
-	triggerBarcodeMatching,
-	triggerTrigramMatching,
-} from "./products";
 import { getProductPrices } from "./products-public";
 import * as search from "./search";
+import {
+	approveDecision,
+	getClusterStats,
+	getPendingDecisions,
+	rejectDecision,
+	triggerPipeline,
+} from "./semantic-clusters";
 import { getSettings, updateSettings } from "./settings";
 import {
 	approveStore,
@@ -159,17 +154,12 @@ export default {
 			getStoresByChain: getStoresByChain,
 			getCategories: getCategories,
 		},
-		products: {
-			getPendingMatches,
-			getPendingMatchCount,
-			approveMatch,
-			rejectMatch,
-			bulkApprove,
-			resolveSuspicious,
-			searchProducts,
-			getStats,
-			triggerBarcodeMatching,
-			triggerTrigramMatching,
+		semanticClusters: {
+			getPendingDecisions,
+			approveDecision,
+			rejectDecision,
+			triggerPipeline,
+			getClusterStats,
 		},
 		cron: {
 			list: cron.list,

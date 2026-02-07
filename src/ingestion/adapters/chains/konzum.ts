@@ -168,7 +168,7 @@ export class KonzumAdapter extends BaseCsvAdapter {
 		const storeCode = this.extractStoreIdentifierFromFilename(file.filename);
 
 		// Common Konzum pattern: "...,<store_code>,<city/address>,..."
-		const codeIndex = parts.findIndex((part) => part === storeCode);
+		const codeIndex = parts.indexOf(storeCode);
 		if (codeIndex >= 0) {
 			const cityCandidate = parts[codeIndex + 1] ?? "";
 			const addressCandidate = parts[codeIndex + 2] ?? "";

@@ -107,11 +107,11 @@ export function IngestionStoreStatsTable({
 					{stores.map((store, index) => {
 						const failedRows = store.failedRows ?? 0;
 						const warningRows = store.warningRows ?? 0;
+						const rowKey =
+							store.storeId ?? store.storeIdentifier ?? index;
 
 						return (
-							<TableRow
-								key={`${store.storeId ?? "store"}-${store.storeIdentifier ?? "id"}-${index}`}
-							>
+							<TableRow key={rowKey}>
 								<TableCell>
 									<div className="font-medium">
 										{store.storeName ?? "Unknown store"}

@@ -8,12 +8,6 @@ function asBoolean(value: string | undefined, fallback = false): boolean {
 	return value === "true" || value === "1";
 }
 
-function asNumber(value: string | undefined, fallback: number): number {
-	if (!value) return fallback;
-	const parsed = Number(value);
-	return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 export function initPostHog(): void {
 	if (initialized || typeof window === "undefined") {
 		return;
@@ -30,13 +24,8 @@ export function initPostHog(): void {
 		capture_pageview: true,
 		capture_pageleave: true,
 		session_recording: {
-			maskAllText: true,
-			maskAllElementAttributes: true,
-			minimumDurationMilliseconds: 1500,
-			sampleRate: asNumber(
-				clientConfig.VITE_POSTHOG_SESSION_REPLAY_SAMPLE_RATE,
-				0.05,
-			),
+			maskAllInputs: true,
+			maskTextSelector: "*",
 		},
 		autocapture: true,
 		person_profiles: "identified_only",

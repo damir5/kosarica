@@ -213,7 +213,7 @@ export class IntersparAdapter extends BaseCsvAdapter {
 		}
 
 		const storeCode = this.extractStoreIdentifierFromFilename(file.filename);
-		const storeCodeIndex = parts.findLastIndex((part) => part === storeCode);
+		const storeCodeIndex = parts.lastIndexOf(storeCode);
 		const codeAnchorIndex = parts.findIndex((part, index) => {
 			return index > 1 && index < Math.max(0, storeCodeIndex) && /^\d{5}$/.test(part);
 		});

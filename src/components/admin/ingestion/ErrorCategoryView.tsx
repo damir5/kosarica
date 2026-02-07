@@ -84,8 +84,7 @@ export function ErrorCategoryView({
 					<div className="space-y-4">
 						{[...Array(3)].map((_, i) => (
 							<div
-								// biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton loader items
-								key={`error-skeleton-${i}`}
+								key={i}
 								className="h-16 bg-muted animate-pulse rounded"
 							/>
 						))}

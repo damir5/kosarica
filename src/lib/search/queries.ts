@@ -30,8 +30,6 @@ function getRows<T>(result: unknown): T[] {
 	return ((result as { rows?: unknown[] }).rows ?? []) as T[];
 }
 
-const EMBEDDING_DIMENSIONS = 1024;
-
 function parseWeightEnv(name: string, fallback: number): number {
 	const raw = process.env[name];
 	if (!raw) {
@@ -46,15 +44,6 @@ function parseWeightEnv(name: string, fallback: number): number {
 
 const SEARCH_WEIGHT_FTS = parseWeightEnv("SEARCH_WEIGHT_FTS", 0.7);
 const SEARCH_WEIGHT_TRIGRAM = parseWeightEnv("SEARCH_WEIGHT_TRIGRAM", 0.3);
-const SEARCH_WEIGHT_FTS_WITH_VECTOR = parseWeightEnv(
-	"SEARCH_WEIGHT_FTS_WITH_VECTOR",
-	0.6,
-);
-const SEARCH_WEIGHT_TRIGRAM_WITH_VECTOR = parseWeightEnv(
-	"SEARCH_WEIGHT_TRIGRAM_WITH_VECTOR",
-	0.25,
-);
-const SEARCH_WEIGHT_VECTOR = parseWeightEnv("SEARCH_WEIGHT_VECTOR", 0.15);
 
 function buildFilterConditions(
 	filters?: SearchFilters,
@@ -92,44 +81,16 @@ function buildFilterConditions(
 	return filterConditions;
 }
 
-function hasValidQueryEmbedding(
-	queryEmbedding?: number[],
-): queryEmbedding is number[] {
-	if (!queryEmbedding || queryEmbedding.length !== EMBEDDING_DIMENSIONS) {
-		return false;
-	}
-	return queryEmbedding.every((component) => Number.isFinite(component));
-}
-
-function buildVectorSimilarityExpression(
-	hasVector: boolean,
-	vectorStr: string | null,
-): SQL {
-	if (!hasVector || vectorStr == null) {
-		return sql`0`;
-	}
-	return sql`COALESCE(
-		CASE
-			WHEN s.entity_type = 'product' AND p.embedding IS NOT NULL
-			THEN 1 - (p.embedding <=> ${vectorStr}::vector)
-			ELSE 0
-		END,
-	0)`;
-}
-
 function buildScoreExpression(
 	ftsWeight: number,
 	trigramWeight: number,
-	vectorWeight: number,
-	vectorSimilarityExpression: SQL,
 ): SQL {
 	return sql`(
 		COALESCE(ts_rank_cd(s.search_vector, q.tsq, 32), 0) * ${ftsWeight} +
 		GREATEST(
 			similarity(s.title_normalized, q.nq),
 			similarity(s.body_normalized, q.nq) * 0.5
-		) * ${trigramWeight} +
-		${vectorSimilarityExpression} * ${vectorWeight}
+		) * ${trigramWeight}
 	)`;
 }
 
@@ -179,7 +140,6 @@ export async function fullSearch(
 	limit = 20,
 	offset = 0,
 	filters?: SearchFilters,
-	queryEmbedding?: number[],
 ): Promise<{ results: FullSearchResult[]; total: number }> {
 	const normalizedQuery = query.toLowerCase().trim();
 	if (normalizedQuery.length < 2) {
@@ -193,34 +153,12 @@ export async function fullSearch(
 			? sql`AND ${sql.join(filterConditions, sql` AND `)}`
 			: sql``;
 
-	const validQueryEmbedding = hasValidQueryEmbedding(queryEmbedding)
-		? queryEmbedding
-		: undefined;
-	const hasVector = validQueryEmbedding !== undefined;
-	const vectorStr = hasVector ? `[${validQueryEmbedding.join(",")}]` : null;
-
-	// Scoring weights: with vector boost vs without
-	const ftsWeight = hasVector
-		? SEARCH_WEIGHT_FTS_WITH_VECTOR
-		: SEARCH_WEIGHT_FTS;
-	const trigramWeight = hasVector
-		? SEARCH_WEIGHT_TRIGRAM_WITH_VECTOR
-		: SEARCH_WEIGHT_TRIGRAM;
-	const vectorWeight = hasVector ? SEARCH_WEIGHT_VECTOR : 0;
-	const vectorSimilarityExpression = buildVectorSimilarityExpression(
-		hasVector,
-		vectorStr,
-	);
+	const ftsWeight = SEARCH_WEIGHT_FTS;
+	const trigramWeight = SEARCH_WEIGHT_TRIGRAM;
 	const scoreExpression = buildScoreExpression(
 		ftsWeight,
 		trigramWeight,
-		vectorWeight,
-		vectorSimilarityExpression,
 	);
-
-	const productJoin = hasVector
-		? sql`LEFT JOIN products p ON s.entity_type = 'product' AND s.entity_id = p.id`
-		: sql``;
 
 	const searchQuery = sql`
 		WITH q AS (
@@ -248,7 +186,6 @@ export async function fullSearch(
 				) as body_highlight
 			FROM search_index s
 			CROSS JOIN q
-			${productJoin}
 			WHERE (
 				s.search_vector @@ q.tsq
 				OR s.title_normalized % q.nq
@@ -287,7 +224,6 @@ export async function fullSearch(
 				SELECT ${scoreExpression} as score
 				FROM search_index s
 				CROSS JOIN q
-				${productJoin}
 			WHERE (
 				s.search_vector @@ q.tsq
 				OR s.title_normalized % q.nq

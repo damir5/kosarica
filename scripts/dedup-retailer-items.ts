@@ -10,7 +10,14 @@
 
 import { eq, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "@/db";
-import { retailerItemBarcodes, retailerItems } from "@/db/schema";
+import {
+	clusterMembers,
+	productClusters,
+	retailerItemBarcodes,
+	retailerItemFeatures,
+	retailerItems,
+	semanticPairDecisions,
+} from "@/db/schema";
 import { computeNameHash } from "@/lib/matching/normalize";
 import { createLogger } from "@/utils/logger";
 
@@ -217,34 +224,67 @@ async function mergeDuplicates(groups: DupGroup[]): Promise<{
 				.where(eq(retailerItemBarcodes.retailerItemId, dupId));
 		}
 
-		// Migrate product_links: move to survivor if survivor doesn't already have a link
 		const dupIdList = sql.join(duplicateIds.map((id) => sql`${id}`), sql`, `);
+
+		// Migrate feature row to survivor if survivor doesn't already have one.
 		await db.execute(sql`
-			UPDATE product_links
+			UPDATE retailer_item_features
 			SET retailer_item_id = ${survivorId}
 			WHERE retailer_item_id IN (${dupIdList})
 			AND NOT EXISTS (
-				SELECT 1 FROM product_links existing
+				SELECT 1 FROM retailer_item_features existing
 				WHERE existing.retailer_item_id = ${survivorId}
 			)
-		`);
-		// Delete conflicting product_links that couldn't be migrated
-		await db.execute(sql`
-			DELETE FROM product_links WHERE retailer_item_id IN (${dupIdList})
 		`);
 
-		// Migrate product_match_queue entries
+		// Drop remaining feature rows for merged duplicates.
 		await db.execute(sql`
-			UPDATE product_match_queue
+			DELETE FROM retailer_item_features WHERE retailer_item_id IN (${dupIdList})
+		`);
+
+		// Keep cluster representative pointer stable.
+		await db.execute(sql`
+			UPDATE product_clusters
+			SET representative_retailer_item_id = ${survivorId}
+			WHERE representative_retailer_item_id IN (${dupIdList})
+		`);
+
+		// Move cluster member pointer when possible, then clear stale duplicate members.
+		await db.execute(sql`
+			UPDATE cluster_members
 			SET retailer_item_id = ${survivorId}
 			WHERE retailer_item_id IN (${dupIdList})
 			AND NOT EXISTS (
-				SELECT 1 FROM product_match_queue existing
+				SELECT 1 FROM cluster_members existing
 				WHERE existing.retailer_item_id = ${survivorId}
 			)
 		`);
 		await db.execute(sql`
-			DELETE FROM product_match_queue WHERE retailer_item_id IN (${dupIdList})
+			DELETE FROM cluster_members WHERE retailer_item_id IN (${dupIdList})
+		`);
+
+		// Any pair decisions involving merged-away items are invalid and should be rebuilt.
+		await db
+			.delete(semanticPairDecisions)
+			.where(
+				sql`${semanticPairDecisions.itemAId} IN (${dupIdList}) OR ${semanticPairDecisions.itemBId} IN (${dupIdList})`,
+			);
+		await db
+			.update(retailerItemFeatures)
+			.set({ updatedAt: new Date() })
+			.where(eq(retailerItemFeatures.retailerItemId, survivorId));
+		await db
+			.update(clusterMembers)
+			.set({ createdAt: new Date() })
+			.where(eq(clusterMembers.retailerItemId, survivorId));
+		await db
+			.update(productClusters)
+			.set({ updatedAt: new Date() })
+			.where(eq(productClusters.representativeRetailerItemId, survivorId));
+		await db.execute(sql`
+			UPDATE semantic_pair_decisions
+			SET updated_at = NOW()
+			WHERE item_a_id = ${survivorId} OR item_b_id = ${survivorId}
 		`);
 
 		// Soft-delete duplicates by setting merged_into_id

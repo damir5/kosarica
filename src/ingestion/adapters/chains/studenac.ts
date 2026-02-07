@@ -288,11 +288,11 @@ function extractPriceWithFallback(
 }
 
 function getStreetCitySplitIndex(parts: string[]): number {
-	const houseNumberIndex = parts.findLastIndex(
-		(part, index) => index < parts.length - 1 && /^\d+[A-Za-z]?$/i.test(part),
-	);
-	if (houseNumberIndex >= 0) {
-		return houseNumberIndex + 1;
+	for (let index = parts.length - 2; index >= 0; index -= 1) {
+		const part = parts[index];
+		if (/^\d+[A-Za-z]?$/i.test(part)) {
+			return index + 1;
+		}
 	}
 	return 1;
 }

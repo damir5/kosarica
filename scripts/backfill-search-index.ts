@@ -8,7 +8,13 @@
 import "dotenv/config";
 import { eq } from "drizzle-orm";
 import { getDatabase } from "@/db";
-import { chains, products, retailerItems, searchIndex, stores } from "@/db/schema";
+import {
+	chains,
+	productClusters,
+	retailerItems,
+	searchIndex,
+	stores,
+} from "@/db/schema";
 import { generatePrefixedId } from "@/utils/id";
 
 const BATCH_SIZE = 1000;
@@ -18,10 +24,14 @@ async function backfillProducts(): Promise<number> {
 	let total = 0;
 	let offset = 0;
 
-	console.log("Backfilling products...");
+	console.log("Backfilling product clusters...");
 
 	while (true) {
-		const batch = await db.select().from(products).limit(BATCH_SIZE).offset(offset);
+		const batch = await db
+			.select()
+			.from(productClusters)
+			.limit(BATCH_SIZE)
+			.offset(offset);
 
 		if (batch.length === 0) break;
 
@@ -30,22 +40,22 @@ async function backfillProducts(): Promise<number> {
 			entityType: "product" as const,
 			entityId: product.id,
 			chainSlug: null,
-			category: product.category ?? null,
-			subcategory: product.subcategory ?? null,
-			title: product.name,
-			subtitle: product.brand ?? null,
+			category: product.clusterType,
+			subcategory: null,
+			title: product.canonicalName ?? "Cluster",
+			subtitle: null,
 			body:
-				[product.description, product.category, product.subcategory]
+				[product.canonicalName, product.clusterType]
 					.filter(Boolean)
 					.join(" ") || null,
-			imageUrl: product.imageUrl ?? null,
+			imageUrl: null,
 		}));
 
 		await db.insert(searchIndex).values(values).onConflictDoNothing();
 
 		total += batch.length;
 		offset += BATCH_SIZE;
-		console.log(`  Products: ${total} indexed`);
+		console.log(`  Product clusters: ${total} indexed`);
 	}
 
 	return total;

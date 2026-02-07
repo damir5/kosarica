@@ -30,7 +30,8 @@
     "knowledge:validate": "tsx scripts/validate-knowledge.ts",
     "knowledge:apply": "tsx scripts/apply-knowledge.ts",
     "knowledge:kpi": "tsx scripts/knowledge-kpi.ts",
-    "knowledge:kpi:strict": "tsx scripts/knowledge-kpi.ts --fail-on-alert"
+    "knowledge:kpi:strict": "tsx scripts/knowledge-kpi.ts --fail-on-alert",
+    "matching:clusters": "tsx scripts/run-semantic-clustering.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.4.13",

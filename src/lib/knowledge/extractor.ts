@@ -210,7 +210,6 @@ function transformValue(
 			const normalized = normalizeKnowledgeText(rawValue);
 			return ["bio", "eko", "organic", "true", "da"].includes(normalized);
 		}
-		case "raw":
 		default:
 			return rawValue;
 	}

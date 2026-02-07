@@ -90,9 +90,9 @@ function HomePage() {
 			>
 				{dealsQuery.isLoading ? (
 					<div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
-						{Array.from({ length: 5 }).map((_, i) => (
+						{Array.from({ length: 5 }).map((_, index) => (
 							<TkSkeleton
-								key={`deal-skeleton-${i}`}
+								key={index}
 								className="h-40 w-48 shrink-0"
 							/>
 						))}

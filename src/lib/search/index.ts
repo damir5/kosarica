@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
 	chains,
-	products,
+	productClusters,
 	retailerItems,
 	searchIndex,
 	stores,
@@ -53,12 +53,12 @@ export async function indexProduct(productId: string): Promise<void> {
 
 	const [product] = await db
 		.select()
-		.from(products)
-		.where(eq(products.id, productId))
+		.from(productClusters)
+		.where(eq(productClusters.id, productId))
 		.limit(1);
 
 	if (!product) {
-		log.warn("Product not found for indexing", { productId });
+		log.warn("Product cluster not found for indexing", { productId });
 		return;
 	}
 
@@ -66,15 +66,14 @@ export async function indexProduct(productId: string): Promise<void> {
 		entityType: "product",
 		entityId: product.id,
 		chainSlug: null,
-		category: product.category ?? null,
-		subcategory: product.subcategory ?? null,
-		title: product.name,
-		subtitle: product.brand ?? null,
+		category: product.clusterType,
+		subcategory: null,
+		title: product.canonicalName ?? "Cluster",
+		subtitle: null,
 		body:
-			[product.description, product.category, product.subcategory]
-				.filter(Boolean)
-				.join(" ") || null,
-		imageUrl: product.imageUrl ?? null,
+			[product.canonicalName, product.clusterType].filter(Boolean).join(" ") ||
+			null,
+		imageUrl: null,
 	});
 }
 

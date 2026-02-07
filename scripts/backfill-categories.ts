@@ -67,32 +67,9 @@ async function main() {
 		totalUpdated += rowCount;
 	}
 
-	// Also update products table
-	const productCategoriesResult = await db.execute(sql`
-		SELECT DISTINCT category FROM products WHERE category IS NOT NULL
-	`);
-	const productRows = (Array.isArray(productCategoriesResult) ? productCategoriesResult : (productCategoriesResult as { rows?: Array<Record<string, unknown>> }).rows ?? []) as Array<Record<string, unknown>>;
-	let productsUpdated = 0;
-
-	for (const row of productRows) {
-		const rawCategory = row.category as string;
-		const normalized = normalizeCategory(rawCategory);
-		if (!normalized) continue;
-
-		const result = await db.execute(sql`
-			UPDATE products
-			SET
-				category = ${normalized.category},
-				subcategory = COALESCE(subcategory, ${normalized.subcategory})
-			WHERE category = ${rawCategory}
-		`);
-		productsUpdated += (result as { rowCount?: number }).rowCount ?? 0;
-	}
-
 	console.log(`Mapped pairs: ${mappedPairs}`);
 	console.log(`Unmapped pairs: ${unmappedPairs}`);
 	console.log(`Retailer items updated: ${totalUpdated}`);
-	console.log(`Products updated: ${productsUpdated}`);
 
 	if (unmapped.length > 0) {
 		console.log(`\nUnmapped categories (${unmapped.length}):`);
