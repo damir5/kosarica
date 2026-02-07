@@ -158,6 +158,12 @@ export const triggerPipeline = superadminProcedure
 		z
 			.object({
 				featureBatchSize: z.number().int().min(1).max(100_000).optional(),
+				embeddingBackfillBatchSize: z
+					.number()
+					.int()
+					.min(1)
+					.max(100_000)
+					.optional(),
 				candidateSourceBatch: z.number().int().min(1).max(100_000).optional(),
 				candidateInsertLimit: z.number().int().min(1).max(200_000).optional(),
 				adjudicationBatchSize: z.number().int().min(1).max(10_000).optional(),
@@ -171,6 +177,7 @@ export const triggerPipeline = superadminProcedure
 	.handler(async ({ input }) => {
 		return await runSemanticClusteringPipeline({
 			featureBatchSize: input?.featureBatchSize,
+			embeddingBackfillBatchSize: input?.embeddingBackfillBatchSize,
 			candidateSourceBatch: input?.candidateSourceBatch,
 			candidateInsertLimit: input?.candidateInsertLimit,
 			adjudicationBatchSize: input?.adjudicationBatchSize,

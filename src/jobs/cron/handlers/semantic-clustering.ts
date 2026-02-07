@@ -33,6 +33,10 @@ export const semanticClusteringHandler: CronJobHandler = {
 			"SEMANTIC_CLUSTERING_CANDIDATE_SOURCE_BATCH",
 			1000,
 		);
+		const embeddingBackfillBatchSize = parsePositiveIntEnv(
+			"SEMANTIC_CLUSTERING_EMBEDDING_BACKFILL_BATCH_SIZE",
+			2000,
+		);
 		const candidateInsertLimit = parsePositiveIntEnv(
 			"SEMANTIC_CLUSTERING_CANDIDATE_INSERT_LIMIT",
 			5000,
@@ -51,6 +55,7 @@ export const semanticClusteringHandler: CronJobHandler = {
 			scheduledFor: context.scheduledFor.toISOString(),
 			maxBatches,
 			featureBatchSize,
+			embeddingBackfillBatchSize,
 			candidateSourceBatch,
 			candidateInsertLimit,
 			adjudicationBatchSize,
@@ -59,6 +64,8 @@ export const semanticClusteringHandler: CronJobHandler = {
 
 		let batchesProcessed = 0;
 		let featuresUpserted = 0;
+		let featureEmbeddingsUpserted = 0;
+		let embeddingsBackfilled = 0;
 		let candidatesQueued = 0;
 		let scoringAutoApproved = 0;
 		let scoringAutoRejected = 0;
@@ -74,6 +81,7 @@ export const semanticClusteringHandler: CronJobHandler = {
 		for (let i = 0; i < maxBatches; i += 1) {
 			const result = await runSemanticClusteringPipeline({
 				featureBatchSize,
+				embeddingBackfillBatchSize,
 				candidateSourceBatch,
 				candidateInsertLimit,
 				adjudicationBatchSize,
@@ -82,6 +90,8 @@ export const semanticClusteringHandler: CronJobHandler = {
 			});
 			batchesProcessed += 1;
 			featuresUpserted += result.featuresUpserted;
+			featureEmbeddingsUpserted += result.featureEmbeddingsUpserted;
+			embeddingsBackfilled += result.embeddingsBackfilled;
 			candidatesQueued += result.candidatesQueued;
 			scoringAutoApproved += result.scoringAutoApproved;
 			scoringAutoRejected += result.scoringAutoRejected;
@@ -107,6 +117,8 @@ export const semanticClusteringHandler: CronJobHandler = {
 			runId: context.runId,
 			batchesProcessed,
 			featuresUpserted,
+			featureEmbeddingsUpserted,
+			embeddingsBackfilled,
 			candidatesQueued,
 			scoringAutoApproved,
 			scoringAutoRejected,

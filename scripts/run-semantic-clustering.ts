@@ -21,6 +21,10 @@ async function main() {
 		"SEMANTIC_CLUSTERING_CANDIDATE_SOURCE_BATCH",
 		1000,
 	);
+	const embeddingBackfillBatchSize = parsePositiveIntEnv(
+		"SEMANTIC_CLUSTERING_EMBEDDING_BACKFILL_BATCH_SIZE",
+		2000,
+	);
 	const candidateInsertLimit = parsePositiveIntEnv(
 		"SEMANTIC_CLUSTERING_CANDIDATE_INSERT_LIMIT",
 		5000,
@@ -36,6 +40,7 @@ async function main() {
 
 	const result = await runSemanticClusteringPipeline({
 		featureBatchSize,
+		embeddingBackfillBatchSize,
 		candidateSourceBatch,
 		candidateInsertLimit,
 		adjudicationBatchSize,
@@ -45,6 +50,8 @@ async function main() {
 
 	console.log("\n=== Semantic Clustering Pipeline ===");
 	console.log(`Features upserted: ${result.featuresUpserted}`);
+	console.log(`Feature embeddings upserted: ${result.featureEmbeddingsUpserted}`);
+	console.log(`Embeddings backfilled: ${result.embeddingsBackfilled}`);
 	console.log(`Candidates queued: ${result.candidatesQueued}`);
 	console.log(`Scoring auto-approved: ${result.scoringAutoApproved}`);
 	console.log(`Scoring auto-rejected: ${result.scoringAutoRejected}`);

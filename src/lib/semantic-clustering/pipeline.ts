@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import { embedTexts, preparePassageText } from "@/lib/embeddings";
 import {
 	clusterMembers,
 	clusterRelations,
@@ -18,6 +19,7 @@ const log = createLogger("matching");
 
 interface PipelineOptions {
 	featureBatchSize?: number;
+	embeddingBackfillBatchSize?: number;
 	candidateSourceBatch?: number;
 	candidateInsertLimit?: number;
 	adjudicationBatchSize?: number;
@@ -35,6 +37,8 @@ interface PipelineOptions {
 
 interface PipelineResult {
 	featuresUpserted: number;
+	featureEmbeddingsUpserted: number;
+	embeddingsBackfilled: number;
 	candidatesQueued: number;
 	scoringAutoApproved: number;
 	scoringAutoRejected: number;
@@ -87,6 +91,15 @@ interface CandidateQueueResult {
 	autoApproved: number;
 	autoRejected: number;
 	pendingReview: number;
+}
+
+interface FeatureEmbeddingRow {
+	retailerItemId: string;
+	name: string;
+	brand: string | null;
+	category: string | null;
+	unit: string | null;
+	unitQuantity: string | null;
 }
 
 function getRows<T>(result: unknown): T[] {
@@ -203,7 +216,59 @@ function determineRelationshipType(a: DecisionRow, b: DecisionRow): string {
 	return "SIZE_VARIANT";
 }
 
-async function upsertFeatures(batchSize: number): Promise<number> {
+function buildFeatureEmbeddingText(row: FeatureEmbeddingRow): string {
+	return preparePassageText({
+		name: row.name,
+		brand: row.brand,
+		category: row.category,
+		unit: row.unit,
+		unitQuantity: row.unitQuantity,
+	});
+}
+
+function toVectorLiteral(vector: readonly number[]): string {
+	return `[${vector.join(",")}]`;
+}
+
+async function embedFeatureRows(
+	rows: readonly FeatureEmbeddingRow[],
+): Promise<Map<string, number[]>> {
+	if (rows.length === 0) {
+		return new Map();
+	}
+
+	const texts = rows.map((row) => buildFeatureEmbeddingText(row));
+	try {
+		const embeddings = await embedTexts(texts);
+		if (embeddings.length !== rows.length) {
+			log.warn("Embedding output length mismatch for feature rows", {
+				rowCount: rows.length,
+				embeddingCount: embeddings.length,
+			});
+		}
+
+		const vectorsByItemId = new Map<string, number[]>();
+		for (const [index, row] of rows.entries()) {
+			const vector = embeddings[index];
+			if (!vector) {
+				continue;
+			}
+			vectorsByItemId.set(row.retailerItemId, vector);
+		}
+		return vectorsByItemId;
+	} catch (error) {
+		log.warn("Failed to generate embeddings for retailer item features", {
+			rowCount: rows.length,
+			error,
+		});
+		return new Map();
+	}
+}
+
+async function upsertFeatures(batchSize: number): Promise<{
+	featuresUpserted: number;
+	featureEmbeddingsUpserted: number;
+}> {
 	const db = getDb();
 	const rowsResult = await db.execute(sql`
 		SELECT
@@ -231,9 +296,21 @@ async function upsertFeatures(batchSize: number): Promise<number> {
 	}>(rowsResult);
 
 	if (rows.length === 0) {
-		return 0;
+		return { featuresUpserted: 0, featureEmbeddingsUpserted: 0 };
 	}
 
+	const embeddingsByItemId = await embedFeatureRows(
+		rows.map((row) => ({
+			retailerItemId: row.id,
+			name: row.name,
+			brand: row.brand,
+			category: row.category,
+			unit: row.unit,
+			unitQuantity: row.unit_quantity,
+		})),
+	);
+
+	let featureEmbeddingsUpserted = 0;
 	for (const row of rows) {
 		const parsed: ParsedFeature = parseRetailerItemFeature({
 			retailerItemId: row.id,
@@ -243,47 +320,134 @@ async function upsertFeatures(batchSize: number): Promise<number> {
 			unit: row.unit,
 			unitQuantity: row.unit_quantity,
 		});
+		const embedding = embeddingsByItemId.get(row.id);
+		const values = {
+			id: generatePrefixedId("rif"),
+			retailerItemId: row.id,
+			normalizedName: parsed.normalizedName,
+			normalizedCategory: parsed.normalizedCategory,
+			extractedBrand: parsed.extractedBrand,
+			extractedAmount: parsed.extractedAmount,
+			extractedUnit: parsed.extractedUnit,
+			isCountItem: parsed.isCountItem,
+			isMultipack: parsed.isMultipack,
+			packAmount: parsed.packAmount,
+			unitAmount: parsed.unitAmount,
+			totalAmount: parsed.totalAmount,
+			containerType: parsed.containerType,
+			blockingKeys: parsed.blockingKeys,
+			updatedAt: new Date(),
+			...(embedding ? { embedding } : {}),
+		};
+		const updateSet = {
+			normalizedName: parsed.normalizedName,
+			normalizedCategory: parsed.normalizedCategory,
+			extractedBrand: parsed.extractedBrand,
+			extractedAmount: parsed.extractedAmount,
+			extractedUnit: parsed.extractedUnit,
+			isCountItem: parsed.isCountItem,
+			isMultipack: parsed.isMultipack,
+			packAmount: parsed.packAmount,
+			unitAmount: parsed.unitAmount,
+			totalAmount: parsed.totalAmount,
+			containerType: parsed.containerType,
+			blockingKeys: parsed.blockingKeys,
+			updatedAt: new Date(),
+			...(embedding ? { embedding } : {}),
+		};
 
 		await db
 			.insert(retailerItemFeatures)
-			.values({
-				id: generatePrefixedId("rif"),
-				retailerItemId: row.id,
-				normalizedName: parsed.normalizedName,
-				normalizedCategory: parsed.normalizedCategory,
-				extractedBrand: parsed.extractedBrand,
-				extractedAmount: parsed.extractedAmount,
-				extractedUnit: parsed.extractedUnit,
-				isCountItem: parsed.isCountItem,
-				isMultipack: parsed.isMultipack,
-				packAmount: parsed.packAmount,
-				unitAmount: parsed.unitAmount,
-				totalAmount: parsed.totalAmount,
-				containerType: parsed.containerType,
-				blockingKeys: parsed.blockingKeys,
-				updatedAt: new Date(),
-			})
+			.values(values)
 			.onConflictDoUpdate({
 				target: [retailerItemFeatures.retailerItemId],
-				set: {
-					normalizedName: parsed.normalizedName,
-					normalizedCategory: parsed.normalizedCategory,
-					extractedBrand: parsed.extractedBrand,
-					extractedAmount: parsed.extractedAmount,
-					extractedUnit: parsed.extractedUnit,
-					isCountItem: parsed.isCountItem,
-					isMultipack: parsed.isMultipack,
-					packAmount: parsed.packAmount,
-					unitAmount: parsed.unitAmount,
-					totalAmount: parsed.totalAmount,
-					containerType: parsed.containerType,
-					blockingKeys: parsed.blockingKeys,
-					updatedAt: new Date(),
-				},
+				set: updateSet,
 			});
+
+		if (embedding) {
+			featureEmbeddingsUpserted += 1;
+		}
 	}
 
-	return rows.length;
+	return { featuresUpserted: rows.length, featureEmbeddingsUpserted };
+}
+
+export async function backfillMissingFeatureEmbeddings(batchSize: number): Promise<number> {
+	if (batchSize <= 0) {
+		return 0;
+	}
+
+	const db = getDb();
+	return await db.transaction(async (tx) => {
+		const rowsResult = await tx.execute(sql`
+			SELECT
+				rif.retailer_item_id,
+				ri.name,
+				ri.brand,
+				ri.category,
+				ri.unit,
+				ri.unit_quantity
+			FROM retailer_item_features rif
+			JOIN retailer_items ri ON ri.id = rif.retailer_item_id
+			WHERE ri.merged_into_id IS NULL
+				AND rif.embedding IS NULL
+			ORDER BY rif.updated_at DESC
+			LIMIT ${batchSize}
+			FOR UPDATE OF rif SKIP LOCKED
+		`);
+
+		const rows = getRows<{
+			retailer_item_id: string;
+			name: string;
+			brand: string | null;
+			category: string | null;
+			unit: string | null;
+			unit_quantity: string | null;
+		}>(rowsResult);
+		if (rows.length === 0) {
+			return 0;
+		}
+
+		const embeddingsByItemId = await embedFeatureRows(
+			rows.map((row) => ({
+				retailerItemId: row.retailer_item_id,
+				name: row.name,
+				brand: row.brand,
+				category: row.category,
+				unit: row.unit,
+				unitQuantity: row.unit_quantity,
+			})),
+		);
+
+		const updateRows: Array<{ retailerItemId: string; vectorLiteral: string }> = [];
+		for (const row of rows) {
+			const embedding = embeddingsByItemId.get(row.retailer_item_id);
+			if (!embedding) {
+				continue;
+			}
+			updateRows.push({
+				retailerItemId: row.retailer_item_id,
+				vectorLiteral: toVectorLiteral(embedding),
+			});
+		}
+
+		if (updateRows.length === 0) {
+			return 0;
+		}
+
+		const values = updateRows.map((row) => sql`(${row.retailerItemId}::text, ${row.vectorLiteral}::vector)`);
+		await tx.execute(sql`
+			WITH updates(retailer_item_id, embedding) AS (
+				VALUES ${sql.join(values, sql`, `)}
+			)
+			UPDATE retailer_item_features rif
+			SET embedding = updates.embedding
+			FROM updates
+			WHERE rif.retailer_item_id = updates.retailer_item_id
+		`);
+
+		return updateRows.length;
+	});
 }
 
 function heuristicVerdictFromCandidate(input: {
@@ -356,7 +520,7 @@ async function queueCandidates(config: CandidateQueueConfig): Promise<CandidateQ
 					OR abs(s.total_amount - t.total_amount) <= greatest(0.1, 0.15 * greatest(s.total_amount, t.total_amount))
 				)
 		),
-		semantic_candidates AS (
+			semantic_candidates AS (
 			SELECT
 				s.retailer_item_id AS source_id,
 				t.retailer_item_id AS target_id,
@@ -374,27 +538,27 @@ async function queueCandidates(config: CandidateQueueConfig): Promise<CandidateQ
 				END AS amount_ratio,
 				(COALESCE(s.pack_amount, 1) = COALESCE(t.pack_amount, 1)) AS pack_match,
 				(COALESCE(s.container_type, '') = COALESCE(t.container_type, '')) AS container_match
-			FROM source s
-			JOIN LATERAL (
-				SELECT
-					t.retailer_item_id,
-					t.normalized_name,
-					t.normalized_category,
-					t.extracted_brand,
+				FROM source s
+				JOIN LATERAL (
+					SELECT
+						t.retailer_item_id,
+						t.normalized_name,
+						t.normalized_category,
+						t.extracted_brand,
 					t.extracted_unit,
 					t.total_amount,
 					t.pack_amount,
 					t.container_type,
-					t.embedding
-				FROM retailer_item_features t
-				WHERE t.retailer_item_id <> s.retailer_item_id
-					AND s.embedding IS NOT NULL
-					AND t.embedding IS NOT NULL
-				ORDER BY s.embedding <=> t.embedding
-				LIMIT ${config.semanticNeighborCount}
-			) t ON true
-			WHERE s.embedding IS NOT NULL
-		),
+						t.embedding
+					FROM retailer_item_features t
+					WHERE t.retailer_item_id <> s.retailer_item_id
+						AND s.embedding IS NOT NULL
+						AND t.embedding IS NOT NULL
+					ORDER BY s.embedding <=> t.embedding
+					LIMIT ${config.semanticNeighborCount}
+				) t ON true
+				WHERE s.embedding IS NOT NULL
+			),
 		lexical_candidates AS (
 			SELECT
 				s.retailer_item_id AS source_id,
@@ -418,25 +582,25 @@ async function queueCandidates(config: CandidateQueueConfig): Promise<CandidateQ
 				(COALESCE(s.pack_amount, 1) = COALESCE(t.pack_amount, 1)) AS pack_match,
 				(COALESCE(s.container_type, '') = COALESCE(t.container_type, '')) AS container_match
 			FROM source s
-			JOIN LATERAL (
-				SELECT
-					t.retailer_item_id,
-					t.normalized_name,
-					t.normalized_category,
-					t.extracted_brand,
-					t.extracted_unit,
-					t.total_amount,
-					t.pack_amount,
-					t.container_type,
-					t.embedding,
-					similarity(s.normalized_name, t.normalized_name)::real AS lexical_similarity
-				FROM retailer_item_features t
-				WHERE t.retailer_item_id <> s.retailer_item_id
-				ORDER BY similarity(s.normalized_name, t.normalized_name) DESC
-				LIMIT ${config.lexicalNeighborCount}
-			) t ON true
-			WHERE t.lexical_similarity >= 0.12
-		),
+				JOIN LATERAL (
+					SELECT
+						t.retailer_item_id,
+						t.normalized_name,
+						t.normalized_category,
+						t.extracted_brand,
+						t.extracted_unit,
+						t.total_amount,
+						t.pack_amount,
+						t.container_type,
+						t.embedding,
+						similarity(s.normalized_name, t.normalized_name)::real AS lexical_similarity
+					FROM retailer_item_features t
+					WHERE t.retailer_item_id <> s.retailer_item_id
+					ORDER BY t.normalized_name <-> s.normalized_name
+					LIMIT ${config.lexicalNeighborCount}
+				) t ON true
+				WHERE t.lexical_similarity >= 0.12
+			),
 		combined_candidates AS (
 			SELECT * FROM rule_candidates
 			UNION ALL
@@ -927,6 +1091,7 @@ export async function runSemanticClusteringPipeline(
 	options: PipelineOptions = {},
 ): Promise<PipelineResult> {
 	const featureBatchSize = options.featureBatchSize ?? 2000;
+	const embeddingBackfillBatchSize = options.embeddingBackfillBatchSize ?? 2000;
 	const candidateSourceBatch = options.candidateSourceBatch ?? 1000;
 	const candidateInsertLimit = options.candidateInsertLimit ?? 5000;
 	const adjudicationBatchSize = options.adjudicationBatchSize ?? 200;
@@ -941,7 +1106,10 @@ export async function runSemanticClusteringPipeline(
 	const categoryWeight = options.categoryWeight ?? 0.05;
 	const rebuildClusters = options.rebuildClusters ?? true;
 
-	const featuresUpserted = await upsertFeatures(featureBatchSize);
+	const featureUpsertResult = await upsertFeatures(featureBatchSize);
+	const embeddingsBackfilled = await backfillMissingFeatureEmbeddings(
+		embeddingBackfillBatchSize,
+	);
 	const candidateQueue = await queueCandidates({
 		sourceBatch: candidateSourceBatch,
 		insertLimit: candidateInsertLimit,
@@ -963,7 +1131,9 @@ export async function runSemanticClusteringPipeline(
 		: { variantClusters: 0, baseClusters: 0 };
 
 	const result: PipelineResult = {
-		featuresUpserted,
+		featuresUpserted: featureUpsertResult.featuresUpserted,
+		featureEmbeddingsUpserted: featureUpsertResult.featureEmbeddingsUpserted,
+		embeddingsBackfilled,
 		candidatesQueued: candidateQueue.inserted,
 		scoringAutoApproved: candidateQueue.autoApproved,
 		scoringAutoRejected: candidateQueue.autoRejected,

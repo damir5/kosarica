@@ -31,7 +31,8 @@
     "knowledge:apply": "tsx scripts/apply-knowledge.ts",
     "knowledge:kpi": "tsx scripts/knowledge-kpi.ts",
     "knowledge:kpi:strict": "tsx scripts/knowledge-kpi.ts --fail-on-alert",
-    "matching:clusters": "tsx scripts/run-semantic-clustering.ts"
+    "matching:clusters": "tsx scripts/run-semantic-clustering.ts",
+    "matching:backfill-embeddings": "tsx scripts/backfill-semantic-feature-embeddings.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.4.13",

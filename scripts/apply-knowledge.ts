@@ -58,6 +58,11 @@ async function main() {
 		"--candidate-source-batch",
 		1000,
 	);
+	const embeddingBackfillBatchSize = parsePositiveIntArg(
+		argv,
+		"--embedding-backfill-batch-size",
+		2000,
+	);
 	const candidateInsertLimit = parsePositiveIntArg(
 		argv,
 		"--candidate-insert-limit",
@@ -77,6 +82,7 @@ async function main() {
 
 	const result = await runSemanticClusteringPipeline({
 		featureBatchSize,
+		embeddingBackfillBatchSize,
 		candidateSourceBatch,
 		candidateInsertLimit,
 		adjudicationBatchSize,
@@ -86,6 +92,8 @@ async function main() {
 
 	console.log("Knowledge apply summary:");
 	console.log(`Features upserted: ${result.featuresUpserted}`);
+	console.log(`Feature embeddings upserted: ${result.featureEmbeddingsUpserted}`);
+	console.log(`Embeddings backfilled: ${result.embeddingsBackfilled}`);
 	console.log(`Candidates queued: ${result.candidatesQueued}`);
 	console.log(`Scoring auto-approved: ${result.scoringAutoApproved}`);
 	console.log(`Scoring auto-rejected: ${result.scoringAutoRejected}`);

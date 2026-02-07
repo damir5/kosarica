@@ -28,6 +28,10 @@ async function main() {
 		"SEMANTIC_CLUSTERING_CANDIDATE_SOURCE_BATCH",
 		1000,
 	);
+	const embeddingBackfillBatchSize = parsePositiveIntEnv(
+		"SEMANTIC_CLUSTERING_EMBEDDING_BACKFILL_BATCH_SIZE",
+		2000,
+	);
 	const candidateInsertLimit = parsePositiveIntEnv(
 		"SEMANTIC_CLUSTERING_CANDIDATE_INSERT_LIMIT",
 		5000,
@@ -43,6 +47,8 @@ async function main() {
 
 	let rounds = 0;
 	let totalFeatures = 0;
+	let totalFeatureEmbeddings = 0;
+	let totalEmbeddingsBackfilled = 0;
 	let totalCandidates = 0;
 	let totalAdjudicated = 0;
 	let totalApproved = 0;
@@ -55,6 +61,7 @@ async function main() {
 		rounds += 1;
 		const result = await runSemanticClusteringPipeline({
 			featureBatchSize,
+			embeddingBackfillBatchSize,
 			candidateSourceBatch,
 			candidateInsertLimit,
 			adjudicationBatchSize,
@@ -63,6 +70,8 @@ async function main() {
 		});
 
 		totalFeatures += result.featuresUpserted;
+		totalFeatureEmbeddings += result.featureEmbeddingsUpserted;
+		totalEmbeddingsBackfilled += result.embeddingsBackfilled;
 		totalCandidates += result.candidatesQueued;
 		totalAdjudicated += result.pairsAdjudicated;
 		totalApproved += result.autoApproved;
@@ -71,7 +80,7 @@ async function main() {
 		totalErrors += result.systemErrors;
 
 		console.log(
-			`Round ${rounds}: features=${result.featuresUpserted}, candidates=${result.candidatesQueued}, scoreApproved=${result.scoringAutoApproved}, scoreRejected=${result.scoringAutoRejected}, scorePending=${result.scoringPendingReview}, adjudicated=${result.pairsAdjudicated}, approved=${result.autoApproved}, rejected=${result.autoRejected}, review=${result.pendingReview}, errors=${result.systemErrors}`,
+			`Round ${rounds}: features=${result.featuresUpserted}, featureEmbeddings=${result.featureEmbeddingsUpserted}, embeddingsBackfilled=${result.embeddingsBackfilled}, candidates=${result.candidatesQueued}, scoreApproved=${result.scoringAutoApproved}, scoreRejected=${result.scoringAutoRejected}, scorePending=${result.scoringPendingReview}, adjudicated=${result.pairsAdjudicated}, approved=${result.autoApproved}, rejected=${result.autoRejected}, review=${result.pendingReview}, errors=${result.systemErrors}`,
 		);
 
 		if (
@@ -86,6 +95,8 @@ async function main() {
 
 	console.log(`\nRounds: ${rounds}`);
 	console.log(`Features upserted: ${totalFeatures}`);
+	console.log(`Feature embeddings upserted: ${totalFeatureEmbeddings}`);
+	console.log(`Embeddings backfilled: ${totalEmbeddingsBackfilled}`);
 	console.log(`Candidates queued: ${totalCandidates}`);
 	console.log(`Pairs adjudicated: ${totalAdjudicated}`);
 	console.log(`Auto-approved: ${totalApproved}`);

@@ -9,7 +9,16 @@ import { getEmbeddingModel, isModelAvailable } from "./model";
 export { preparePassageText, prepareQueryText } from "./text";
 export { isModelAvailable };
 
-const BATCH_SIZE = 32;
+const DEFAULT_BATCH_SIZE = 32;
+
+function resolveBatchSize(): number {
+	const raw = process.env.EMBEDDING_BATCH_SIZE;
+	if (!raw) {
+		return DEFAULT_BATCH_SIZE;
+	}
+	const parsed = Number.parseInt(raw, 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_BATCH_SIZE;
+}
 
 /**
  * Embed multiple texts in batches.
@@ -18,11 +27,12 @@ const BATCH_SIZE = 32;
 export async function embedTexts(texts: string[]): Promise<number[][]> {
 	if (texts.length === 0) return [];
 
+	const batchSize = resolveBatchSize();
 	const model = await getEmbeddingModel();
 	const results: number[][] = [];
 
-	for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-		const batch = texts.slice(i, i + BATCH_SIZE);
+	for (let i = 0; i < texts.length; i += batchSize) {
+		const batch = texts.slice(i, i + batchSize);
 		const output = await model(batch, {
 			pooling: "cls",
 			normalize: true,

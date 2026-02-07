@@ -35,6 +35,47 @@ interface LLMBatchJsonResponse extends LLMJsonResponse {
 	pairId: string;
 }
 
+type OpenAiResponseFormat =
+	| { type: "json_object" }
+	| {
+			type: "json_schema";
+			json_schema: {
+				name: string;
+				schema: {
+					type: "object";
+					properties: {
+						results: {
+							type: "array";
+							items: {
+								type: "object";
+								properties: {
+									pair_id: { type: "string" };
+									verdict: {
+										type: "string";
+										enum: SemanticVerdict[];
+									};
+									confidence: { type: "number" };
+									reasoning: { type: "string" };
+								};
+								required: Array<"pair_id" | "verdict" | "confidence" | "reasoning">;
+							};
+						};
+					};
+					required: ["results"];
+				};
+			};
+	  }
+	| { type: "text" };
+
+type OpenAiResponseFormatType = OpenAiResponseFormat["type"];
+
+const OPENAI_RESPONSE_FORMAT_ORDER: OpenAiResponseFormatType[] = [
+	"json_object",
+	"json_schema",
+	"text",
+];
+const responseFormatPreferenceByEndpoint = new Map<string, OpenAiResponseFormatType>();
+
 function clampConfidence(value: number): number {
 	if (!Number.isFinite(value)) {
 		return 0;
@@ -205,6 +246,77 @@ function parseBatchJson(
 	return decisions;
 }
 
+function buildJsonSchemaResponseFormat(): OpenAiResponseFormat {
+	return {
+		type: "json_schema",
+		json_schema: {
+			name: "pair_results",
+			schema: {
+				type: "object",
+				properties: {
+					results: {
+						type: "array",
+						items: {
+							type: "object",
+							properties: {
+								pair_id: { type: "string" },
+								verdict: {
+									type: "string",
+									enum: ALLOWED_VERDICTS,
+								},
+								confidence: { type: "number" },
+								reasoning: { type: "string" },
+							},
+							required: ["pair_id", "verdict", "confidence", "reasoning"],
+						},
+					},
+				},
+				required: ["results"],
+			},
+		},
+	};
+}
+
+function responseFormatType(format: OpenAiResponseFormat): OpenAiResponseFormatType {
+	return format.type;
+}
+
+function openAiEndpointPreferenceKey(config: EnsembleModelConfig): string {
+	return `${config.provider}|${config.model}|${config.endpoint ?? ""}`;
+}
+
+function buildResponseFormat(
+	formatType: OpenAiResponseFormatType,
+): OpenAiResponseFormat {
+	if (formatType === "json_schema") {
+		return buildJsonSchemaResponseFormat();
+	}
+	return { type: formatType };
+}
+
+function orderedResponseFormats(
+	preferred: OpenAiResponseFormatType | undefined,
+): OpenAiResponseFormat[] {
+	if (!preferred) {
+		return OPENAI_RESPONSE_FORMAT_ORDER.map((formatType) =>
+			buildResponseFormat(formatType),
+		);
+	}
+
+	const order = [
+		preferred,
+		...OPENAI_RESPONSE_FORMAT_ORDER.filter((formatType) => formatType !== preferred),
+	];
+	return order.map((formatType) => buildResponseFormat(formatType));
+}
+
+function isLikelyResponseFormatError(status: number, bodyText: string): boolean {
+	if (status !== 400 && status !== 422) {
+		return false;
+	}
+	return /response[_\s-]?format|json_schema|json_object|must be/i.test(bodyText);
+}
+
 async function callOpenAiCompatibleBatch(
 	config: EnsembleModelConfig,
 	pairs: SemanticBatchPairInput[],
@@ -212,43 +324,74 @@ async function callOpenAiCompatibleBatch(
 	const apiKey = readApiKey(config);
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+	const preferenceKey = openAiEndpointPreferenceKey(config);
 
 	try {
-		const response = await fetch(config.endpoint ?? "", {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				model: config.model,
-				temperature: 0,
-				response_format: { type: "json_object" },
-				messages: [
-					{ role: "system", content: "Return strict JSON only." },
-					{ role: "user", content: buildBatchPrompt(pairs) },
-				],
-			}),
-			signal: controller.signal,
-		});
+		const expectedPairIds = new Set(pairs.map((pair) => pair.pairId));
+		const preferredFormat = responseFormatPreferenceByEndpoint.get(preferenceKey);
+		const responseFormatAttempts = orderedResponseFormats(preferredFormat);
 
-		if (!response.ok) {
-			throw new Error(
-				`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText}`,
-			);
+		let lastError: Error | null = null;
+		for (const [attemptIndex, responseFormat] of responseFormatAttempts.entries()) {
+			const response = await fetch(config.endpoint ?? "", {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${apiKey}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					model: config.model,
+					temperature: 0,
+					response_format: responseFormat,
+					messages: [
+						{ role: "system", content: "Return strict JSON only." },
+						{ role: "user", content: buildBatchPrompt(pairs) },
+					],
+				}),
+				signal: controller.signal,
+			});
+
+			if (!response.ok) {
+				const errorBody = await response.text();
+				const isLastAttempt = attemptIndex === responseFormatAttempts.length - 1;
+				if (!isLastAttempt && isLikelyResponseFormatError(response.status, errorBody)) {
+					log.warn("OpenAI-compatible endpoint rejected response_format, trying fallback", {
+						model: config.model,
+						endpoint: config.endpoint,
+						attemptFormat: responseFormat.type,
+						status: response.status,
+					});
+					continue;
+				}
+				lastError = new Error(
+					`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText} body=${errorBody.slice(0, 280)}`,
+				);
+				break;
+			}
+
+			const data = (await response.json()) as {
+				choices?: Array<{ message?: { content?: string } }>;
+			};
+			const content = data.choices?.[0]?.message?.content;
+			if (!content) {
+				lastError = new Error("No content in model response");
+				break;
+			}
+
+			const activeFormat = responseFormatType(responseFormat);
+			if (responseFormatPreferenceByEndpoint.get(preferenceKey) !== activeFormat) {
+				responseFormatPreferenceByEndpoint.set(preferenceKey, activeFormat);
+				log.info("OpenAI-compatible response_format preference updated", {
+					model: config.model,
+					endpoint: config.endpoint,
+					preferredResponseFormat: activeFormat,
+				});
+			}
+
+			return parseBatchJson(content, expectedPairIds);
 		}
 
-		const data = (await response.json()) as {
-			choices?: Array<{ message?: { content?: string } }>;
-		};
-		const content = data.choices?.[0]?.message?.content;
-		if (!content) {
-			throw new Error("No content in model response");
-		}
-		return parseBatchJson(
-			content,
-			new Set(pairs.map((pair) => pair.pairId)),
-		);
+		throw lastError ?? new Error("OpenAI-compatible batch request failed");
 	} finally {
 		clearTimeout(timeout);
 	}

@@ -596,6 +596,9 @@ export const retailerItemFeatures = pgTable(
 			table.extractedUnit,
 			table.totalAmount,
 		),
+		updatedAtIdx: index("retailer_item_features_updated_at_idx").on(
+			table.updatedAt,
+		),
 	}),
 );
 
