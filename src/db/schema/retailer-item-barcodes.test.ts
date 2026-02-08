@@ -16,13 +16,14 @@ describe("retailerItemBarcodes schema", () => {
 			expect(columnNames).toContain("id");
 			expect(columnNames).toContain("retailerItemId");
 			expect(columnNames).toContain("barcode");
+			expect(columnNames).toContain("barcodeClass");
 			expect(columnNames).toContain("isPrimary");
 			expect(columnNames).toContain("createdAt");
 		});
 
-		it("should have exactly 5 columns", () => {
+		it("should have exactly 6 columns", () => {
 			const columns = getTableColumns(retailerItemBarcodes);
-			expect(Object.keys(columns).length).toBe(5);
+			expect(Object.keys(columns).length).toBe(6);
 		});
 	});
 
@@ -69,6 +70,18 @@ describe("retailerItemBarcodes schema", () => {
 		it("should have barcode as text type", () => {
 			const columns = getTableColumns(retailerItemBarcodes);
 			expect(columns.barcode.dataType).toBe("string");
+		});
+	});
+
+	describe("barcodeClass column", () => {
+		it("should have barcodeClass column defined", () => {
+			const columns = getTableColumns(retailerItemBarcodes);
+			expect(columns.barcodeClass).toBeDefined();
+		});
+
+		it("should have barcodeClass as text type", () => {
+			const columns = getTableColumns(retailerItemBarcodes);
+			expect(columns.barcodeClass.dataType).toBe("string");
 		});
 	});
 

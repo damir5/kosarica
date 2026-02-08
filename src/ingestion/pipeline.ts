@@ -32,6 +32,7 @@ import type {
 import { normalizeCategory } from "@/lib/matching/categories";
 import { computeNameHash, parseUnit } from "@/lib/matching/normalize";
 import { indexRetailerItemsBatch } from "@/lib/search";
+import { scheduleTask } from "@/lib/taskqueue";
 import {
 	buildArchiveKey,
 	buildExpandedKey,
@@ -2062,6 +2063,28 @@ export async function runIngestion(
 				});
 			}
 		}
+
+		try {
+			await scheduleTask({
+				taskType: "categorize",
+				payload: {
+					type: "categorize",
+					runId,
+					chainSlug,
+				},
+			});
+			log.info("Queued categorization task", {
+				runId,
+				chainSlug,
+			});
+		} catch (categorizationScheduleError) {
+			log.warn("Failed to queue categorization task (non-fatal)", {
+				error: errorToObject(categorizationScheduleError),
+				runId,
+				chainSlug,
+			});
+		}
+
 		const totalDurationMs = Date.now() - runWallStart;
 
 		await db

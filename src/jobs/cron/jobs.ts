@@ -6,9 +6,13 @@
  * when the instance becomes the leader.
  */
 
+import { barcodeAnchorBatchHandler } from "./handlers/barcode-anchor-batch";
+import { conflictCheckHandler } from "./handlers/conflict-check";
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
+import { featureMatchBatchHandler } from "./handlers/feature-match-batch";
 import { semanticClusteringHandler } from "./handlers/semantic-clustering";
 import { tempCleanupHandler } from "./handlers/temp-cleanup";
+import { triageQueueRefreshHandler } from "./handlers/triage-queue-refresh";
 import { registerCronJob } from "./registry";
 
 /**
@@ -46,6 +50,42 @@ export function registerAllCronJobs(): void {
 		timezone: "UTC",
 		taskType: "matching",
 		handler: semanticClusteringHandler,
+	});
+
+	registerCronJob({
+		id: "barcode-anchor-batch",
+		name: "Barcode Anchor Batch",
+		cronExpression: "0 */2 * * *", // Every 2 hours
+		timezone: "UTC",
+		taskType: "barcode-anchor",
+		handler: barcodeAnchorBatchHandler,
+	});
+
+	registerCronJob({
+		id: "feature-match-batch",
+		name: "Feature Match Batch",
+		cronExpression: "15 */4 * * *", // Every 4 hours
+		timezone: "UTC",
+		taskType: "matching",
+		handler: featureMatchBatchHandler,
+	});
+
+	registerCronJob({
+		id: "conflict-check",
+		name: "Catalog Conflict Check",
+		cronExpression: "0 5 * * *", // Daily at 5 AM UTC
+		timezone: "UTC",
+		taskType: "matching",
+		handler: conflictCheckHandler,
+	});
+
+	registerCronJob({
+		id: "triage-queue-refresh",
+		name: "Barcode Triage Queue Refresh",
+		cronExpression: "*/15 * * * *", // Every 15 minutes
+		timezone: "UTC",
+		taskType: "matching",
+		handler: triageQueueRefreshHandler,
 	});
 
 	// Add more jobs here as needed:

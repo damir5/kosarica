@@ -15,6 +15,12 @@ https://github.com/leeoniya/uPlot
 - self hosted sentry replacement since we have no budget - user monitoring, errors, behaviour, ...
 
 
+## categorization
+imperative-watching-fog.md
+- import catalog with immediate categorization
+- add flag to recheck items categorizatio and links - ai/human
+
+
 ## UX
 https://claudecodeplugins.dev/category/design-ux
 - joker, mobile ux, researcher

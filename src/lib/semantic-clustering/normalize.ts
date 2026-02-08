@@ -17,11 +17,11 @@ const KNOWN_BRANDS = new Set([
 ]);
 
 const CONTAINER_PATTERNS: Array<[RegExp, string]> = [
-	[/\blimenka\b|\bcan\b/i, "can"],
-	[/\bboca\b|\bpet\b|\bbottle\b/i, "bottle"],
-	[/\bstaklo\b|\bglass\b/i, "glass"],
-	[/\bpak\b|\bpack\b/i, "pack"],
-	[/\bkarton\b|\bcarton\b/i, "carton"],
+	[/\blimenka\b|\bcan\b/i, "limenka"],
+	[/\bpet\b|\bbottle\b/i, "pet"],
+	[/\bstaklo\b|\bglass\b/i, "staklo"],
+	[/\btetrapak\b|\bkarton\b|\bcarton\b|\bpak\s*juice\b/i, "tetrapak"],
+	[/\btuba\b|\btube\b/i, "tuba"],
 ];
 
 const MULTIPACK_RE = /(\d+)\s*[xX×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gr|dag|dkg|l|lt|lit|ltr|ml|kom|pcs|komad)/i;

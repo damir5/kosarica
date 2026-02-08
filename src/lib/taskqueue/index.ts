@@ -15,6 +15,8 @@ export type TaskType =
 	| "rerun"
 	| "cleanup"
 	| "clickhouse"
+	| "categorize"
+	| "barcode-anchor"
 	| "matching";
 
 export interface ClaimedTask {

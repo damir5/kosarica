@@ -31,11 +31,26 @@ export const clickhouseSyncTaskPayload = z.object({
 	mode: z.enum(["missing", "all"]),
 });
 
+export const categorizeTaskPayload = z.object({
+	type: z.literal("categorize"),
+	runId: z.string(),
+	chainSlug: z.string(),
+});
+
+export const barcodeAnchorTaskPayload = z.object({
+	type: z.literal("barcodeAnchor"),
+	limit: z.number().int().positive().optional(),
+	minChains: z.number().int().positive().optional(),
+	dryRun: z.boolean().optional(),
+});
+
 export const taskQueuePayload = z.discriminatedUnion("type", [
 	ingestionTaskPayload,
 	rerunTaskPayload,
 	cleanupTaskPayload,
 	clickhouseSyncTaskPayload,
+	categorizeTaskPayload,
+	barcodeAnchorTaskPayload,
 ]);
 
 // ============================================================================
@@ -83,6 +98,32 @@ export const archiveMetadata = z.looseObject({
 });
 
 // ============================================================================
+// Catalog Event Payload + LLM Observability Payloads
+// ============================================================================
+
+export const catalogEventPayload = z.looseObject({
+	before: z.unknown().optional(),
+	after: z.unknown().optional(),
+	reason: z.string().optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const llmDecisionInput = z.looseObject({
+	prompt: z.string().optional(),
+	items: z.array(z.unknown()).optional(),
+	context: z.unknown().optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const llmDecisionOutput = z.looseObject({
+	verdict: z.string().optional(),
+	confidence: z.number().optional(),
+	reasoning: z.string().optional(),
+	result: z.unknown().optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+// ============================================================================
 // Export Types
 // ============================================================================
 
@@ -92,9 +133,14 @@ export type CleanupTaskPayload = z.infer<typeof cleanupTaskPayload>;
 export type ClickHouseSyncTaskPayload = z.infer<
 	typeof clickhouseSyncTaskPayload
 >;
+export type CategorizeTaskPayload = z.infer<typeof categorizeTaskPayload>;
+export type BarcodeAnchorTaskPayload = z.infer<typeof barcodeAnchorTaskPayload>;
 export type TaskQueuePayload = z.infer<typeof taskQueuePayload>;
 export type ValidationError = z.infer<typeof validationError>;
 export type ValidationErrors = z.infer<typeof validationErrors>;
 export type CronJobPayload = z.infer<typeof cronJobPayload>;
 export type CronRunMetadata = z.infer<typeof cronRunMetadata>;
 export type ArchiveMetadata = z.infer<typeof archiveMetadata>;
+export type CatalogEventPayload = z.infer<typeof catalogEventPayload>;
+export type LlmDecisionInput = z.infer<typeof llmDecisionInput>;
+export type LlmDecisionOutput = z.infer<typeof llmDecisionOutput>;

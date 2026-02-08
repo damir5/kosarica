@@ -4,6 +4,7 @@ import {
 	bigint,
 	bigserial,
 	boolean,
+	check,
 	date,
 	index,
 	integer,
@@ -17,8 +18,11 @@ import {
 import { cuid2, pgVector, typedJsonb } from "./custom-types";
 import {
 	archiveMetadata,
+	catalogEventPayload,
 	cronJobPayload,
 	cronRunMetadata,
+	llmDecisionInput,
+	llmDecisionOutput,
 	taskQueuePayload,
 	validationErrors,
 } from "./jsonb-schemas";
@@ -187,8 +191,6 @@ export const retailerItems = pgTable(
 	"retailer_items",
 	{
 		id: cuid2("rit").primaryKey(),
-		retailerItemId: integer("retailer_item_id"), // nullable - legacy column, not used
-		barcode: text("barcode"), // EAN-13, EAN-8, etc. (nullable - legacy column, not used)
 		isPrimary: boolean("is_primary").default(false),
 		createdAt: timestamp("created_at").defaultNow(),
 		name: text("name").notNull(),
@@ -219,7 +221,6 @@ export const retailerItems = pgTable(
 		normalizedQuantity: real("normalized_quantity"), // 0.5, 1.98
 	},
 	(table) => ({
-		barcodeIdx: index("retailer_item_barcodes_barcode_idx").on(table.barcode),
 		archiveIdIdx: index("idx_retailer_items_archive_id").on(table.archiveId),
 		// Unique index for finding items by chain and external ID
 		chainExternalIdUnique: uniqueIndex(
@@ -245,6 +246,7 @@ export const retailerItemBarcodes = pgTable(
 			.notNull()
 			.references(() => retailerItems.id, { onDelete: "cascade" }),
 		barcode: text("barcode").notNull(), // EAN-13, EAN-8, GTIN codes
+		barcodeClass: text("barcode_class").notNull().default("unknown"),
 		isPrimary: boolean("is_primary").default(false),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
@@ -254,6 +256,9 @@ export const retailerItemBarcodes = pgTable(
 		),
 		barcodeIdx: index("retailer_item_barcodes_barcode_new_idx").on(
 			table.barcode,
+		),
+		barcodeClassIdx: index("retailer_item_barcodes_barcode_class_idx").on(
+			table.barcodeClass,
 		),
 		barcodeItemIdx: index("retailer_item_barcodes_barcode_item_idx").on(
 			table.barcode,
@@ -562,6 +567,11 @@ export const storeEnrichmentTasks = pgTable(
 // Semantic Clustering V2: features, pair decisions, clusters
 // ============================================================================
 
+export const containerTypes = pgTable("container_types", {
+	code: text("code").primaryKey(),
+	label: text("label").notNull(),
+});
+
 export const retailerItemFeatures = pgTable(
 	"retailer_item_features",
 	{
@@ -579,7 +589,17 @@ export const retailerItemFeatures = pgTable(
 		packAmount: integer("pack_amount").notNull().default(1),
 		unitAmount: real("unit_amount"),
 		totalAmount: real("total_amount"),
-		containerType: text("container_type"),
+		containerType: text("container_type").references(() => containerTypes.code),
+		everydayName: text("everyday_name"),
+		productType: text("product_type"),
+		variant: text("variant"),
+		searchTags: text("search_tags").array(),
+		categorizedAt: timestamp("categorized_at"),
+		categorizationModel: text("categorization_model"),
+		categorizationConfidence: real("categorization_confidence"),
+		categorizationNeedsReview: boolean("categorization_needs_review")
+			.notNull()
+			.default(false),
 		embedding: pgVector("embedding", 1024),
 		blockingKeys: text("blocking_keys").array(),
 		updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -595,6 +615,15 @@ export const retailerItemFeatures = pgTable(
 		unitAmountIdx: index("retailer_item_features_unit_amount_idx").on(
 			table.extractedUnit,
 			table.totalAmount,
+		),
+		productTypeIdx: index("retailer_item_features_product_type_idx").on(
+			table.productType,
+		),
+		categorizedAtIdx: index("retailer_item_features_categorized_at_idx").on(
+			table.categorizedAt,
+		),
+		needsReviewIdx: index("retailer_item_features_needs_review_idx").on(
+			table.categorizationNeedsReview,
 		),
 		updatedAtIdx: index("retailer_item_features_updated_at_idx").on(
 			table.updatedAt,
@@ -641,6 +670,248 @@ export const semanticPairDecisions = pgTable(
 	}),
 );
 
+// ============================================================================
+// Canonical Catalog: canonical SKUs, item links, barcode mappings, event log
+// ============================================================================
+
+export const canonicalSkus = pgTable(
+	"canonical_skus",
+	{
+		id: cuid2("csku").primaryKey(),
+		baseProductId: text("base_product_id").references(
+			(): AnyPgColumn => canonicalSkus.id,
+			{ onDelete: "set null" },
+		),
+		mergedIntoId: text("merged_into_id").references(
+			(): AnyPgColumn => canonicalSkus.id,
+			{ onDelete: "set null" },
+		),
+		canonicalName: text("canonical_name").notNull(),
+		everydayName: text("everyday_name"),
+		brand: text("brand"),
+		productType: text("product_type"),
+		normalizedUnit: text("normalized_unit"),
+		normalizedQuantity: real("normalized_quantity"),
+		packAmount: integer("pack_amount").notNull().default(1),
+		containerType: text("container_type"),
+		isBaseProduct: boolean("is_base_product").notNull().default(false),
+		matchPolicy: text("match_policy").notNull().default("matchable"),
+		status: text("status").notNull().default("draft"),
+		createdBy: text("created_by").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		baseProductIdx: index("canonical_skus_base_product_idx").on(
+			table.baseProductId,
+		),
+		mergedIntoIdx: index("canonical_skus_merged_into_idx").on(table.mergedIntoId),
+		statusIdx: index("canonical_skus_status_idx").on(table.status),
+		matchPolicyIdx: index("canonical_skus_match_policy_idx").on(table.matchPolicy),
+		activeNameIdx: index("canonical_skus_active_name_idx")
+			.on(table.canonicalName)
+			.where(sql`status = 'active'`),
+		matchPolicyCheck: check(
+			"canonical_skus_match_policy_check",
+			sql`match_policy IN ('matchable', 'private_label', 'non_comparable')`,
+		),
+		statusCheck: check(
+			"canonical_skus_status_check",
+			sql`status IN ('draft', 'active', 'merged', 'deprecated')`,
+		),
+		baseProductInvariantCheck: check(
+			"canonical_skus_base_product_invariant_check",
+			sql`(is_base_product = false) OR base_product_id IS NULL`,
+		),
+		activeVariantBaseCheck: check(
+			"canonical_skus_active_variant_base_check",
+			sql`(is_base_product = true) OR (status <> 'active') OR (base_product_id IS NOT NULL)`,
+		),
+		mergedStatusTargetCheck: check(
+			"canonical_skus_merged_status_target_check",
+			sql`(status <> 'merged') OR (merged_into_id IS NOT NULL)`,
+		),
+	}),
+);
+
+export const barcodeSkuMappings = pgTable(
+	"barcode_sku_mappings",
+	{
+		id: cuid2("bsm").primaryKey(),
+		barcode: text("barcode").notNull(),
+		canonicalSkuId: text("canonical_sku_id")
+			.notNull()
+			.references(() => canonicalSkus.id, { onDelete: "cascade" }),
+		confidence: real("confidence").notNull().default(1),
+		source: text("source").notNull(),
+		verifiedBy: text("verified_by").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		verifiedAt: timestamp("verified_at", { withTimezone: true }),
+		createdBy: text("created_by").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		notes: text("notes"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		barcodeUnique: uniqueIndex("barcode_sku_mappings_barcode_unique").on(
+			table.barcode,
+		),
+		skuIdx: index("barcode_sku_mappings_sku_idx").on(table.canonicalSkuId),
+		sourceIdx: index("barcode_sku_mappings_source_idx").on(table.source),
+		verifiedByIdx: index("barcode_sku_mappings_verified_by_idx").on(
+			table.verifiedBy,
+		),
+		confidenceCheck: check(
+			"barcode_sku_mappings_confidence_check",
+			sql`confidence >= 0 AND confidence <= 1`,
+		),
+		sourceCheck: check(
+			"barcode_sku_mappings_source_check",
+			sql`source IN ('barcode_cluster', 'llm', 'manual')`,
+		),
+	}),
+);
+
+export const skuItemLinks = pgTable(
+	"sku_item_links",
+	{
+		id: cuid2("sil").primaryKey(),
+		canonicalSkuId: text("canonical_sku_id")
+			.notNull()
+			.references(() => canonicalSkus.id, { onDelete: "cascade" }),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		linkType: text("link_type").notNull(),
+		confidence: real("confidence"),
+		createdBy: text("created_by").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		itemUnique: uniqueIndex("sku_item_links_item_unique").on(table.retailerItemId),
+		skuItemUnique: uniqueIndex("sku_item_links_sku_item_unique").on(
+			table.canonicalSkuId,
+			table.retailerItemId,
+		),
+		skuIdx: index("sku_item_links_sku_idx").on(table.canonicalSkuId),
+		linkTypeIdx: index("sku_item_links_link_type_idx").on(table.linkType),
+		confidenceCheck: check(
+			"sku_item_links_confidence_check",
+			sql`confidence IS NULL OR (confidence >= 0 AND confidence <= 1)`,
+		),
+		linkTypeCheck: check(
+			"sku_item_links_link_type_check",
+			sql`link_type IN ('barcode', 'llm', 'manual', 'feature_match')`,
+		),
+	}),
+);
+
+export const llmDecisionLog = pgTable(
+	"llm_decision_log",
+	{
+		id: cuid2("ldl").primaryKey(),
+		taskType: text("task_type").notNull(),
+		inputHash: text("input_hash").notNull(),
+		input: typedJsonb(llmDecisionInput, "input").notNull(),
+		output: typedJsonb(llmDecisionOutput, "output"),
+		modelId: text("model_id").notNull(),
+		provider: text("provider").notNull(),
+		latencyMs: integer("latency_ms"),
+		tokenCount: integer("token_count"),
+		costCents: integer("cost_cents"),
+		verdict: text("verdict"),
+		confidence: real("confidence"),
+		reasoning: text("reasoning"),
+		humanOverride: text("human_override"),
+		humanNotes: text("human_notes"),
+		reviewedBy: text("reviewed_by").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		createdAtIdx: index("llm_decision_log_created_at_idx").on(table.createdAt),
+		taskTypeCreatedAtIdx: index("llm_decision_log_task_type_created_at_idx").on(
+			table.taskType,
+			table.createdAt,
+		),
+		modelCreatedAtIdx: index("llm_decision_log_model_created_at_idx").on(
+			table.modelId,
+			table.createdAt,
+		),
+		inputHashIdx: index("llm_decision_log_input_hash_idx").on(table.inputHash),
+		confidenceCheck: check(
+			"llm_decision_log_confidence_check",
+			sql`confidence IS NULL OR (confidence >= 0 AND confidence <= 1)`,
+		),
+	}),
+);
+
+export const catalogEvents = pgTable(
+	"catalog_events",
+	{
+		id: cuid2("cev").primaryKey(),
+		eventType: text("event_type").notNull(),
+		entityType: text("entity_type").notNull(),
+		entityId: text("entity_id").notNull(),
+		actorId: text("actor_id").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		payload: typedJsonb(catalogEventPayload, "payload").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		entityCreatedAtIdx: index("catalog_events_entity_created_at_idx").on(
+			table.entityType,
+			table.entityId,
+			table.createdAt,
+		),
+		eventTypeCreatedAtIdx: index("catalog_events_event_type_created_at_idx").on(
+			table.eventType,
+			table.createdAt,
+		),
+	}),
+);
+
+export const barcodeTriageClaims = pgTable(
+	"barcode_triage_claims",
+	{
+		barcode: text("barcode").primaryKey(),
+		claimedBy: text("claimed_by").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		claimedAt: timestamp("claimed_at", { withTimezone: true }).defaultNow(),
+		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+	},
+	(table) => ({
+		expiresAtIdx: index("barcode_triage_claims_expires_at_idx").on(
+			table.expiresAt,
+		),
+		claimedByIdx: index("barcode_triage_claims_claimed_by_idx").on(table.claimedBy),
+	}),
+);
+
+// Deprecated: replaced by canonical_skus + sku_item_links + barcode_sku_mappings.
 export const productClusters = pgTable(
 	"product_clusters",
 	{

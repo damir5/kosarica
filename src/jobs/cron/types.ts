@@ -5,6 +5,7 @@
  */
 
 import type {
+	BarcodeAnchorTaskPayload,
 	CleanupTaskPayload,
 	ClickHouseSyncTaskPayload,
 	IngestionTaskPayload,
@@ -31,6 +32,7 @@ type TaskPayloadByType = {
 	rerun: Omit<RerunTaskPayload, "type">;
 	cleanup: Omit<CleanupTaskPayload, "type">;
 	clickhouse: Omit<ClickHouseSyncTaskPayload, "type">;
+	"barcode-anchor": Omit<BarcodeAnchorTaskPayload, "type">;
 };
 
 export type TaskToEnqueue =
@@ -52,6 +54,11 @@ export type TaskToEnqueue =
 	| {
 			type: "clickhouse";
 			payload: TaskPayloadByType["clickhouse"];
+			idempotencyKey?: string;
+	  }
+	| {
+			type: "barcode-anchor";
+			payload?: TaskPayloadByType["barcode-anchor"];
 			idempotencyKey?: string;
 	  };
 

@@ -1,5 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+	Brain,
+	ScanBarcode,
 	Clock,
 	Database,
 	DollarSign,
@@ -9,6 +11,7 @@ import {
 	Shield,
 	Store,
 	Table,
+	Tags,
 	Users,
 	Wrench,
 } from "lucide-react";
@@ -19,6 +22,9 @@ const adminNavItems = [
 	{ to: "/admin/stores", label: "Stores", icon: Store },
 	{ to: "/admin/catalog-prices", label: "Prices", icon: DollarSign },
 	{ to: "/admin/ingestion", label: "Ingestion", icon: Database },
+	{ to: "/admin/categorization", label: "Categorization", icon: Tags },
+	{ to: "/admin/barcode-triage", label: "Barcode Triage", icon: ScanBarcode },
+	{ to: "/admin/llm-decisions", label: "LLM Decisions", icon: Brain },
 	{ to: "/admin/clickhouse", label: "ClickHouse", icon: Table },
 	{ to: "/admin/task-queue", label: "Task Queue", icon: ListChecks },
 	{ to: "/admin/cron", label: "Cron", icon: Clock },

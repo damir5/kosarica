@@ -27,7 +27,14 @@ const TaskStatusSchema = z.enum([
 	"waiting_for_children",
 ]);
 
-const TaskTypeSchema = z.enum(["ingestion", "rerun", "cleanup", "clickhouse"]);
+const TaskTypeSchema = z.enum([
+	"ingestion",
+	"rerun",
+	"cleanup",
+	"clickhouse",
+	"categorize",
+	"barcode-anchor",
+]);
 
 const SortFieldSchema = z.enum([
 	"createdAt",

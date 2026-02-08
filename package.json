@@ -32,7 +32,12 @@
     "knowledge:kpi": "tsx scripts/knowledge-kpi.ts",
     "knowledge:kpi:strict": "tsx scripts/knowledge-kpi.ts --fail-on-alert",
     "matching:clusters": "tsx scripts/run-semantic-clustering.ts",
-    "matching:backfill-embeddings": "tsx scripts/backfill-semantic-feature-embeddings.ts"
+    "matching:backfill-embeddings": "tsx scripts/backfill-semantic-feature-embeddings.ts",
+    "categorization:backfill": "tsx scripts/backfill-categorizations.ts",
+    "barcode:classify": "tsx scripts/classify-barcodes.ts",
+    "barcode:auto-link": "tsx scripts/auto-link-barcodes.ts",
+    "feature:candidates": "tsx scripts/generate-feature-candidates.ts",
+    "catalog:conflicts": "tsx scripts/detect-catalog-conflicts.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.4.13",

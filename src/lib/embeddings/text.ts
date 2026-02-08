@@ -14,6 +14,7 @@ import { normalizeWhitespace } from "@/lib/matching/normalize";
 export function preparePassageText(product: {
 	name: string;
 	brand?: string | null;
+	variant?: string | null;
 	category?: string | null;
 	unit?: string | null;
 	unitQuantity?: string | null;
@@ -25,6 +26,9 @@ export function preparePassageText(product: {
 	}
 	if (product.brand) {
 		parts.push(product.brand);
+	}
+	if (product.variant) {
+		parts.push(product.variant);
 	}
 	if (product.category) {
 		parts.push(product.category);

@@ -1,9 +1,13 @@
 import type {
+	BarcodeAnchorTaskPayload,
+	CategorizeTaskPayload,
 	CleanupTaskPayload,
 	ClickHouseSyncTaskPayload,
 	IngestionTaskPayload,
 	RerunTaskPayload,
 } from "@/db/jsonb-schemas";
+import { processBarcodeClusters } from "@/lib/barcode-anchoring";
+import { categorizeRunItems } from "@/lib/categorization";
 import {
 	loadAllToClickHouse,
 	loadMissingToClickHouse,
@@ -35,7 +39,14 @@ export function createTaskQueueWorker(options?: {
 
 	const worker = new TaskQueueWorker({
 		workerId,
-		taskTypes: ["ingestion", "rerun", "cleanup", "clickhouse"],
+		taskTypes: [
+			"ingestion",
+			"rerun",
+			"cleanup",
+			"clickhouse",
+			"categorize",
+			"barcode-anchor",
+		],
 		maxTasks: options?.maxTasks ?? defaultMaxTasks,
 		pollDelay: options?.pollDelay ?? defaultPollDelay,
 	});
@@ -97,6 +108,27 @@ export function createTaskQueueWorker(options?: {
 			return;
 		}
 		await loadMissingToClickHouse();
+	});
+
+	worker.registerHandler("categorize", async (task) => {
+		const payload = task.payload as CategorizeTaskPayload;
+		if (payload.type !== "categorize") {
+			throw new Error("Invalid payload for categorize task");
+		}
+		await categorizeRunItems(payload.runId, payload.chainSlug);
+	});
+
+	worker.registerHandler("barcode-anchor", async (task) => {
+		const payload = task.payload as BarcodeAnchorTaskPayload;
+		if (payload.type !== "barcodeAnchor") {
+			throw new Error("Invalid payload for barcode-anchor task");
+		}
+		await processBarcodeClusters({
+			limit: payload.limit,
+			minChains: payload.minChains,
+			dryRun: payload.dryRun ?? false,
+			createdBy: "system",
+		});
 	});
 
 	return worker;

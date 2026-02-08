@@ -72,7 +72,13 @@ type StatusFilter =
 	| "cancelled"
 	| "waiting_for_children";
 
-type TypeFilter = "all" | "ingestion" | "rerun" | "cleanup" | "clickhouse";
+type TypeFilter =
+	| "all"
+	| "ingestion"
+	| "rerun"
+	| "cleanup"
+	| "clickhouse"
+	| "categorize";
 
 type TaskStatus = Exclude<StatusFilter, "all">;
 type TaskType = Exclude<TypeFilter, "all">;
@@ -400,6 +406,9 @@ function TaskQueueDashboard() {
 											<SelectItem value="rerun">Rerun</SelectItem>
 											<SelectItem value="cleanup">Cleanup</SelectItem>
 											<SelectItem value="clickhouse">ClickHouse</SelectItem>
+											<SelectItem value="categorize">
+												Categorize
+											</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>

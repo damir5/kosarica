@@ -1,0 +1,832 @@
+[
+  {
+    "name": "INS.KAVA BARCAFFE 2U1 CLA.14 g",
+    "brand": "Barcaffe",
+    "chain": "interspar"
+  },
+  {
+    "name": "Carex Dezinfekcijski tekući sapun",
+    "brand": "",
+    "chain": "lidl"
+  },
+  {
+    "name": "�AJ SPAR JAB.CIMET VANILI.60 g",
+    "brand": "SPAR",
+    "chain": "interspar"
+  },
+  {
+    "name": "ODREZAK PANIRANI  PIL. PUREĆI 220 g",
+    "brand": "A.I.A.",
+    "chain": "studenac"
+  },
+  {
+    "name": "DATULJA SVJE�A MAZAFATI 500 g",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "Vape Tablete protiv komaraca mirisne30/1",
+    "brand": "Vape",
+    "chain": "kaufland"
+  },
+  {
+    "name": "GEL AGRADO POSLJE SUN.A 200 ml",
+    "brand": "AGRADO",
+    "chain": "interspar"
+  },
+  {
+    "name": "�E�.BIJELI KOCKA RIO PAK 500 g",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "Syoss Gel za kosu Max hold 250ml",
+    "brand": "Syoss",
+    "chain": "kaufland"
+  },
+  {
+    "name": "INOX �ICA 4 kom",
+    "brand": "SISTEMA CASA",
+    "chain": "eurospin"
+  },
+  {
+    "name": "SALVETE JUNGLE 33x33cm,20/1",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "HRANA ZA MACKE 4X85 G RIBA FELIX",
+    "brand": "NESTLE PURINA",
+    "chain": "plodine"
+  },
+  {
+    "name": "OUST SPRAY 3U1 400ML",
+    "brand": "OUST",
+    "chain": "plodine"
+  },
+  {
+    "name": "SODA MIST MAND.MARAKUJA 0,33 L",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "BECUTAN ULJE ZA DJECU 200 ML.",
+    "brand": "ALKALOID, SKOPJE",
+    "chain": "trgocentar"
+  },
+  {
+    "name": "Eukaliptus-mentol bomboni XXL",
+    "brand": "Amanie",
+    "chain": "lidl"
+  },
+  {
+    "name": "WHISKAS JUNIOR IZB.PERADI U ŽELEU 4X85 G",
+    "brand": "ATLANTIC-MARS PET CARE",
+    "chain": "studenac"
+  },
+  {
+    "name": "ABC krem sir kulen 65%mm 100 g",
+    "brand": "Belje",
+    "chain": "kaufland"
+  },
+  {
+    "name": "1600G MC PIŠKOTE",
+    "brand": "METRO CHEF",
+    "chain": "metro"
+  },
+  {
+    "name": "KREMA NIVEA CELL.  NOĆNA 50 ml",
+    "brand": "BEIERSDORF",
+    "chain": "studenac"
+  },
+  {
+    "name": "Yogurt SK4",
+    "brand": "MCENNEDY",
+    "chain": "lidl"
+  },
+  {
+    "name": "�OK.LIZALICA  ZE�I�I 60 g",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "VILEDA TURBO MOP (EWC) BOX",
+    "brand": "VILEDA",
+    "chain": "metro"
+  },
+  {
+    "name": "SLADOLED KINDER BUENO KORNET 4X90 ML",
+    "brand": "KINDER BUENO SLADOLEDI - ATLANTIC",
+    "chain": "plodine"
+  },
+  {
+    "name": "SCALA SIRNI NAMAZ LIGHT SORTIRANO 200G, VINDIJA",
+    "brand": "VINDIJA - MLIJEČNO",
+    "chain": "trgocentar"
+  },
+  {
+    "name": "Juicy ledeni čaj breskva 0,5 l PET",
+    "brand": "Juicy",
+    "chain": "kaufland"
+  },
+  {
+    "name": "CCA3,4KG SVINJSKI VRAT SK",
+    "brand": "PIK",
+    "chain": "metro"
+  },
+  {
+    "name": "HIPP BIO NEKT.ŠLJIVA S KRUŠK.200mL",
+    "brand": "HIPP",
+    "chain": "ktc"
+  },
+  {
+    "name": "INSTANT KAVA MONARCH 2 G JACOBS",
+    "brand": "JACOBS",
+    "chain": "plodine"
+  },
+  {
+    "name": "SNICKERS ICE ŠTAPIĆ  73,5 g",
+    "brand": "ATLANTIC-MARS CHOCOLATE",
+    "chain": "studenac"
+  },
+  {
+    "name": "YIPPY BRESKVA 0,2",
+    "brand": "RAUCH",
+    "chain": "ktc"
+  },
+  {
+    "name": "400G KLARA M. REZAN JUHA S JAJ",
+    "brand": "KLARA MARIC",
+    "chain": "metro"
+  },
+  {
+    "name": "ŠKAMP 3B",
+    "brand": "CENTAURUS FISH",
+    "chain": "studenac"
+  },
+  {
+    "name": "ČARLI 900mL ORIGINAL",
+    "brand": "ČARLI",
+    "chain": "ktc"
+  },
+  {
+    "name": "D�EM DIDA BO�A JAGODA 690 g",
+    "brand": "Dida Boza",
+    "chain": "interspar"
+  },
+  {
+    "name": "�IPS CRUNCHIPS X-CUT SLA.150 g",
+    "brand": "Crunchips",
+    "chain": "interspar"
+  },
+  {
+    "name": "SIR AMERICANA ZA PIZZU 200 g",
+    "brand": "President",
+    "chain": "interspar"
+  },
+  {
+    "name": "GIN GRENALL'S 0,7 L",
+    "brand": "GRENALL'S",
+    "chain": "plodine"
+  },
+  {
+    "name": "VINO TERAN BEN�I� 0,75 L",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "OTIRA� OD KOKOSA,60X40cm,TERRA",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "SENF SPAR DIJON 200 g",
+    "brand": "SPAR",
+    "chain": "interspar"
+  },
+  {
+    "name": "DOMESTOS UNIVERSAL DESINFEC.SPRAY 750mL",
+    "brand": "DOMESTOS",
+    "chain": "ktc"
+  },
+  {
+    "name": "CCA15KG GOUDA",
+    "brand": "",
+    "chain": "metro"
+  },
+  {
+    "name": "POK.PAK.AFRODITA MEN ENERGY",
+    "brand": "Afrodita",
+    "chain": "interspar"
+  },
+  {
+    "name": "INST.JUHA S REZANC.GOVEDINA 70g INDOMIE",
+    "brand": "INDOMIE",
+    "chain": "ktc"
+  },
+  {
+    "name": "OTOPINA LACALUT MIC.SEN.500 ml",
+    "brand": "Lacalut",
+    "chain": "interspar"
+  },
+  {
+    "name": "LIKER PELINKOVAC DALMACIJAVINO 1 l",
+    "brand": "BADEL-DALM.VIN",
+    "chain": "studenac"
+  },
+  {
+    "name": "VREĆE ZA SMEĆE 60L 10/1 ALUFIX",
+    "brand": "FIBIS D.O.O.",
+    "chain": "ktc"
+  },
+  {
+    "name": "�AJ AHMAD MENTA LIMUN 40 g",
+    "brand": "Ahmad",
+    "chain": "interspar"
+  },
+  {
+    "name": "PLUMCAKE COKOLADA 240 G BALCONI",
+    "brand": "DALCOLE",
+    "chain": "plodine"
+  },
+  {
+    "name": "Cillit bang natural.sprej, kupaon. 750ml",
+    "brand": "Cillit Bang",
+    "chain": "kaufland"
+  },
+  {
+    "name": "0,25L BIBICH KRVAV. MASL.ULJE",
+    "brand": "BIBICH",
+    "chain": "metro"
+  },
+  {
+    "name": "VODKA PURE DIVINE 0,7 L",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "VINO IL POTERE 0,75 L",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "AJVAR BLAGI 300 G DIDA BOZA",
+    "brand": "DIDA BOZA",
+    "chain": "plodine"
+  },
+  {
+    "name": "METRO-JAB. CRIPS PINK PD",
+    "brand": "",
+    "chain": "metro"
+  },
+  {
+    "name": "ULJE KOKOSOVO BEZ MIRIS.1000mL NUTRIGOLD",
+    "brand": "GALLERIA INTERNAZIONALE D.O.O.",
+    "chain": "ktc"
+  },
+  {
+    "name": "Somersby Piće gaz.bezalk.mandarina0,33L",
+    "brand": "Somersby",
+    "chain": "kaufland"
+  },
+  {
+    "name": "PIVO KOZEL 4X0,5 L LIM.DARK",
+    "brand": "Kozel",
+    "chain": "interspar"
+  },
+  {
+    "name": "ADVENTUROS STRIPS 90g",
+    "brand": "PURINA",
+    "chain": "ktc"
+  },
+  {
+    "name": "VODA JANA NARANČA VIT. HAPPY 1,5 l",
+    "brand": "JAMNICA-BAP",
+    "chain": "studenac"
+  },
+  {
+    "name": "SIR EDAM BLOK MONKI",
+    "brand": "HOOGWEGT",
+    "chain": "plodine"
+  },
+  {
+    "name": "Barilla Umak od rajčice sa češnjakom400g",
+    "brand": "Barilla",
+    "chain": "kaufland"
+  },
+  {
+    "name": "KOKOSJA PASTETA 95 G RETRO PODRAVKA",
+    "brand": "PODRAVKA PASTETE I MESNE KONZERVE",
+    "chain": "plodine"
+  },
+  {
+    "name": "SVRDLA S JAJIMA KOLEDA 400 g",
+    "brand": "Koleda",
+    "chain": "interspar"
+  },
+  {
+    "name": "LIMUN VH 1 kg",
+    "brand": "SPAR Vrtovi Hrvatske",
+    "chain": "interspar"
+  },
+  {
+    "name": "SIR TEZACKI 190 G SIRANA GLIGORA",
+    "brand": "SIRANA GLIGORA",
+    "chain": "plodine"
+  },
+  {
+    "name": "PRŠUT REZANI  PERAJICA",
+    "brand": "SUŠARA PERAJICA",
+    "chain": "studenac"
+  },
+  {
+    "name": "SKY ORANGE 2L",
+    "brand": "SKY",
+    "chain": "ktc"
+  },
+  {
+    "name": "UHT LEDENA KAVA 0,235L VINDIJA",
+    "brand": "VINDIJA - MLIJEČNO",
+    "chain": "trgocentar"
+  },
+  {
+    "name": "ENERG. NAP. MONSTER GREEN 0,5 l",
+    "brand": "COCA COLA-MONSTER",
+    "chain": "studenac"
+  },
+  {
+    "name": "SVINJSKA LOPATICA ZA SU�ENJE",
+    "brand": "NO BRAND",
+    "chain": "eurospin"
+  },
+  {
+    "name": "BONDUELE MEKSIČKI MIX 340GR/280G",
+    "brand": "",
+    "chain": "trgocentar"
+  },
+  {
+    "name": "KRINKA BANDIT",
+    "brand": "BEST WEST",
+    "chain": "studenac"
+  },
+  {
+    "name": "VITAMIN B12 GREEN LAB 30 ml",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "�OK.KINDER SCHOCOBONS 200 g",
+    "brand": "Ferrero",
+    "chain": "interspar"
+  },
+  {
+    "name": "Fini-Mini Noodles kokošji okus 75g",
+    "brand": "Fini-Mini",
+    "chain": "kaufland"
+  },
+  {
+    "name": "SRED. ZA ČIŠ. VIKING  SAILOR LIMUN 500 ml",
+    "brand": "",
+    "chain": "studenac"
+  },
+  {
+    "name": "Eveline Olovka Za Oči Smeđa",
+    "brand": "Eveline",
+    "chain": "kaufland"
+  },
+  {
+    "name": "PINK STUFF PJENASTO SRED.ZA WC 300g**",
+    "brand": "PINK STUFF",
+    "chain": "ktc"
+  },
+  {
+    "name": "Hipp 2 Bio Combiotik 600 g",
+    "brand": "Hipp",
+    "chain": "kaufland"
+  },
+  {
+    "name": "Bev.Gel za tuš.Men 3u1 Fresh300ml",
+    "brand": "Bevola",
+    "chain": "kaufland"
+  },
+  {
+    "name": "JOG. VOĆNI ŠUM.VOĆE DUKAT 1 kg",
+    "brand": "DUKAT UKUPNO BEZ GAUDE",
+    "chain": "studenac"
+  },
+  {
+    "name": "Aluminijska folija 12µ, 30m",
+    "brand": "Aromata",
+    "chain": "lidl"
+  },
+  {
+    "name": "ŠEĆERNA VUNA 50g UNICORN",
+    "brand": "SLI-MET D.O.O.",
+    "chain": "ktc"
+  },
+  {
+    "name": "KA�ICA FRUTEK POV.GOV.190 g",
+    "brand": "Fructal",
+    "chain": "interspar"
+  },
+  {
+    "name": "TUNA S-BUD.KOM.SUNC.ULJE 195 g",
+    "brand": "S-Budget",
+    "chain": "interspar"
+  },
+  {
+    "name": "KREMA UNIVERZALNA MIXA 50 ml",
+    "brand": "MIXA",
+    "chain": "interspar"
+  },
+  {
+    "name": "VIPLAST  VRECICE ZA SMECE   120 L 10/1",
+    "brand": "VIPLAST",
+    "chain": "plodine"
+  },
+  {
+    "name": "GNOCCHI ALLA SORRENTINA 330G, PRIMI REALI",
+    "brand": "PRIMI REALI",
+    "chain": "plodine"
+  },
+  {
+    "name": "KA�ICA HIPP PUR.RI�A MRK.220 g",
+    "brand": "Hipp",
+    "chain": "interspar"
+  },
+  {
+    "name": "�IPS CHIO OB SLANI 100 g",
+    "brand": "Chio",
+    "chain": "interspar"
+  },
+  {
+    "name": "SOK JUICY FRUITS MULTIVITAMIN 0,5 l",
+    "brand": "AWT-STANIĆ BEVERAGES",
+    "chain": "studenac"
+  },
+  {
+    "name": "SUHA PE�ENICA 100g",
+    "brand": "PUTOVANJE KROZ OKUSE",
+    "chain": "eurospin"
+  },
+  {
+    "name": "KLC.BBQ umak 250 ml",
+    "brand": "K-Classic",
+    "chain": "kaufland"
+  },
+  {
+    "name": "Jabuka Idared rfs",
+    "brand": "S-BUDGET",
+    "chain": "interspar"
+  },
+  {
+    "name": "PRSUT VRGORACKI SK PIVAC (30901)",
+    "brand": "PIVAC",
+    "chain": "plodine"
+  },
+  {
+    "name": "MLIJEKO NIVEA FIORE 200 ml",
+    "brand": "Nivea",
+    "chain": "interspar"
+  },
+  {
+    "name": "CCA2,5KG GOVEDI USA BIFTEK BK",
+    "brand": "",
+    "chain": "metro"
+  },
+  {
+    "name": "Eveline Paleta sjenila Lo.up take my on",
+    "brand": "Eveline",
+    "chain": "kaufland"
+  },
+  {
+    "name": "OREHNJACA 500 G MIVIT",
+    "brand": "MIVIT",
+    "chain": "plodine"
+  },
+  {
+    "name": "PIVO HEINEKEN LIM.  0,5 l",
+    "brand": "HEINEKEN HRVATS",
+    "chain": "studenac"
+  },
+  {
+    "name": "KULEN V.P. CIJELI PODRAVKA",
+    "brand": "PODRAVKA DANICA",
+    "chain": "plodine"
+  },
+  {
+    "name": "JELO CASA FUSILLI PESTO 70 G ARRIGHI",
+    "brand": "ARRIGHI / BERRUTO",
+    "chain": "plodine"
+  },
+  {
+    "name": "BOJA PALETTE ICC 9-1 PLAVA",
+    "brand": "Palette",
+    "chain": "interspar"
+  },
+  {
+    "name": "LJEPILO PATTEX CLAS.50 ml",
+    "brand": "AWT-HENKEL LHCD",
+    "chain": "studenac"
+  },
+  {
+    "name": "TANJU BOŽ. STAKL. 32cm ZLATNA",
+    "brand": "BERLINER",
+    "chain": "studenac"
+  },
+  {
+    "name": "SOK VINDI MARELICA 1 L KASASTI S.C.",
+    "brand": "VINDIJA VINDI",
+    "chain": "plodine"
+  },
+  {
+    "name": "KLC.Vrhnje kiselo 12%m.m. 180g_OC",
+    "brand": "K-Classic",
+    "chain": "kaufland"
+  },
+  {
+    "name": "REGENERATOR PANTENE MIR.200 ml",
+    "brand": "Pantene",
+    "chain": "interspar"
+  },
+  {
+    "name": "KROASAN 7 DAYS MIDI C&COO.HAS. 60 g",
+    "brand": "FILIR-CHIPITA",
+    "chain": "studenac"
+  },
+  {
+    "name": "SENSODYNE 75 ML HERBAL FRESH",
+    "brand": "SENSODYNE",
+    "chain": "plodine"
+  },
+  {
+    "name": "Kitekat sm s piletinom i povrćem 300g",
+    "brand": "Kiktekat",
+    "chain": "kaufland"
+  },
+  {
+    "name": "OME.LENOR RUBY JASMINE 1,239 L",
+    "brand": "Lenor",
+    "chain": "interspar"
+  },
+  {
+    "name": "SOMAT GOLD GEL 540 ML  ANTI GREASE LEMON",
+    "brand": "SOMAT",
+    "chain": "plodine"
+  },
+  {
+    "name": "PISTACIJA ŠTAPIĆ 90ML/71G",
+    "brand": "",
+    "chain": "trgocentar"
+  },
+  {
+    "name": "0,75L ROSSI VINO MALVAZIJA",
+    "brand": "ROSSI",
+    "chain": "metro"
+  },
+  {
+    "name": "Libresse Ulošci hig.Ultra long 8/1_OC",
+    "brand": "Libresse",
+    "chain": "kaufland"
+  },
+  {
+    "name": "KREKERI SALTAS SLANINA 100 g",
+    "brand": "Koestlin",
+    "chain": "interspar"
+  },
+  {
+    "name": "KAVA JUL.MEINL VIEN.MEL.500 g",
+    "brand": "JULIUS MEINL",
+    "chain": "interspar"
+  },
+  {
+    "name": ".GAZIRANO PI�E ZERO 1l",
+    "brand": "BLUES",
+    "chain": "eurospin"
+  },
+  {
+    "name": "TJ.NA.PUR FUSILLI GRA�AK 250 g",
+    "brand": "SPAR Natur*pur",
+    "chain": "interspar"
+  },
+  {
+    "name": "KRUPICA KUKURUZNA 1 KG PODRAVKA",
+    "brand": "PODRAVKA KONZERVIRANO",
+    "chain": "plodine"
+  },
+  {
+    "name": "0,75L CATTUNAR VINO MALV. CRN.",
+    "brand": "CATTUNAR",
+    "chain": "metro"
+  },
+  {
+    "name": "WC OSVJ.DR.DEVIL LEMON 3X55mL",
+    "brand": "PORTEROS D.O.O.",
+    "chain": "ktc"
+  },
+  {
+    "name": "GAVUNIĆ (OLIGA)",
+    "brand": "",
+    "chain": "metro"
+  },
+  {
+    "name": "ŽVAKE AIRWAVES GREEN MINT 14 g",
+    "brand": "ATLANTIC-WRIGLEY",
+    "chain": "studenac"
+  },
+  {
+    "name": "0,7L KORLAT LIKER BISKA",
+    "brand": "KORLAT",
+    "chain": "metro"
+  },
+  {
+    "name": "FANT ZA PUNJENU PAPRIKU I SARMU 60 G PODRAVKA",
+    "brand": "PODRAVKA KONZERVIRANO",
+    "chain": "plodine"
+  },
+  {
+    "name": "BRIKET 2,5kg PREMIUM CROGRILL ECO FRIEND",
+    "brand": "KRIŽEVCI PRODUKT d.o.o.",
+    "chain": "ktc"
+  },
+  {
+    "name": "HRANA ZA MACKE GOV/RAJ 85 G FELIX",
+    "brand": "NESTLE PURINA",
+    "chain": "plodine"
+  },
+  {
+    "name": "SVIJEĆA KONUSNA  METALIK 2 kom",
+    "brand": "LAMPAŠ",
+    "chain": "studenac"
+  },
+  {
+    "name": "500G MC KUPUS KISELI REZANI",
+    "brand": "METRO CHEF",
+    "chain": "metro"
+  },
+  {
+    "name": "JUN.MESNE KOSTI III KAT",
+    "brand": "CRVENO MESO",
+    "chain": "plodine"
+  },
+  {
+    "name": "OME.ORNEL GOLDEN DREAM 2,4 L",
+    "brand": "Ornel",
+    "chain": "interspar"
+  },
+  {
+    "name": "JABUKA KAKI - KG",
+    "brand": "",
+    "chain": "metro"
+  },
+  {
+    "name": "Kinder Milchschnitte 5x28g",
+    "brand": "",
+    "chain": "lidl"
+  },
+  {
+    "name": "Melem Gel za intimno pranje Herba 200 ml",
+    "brand": "Melem",
+    "chain": "kaufland"
+  },
+  {
+    "name": "Mortadela s maslinama",
+    "brand": "Pikok",
+    "chain": "lidl"
+  },
+  {
+    "name": "MLINCI ZAGORSKI 400g ZEBRANO",
+    "brand": "ZEBRANO D.O.O.",
+    "chain": "ktc"
+  },
+  {
+    "name": "KAVA KAPSULE 125YE 57 G FRANCK",
+    "brand": "FRANCK KAPSULE",
+    "chain": "plodine"
+  },
+  {
+    "name": "KINDER SCHOCOBONS WHITE 200g",
+    "brand": "FERRERO",
+    "chain": "ktc"
+  },
+  {
+    "name": "KASICA SLJIVA JABUKA 190 G LINO",
+    "brand": "LINO",
+    "chain": "plodine"
+  },
+  {
+    "name": "LIKER BOGATI TERANINO 0,7 L",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "CAPPUCCINO VANILIJA 10kom 140g",
+    "brand": "DON JEREZ",
+    "chain": "eurospin"
+  },
+  {
+    "name": "INST.J.NISSIN NOOD.KOZICE 63g",
+    "brand": "Nissin",
+    "chain": "interspar"
+  },
+  {
+    "name": "SVINJSKA CRIJEVA 38/42 10m DOZA",
+    "brand": "DERMA",
+    "chain": "ktc"
+  },
+  {
+    "name": "RALON KREMA ZA BRIJANJE 70mL",
+    "brand": "RALON",
+    "chain": "ktc"
+  },
+  {
+    "name": "CELJ.M.DIMLJENA  SLANINA",
+    "brand": "",
+    "chain": "studenac"
+  },
+  {
+    "name": "GEL TU�.PALMOLIVE ALM.750 ml",
+    "brand": "Palmolive",
+    "chain": "interspar"
+  },
+  {
+    "name": "Somersby Jabuka",
+    "brand": "",
+    "chain": "lidl"
+  },
+  {
+    "name": "ROCHER T16 FERRERO 200 g",
+    "brand": "Ferrero",
+    "chain": "interspar"
+  },
+  {
+    "name": "VINO JER.SIVI.PI.ZL.LIN.0,75 L",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "TUNA KOMADI U ULJU 1705G/1260G LARA",
+    "brand": "",
+    "chain": "trgocentar"
+  },
+  {
+    "name": "VINO VRH.CHARDONNAY I.P.0,75L",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "DOKOLJENKE MINI 20 DEN CRNE 2P",
+    "brand": "GLISSADE",
+    "chain": "eurospin"
+  },
+  {
+    "name": "WEISSER RIESE CAPS 80KOM",
+    "brand": "WEISSER RIESE",
+    "chain": "ktc"
+  },
+  {
+    "name": "COCKTA FREE 0,33 l  LIMENKA",
+    "brand": "ATLANTIC-COCKTA",
+    "chain": "studenac"
+  },
+  {
+    "name": "HARIBO ZLATNI MEDO BOMBONI 100G",
+    "brand": "",
+    "chain": "trgocentar"
+  },
+  {
+    "name": "SOK NARAN�A 100% 1l",
+    "brand": "PUERTOSOL",
+    "chain": "eurospin"
+  },
+  {
+    "name": "POK.PAKET LA RIVE HEROIC MAN",
+    "brand": "",
+    "chain": "interspar"
+  },
+  {
+    "name": "VIOLETA JUMBO RUČNICI 2/1 XXL (12)",
+    "brand": "",
+    "chain": "trgocentar"
+  },
+  {
+    "name": "ASEPSOLETA CLASSIC 5 KOM",
+    "brand": "ATLANTIC MAGDIS",
+    "chain": "plodine"
+  },
+  {
+    "name": "KEKS ABBRACCI  350 G MULINO BIANCO",
+    "brand": "MULINO BIANCO KEKSI",
+    "chain": "plodine"
+  },
+  {
+    "name": "NAPITAK VIT. NARANČA INSTAVITA 900 g",
+    "brand": "STUDENAC-ROBNA MARKA",
+    "chain": "studenac"
+  },
+  {
+    "name": "SOL KUHINJSKA KAMENA 25KG, TUZLA",
+    "brand": "SOLANA TUZLA",
+    "chain": "trgocentar"
+  }
+]

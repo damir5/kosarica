@@ -29,10 +29,13 @@ import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users
 import { Route as AdminAdminTaskQueueRouteImport } from './routes/_admin.admin.task-queue'
 import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stores'
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
+import { Route as AdminAdminLlmDecisionsRouteImport } from './routes/_admin.admin.llm-decisions'
 import { Route as AdminAdminIngestionRouteImport } from './routes/_admin.admin.ingestion'
 import { Route as AdminAdminCronRouteImport } from './routes/_admin.admin.cron'
 import { Route as AdminAdminClickhouseRouteImport } from './routes/_admin.admin.clickhouse'
+import { Route as AdminAdminCategorizationRouteImport } from './routes/_admin.admin.categorization'
 import { Route as AdminAdminCatalogPricesRouteImport } from './routes/_admin.admin.catalog-prices'
+import { Route as AdminAdminBarcodeTriageRouteImport } from './routes/_admin.admin.barcode-triage'
 import { Route as AdminAdminStoresIndexRouteImport } from './routes/_admin.admin.stores.index'
 import { Route as AdminAdminIngestionIndexRouteImport } from './routes/_admin.admin.ingestion.index'
 import { Route as AdminAdminConfigIndexRouteImport } from './routes/_admin.admin.config.index'
@@ -139,6 +142,11 @@ const AdminAdminSettingsRoute = AdminAdminSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AdminAdminRoute,
 } as any)
+const AdminAdminLlmDecisionsRoute = AdminAdminLlmDecisionsRouteImport.update({
+  id: '/llm-decisions',
+  path: '/llm-decisions',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
 const AdminAdminIngestionRoute = AdminAdminIngestionRouteImport.update({
   id: '/ingestion',
   path: '/ingestion',
@@ -154,9 +162,20 @@ const AdminAdminClickhouseRoute = AdminAdminClickhouseRouteImport.update({
   path: '/clickhouse',
   getParentRoute: () => AdminAdminRoute,
 } as any)
+const AdminAdminCategorizationRoute =
+  AdminAdminCategorizationRouteImport.update({
+    id: '/categorization',
+    path: '/categorization',
+    getParentRoute: () => AdminAdminRoute,
+  } as any)
 const AdminAdminCatalogPricesRoute = AdminAdminCatalogPricesRouteImport.update({
   id: '/catalog-prices',
   path: '/catalog-prices',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
+const AdminAdminBarcodeTriageRoute = AdminAdminBarcodeTriageRouteImport.update({
+  id: '/barcode-triage',
+  path: '/barcode-triage',
   getParentRoute: () => AdminAdminRoute,
 } as any)
 const AdminAdminStoresIndexRoute = AdminAdminStoresIndexRouteImport.update({
@@ -209,10 +228,13 @@ export interface FileRoutesByFullPath {
   '/search': typeof PublicSearchRoute
   '/stores': typeof PublicStoresRoute
   '/api/$': typeof ApiSplatRoute
+  '/admin/barcode-triage': typeof AdminAdminBarcodeTriageRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/admin/categorization': typeof AdminAdminCategorizationRoute
   '/admin/clickhouse': typeof AdminAdminClickhouseRoute
   '/admin/cron': typeof AdminAdminCronRoute
   '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
+  '/admin/llm-decisions': typeof AdminAdminLlmDecisionsRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
   '/admin/task-queue': typeof AdminAdminTaskQueueRoute
@@ -239,9 +261,12 @@ export interface FileRoutesByTo {
   '/search': typeof PublicSearchRoute
   '/stores': typeof PublicStoresRoute
   '/api/$': typeof ApiSplatRoute
+  '/admin/barcode-triage': typeof AdminAdminBarcodeTriageRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/admin/categorization': typeof AdminAdminCategorizationRoute
   '/admin/clickhouse': typeof AdminAdminClickhouseRoute
   '/admin/cron': typeof AdminAdminCronRoute
+  '/admin/llm-decisions': typeof AdminAdminLlmDecisionsRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/task-queue': typeof AdminAdminTaskQueueRoute
   '/admin/users': typeof AdminAdminUsersRoute
@@ -271,10 +296,13 @@ export interface FileRoutesById {
   '/_public/stores': typeof PublicStoresRoute
   '/api/$': typeof ApiSplatRoute
   '/_public/': typeof PublicIndexRoute
+  '/_admin/admin/barcode-triage': typeof AdminAdminBarcodeTriageRoute
   '/_admin/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
+  '/_admin/admin/categorization': typeof AdminAdminCategorizationRoute
   '/_admin/admin/clickhouse': typeof AdminAdminClickhouseRoute
   '/_admin/admin/cron': typeof AdminAdminCronRoute
   '/_admin/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
+  '/_admin/admin/llm-decisions': typeof AdminAdminLlmDecisionsRoute
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
   '/_admin/admin/stores': typeof AdminAdminStoresRouteWithChildren
   '/_admin/admin/task-queue': typeof AdminAdminTaskQueueRoute
@@ -304,10 +332,13 @@ export interface FileRouteTypes {
     | '/search'
     | '/stores'
     | '/api/$'
+    | '/admin/barcode-triage'
     | '/admin/catalog-prices'
+    | '/admin/categorization'
     | '/admin/clickhouse'
     | '/admin/cron'
     | '/admin/ingestion'
+    | '/admin/llm-decisions'
     | '/admin/settings'
     | '/admin/stores'
     | '/admin/task-queue'
@@ -334,9 +365,12 @@ export interface FileRouteTypes {
     | '/search'
     | '/stores'
     | '/api/$'
+    | '/admin/barcode-triage'
     | '/admin/catalog-prices'
+    | '/admin/categorization'
     | '/admin/clickhouse'
     | '/admin/cron'
+    | '/admin/llm-decisions'
     | '/admin/settings'
     | '/admin/task-queue'
     | '/admin/users'
@@ -365,10 +399,13 @@ export interface FileRouteTypes {
     | '/_public/stores'
     | '/api/$'
     | '/_public/'
+    | '/_admin/admin/barcode-triage'
     | '/_admin/admin/catalog-prices'
+    | '/_admin/admin/categorization'
     | '/_admin/admin/clickhouse'
     | '/_admin/admin/cron'
     | '/_admin/admin/ingestion'
+    | '/_admin/admin/llm-decisions'
     | '/_admin/admin/settings'
     | '/_admin/admin/stores'
     | '/_admin/admin/task-queue'
@@ -538,6 +575,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminSettingsRouteImport
       parentRoute: typeof AdminAdminRoute
     }
+    '/_admin/admin/llm-decisions': {
+      id: '/_admin/admin/llm-decisions'
+      path: '/llm-decisions'
+      fullPath: '/admin/llm-decisions'
+      preLoaderRoute: typeof AdminAdminLlmDecisionsRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
     '/_admin/admin/ingestion': {
       id: '/_admin/admin/ingestion'
       path: '/ingestion'
@@ -559,11 +603,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminClickhouseRouteImport
       parentRoute: typeof AdminAdminRoute
     }
+    '/_admin/admin/categorization': {
+      id: '/_admin/admin/categorization'
+      path: '/categorization'
+      fullPath: '/admin/categorization'
+      preLoaderRoute: typeof AdminAdminCategorizationRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
     '/_admin/admin/catalog-prices': {
       id: '/_admin/admin/catalog-prices'
       path: '/catalog-prices'
       fullPath: '/admin/catalog-prices'
       preLoaderRoute: typeof AdminAdminCatalogPricesRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
+    '/_admin/admin/barcode-triage': {
+      id: '/_admin/admin/barcode-triage'
+      path: '/barcode-triage'
+      fullPath: '/admin/barcode-triage'
+      preLoaderRoute: typeof AdminAdminBarcodeTriageRouteImport
       parentRoute: typeof AdminAdminRoute
     }
     '/_admin/admin/stores/': {
@@ -661,10 +719,13 @@ const AdminAdminStoresRouteWithChildren =
   AdminAdminStoresRoute._addFileChildren(AdminAdminStoresRouteChildren)
 
 interface AdminAdminRouteChildren {
+  AdminAdminBarcodeTriageRoute: typeof AdminAdminBarcodeTriageRoute
   AdminAdminCatalogPricesRoute: typeof AdminAdminCatalogPricesRoute
+  AdminAdminCategorizationRoute: typeof AdminAdminCategorizationRoute
   AdminAdminClickhouseRoute: typeof AdminAdminClickhouseRoute
   AdminAdminCronRoute: typeof AdminAdminCronRoute
   AdminAdminIngestionRoute: typeof AdminAdminIngestionRouteWithChildren
+  AdminAdminLlmDecisionsRoute: typeof AdminAdminLlmDecisionsRoute
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
   AdminAdminStoresRoute: typeof AdminAdminStoresRouteWithChildren
   AdminAdminTaskQueueRoute: typeof AdminAdminTaskQueueRoute
@@ -674,10 +735,13 @@ interface AdminAdminRouteChildren {
 }
 
 const AdminAdminRouteChildren: AdminAdminRouteChildren = {
+  AdminAdminBarcodeTriageRoute: AdminAdminBarcodeTriageRoute,
   AdminAdminCatalogPricesRoute: AdminAdminCatalogPricesRoute,
+  AdminAdminCategorizationRoute: AdminAdminCategorizationRoute,
   AdminAdminClickhouseRoute: AdminAdminClickhouseRoute,
   AdminAdminCronRoute: AdminAdminCronRoute,
   AdminAdminIngestionRoute: AdminAdminIngestionRouteWithChildren,
+  AdminAdminLlmDecisionsRoute: AdminAdminLlmDecisionsRoute,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,
   AdminAdminStoresRoute: AdminAdminStoresRouteWithChildren,
   AdminAdminTaskQueueRoute: AdminAdminTaskQueueRoute,

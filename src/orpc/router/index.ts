@@ -7,8 +7,11 @@ import {
 	listCatalogPrices,
 } from "./catalog-prices";
 import * as clickhouse from "./clickhouse";
+import * as categorization from "./categorization";
 import * as cron from "./cron";
 import * as ingestion from "./ingestion";
+import * as barcodeTriage from "./barcode-triage";
+import * as llmDecisions from "./llm-decisions";
 import * as prices from "./prices";
 import { getProductPrices, getSimilarVariants } from "./products-public";
 import * as search from "./search";
@@ -183,6 +186,27 @@ export default {
 			reschedule: taskQueue.reschedule,
 			recoverOrphaned: taskQueue.recoverOrphaned,
 			cleanupCompleted: taskQueue.cleanupCompleted,
+		},
+		categorization: {
+			list: categorization.listCategorizations,
+			getStats: categorization.getStats,
+			update: categorization.updateCategorization,
+			trigger: categorization.triggerCategorization,
+		},
+		barcodeTriage: {
+			getQueue: barcodeTriage.getTriageQueue,
+			claim: barcodeTriage.claimTriageItem,
+			getClusterDetail: barcodeTriage.getClusterDetail,
+			submitDecision: barcodeTriage.submitDecision,
+			revertDecision: barcodeTriage.revertDecision,
+			getDecisionHistory: barcodeTriage.getDecisionHistory,
+			searchCanonicalSkus: barcodeTriage.searchCanonicalSkus,
+		},
+		llmDecisions: {
+			list: llmDecisions.listLlmDecisions,
+			get: llmDecisions.getLlmDecision,
+			override: llmDecisions.overrideLlmDecision,
+			stats: llmDecisions.getLlmDecisionStats,
 		},
 	},
 };

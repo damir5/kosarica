@@ -58,6 +58,9 @@ async function enqueueTasks(
 			case "clickhouse":
 				payload = { type: "clickhouseSync", ...task.payload };
 				break;
+			case "barcode-anchor":
+				payload = { type: "barcodeAnchor", ...(task.payload ?? {}) };
+				break;
 			default: {
 				// @ts-expect-error - exhaustive check for unreachable code
 				const _exhaustiveCheck: never = task;

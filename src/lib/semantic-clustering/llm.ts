@@ -126,7 +126,7 @@ ${JSON.stringify(
 	)}`;
 }
 
-function extractJsonPayload(content: string): unknown {
+export function extractJsonPayload(content: string): unknown {
 	const trimmed = content.trim();
 	if (trimmed.length === 0) {
 		throw new Error("Model response is empty");

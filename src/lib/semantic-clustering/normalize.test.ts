@@ -17,7 +17,7 @@ describe("parseRetailerItemFeature", () => {
 		expect(parsed.packAmount).toBe(6);
 		expect(parsed.extractedUnit).toBe("l");
 		expect(parsed.totalAmount).toBeCloseTo(1.98, 2);
-		expect(parsed.containerType).toBe("can");
+		expect(parsed.containerType).toBe("limenka");
 	});
 
 	it("detects pack counts from slash format", () => {

@@ -1,0 +1,23 @@
+generated_at: 2026-02-08T08:37:25.695Z
+loop_state:
+  shard_count: 64
+  completed_shards: 0
+  missing_shards: 64
+  global_loop_number: 0
+  next_shard: 0
+  active_agents: 0
+  last_full_sweep_completed_at: null
+metrics:
+  unlinked_items: 0
+  pending_product_review: 0
+  pending_product_review_oldest_hours: 0
+  candidate_equivalences: 2
+  stores_needs_review: 0
+  stores_ungeocoded_active: 0
+alerts:
+  - at: 2026-02-08T08:37:25.695Z
+    severity: critical
+    metric: loop_shards_missing
+    value: 64
+    threshold: 16
+    message: Loop sweep coverage is lagging

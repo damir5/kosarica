@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { embedTexts, preparePassageText } from "@/lib/embeddings";
+import { logLlmDecision } from "@/lib/llm-observability";
 import {
 	clusterMembers,
 	clusterRelations,
@@ -96,7 +97,10 @@ interface CandidateQueueResult {
 interface FeatureEmbeddingRow {
 	retailerItemId: string;
 	name: string;
+	everydayName: string | null;
 	brand: string | null;
+	extractedBrand: string | null;
+	variant: string | null;
 	category: string | null;
 	unit: string | null;
 	unitQuantity: string | null;
@@ -218,8 +222,9 @@ function determineRelationshipType(a: DecisionRow, b: DecisionRow): string {
 
 function buildFeatureEmbeddingText(row: FeatureEmbeddingRow): string {
 	return preparePassageText({
-		name: row.name,
-		brand: row.brand,
+		name: row.everydayName ?? row.name,
+		brand: row.extractedBrand ?? row.brand,
+		variant: row.variant,
 		category: row.category,
 		unit: row.unit,
 		unitQuantity: row.unitQuantity,
@@ -277,7 +282,10 @@ async function upsertFeatures(batchSize: number): Promise<{
 			ri.brand,
 			ri.category,
 			ri.unit,
-			ri.unit_quantity
+			ri.unit_quantity,
+			rif.everyday_name,
+			rif.extracted_brand,
+			rif.variant
 		FROM retailer_items ri
 		LEFT JOIN retailer_item_features rif ON rif.retailer_item_id = ri.id
 		WHERE ri.merged_into_id IS NULL
@@ -293,6 +301,9 @@ async function upsertFeatures(batchSize: number): Promise<{
 		category: string | null;
 		unit: string | null;
 		unit_quantity: string | null;
+		everyday_name: string | null;
+		extracted_brand: string | null;
+		variant: string | null;
 	}>(rowsResult);
 
 	if (rows.length === 0) {
@@ -303,7 +314,10 @@ async function upsertFeatures(batchSize: number): Promise<{
 		rows.map((row) => ({
 			retailerItemId: row.id,
 			name: row.name,
+			everydayName: row.everyday_name,
 			brand: row.brand,
+			extractedBrand: row.extracted_brand,
+			variant: row.variant,
 			category: row.category,
 			unit: row.unit,
 			unitQuantity: row.unit_quantity,
@@ -386,11 +400,20 @@ export async function backfillMissingFeatureEmbeddings(batchSize: number): Promi
 				ri.brand,
 				ri.category,
 				ri.unit,
-				ri.unit_quantity
+				ri.unit_quantity,
+				rif.everyday_name,
+				rif.extracted_brand,
+				rif.variant
 			FROM retailer_item_features rif
 			JOIN retailer_items ri ON ri.id = rif.retailer_item_id
 			WHERE ri.merged_into_id IS NULL
-				AND rif.embedding IS NULL
+				AND (
+					rif.embedding IS NULL
+					OR (
+						rif.categorized_at IS NOT NULL
+						AND rif.updated_at < rif.categorized_at
+					)
+				)
 			LIMIT ${batchSize}
 			FOR UPDATE OF rif SKIP LOCKED
 		`);
@@ -402,6 +425,9 @@ export async function backfillMissingFeatureEmbeddings(batchSize: number): Promi
 			category: string | null;
 			unit: string | null;
 			unit_quantity: string | null;
+			everyday_name: string | null;
+			extracted_brand: string | null;
+			variant: string | null;
 		}>(rowsResult);
 		if (rows.length === 0) {
 			return 0;
@@ -411,7 +437,10 @@ export async function backfillMissingFeatureEmbeddings(batchSize: number): Promi
 			rows.map((row) => ({
 				retailerItemId: row.retailer_item_id,
 				name: row.name,
+				everydayName: row.everyday_name,
 				brand: row.brand,
+				extractedBrand: row.extracted_brand,
+				variant: row.variant,
 				category: row.category,
 				unit: row.unit,
 				unitQuantity: row.unit_quantity,
@@ -440,7 +469,8 @@ export async function backfillMissingFeatureEmbeddings(batchSize: number): Promi
 				VALUES ${sql.join(values, sql`, `)}
 			)
 			UPDATE retailer_item_features rif
-			SET embedding = updates.embedding
+			SET embedding = updates.embedding,
+				updated_at = NOW()
 			FROM updates
 			WHERE rif.retailer_item_id = updates.retailer_item_id
 		`);
@@ -894,6 +924,57 @@ async function adjudicatePairs(batchSize: number, llmPromptBatchSize: number): P
 						eq(semanticPairDecisions.itemBId, row.item_b_id),
 					),
 				);
+
+			try {
+				await logLlmDecision({
+					taskType: "pair_match",
+					input: {
+						pairId,
+						itemAId: row.item_a_id,
+						itemBId: row.item_b_id,
+						itemA: {
+							name: row.item_name_a,
+							brand: row.extracted_brand_a,
+							category: row.normalized_category_a,
+							amount: row.total_amount_a,
+							unit: row.extracted_unit_a,
+							packAmount: row.pack_amount_a ?? 1,
+							containerType: row.container_type_a,
+						},
+						itemB: {
+							name: row.item_name_b,
+							brand: row.extracted_brand_b,
+							category: row.normalized_category_b,
+							amount: row.total_amount_b,
+							unit: row.extracted_unit_b,
+							packAmount: row.pack_amount_b ?? 1,
+							containerType: row.container_type_b,
+						},
+					},
+					output: {
+						finalVerdict: result.finalVerdict,
+						finalConfidence: result.finalConfidence,
+						consensusScore: result.consensusScore,
+						votes: result.votes,
+						decisionState: result.decisionState,
+						systemError: result.systemError,
+					},
+					modelId:
+						result.votes.map((vote) => vote.modelId).join(",") || "heuristic",
+					provider:
+						result.votes.map((vote) => vote.provider).join(",") || "rule-engine",
+					verdict: result.finalVerdict,
+					confidence: result.finalConfidence,
+					reasoning:
+						result.votes.map((vote) => `${vote.modelId}:${vote.reasoning}`).join(" | ") ||
+						(result.systemError ?? "No reasoning"),
+				});
+			} catch (error) {
+				log.warn("Failed to persist semantic LLM decision log", {
+					error: String(error),
+					pairId,
+				});
+			}
 		}
 	}
 
