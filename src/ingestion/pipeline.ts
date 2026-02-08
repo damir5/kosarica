@@ -834,12 +834,10 @@ async function resolveRetailerItemsForRows(
 	};
 
 	const rowItemIds = new Array<string>(rows.length);
-	const rowExternalIds = new Array<string | null>(rows.length);
 	const newCandidates = new Map<string, NewItemCandidate>();
 
 	for (const [index, rowEntry] of rows.entries()) {
 		const externalId = normalizeExternalId(rowEntry.row.externalId);
-		rowExternalIds[index] = externalId;
 		let resolvedItemId: string | null = null;
 
 		if (externalId) {
@@ -1071,8 +1069,7 @@ async function resolveRetailerItemsForRows(
 
 	for (let i = 0; i < rows.length; i += 1) {
 		const itemId = rowItemIds[i];
-		const externalId = rowExternalIds[i];
-		if (!externalId || createdItemIds.has(itemId)) {
+		if (createdItemIds.has(itemId)) {
 			continue;
 		}
 		if (state.updatedItemIds.has(itemId) || metadataQueuedInBatch.has(itemId)) {
