@@ -45,6 +45,10 @@ function parseWeightEnv(name: string, fallback: number): number {
 const SEARCH_WEIGHT_FTS = parseWeightEnv("SEARCH_WEIGHT_FTS", 0.7);
 const SEARCH_WEIGHT_TRIGRAM = parseWeightEnv("SEARCH_WEIGHT_TRIGRAM", 0.3);
 
+function buildInList(values: readonly string[]): SQL {
+	return sql`(${sql.join(values.map((value) => sql`${value}`), sql`, `)})`;
+}
+
 function buildFilterConditions(
 	filters?: SearchFilters,
 	aliased = false,
@@ -54,15 +58,21 @@ function buildFilterConditions(
 	if (filters?.entityTypes?.length) {
 		const validTypes = validateEntityTypes(filters.entityTypes);
 		if (validTypes.length > 0) {
+			const entityTypeColumn = aliased
+				? sql`s.entity_type`
+				: sql`entity_type`;
 			filterConditions.push(
-				aliased
-					? sql`s.entity_type = ANY(${validTypes})`
-					: sql`entity_type = ANY(${validTypes})`,
+				sql`${entityTypeColumn} IN ${buildInList(validTypes)}`,
 			);
 		}
 	}
 
-	if (filters?.chainSlug) {
+	if (filters?.chainSlugs?.length) {
+		const chainSlugColumn = aliased ? sql`s.chain_slug` : sql`chain_slug`;
+		filterConditions.push(
+			sql`${chainSlugColumn} IN ${buildInList(filters.chainSlugs)}`,
+		);
+	} else if (filters?.chainSlug) {
 		filterConditions.push(
 			aliased
 				? sql`s.chain_slug = ${filters.chainSlug}`

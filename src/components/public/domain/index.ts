@@ -1,7 +1,7 @@
 export {
 	BasketOptimizationResults,
-	type StoreAllocationResult,
 	type SingleStoreResultItem,
+	type StoreAllocationResult,
 } from "./basket-optimization-results";
 export { CategoryGrid, type CategoryGridProps } from "./category-grid";
 export { CategoryIcon } from "./category-icon";
@@ -13,6 +13,7 @@ export {
 	type EmptyStateVariant,
 } from "./empty-state";
 export { FilterChip, type FilterChipProps } from "./filter-chip";
+export { LocationChip } from "./location-chip";
 export { PriceBar } from "./price-bar";
 export {
 	PriceComparisonRow,
@@ -33,6 +34,10 @@ export {
 	ShoppingListItem,
 	type ShoppingListItemProps,
 } from "./shopping-list-item";
+export {
+	SimilarVariantCard,
+	type SimilarVariantCardProps,
+} from "./similar-variant-card";
 export { Sparkline } from "./sparkline";
 export { StoreChip, storeChipVariants } from "./store-chip";
 export { STORE_COLORS, type StoreSlug } from "./store-colors";

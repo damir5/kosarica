@@ -34,6 +34,7 @@ export const listCatalogPrices = procedure
 			includeFutureDates: z.boolean().optional().default(false),
 			chainSlug: z.string().optional(),
 			storeId: z.string().optional(),
+			storeIds: z.array(z.string()).optional(),
 			category: z.string().optional(),
 			search: z.string().optional(),
 			minPrice: z.number().int().min(0).optional(),
@@ -61,6 +62,15 @@ export const listCatalogPrices = procedure
 		if (input.storeId) {
 			conditions.push("store_id = {storeId:String}");
 			params.storeId = input.storeId;
+		}
+
+		if (input.storeIds && input.storeIds.length > 0) {
+			conditions.push("store_id IN ({storeIds:Array(String)})");
+			(params as Record<string, unknown>).storeIds = input.storeIds;
+			// Constrain to recent data when filtering by store to avoid full-table scan
+			if (!input.dateFrom) {
+				conditions.push("target_date >= today() - 30");
+			}
 		}
 
 		if (input.category) {
@@ -120,7 +130,9 @@ export const listCatalogPrices = procedure
 			${havingClause}
 		`;
 
-		const rows = await clickhouse.query<ClickHouseCatalogRow>(
+		const hasStoreIdFilter = input.storeIds && input.storeIds.length > 0;
+
+		const rowsPromise = clickhouse.query<ClickHouseCatalogRow>(
 			`${baseQuery} ORDER BY last_seen_at DESC LIMIT {limit:UInt32} OFFSET {offset:UInt32}`,
 			{
 				...params,
@@ -129,10 +141,15 @@ export const listCatalogPrices = procedure
 			},
 		);
 
-		const totals = await clickhouse.query<{ count: string }>(
-			`SELECT count() AS count FROM (${baseQuery})`,
-			params,
-		);
+		// Skip expensive count subquery when filtering by storeIds — use result length instead
+		const totalsPromise = hasStoreIdFilter
+			? Promise.resolve([{ count: "0" }])
+			: clickhouse.query<{ count: string }>(
+					`SELECT count() AS count FROM (${baseQuery})`,
+					params,
+				);
+
+		const [rows, totals] = await Promise.all([rowsPromise, totalsPromise]);
 
 		const storeIds = Array.from(new Set(rows.map((row) => row.store_id)));
 		const storeMap = new Map<
@@ -197,7 +214,10 @@ export const listCatalogPrices = procedure
 			};
 		});
 
-		const total = Number.parseInt(totals[0]?.count ?? "0", 10);
+		// When storeIds filter is active, estimate total from result count
+		const total = hasStoreIdFilter
+			? (offset + rows.length + (rows.length === input.pageSize ? 1 : 0))
+			: Number.parseInt(totals[0]?.count ?? "0", 10);
 
 		return {
 			prices,

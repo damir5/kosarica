@@ -10,7 +10,7 @@ import * as clickhouse from "./clickhouse";
 import * as cron from "./cron";
 import * as ingestion from "./ingestion";
 import * as prices from "./prices";
-import { getProductPrices } from "./products-public";
+import { getProductPrices, getSimilarVariants } from "./products-public";
 import * as search from "./search";
 import {
 	approveDecision,
@@ -43,6 +43,7 @@ import {
 	updateStore,
 	verifyEnrichment,
 } from "./stores";
+import { listCities, listNearbyStores } from "./stores-public";
 import * as taskQueue from "./task-queue";
 import { addTodo, listTodos } from "./todos";
 import {
@@ -65,6 +66,8 @@ export default {
 		list: listStores,
 		get: getStore,
 		getDetail: getStoreDetail,
+		listNearby: listNearbyStores,
+		listCities: listCities,
 	},
 	basket: {
 		optimizeSingle: basket.optimizeSingle,
@@ -83,6 +86,7 @@ export default {
 	},
 	products: {
 		get: getProductPrices,
+		getSimilarVariants,
 	},
 	alerts: {
 		list: alerts.listAlerts,

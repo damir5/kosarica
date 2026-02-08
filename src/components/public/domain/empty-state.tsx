@@ -10,6 +10,7 @@ type EmptyStateVariant =
 	| "search-empty"
 	| "list-empty"
 	| "alerts-empty"
+	| "location-required"
 	| "generic";
 
 const defaultContent: Record<
@@ -29,6 +30,11 @@ const defaultContent: Record<
 		title: "Nema alarma",
 		description:
 			"Postavi alarm i mi \u0107emo te probuditi kad cijena padne. Figurativno.",
+	},
+	"location-required": {
+		title: "Postavi svoju lokaciju",
+		description:
+			"Odaberi lokaciju da vidi\u0161 trgovine u tvojoj blizini i filtrira\u0161 cijene.",
 	},
 	generic: {
 		title: "Ni\u0161ta za vidjeti",

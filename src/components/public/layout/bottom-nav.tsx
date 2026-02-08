@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bell, Home, Search, ShoppingBasket, User } from "lucide-react";
+import { Bell, Home, MapPin, Search, ShoppingBasket, User } from "lucide-react";
 import type { ComponentType } from "react";
 
 // Routes not yet registered — casts will be removed once public routes are added
@@ -11,6 +11,7 @@ const tabs: ReadonlyArray<{
 }> = [
 	{ to: "/", icon: Home, label: "Početna", exact: true },
 	{ to: "/search", icon: Search, label: "Traži" },
+	{ to: "/stores", icon: MapPin, label: "Trgovine" },
 	{ to: "/basket", icon: ShoppingBasket, label: "Košarica" },
 	{ to: "/alerts", icon: Bell, label: "Alarmi" },
 	{ to: "/profile", icon: User, label: "Profil" },

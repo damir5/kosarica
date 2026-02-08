@@ -8,6 +8,7 @@ const SearchFiltersSchema = z
 	.object({
 		entityTypes: z.array(EntityTypeSchema).optional(),
 		chainSlug: z.string().optional(),
+		chainSlugs: z.array(z.string()).optional(),
 		category: z.string().optional(),
 	})
 	.optional();

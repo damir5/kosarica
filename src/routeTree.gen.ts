@@ -15,6 +15,7 @@ import { Route as PublicRouteRouteImport } from './routes/_public/route'
 import { Route as AdminRouteRouteImport } from './routes/_admin/route'
 import { Route as PublicIndexRouteImport } from './routes/_public.index'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
+import { Route as PublicStoresRouteImport } from './routes/_public.stores'
 import { Route as PublicSearchRouteImport } from './routes/_public.search'
 import { Route as PublicProfileRouteImport } from './routes/_public.profile'
 import { Route as PublicBasketRouteImport } from './routes/_public.basket'
@@ -67,6 +68,11 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PublicStoresRoute = PublicStoresRouteImport.update({
+  id: '/stores',
+  path: '/stores',
+  getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicSearchRoute = PublicSearchRouteImport.update({
   id: '/search',
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/basket': typeof PublicBasketRoute
   '/profile': typeof PublicProfileRoute
   '/search': typeof PublicSearchRoute
+  '/stores': typeof PublicStoresRoute
   '/api/$': typeof ApiSplatRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/admin/clickhouse': typeof AdminAdminClickhouseRoute
@@ -230,6 +237,7 @@ export interface FileRoutesByTo {
   '/basket': typeof PublicBasketRoute
   '/profile': typeof PublicProfileRoute
   '/search': typeof PublicSearchRoute
+  '/stores': typeof PublicStoresRoute
   '/api/$': typeof ApiSplatRoute
   '/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
   '/admin/clickhouse': typeof AdminAdminClickhouseRoute
@@ -260,6 +268,7 @@ export interface FileRoutesById {
   '/_public/basket': typeof PublicBasketRoute
   '/_public/profile': typeof PublicProfileRoute
   '/_public/search': typeof PublicSearchRoute
+  '/_public/stores': typeof PublicStoresRoute
   '/api/$': typeof ApiSplatRoute
   '/_public/': typeof PublicIndexRoute
   '/_admin/admin/catalog-prices': typeof AdminAdminCatalogPricesRoute
@@ -293,6 +302,7 @@ export interface FileRouteTypes {
     | '/basket'
     | '/profile'
     | '/search'
+    | '/stores'
     | '/api/$'
     | '/admin/catalog-prices'
     | '/admin/clickhouse'
@@ -322,6 +332,7 @@ export interface FileRouteTypes {
     | '/basket'
     | '/profile'
     | '/search'
+    | '/stores'
     | '/api/$'
     | '/admin/catalog-prices'
     | '/admin/clickhouse'
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
     | '/_public/basket'
     | '/_public/profile'
     | '/_public/search'
+    | '/_public/stores'
     | '/api/$'
     | '/_public/'
     | '/_admin/admin/catalog-prices'
@@ -427,6 +439,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/$'
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_public/stores': {
+      id: '/_public/stores'
+      path: '/stores'
+      fullPath: '/stores'
+      preLoaderRoute: typeof PublicStoresRouteImport
+      parentRoute: typeof PublicRouteRoute
     }
     '/_public/search': {
       id: '/_public/search'
@@ -688,6 +707,7 @@ interface PublicRouteRouteChildren {
   PublicBasketRoute: typeof PublicBasketRoute
   PublicProfileRoute: typeof PublicProfileRoute
   PublicSearchRoute: typeof PublicSearchRoute
+  PublicStoresRoute: typeof PublicStoresRoute
   PublicIndexRoute: typeof PublicIndexRoute
   PublicProductProductIdRoute: typeof PublicProductProductIdRoute
 }
@@ -697,6 +717,7 @@ const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicBasketRoute: PublicBasketRoute,
   PublicProfileRoute: PublicProfileRoute,
   PublicSearchRoute: PublicSearchRoute,
+  PublicStoresRoute: PublicStoresRoute,
   PublicIndexRoute: PublicIndexRoute,
   PublicProductProductIdRoute: PublicProductProductIdRoute,
 }

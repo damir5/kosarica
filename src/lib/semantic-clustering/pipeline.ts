@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { embedTexts, preparePassageText } from "@/lib/embeddings";
 import {
 	clusterMembers,
@@ -391,7 +391,6 @@ export async function backfillMissingFeatureEmbeddings(batchSize: number): Promi
 			JOIN retailer_items ri ON ri.id = rif.retailer_item_id
 			WHERE ri.merged_into_id IS NULL
 				AND rif.embedding IS NULL
-			ORDER BY rif.updated_at DESC
 			LIMIT ${batchSize}
 			FOR UPDATE OF rif SKIP LOCKED
 		`);
@@ -947,7 +946,7 @@ async function rebuildClustersFromApproved(): Promise<{
 	const namesRows = await db
 		.select({ id: retailerItems.id, name: retailerItems.name })
 		.from(retailerItems)
-		.where(sql`${retailerItems.id} = ANY(${Array.from(allItemIds)}::text[])`);
+		.where(inArray(retailerItems.id, Array.from(allItemIds)));
 	const itemNames = new Map(namesRows.map((row) => [row.id, row.name]));
 
 	const variantUf = new UnionFind();

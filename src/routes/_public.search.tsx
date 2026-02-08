@@ -7,6 +7,7 @@ import * as z from "zod";
 
 import { orpc } from "@/orpc/client";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useNearbyStores } from "@/hooks/use-nearby-stores";
 import { PageContainer, Section } from "@/components/public/layout";
 import {
 	Heading,
@@ -48,6 +49,7 @@ function SearchPage() {
 	const navigate = useNavigate({ from: "/search" });
 
 	const debouncedQ = useDebounce(q, 300);
+	const { priceStoreIds, chainSlugs: nearbyChainSlugs, isActive: locationActive } = useNearbyStores();
 
 	const categoriesQuery = useQuery(
 		orpc.catalogPrices.getCategories.queryOptions({ input: {} }),
@@ -63,8 +65,10 @@ function SearchPage() {
 				limit: PAGE_SIZE,
 				offset: (page - 1) * PAGE_SIZE,
 				filters: {
+					entityTypes: ["product", "item"],
 					category: category ?? undefined,
 					chainSlug: chain ?? undefined,
+					chainSlugs: locationActive && !chain ? nearbyChainSlugs : undefined,
 				},
 			},
 		}),
@@ -72,6 +76,7 @@ function SearchPage() {
 	});
 
 	// Category-based browsing when no text query
+	// Filter by chain slug (not storeIds) for performance — ClickHouse scans are expensive with large IN arrays
 	const browseQuery = useQuery({
 		...orpc.catalogPrices.list.queryOptions({
 			input: {
@@ -80,6 +85,7 @@ function SearchPage() {
 				includeFutureDates: false,
 				category: category ?? undefined,
 				chainSlug: chain ?? undefined,
+				storeIds: locationActive && !chain ? priceStoreIds : undefined,
 			},
 		}),
 		enabled: !searchEnabled,

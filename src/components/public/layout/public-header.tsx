@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { LocationChip } from "../domain/location-chip";
 import { ThemeToggle } from "../domain/theme-toggle";
 
 export function PublicHeader() {
@@ -13,9 +14,12 @@ export function PublicHeader() {
 			className="sticky top-0 z-40 h-14 border-b border-tk-border bg-tk-surface/95 backdrop-blur-sm"
 		>
 			<div className="mx-auto flex h-full max-w-[1200px] items-center justify-between px-4 md:px-8 lg:px-6">
-				<Link to="/" className="font-tk-display text-lg italic text-tk-text">
-					Tvoja Košarica
-				</Link>
+				<div className="flex items-center gap-3">
+					<Link to="/" className="font-tk-display text-lg italic text-tk-text">
+						Tvoja Košarica
+					</Link>
+					<LocationChip />
+				</div>
 
 				<nav
 					data-slot="public-header-nav"

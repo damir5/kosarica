@@ -35,5 +35,6 @@ export interface FullSearchResult extends AutocompleteResult {
 export interface SearchFilters {
 	entityTypes?: SearchEntityType[];
 	chainSlug?: string;
+	chainSlugs?: string[];
 	category?: string;
 }

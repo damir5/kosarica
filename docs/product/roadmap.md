@@ -48,4 +48,18 @@ https://github.com/wondelai/skills
 - barcode matching
 - categories
 - ai matching - analyze and create instructions ? or run in bg as claw and create reports for manual review by other ais and then human - whatapp channel
+  - 3 agents
+    - one of which did nothing but read logs and report errors
+    - one of which did analysis of the errors and triaged and proposed fixes
+    - and one to do the work and submit PRs to your repo
 - stores
+
+
+[ui]
+https://www.pingprice.be/en/pricecompare_en/
+https://www.instacart.com/store/s?k=coca+cola&actid=e766a894-13eb-41ef-bac5-94814a1d8cd1&search_source=logged_out_home_cross_retailer_search&search_id=15dfc0bc-8051-4be2-8aa8-42a8866843da
+https://www.hargapedia.com.my/
+https://www.wiselist.app/
+https://www.pricerunner.com/
+https://www.idealo.de/
+https://www.trolley.co.uk/deals/
