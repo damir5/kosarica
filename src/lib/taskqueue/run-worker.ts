@@ -7,7 +7,7 @@ import type {
 	RerunTaskPayload,
 } from "@/db/jsonb-schemas";
 import { processBarcodeClusters } from "@/lib/barcode-anchoring";
-import { categorizeRunItems } from "@/lib/categorization";
+import { backfillUncategorizedItems, categorizeRunItems } from "@/lib/categorization";
 import {
 	loadAllToClickHouse,
 	loadMissingToClickHouse,
@@ -115,7 +115,15 @@ export function createTaskQueueWorker(options?: {
 		if (payload.type !== "categorize") {
 			throw new Error("Invalid payload for categorize task");
 		}
-		await categorizeRunItems(payload.runId, payload.chainSlug);
+		if (payload.runId && payload.chainSlug) {
+			await categorizeRunItems(payload.runId, payload.chainSlug);
+			return;
+		}
+		await backfillUncategorizedItems({
+			chainSlug: payload.chainSlug,
+			batchSize: payload.batchSize,
+			maxBatches: payload.maxBatches,
+		});
 	});
 
 	worker.registerHandler("barcode-anchor", async (task) => {

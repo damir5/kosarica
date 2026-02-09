@@ -82,6 +82,55 @@ function computeCategoryAgreement(items: BarcodeCluster["items"]): number {
 	return maxCount / items.length;
 }
 
+function normalizeComparableQuantity(
+	amount: number | null,
+	unit: string | null,
+): string | null {
+	if (amount == null || !Number.isFinite(amount) || amount <= 0) {
+		return null;
+	}
+	const normalizedUnit = unit?.trim().toLowerCase();
+	if (!normalizedUnit) {
+		return null;
+	}
+
+	if (normalizedUnit === "kg") {
+		return `g:${Math.round(amount * 1000)}`;
+	}
+	if (normalizedUnit === "g") {
+		return `g:${Math.round(amount)}`;
+	}
+	if (normalizedUnit === "l") {
+		return `ml:${Math.round(amount * 1000)}`;
+	}
+	if (normalizedUnit === "ml") {
+		return `ml:${Math.round(amount)}`;
+	}
+
+	return null;
+}
+
+function computeQuantityAgreement(items: BarcodeCluster["items"]): number {
+	const counts = new Map<string, number>();
+	let comparableCount = 0;
+	for (const item of items) {
+		const comparableQuantity = normalizeComparableQuantity(
+			item.totalAmount,
+			item.extractedUnit,
+		);
+		if (!comparableQuantity) {
+			continue;
+		}
+		comparableCount += 1;
+		counts.set(comparableQuantity, (counts.get(comparableQuantity) ?? 0) + 1);
+	}
+	if (comparableCount < 2 || counts.size === 0) {
+		return 0;
+	}
+	const maxCount = Math.max(...counts.values());
+	return maxCount / comparableCount;
+}
+
 function selectCanonicalName(items: BarcodeCluster["items"]): string {
 	const byName = new Map<string, number>();
 	for (const item of items) {
@@ -110,6 +159,8 @@ async function loadSourceRows(): Promise<BarcodeSourceRow[]> {
 			chainSlug: retailerItems.chainSlug,
 			name: retailerItems.name,
 			category: retailerItemFeatures.normalizedCategory,
+			totalAmount: retailerItemFeatures.totalAmount,
+			extractedUnit: retailerItemFeatures.extractedUnit,
 		})
 		.from(retailerItemBarcodes)
 		.innerJoin(
@@ -155,7 +206,15 @@ async function persistBarcodeClassifications(
 async function loadLatestPrices(
 	itemIds: string[],
 ): Promise<Map<string, number>> {
-	return await getLatestEffectivePricesByItemId(itemIds);
+	try {
+		return await getLatestEffectivePricesByItemId(itemIds);
+	} catch (error) {
+		log.warn("Failed to load latest prices for barcode clustering; continuing without prices", {
+			error: error instanceof Error ? error.message : String(error),
+			itemCount: itemIds.length,
+		});
+		return new Map();
+	}
 }
 
 async function loadMappedBarcodes(
@@ -277,6 +336,7 @@ export async function buildBarcodeClusterQueue(
 		}
 
 		cluster.categoryAgreement = computeCategoryAgreement(cluster.items);
+		cluster.quantityAgreement = computeQuantityAgreement(cluster.items);
 		cluster.priceVariance = computePriceVariance(
 			cluster.items
 				.map((item) => pricesByItem.get(item.retailerItemId) ?? null)
@@ -323,6 +383,7 @@ export async function processBarcodeClusters(
 				chainCount: cluster.chainCount,
 				itemCount: cluster.itemCount,
 				categoryAgreement: cluster.categoryAgreement,
+				quantityAgreement: cluster.quantityAgreement,
 				priceVariance: cluster.priceVariance,
 				priorityScore: cluster.priorityScore,
 				items: cluster.items,

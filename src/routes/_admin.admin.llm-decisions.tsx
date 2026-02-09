@@ -69,6 +69,22 @@ function AdminLlmDecisionsPage() {
 			invalidate();
 		},
 	});
+	const listErrorMessage =
+		listQuery.error instanceof Error
+			? listQuery.error.message
+			: "Failed to load LLM decisions";
+	const statsErrorMessage =
+		statsQuery.error instanceof Error
+			? statsQuery.error.message
+			: "Failed to load LLM decision stats";
+	const detailErrorMessage =
+		detailQuery.error instanceof Error
+			? detailQuery.error.message
+			: "Failed to load decision detail";
+	const overrideErrorMessage =
+		overrideMutation.error instanceof Error
+			? overrideMutation.error.message
+			: "Failed to apply override";
 
 	return (
 		<div className="mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6 lg:px-8">
@@ -132,6 +148,16 @@ function AdminLlmDecisionsPage() {
 					/>
 				</CardContent>
 			</Card>
+			{statsQuery.isError ? (
+				<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+					{statsErrorMessage}
+				</div>
+			) : null}
+			{overrideMutation.isError ? (
+				<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+					{overrideErrorMessage}
+				</div>
+			) : null}
 
 			<div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
 				<Card>
@@ -143,6 +169,10 @@ function AdminLlmDecisionsPage() {
 							<div className="flex items-center gap-2 text-muted-foreground text-sm">
 								<Loader2 className="h-4 w-4 animate-spin" />
 								Loading...
+							</div>
+						) : listQuery.isError ? (
+							<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+								{listErrorMessage}
 							</div>
 						) : (
 							<div className="overflow-x-auto">
@@ -196,6 +226,10 @@ function AdminLlmDecisionsPage() {
 							<div className="flex items-center gap-2 text-muted-foreground text-sm">
 								<Loader2 className="h-4 w-4 animate-spin" />
 								Loading detail...
+							</div>
+						) : detailQuery.isError ? (
+							<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+								{detailErrorMessage}
 							</div>
 						) : detailQuery.data ? (
 							<>

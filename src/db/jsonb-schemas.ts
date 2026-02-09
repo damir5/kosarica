@@ -33,8 +33,22 @@ export const clickhouseSyncTaskPayload = z.object({
 
 export const categorizeTaskPayload = z.object({
 	type: z.literal("categorize"),
-	runId: z.string(),
-	chainSlug: z.string(),
+	runId: z.string().optional(),
+	chainSlug: z.string().optional(),
+	batchSize: z.number().int().min(1).max(5000).optional(),
+	maxBatches: z.number().int().min(1).max(1000).optional(),
+}).superRefine((payload, ctx) => {
+	const hasRunId = typeof payload.runId === "string" && payload.runId.length > 0;
+	const hasChainSlug =
+		typeof payload.chainSlug === "string" && payload.chainSlug.length > 0;
+	const isRunScoped = hasRunId || hasChainSlug;
+
+	if (isRunScoped && !(hasRunId && hasChainSlug)) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "categorize payload must include both runId and chainSlug",
+		});
+	}
 });
 
 export const barcodeAnchorTaskPayload = z.object({

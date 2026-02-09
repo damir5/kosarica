@@ -353,6 +353,7 @@ export const triggerCategorization = superadminProcedure
 				chainSlug: z.string().optional(),
 				batchSize: z.number().int().min(1).max(5000).optional(),
 				maxBatches: z.number().int().min(1).max(1000).optional(),
+				async: z.boolean().optional(),
 			})
 			.optional(),
 	)
@@ -364,6 +365,19 @@ export const triggerCategorization = superadminProcedure
 					type: "categorize",
 					runId: input.runId,
 					chainSlug: input.chainSlug,
+				},
+			});
+			return { queued: true, taskId: task.id };
+		}
+
+		if (input?.async) {
+			const task = await scheduleTask({
+				taskType: "categorize",
+				payload: {
+					type: "categorize",
+					chainSlug: input.chainSlug,
+					batchSize: input.batchSize,
+					maxBatches: input.maxBatches,
 				},
 			});
 			return { queued: true, taskId: task.id };

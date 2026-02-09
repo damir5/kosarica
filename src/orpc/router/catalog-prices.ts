@@ -87,6 +87,17 @@ export const listCatalogPrices = procedure
 
 		const dateFrom = toDateOnly(input.dateFrom);
 		const dateTo = toDateOnly(input.dateTo);
+
+		// Prevent full table scan: add default date constraint when no filters provided
+		const hasStoreFilter = input.storeIds && input.storeIds.length > 0;
+		const hasChainFilter = Boolean(input.chainSlug);
+		const hasDateFilter = dateFrom || dateTo;
+
+		if (!hasStoreFilter && !hasChainFilter && !hasDateFilter) {
+			// No specific filters - constrain to last 90 days to avoid timeout
+			conditions.push("target_date >= today() - 90");
+		}
+
 		if (dateFrom) {
 			conditions.push("target_date >= {dateFrom:Date}");
 			params.dateFrom = dateFrom;

@@ -93,7 +93,7 @@ function AdminCategorizationPage() {
 
 	const triggerMutation = useMutation({
 		mutationFn: async () => {
-			return orpc.admin.categorization.trigger.call({});
+			return orpc.admin.categorization.trigger.call({ async: true });
 		},
 		onSuccess: () => invalidate(),
 	});
@@ -111,6 +111,18 @@ function AdminCategorizationPage() {
 	const items = listQuery.data?.items ?? [];
 	const total = listQuery.data?.total ?? 0;
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
+	const triggerErrorMessage =
+		triggerMutation.error instanceof Error
+			? triggerMutation.error.message
+			: "Failed to start categorization backfill";
+	const listErrorMessage =
+		listQuery.error instanceof Error
+			? listQuery.error.message
+			: "Failed to load categorization rows";
+	const statsErrorMessage =
+		statsQuery.error instanceof Error
+			? statsQuery.error.message
+			: "Failed to load categorization stats";
 
 	const [editEverydayName, setEditEverydayName] = useState<string>("");
 	const [editProductType, setEditProductType] = useState<string>("");
@@ -156,6 +168,21 @@ function AdminCategorizationPage() {
 				<StatCard label="Pending" value={statsQuery.data?.pending ?? 0} />
 				<StatCard label="Escalated" value={statsQuery.data?.escalated ?? 0} />
 			</div>
+			{statsQuery.isError ? (
+				<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+					{statsErrorMessage}
+				</div>
+			) : null}
+			{triggerMutation.isSuccess && triggerMutation.data?.queued ? (
+				<div className="rounded-md border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700">
+					Backfill task queued: {triggerMutation.data.taskId}
+				</div>
+			) : null}
+			{triggerMutation.isError ? (
+				<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+					{triggerErrorMessage}
+				</div>
+			) : null}
 
 			<Card>
 				<CardHeader>
@@ -218,6 +245,10 @@ function AdminCategorizationPage() {
 						<div className="flex items-center gap-2 text-muted-foreground">
 							<Loader2 className="h-4 w-4 animate-spin" />
 							Loading categorizations...
+						</div>
+					) : listQuery.isError ? (
+						<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+							{listErrorMessage}
 						</div>
 					) : (
 						<div className="overflow-x-auto">

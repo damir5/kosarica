@@ -151,10 +151,49 @@ function AdminBarcodeTriagePage() {
 		},
 		onSuccess: () => invalidate(),
 	});
+	const backgroundTriageMutation = useMutation({
+		mutationFn: () =>
+			orpc.admin.barcodeTriage.triggerAutoTriage.call({
+				minChains: 2,
+			}),
+	});
+	const queueErrorMessage =
+		queueQuery.error instanceof Error
+			? queueQuery.error.message
+			: "Failed to load barcode triage queue";
+	const detailErrorMessage =
+		detailQuery.error instanceof Error
+			? detailQuery.error.message
+			: "Failed to load barcode cluster";
+	const decisionErrorMessage =
+		decisionMutation.error instanceof Error
+			? decisionMutation.error.message
+			: "Failed to submit triage decision";
+	const bulkErrorMessage =
+		bulkApproveMutation.error instanceof Error
+			? bulkApproveMutation.error.message
+			: "Failed to auto-approve queue items";
+	const backgroundTriageErrorMessage =
+		backgroundTriageMutation.error instanceof Error
+			? backgroundTriageMutation.error.message
+			: "Failed to start background triage";
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.target instanceof HTMLInputElement) return;
+			if (event.metaKey || event.ctrlKey || event.altKey) return;
+			if (
+				event.target instanceof HTMLInputElement ||
+				event.target instanceof HTMLTextAreaElement ||
+				event.target instanceof HTMLSelectElement
+			) {
+				return;
+			}
+			if (
+				event.target instanceof HTMLElement &&
+				event.target.isContentEditable
+			) {
+				return;
+			}
 			const key = event.key.toLowerCase();
 			if (key === "s") {
 				event.preventDefault();
@@ -198,6 +237,13 @@ function AdminBarcodeTriagePage() {
 					>
 						Auto-approve 3+ chains
 					</Button>
+					<Button
+						variant="secondary"
+						onClick={() => backgroundTriageMutation.mutate()}
+						disabled={backgroundTriageMutation.isPending}
+					>
+						Triage All In Background
+					</Button>
 				</div>
 			</div>
 
@@ -230,6 +276,26 @@ function AdminBarcodeTriagePage() {
 					</div>
 				</CardContent>
 			</Card>
+			{decisionMutation.isError ? (
+				<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+					{decisionErrorMessage}
+				</div>
+			) : null}
+			{bulkApproveMutation.isError ? (
+				<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+					{bulkErrorMessage}
+				</div>
+			) : null}
+			{backgroundTriageMutation.isError ? (
+				<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+					{backgroundTriageErrorMessage}
+				</div>
+			) : null}
+			{backgroundTriageMutation.isSuccess ? (
+				<div className="rounded-md border border-primary/40 bg-primary/10 p-3 text-sm">
+					Background triage task queued: {backgroundTriageMutation.data.taskId}
+				</div>
+			) : null}
 
 			<div className="grid gap-4 lg:grid-cols-[320px_1fr]">
 				<Card>
@@ -241,6 +307,10 @@ function AdminBarcodeTriagePage() {
 							<div className="flex items-center gap-2 text-muted-foreground text-sm">
 								<Loader2 className="h-4 w-4 animate-spin" />
 								Loading...
+							</div>
+						) : queueQuery.isError ? (
+							<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+								{queueErrorMessage}
 							</div>
 						) : (
 							queueItems.map((item) => (
@@ -277,6 +347,10 @@ function AdminBarcodeTriagePage() {
 							<div className="flex items-center gap-2 text-muted-foreground text-sm">
 								<Loader2 className="h-4 w-4 animate-spin" />
 								Loading cluster...
+							</div>
+						) : detailQuery.isError ? (
+							<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+								{detailErrorMessage}
 							</div>
 						) : (
 							<>
@@ -346,6 +420,11 @@ function AdminBarcodeTriagePage() {
 											</option>
 										))}
 									</select>
+									{skuQuery.isError ? (
+										<div className="text-destructive text-xs">
+											Failed to load SKU suggestions.
+										</div>
+									) : null}
 									<Button
 										variant="outline"
 										onClick={submitMap}

@@ -8,12 +8,13 @@ export function priorityScore(cluster: BarcodeCluster): number {
 	const chainScore = cluster.chainCount * 20;
 	const itemScore = cluster.itemCount * 4;
 	const categoryScore = Math.round(clamp(cluster.categoryAgreement, 0, 1) * 20);
+	const quantityScore = Math.round(clamp(cluster.quantityAgreement, 0, 1) * 16);
 	const variancePenalty =
 		cluster.priceVariance == null
 			? 8
 			: Math.round(clamp(1 - cluster.priceVariance, 0, 1) * 20);
 
-	return chainScore + itemScore + categoryScore + variancePenalty;
+	return chainScore + itemScore + categoryScore + quantityScore + variancePenalty;
 }
 
 export function autoLinkEligibility(cluster: BarcodeCluster): boolean {
@@ -23,8 +24,9 @@ export function autoLinkEligibility(cluster: BarcodeCluster): boolean {
 	if (cluster.categoryAgreement < 1) {
 		return false;
 	}
-	if (cluster.priceVariance == null) {
-		return false;
+	if (cluster.priceVariance != null) {
+		return cluster.priceVariance < 0.3;
 	}
-	return cluster.priceVariance < 0.3;
+	// Price is frequently missing in source exports; fall back to quantity consensus.
+	return cluster.quantityAgreement >= 0.8;
 }

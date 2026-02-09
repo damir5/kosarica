@@ -69,11 +69,14 @@ export function groupByBarcode(rows: BarcodeSourceRow[]): Map<string, BarcodeClu
 						chainSlug: row.chainSlug,
 						name: row.name,
 						category: row.category,
+						totalAmount: row.totalAmount,
+						extractedUnit: row.extractedUnit,
 					},
 				],
 				chainCount: row.chainSlug ? 1 : 0,
 				itemCount: 1,
 				categoryAgreement: 0,
+				quantityAgreement: 0,
 				priceVariance: null,
 				priorityScore: 0,
 			});
@@ -85,6 +88,8 @@ export function groupByBarcode(rows: BarcodeSourceRow[]): Map<string, BarcodeClu
 			chainSlug: row.chainSlug,
 			name: row.name,
 			category: row.category,
+			totalAmount: row.totalAmount,
+			extractedUnit: row.extractedUnit,
 		});
 		existing.itemCount = existing.items.length;
 		existing.chainCount = new Set(

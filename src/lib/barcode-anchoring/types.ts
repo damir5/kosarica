@@ -10,6 +10,8 @@ export interface BarcodeClusterItem {
 	chainSlug: string | null;
 	name: string;
 	category: string | null;
+	totalAmount: number | null;
+	extractedUnit: string | null;
 }
 
 export interface BarcodeCluster {
@@ -19,6 +21,7 @@ export interface BarcodeCluster {
 	chainCount: number;
 	itemCount: number;
 	categoryAgreement: number;
+	quantityAgreement: number;
 	priceVariance: number | null;
 	priorityScore: number;
 }
@@ -30,6 +33,8 @@ export interface BarcodeSourceRow {
 	chainSlug: string | null;
 	name: string;
 	category: string | null;
+	totalAmount: number | null;
+	extractedUnit: string | null;
 }
 
 export interface BuildBarcodeClusterQueueOptions {

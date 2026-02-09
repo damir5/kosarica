@@ -196,6 +196,7 @@ export default {
 		barcodeTriage: {
 			getQueue: barcodeTriage.getTriageQueue,
 			claim: barcodeTriage.claimTriageItem,
+			triggerAutoTriage: barcodeTriage.triggerAutoTriage,
 			getClusterDetail: barcodeTriage.getClusterDetail,
 			submitDecision: barcodeTriage.submitDecision,
 			revertDecision: barcodeTriage.revertDecision,

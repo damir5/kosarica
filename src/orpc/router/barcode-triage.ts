@@ -11,8 +11,10 @@ import {
 import { logCatalogEvent } from "@/lib/catalog-events";
 import { getLatestEffectivePricesByItemId } from "@/lib/clickhouse/latest-prices";
 import { logLlmDecision } from "@/lib/llm-observability";
+import { scheduleTask } from "@/lib/taskqueue";
 import { getDb } from "@/utils/bindings";
-import { superadminProcedure, type AuthenticatedContext } from "../base";
+import { createLogger, errorToObject } from "@/utils/logger";
+import { type AuthenticatedContext, superadminProcedure } from "../base";
 
 const queueFiltersSchema = z.object({
 	limit: z.number().int().min(1).max(200).default(50),
@@ -35,6 +37,8 @@ type QueueRow = {
 	expires_at: Date | null;
 };
 
+const log = createLogger("matching");
+
 function getContextUserId(context: unknown): string {
 	return (context as AuthenticatedContext).user.id;
 }
@@ -47,7 +51,10 @@ function getRows<T>(result: unknown): T[] {
 }
 
 function escapeLikePattern(value: string): string {
-	return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+	return value
+		.replaceAll("\\", "\\\\")
+		.replaceAll("%", "\\%")
+		.replaceAll("_", "\\_");
 }
 
 export const getTriageQueue = superadminProcedure
@@ -129,7 +136,9 @@ export const getTriageQueue = superadminProcedure
 				chainCount: Number(row.chain_count),
 				itemCount: Number(row.item_count),
 				categoryAgreement:
-					row.category_agreement == null ? null : Number(row.category_agreement),
+					row.category_agreement == null
+						? null
+						: Number(row.category_agreement),
 				priceVariance:
 					row.price_variance == null ? null : Number(row.price_variance),
 				priorityScore: Number(row.priority_score),
@@ -184,6 +193,32 @@ export const claimTriageItem = superadminProcedure
 		};
 	});
 
+export const triggerAutoTriage = superadminProcedure
+	.input(
+		z.object({
+			limit: z.number().int().min(1).max(100000).optional(),
+			minChains: z.number().int().min(2).max(10).default(2),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const task = await scheduleTask({
+			taskType: "barcode-anchor",
+			priority: 20,
+			payload: {
+				type: "barcodeAnchor",
+				limit: input.limit,
+				minChains: input.minChains,
+				dryRun: false,
+			},
+		});
+
+		return {
+			taskId: task.id,
+			limit: input.limit ?? null,
+			minChains: input.minChains,
+		};
+	});
+
 export const getClusterDetail = superadminProcedure
 	.input(z.object({ barcode: z.string().min(4) }))
 	.handler(async ({ input }) => {
@@ -218,10 +253,24 @@ export const getClusterDetail = superadminProcedure
 			};
 		}
 
-		const priceMap = await getLatestEffectivePricesByItemId(
-			items.map((item) => item.retailerItemId),
-			{ includeNonPositive: true },
-		);
+		let priceMap = new Map<string, number>();
+		try {
+			priceMap = await Promise.race([
+				getLatestEffectivePricesByItemId(
+					items.map((item) => item.retailerItemId),
+					{ includeNonPositive: true, maxAgeDays: 30 },
+				),
+				new Promise<Map<string, number>>((_, reject) => {
+					setTimeout(() => reject(new Error("Price lookup timed out")), 2000);
+				}),
+			]);
+		} catch (error) {
+			log.warn("Failed to fetch barcode triage prices from ClickHouse", {
+				barcode: input.barcode,
+				itemCount: items.length,
+				error: errorToObject(error),
+			});
+		}
 
 		return {
 			barcode: input.barcode,
