@@ -31,6 +31,7 @@ env:
     PORT: 3000
     LOG_LEVEL: info
     NODE_OPTIONS: --enable-source-maps
+    WEB_CONCURRENCY: 2
     STORAGE_PATH: /app/data/storage
     TEMP_STORAGE_PATH: /app/data/temp
     CLICKHOUSE_URL: http://kosarica-clickhouse:8123

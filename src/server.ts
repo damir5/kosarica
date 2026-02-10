@@ -13,7 +13,6 @@ import { closeDatabase } from "@/db";
 import { startScheduler, stopScheduler } from "@/jobs/scheduler";
 import { startWorker } from "@/lib/taskqueue/run-worker";
 import type { TaskQueueWorker } from "@/lib/taskqueue/worker";
-import { initTelemetry, shutdownTelemetry } from "@/telemetry";
 import { createLogger } from "@/utils/logger";
 import { getReleaseMetadata } from "@/utils/release";
 import {
@@ -27,17 +26,8 @@ const nodeEnv = process.env.NODE_ENV || "development";
 config({ path: `.env.${nodeEnv}` }); // Load .env.development first
 config(); // Then load .env (defaults)
 
-// Initialize OpenTelemetry first, before any other imports
-let telemetrySdk: unknown = null;
-
-async function setupTelemetry() {
-	telemetrySdk = await initTelemetry();
-}
-
-// Don't block server start on telemetry - initialize in background
-setupTelemetry().catch((error) => {
-	console.error("[Server] Failed to initialize telemetry:", error);
-});
+// OpenTelemetry is initialized via --import ./scripts/instrumentation.mjs
+// before this module loads, ensuring HttpInstrumentation patches http early.
 
 const logger = createLogger("app");
 const release = getReleaseMetadata();
@@ -57,6 +47,13 @@ async function initServer(): Promise<void> {
 		return;
 	}
 	globalState.__kosaricaBackgroundStarted = true;
+
+	// In cluster mode, only worker 0 runs background services.
+	// Other workers are HTTP-only (set by start-server.mjs).
+	if (process.env.SKIP_BACKGROUND_SERVICES === "1") {
+		logger.info("Background services skipped (HTTP-only worker)");
+		return;
+	}
 
 	// Start the job scheduler
 	try {
@@ -102,11 +99,7 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
 		logger.error("Error closing database", { error });
 	}
 
-	try {
-		await shutdownTelemetry(telemetrySdk);
-	} catch (error) {
-		logger.error("Error shutting down telemetry", { error });
-	}
+	// OTel SDK shutdown is handled by scripts/instrumentation.mjs SIGTERM handler
 
 	process.exit(exitCode);
 }

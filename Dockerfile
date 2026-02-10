@@ -122,7 +122,7 @@ WORKDIR /app
 # Copy built application from build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/sourcemaps ./sourcemaps
-COPY --from=build /app/scripts/start-server.mjs ./scripts/start-server.mjs
+COPY --from=build /app/scripts/start-server.mjs /app/scripts/instrumentation.mjs ./scripts/
 COPY --from=build /app/package.json /app/pnpm-lock.yaml ./
 
 # Install production dependencies only using pnpm for consistency
@@ -156,4 +156,7 @@ ENV APP_RELEASE=${APP_RELEASE}
 ENV SOURCEMAP_STORAGE_PATH=/app/sourcemaps
 
 # Start application
-CMD ["node", "scripts/start-server.mjs"]
+# 1. @opentelemetry/instrumentation/hook.mjs registers the ESM loader hook so that
+#    instrumentation-http can patch `import http from 'node:http'` in ESM modules.
+# 2. ./scripts/instrumentation.mjs initializes the OTel SDK before any app code.
+CMD ["node", "--import", "@opentelemetry/instrumentation/hook.mjs", "--import", "./scripts/instrumentation.mjs", "scripts/start-server.mjs"]

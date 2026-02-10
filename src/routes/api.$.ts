@@ -23,6 +23,20 @@ const ClientErrorPayloadSchema = z.object({
 	userAgent: z.string().min(1).max(512),
 });
 
+const rumLog = createLogger("rum");
+
+const RumPayloadSchema = z.object({
+	name: z.enum(["CLS", "INP", "LCP", "TTFB", "FCP"]),
+	value: z.number(),
+	rating: z.enum(["good", "needs-improvement", "poor"]),
+	delta: z.number(),
+	id: z.string().max(128),
+	navigationType: z.string().max(64).optional(),
+	path: z.string().min(1).max(1024),
+	release: z.string().max(128).optional(),
+	userAgent: z.string().max(512).optional(),
+});
+
 const handler = new OpenAPIHandler(router, {
 	interceptors: [
 		onError((error) => {
@@ -73,6 +87,10 @@ async function handle({ request }: { request: Request }) {
 
 	if (url.pathname === "/api/client-errors") {
 		return handleClientErrorIngest(request, requestId);
+	}
+
+	if (url.pathname === "/api/rum") {
+		return handleRumIngest(request, requestId);
 	}
 
 	return runWithContext(requestId, async () => {
@@ -144,6 +162,47 @@ async function handleClientErrorIngest(
 			});
 		} catch (error) {
 			log.error("Failed to ingest client error payload", undefined, error);
+		}
+
+		return new Response(null, { status: 204 });
+	});
+}
+
+async function handleRumIngest(
+	request: Request,
+	requestId: string,
+): Promise<Response> {
+	if (request.method !== "POST") {
+		return new Response("Method Not Allowed", { status: 405 });
+	}
+
+	return runWithContext(requestId, async () => {
+		try {
+			const rawBody = await request.text();
+			if (rawBody.length > 4_000) {
+				return new Response(null, { status: 204 });
+			}
+
+			const parsedJson: unknown = JSON.parse(rawBody);
+			const parsed = RumPayloadSchema.safeParse(parsedJson);
+			if (!parsed.success) {
+				return new Response(null, { status: 204 });
+			}
+
+			const m = parsed.data;
+			rumLog.info("Web Vital", {
+				metric: m.name,
+				value: m.value,
+				rating: m.rating,
+				delta: m.delta,
+				metricId: m.id,
+				navigationType: m.navigationType,
+				clientPath: m.path,
+				clientRelease: m.release,
+				serverRelease: release.release,
+			});
+		} catch {
+			// RUM ingest is best-effort
 		}
 
 		return new Response(null, { status: 204 });

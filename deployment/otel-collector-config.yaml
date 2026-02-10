@@ -1,13 +1,20 @@
 # OpenTelemetry Collector Configuration for Kosarica
-# Receives logs and metrics from Node.js and Go services, sends to OpenObserve
+#
+# Architecture:
+#   App (Pino JSON -> stdout) -> Docker json-file -> filelog receiver -> OpenObserve
+#   App (OTel SDK)            -> OTLP gRPC receiver                  -> OpenObserve
+#   Host metrics              -> hostmetrics receiver                 -> OpenObserve
+#
+# Log parsing pipeline:
+#   Docker JSON -> route by format -> Pino JSON path (extract fields, map severity)
+#                                  -> Plain text path (passthrough)
 
 extensions:
-  # Health check extension
   health_check:
     endpoint: 0.0.0.0:13133
 
 receivers:
-  # OTLP receiver for application telemetry (gRPC)
+  # OTLP receiver for application telemetry (traces + metrics via gRPC/HTTP)
   otlp:
     protocols:
       grpc:
@@ -15,7 +22,9 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
-  # Host metrics receiver
+  # Host metrics (CPU, memory, disk, network, processes)
+  # Note: Running inside container reports container-scoped filesystem stats.
+  # To get host stats, mount host root at /hostfs and set root_path: /hostfs
   hostmetrics:
     collection_interval: 60s
     scrapers:
@@ -27,47 +36,106 @@ receivers:
       network:
       processes:
 
-  # Collect Docker json-file logs (includes application stdout/stderr).
+  # Docker container logs via json-file driver
+  # Reads all container logs, routes Pino JSON vs plain text
   filelog/docker:
     include:
       - /var/lib/docker/containers/*/*-json.log
     include_file_path: true
+    include_file_name: true
     start_at: end
     operators:
+      # 1. Parse Docker json-file envelope: extracts log, stream, time
       - type: json_parser
-        id: parse_docker_json
+        id: parse_docker
         parse_from: body
         timestamp:
           parse_from: attributes.time
           layout_type: gotime
           layout: "2006-01-02T15:04:05.999999999Z07:00"
-      # Parse structured pino JSON payloads emitted by the app.
-      - type: json_parser
-        id: parse_pino_json
-        parse_from: attributes.log
-        if: 'attributes.log matches "^\\{.*\\}$"'
 
-  # Docker container stats
-  # Note: This requires the container to run with Docker socket access
-  # docker_stats:
-  #   endpoint: /var/run/docker.sock
-  #   container_ids: []
-  #   timeout: 10s
+      # 2. Route: JSON logs (Pino/kamal-proxy) vs plain text logs
+      #    Note: Docker log lines include trailing \n, so match with \s*$
+      - type: router
+        id: route_format
+        routes:
+          - expr: 'attributes.log matches "^\\{.*\\}\\s*$"'
+            output: parse_pino
+        default: set_text_body
+
+      # === Pino JSON path ===
+
+      # 3a. Parse Pino structured JSON (extracts msg, level, loggerType, etc.)
+      - type: json_parser
+        id: parse_pino
+        parse_from: attributes.log
+
+      # 3b. Map log level to OTel severity
+      #     Pino uses numeric: 10=trace, 20=debug, 30=info, 40=warn, 50=error, 60=fatal
+      #     kamal-proxy uses uppercase strings: INFO, WARN, ERROR
+      - type: severity_parser
+        id: map_severity
+        parse_from: attributes.level
+        mapping:
+          trace:
+            - 10
+            - "TRACE"
+          debug:
+            - 20
+            - "DEBUG"
+          info:
+            - 30
+            - "INFO"
+          warn:
+            - 40
+            - "WARN"
+          error:
+            - 50
+            - "ERROR"
+          fatal:
+            - 60
+            - "FATAL"
+
+      # 3c. Promote Pino message to log body
+      - type: move
+        id: set_pino_body
+        from: attributes.msg
+        to: body
+
+      # 3d. Remove raw Docker log (already parsed into attributes)
+      - type: remove
+        id: clean_pino_raw
+        field: attributes.log
+        output: tag_source
+
+      # === Plain text path ===
+
+      # 4. Use raw log text as body
+      - type: move
+        id: set_text_body
+        from: attributes.log
+        to: body
+
+      # === Merge point ===
+
+      # 5. Tag all Docker-sourced logs
+      - type: add
+        id: tag_source
+        field: attributes.log_source
+        value: docker
 
 processors:
-  # Batch telemetry for better performance
   batch:
     timeout: 5s
     send_batch_size: 1024
     send_batch_max_size: 1024
 
-  # Memory limiter processor
   memory_limiter:
     check_interval: 10s
     limit_mib: 512
     spike_limit_mib: 128
 
-  # Resource processor to add common attributes
+  # Common resource attributes for all telemetry
   resource:
     attributes:
       - key: environment
@@ -77,13 +145,12 @@ processors:
         value: docker
         action: upsert
 
-  # Filter processor to drop unwanted metrics
-  # Uncomment and adjust as needed
-  # filter/metrics:
-  #   metrics:
-  #     include:
-  #       match_type: regexp
-  #       metric_names: [".*"]
+  # Drop noisy internal logs (OpenObserve access logs, collector self-logs)
+  filter/drop_internal:
+    logs:
+      log_record:
+        - 'body != nil and IsMatch(body, "config::axum::middlewares::access_log")'
+        - 'body != nil and IsMatch(body, "OpenTelemetry Collector Contrib")'
 
 exporters:
   # OpenObserve exporter for logs
@@ -117,23 +184,27 @@ exporters:
       stream-type: "traces"
     tls:
       insecure: true
+    encoding: json
 
   # Debug exporter (for troubleshooting, disable in production)
-  # logging:
-  #   verbosity: detailed
+  # debug:
+  #   verbosity: basic
+  #   sampling_initial: 5
+  #   sampling_thereafter: 200
 
 service:
   extensions:
     - health_check
 
   pipelines:
-    # Logs pipeline
+    # Logs pipeline: OTLP (app SDK) + filelog (Docker containers) -> OpenObserve
     logs:
       receivers:
         - otlp
         - filelog/docker
       processors:
         - memory_limiter
+        - filter/drop_internal
         - resource
         - batch
       exporters:

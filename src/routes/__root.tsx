@@ -15,6 +15,7 @@ import {
 } from "@/lib/client-observability";
 import { checkSetupRequired } from "@/lib/auth-server";
 import { initPostHog } from "@/lib/posthog";
+import { initRUM } from "@/lib/rum";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -141,6 +142,7 @@ class RootErrorBoundary extends Component<
 function ClientObservabilityBridge() {
 	useEffect(() => {
 		initPostHog();
+		initRUM();
 		return installGlobalClientErrorHandlers();
 	}, []);
 
