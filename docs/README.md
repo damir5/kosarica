@@ -31,6 +31,7 @@
 - [Testing Guide](./operations/testing-guide.md)
 - [Storage Architecture](./operations/storage-architecture.md)
 - [Matching Analysis](./operations/matching-analysis.md)
+- [Server Install Runbook (Kamal + DuckDNS)](./operations/server-install-kamal-duckdns.md)
 
 ## Reference
 - [Retailers](./reference/retailers.md)

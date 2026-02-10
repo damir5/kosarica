@@ -9,6 +9,7 @@ import type {
 	CleanupTaskPayload,
 	ClickHouseSyncTaskPayload,
 	IngestionTaskPayload,
+	MatchingTaskPayload,
 	RerunTaskPayload,
 } from "@/db/jsonb-schemas";
 import type { cronJobs, cronRuns } from "@/db/schema";
@@ -33,6 +34,7 @@ type TaskPayloadByType = {
 	cleanup: Omit<CleanupTaskPayload, "type">;
 	clickhouse: Omit<ClickHouseSyncTaskPayload, "type">;
 	"barcode-anchor": Omit<BarcodeAnchorTaskPayload, "type">;
+	matching: MatchingTaskPayload;
 };
 
 export type TaskToEnqueue =
@@ -59,6 +61,11 @@ export type TaskToEnqueue =
 	| {
 			type: "barcode-anchor";
 			payload?: TaskPayloadByType["barcode-anchor"];
+			idempotencyKey?: string;
+	  }
+	| {
+			type: "matching";
+			payload: TaskPayloadByType["matching"];
 			idempotencyKey?: string;
 	  };
 

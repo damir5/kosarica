@@ -78,7 +78,9 @@ type TypeFilter =
 	| "rerun"
 	| "cleanup"
 	| "clickhouse"
-	| "categorize";
+	| "categorize"
+	| "barcode-anchor"
+	| "matching";
 
 type TaskStatus = Exclude<StatusFilter, "all">;
 type TaskType = Exclude<TypeFilter, "all">;
@@ -406,9 +408,11 @@ function TaskQueueDashboard() {
 											<SelectItem value="rerun">Rerun</SelectItem>
 											<SelectItem value="cleanup">Cleanup</SelectItem>
 											<SelectItem value="clickhouse">ClickHouse</SelectItem>
-											<SelectItem value="categorize">
-												Categorize
+											<SelectItem value="categorize">Categorize</SelectItem>
+											<SelectItem value="barcode-anchor">
+												Barcode anchor
 											</SelectItem>
+											<SelectItem value="matching">Matching</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>

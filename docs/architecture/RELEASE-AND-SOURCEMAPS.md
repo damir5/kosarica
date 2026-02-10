@@ -75,7 +75,7 @@ This is single-host blue/green (not multi-host HA).
 ### Rollback sequence
 
 1. Point nginx upstream back to previous slot.
-2. Verify `/api/health` and admin build release.
+2. Verify `/` and admin build release.
 3. Keep failed candidate for investigation, then remove.
 
 ## Pre-Deploy Verification
@@ -83,9 +83,11 @@ This is single-host blue/green (not multi-host HA).
 Run before each limited-production deploy:
 
 ```bash
-kamal app status
-kamal accessory status
-curl -f http://localhost:3000/api/health
+kamal app version
+kamal app containers
+kamal accessory details openobserve
+kamal accessory details opentelemetry-collector
+curl -f http://localhost:3000/
 ```
 
 Confirm release values:

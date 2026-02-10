@@ -2,6 +2,8 @@
 
 Use this checklist before first limited production release to avoid missing infra, keys, agents, and observability wiring.
 
+Primary setup reference: `docs/operations/server-install-kamal-duckdns.md`
+
 ## 1. Server Baseline
 
 Target: Hetzner `CX43` (8 vCPU, 16 GB RAM, 160 GB SSD)
@@ -10,7 +12,7 @@ Install once:
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y ca-certificates curl gnupg jq unzip nginx ufw fail2ban
+sudo apt install -y ca-certificates curl gnupg jq ufw fail2ban
 curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 ```
@@ -23,10 +25,11 @@ Optional but recommended:
 
 ## 2. Network and TLS
 
-- DNS A record points to server IP.
-- Ports open: `22`, `80`, `443`.
+- DuckDNS hostname points directly to origin IP.
+- Origin inbound ports open: `22`, `80`, `443`.
 - All other inbound ports denied.
-- TLS via Let's Encrypt.
+- TLS via Kamal proxy and Let's Encrypt.
+- SSH remains globally reachable by key (no source IP allowlist in this environment).
 - OpenObserve UI **not** publicly exposed without protection.
 
 Firewall setup:
@@ -44,7 +47,7 @@ Operator machine (not necessarily server):
 
 - Ruby + `kamal` installed.
 - SSH key to server configured.
-- GHCR credentials available.
+- No external registry credentials needed when using Kamal local registry mode (`localhost:5500`).
 
 Required deployment files:
 
@@ -58,15 +61,17 @@ Must exist for limited production:
 
 - app container (`kosarica`)
 - PostgreSQL
+- ClickHouse
 - OpenTelemetry Collector
 - OpenObserve
-- ClickHouse (external or accessory; must be explicitly configured)
+- Kamal proxy (`kamal-proxy`) for TLS/public ingress
 
 ## 5. Persistent Host Paths
 
 Create and verify ownership/space:
 
 - `/var/lib/kosarica/postgres`
+- `/var/lib/kosarica/clickhouse`
 - `/var/lib/kosarica/openobserve`
 - `/var/lib/kosarica/sourcemaps`
 - `/app/data` (mounted app data)
@@ -150,15 +155,16 @@ Expected capabilities:
 3. verify app and accessories:
 
 ```bash
-kamal app status
+kamal app version
+kamal app containers
 kamal app logs
 ```
 
 4. smoke checks:
 
 ```bash
-curl -f http://localhost:3000/api/health
-curl -f http://localhost:5080/health
+curl -f https://kosarica.duckdns.org/
+kamal accessory logs openobserve --lines 100
 ```
 
 ## 9. Verification Matrix

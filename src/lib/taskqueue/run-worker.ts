@@ -5,14 +5,23 @@ import type {
 	ClickHouseSyncTaskPayload,
 	IngestionTaskPayload,
 	RerunTaskPayload,
+	SemanticClusteringListwiseTaskPayload,
+	SemanticClusteringPairwiseTaskPayload,
 } from "@/db/jsonb-schemas";
-import { processBarcodeClusters } from "@/lib/barcode-anchoring";
-import { backfillUncategorizedItems, categorizeRunItems } from "@/lib/categorization";
 import {
 	loadAllToClickHouse,
 	loadMissingToClickHouse,
 } from "@/ingestion/clickhouse-sync";
 import { rerunIngestionRun, runIngestion } from "@/ingestion/pipeline";
+import { processBarcodeClusters } from "@/lib/barcode-anchoring";
+import {
+	backfillUncategorizedItems,
+	categorizeRunItems,
+} from "@/lib/categorization";
+import {
+	runListwiseSemanticClustering,
+	runSemanticClusteringPipeline,
+} from "@/lib/semantic-clustering";
 import { scheduleTask } from "./index";
 import { TaskQueueWorker } from "./worker";
 
@@ -46,6 +55,7 @@ export function createTaskQueueWorker(options?: {
 			"clickhouse",
 			"categorize",
 			"barcode-anchor",
+			"matching",
 		],
 		maxTasks: options?.maxTasks ?? defaultMaxTasks,
 		pollDelay: options?.pollDelay ?? defaultPollDelay,
@@ -137,6 +147,49 @@ export function createTaskQueueWorker(options?: {
 			dryRun: payload.dryRun ?? false,
 			createdBy: "system",
 		});
+	});
+
+	worker.registerHandler("matching", async (task) => {
+		const payload = task.payload as
+			| SemanticClusteringPairwiseTaskPayload
+			| SemanticClusteringListwiseTaskPayload;
+
+		if (payload.type === "semanticClusteringListwise") {
+			await runListwiseSemanticClustering({
+				limit: payload.limit,
+				minChains: payload.minChains,
+				dryRun: payload.dryRun,
+				minPrimaryConfidence: payload.minPrimaryConfidence,
+				primaryModelId: payload.primaryModelId,
+				secondaryModelId: payload.secondaryModelId,
+			});
+			return;
+		}
+
+		if (payload.type !== "semanticClusteringPairwise") {
+			throw new Error("Invalid payload for matching task");
+		}
+
+		const maxBatches = payload.maxBatches ?? 5;
+		for (let i = 0; i < maxBatches; i += 1) {
+			const result = await runSemanticClusteringPipeline({
+				featureBatchSize: payload.featureBatchSize,
+				embeddingBackfillBatchSize: payload.embeddingBackfillBatchSize,
+				candidateSourceBatch: payload.candidateSourceBatch,
+				candidateInsertLimit: payload.candidateInsertLimit,
+				adjudicationBatchSize: payload.adjudicationBatchSize,
+				llmPromptBatchSize: payload.llmPromptBatchSize,
+				rebuildClusters: payload.rebuildClusters,
+			});
+
+			if (
+				result.featuresUpserted === 0 &&
+				result.candidatesQueued === 0 &&
+				result.pairsAdjudicated === 0
+			) {
+				break;
+			}
+		}
 	});
 
 	return worker;

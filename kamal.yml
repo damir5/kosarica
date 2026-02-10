@@ -4,17 +4,25 @@
 service: kosarica
 image: kosarica/app
 registry:
-  server: ghcr.io
-  username: ${GITHUB_USERNAME}
-  password: ${KAMAL_REGISTRY_PASSWORD}
+  # Kamal local registry mode (no external container registry)
+  # When server starts with "localhost", Kamal bootstraps a registry on the host.
+  # Use 5500 to avoid common host conflicts on macOS with system services on 5000.
+  server: localhost:5500
+
+# Public app host (TLS via kamal-proxy + Let's Encrypt)
+proxy:
+  ssl: true
+  host: kosarica.duckdns.org
+  app_port: 3000
+  healthcheck:
+    path: /
+    interval: 10
+    timeout: 10
 
 # Deployment servers
 servers:
   web:
-    hosts:
-      - ${KAMAL_HOST}
-    labels:
-      service: kosarica
+    - kosarica.duckdns.org
 
 # Environment variables
 env:
@@ -23,15 +31,16 @@ env:
     PORT: 3000
     LOG_LEVEL: info
     NODE_OPTIONS: --enable-source-maps
-    OTEL_EXPORTER_OTLP_ENDPOINT: opentelemetry-collector:4317
+    STORAGE_PATH: /app/data/storage
+    TEMP_STORAGE_PATH: /app/data/temp
+    CLICKHOUSE_URL: http://kosarica-clickhouse:8123
+    OTEL_EXPORTER_OTLP_ENDPOINT: kosarica-opentelemetry-collector:4317
     OTEL_SERVICE_NAME: kosarica-nodejs
     APP_VERSION: 0.1.0
-    APP_RELEASE: ${GIT_COMMIT}
+    APP_RELEASE: "<%= `git rev-parse --short HEAD`.strip %>"
   secret:
     # Secret env vars
-    - POSTGRES_USER
     - POSTGRES_PASSWORD
-    - POSTGRES_DB
     - DATABASE_URL
     - BETTER_AUTH_SECRET
     - BETTER_AUTH_URL
@@ -44,82 +53,67 @@ env:
 
 # Builder configuration
 builder:
+  arch: amd64
   dockerfile: Dockerfile
   context: .
   args:
-    BUILD_TIME: ${BUILD_TIME}
-    GIT_COMMIT: ${GIT_COMMIT}
+    BUILD_TIME: "<%= Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ') %>"
+    GIT_COMMIT: "<%= `git rev-parse --short HEAD`.strip %>"
     BUILD_ENV: production
     APP_VERSION: 0.1.0
-    APP_RELEASE: ${GIT_COMMIT}
+    APP_RELEASE: "<%= `git rev-parse --short HEAD`.strip %>"
 
-# Deployment options
-deploy:
-  # Expose port 3000 to host (for nginx proxy)
-  port: 3000
-
-  # Health check
-  healthcheck:
-    path: /api/health
-    interval: 10
-    max_attempts: 5
-
-  # Volume mounts (for persistent storage)
-  volumes:
-    - /app/data:/app/data
-    - /app/logs:/app/logs
-    - /var/lib/kosarica/sourcemaps:/app/sourcemaps
-
-  # Stop old container after starting new one
-  stop_wait_time: 30
+# Volume mounts (for persistent storage)
+volumes:
+  - /app/data:/app/data
+  - /app/logs:/app/logs
+  - /var/lib/kosarica/sourcemaps:/app/sourcemaps
 
 # Accessories (services that run alongside the main app)
 accessories:
   # PostgreSQL database
   postgres:
-    image: postgres:16-alpine
-    host: ${KAMAL_HOST}
-    port: 5432
+    image: pgvector/pgvector:pg16
+    host: kosarica.duckdns.org
     env:
       clear:
-        POSTGRES_USER: ${POSTGRES_USER}
-        POSTGRES_DB: ${POSTGRES_DB}
+        POSTGRES_USER: kosarica
+        POSTGRES_DB: kosarica
       secret:
         - POSTGRES_PASSWORD
-    volumes:
+    directories:
       - /var/lib/kosarica/postgres:/var/lib/postgresql/data
-    options:
-      restart: unless-stopped
-      healthcheck:
-        test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-        interval: 10s
-        timeout: 5s
-        retries: 5
+
+  # ClickHouse database (internal only)
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    host: kosarica.duckdns.org
+    env:
+      clear:
+        CLICKHOUSE_SKIP_USER_SETUP: "1"
+    directories:
+      - /var/lib/kosarica/clickhouse:/var/lib/clickhouse
 
   # OpenTelemetry Collector
   opentelemetry-collector:
     image: otel/opentelemetry-collector-contrib:latest
-    host: ${KAMAL_HOST}
-    ports:
-      - "4317:4317"
-      - "4318:4318"
+    host: kosarica.duckdns.org
+    options:
+      user: "0:0"
     env:
       secret:
         - ZO_BASIC_AUTH
         - ZO_ORG_ID
-    volumes:
-      - /etc/kamal/accessories/otel-collector-config.yaml:/etc/otelcol-config.yaml:ro
+    files:
+      - deployment/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    directories:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log:/var/log:ro
-    options:
-      command: ["--config=/etc/otelcol-config.yaml"]
-      restart: unless-stopped
 
   # OpenObserve observability platform
   openobserve:
     image: public.ecr.aws/zinclabs/openobserve:latest
-    host: ${KAMAL_HOST}
-    port: 5080
+    host: kosarica.duckdns.org
     env:
       clear:
         ZO_MEMORY_CACHE_ENABLED: "false"
@@ -127,20 +121,13 @@ accessories:
       secret:
         - ZO_ROOT_USER_EMAIL
         - ZO_ROOT_USER_PASSWORD
-    volumes:
+    directories:
       - /var/lib/kosarica/openobserve:/data
-    options:
-      restart: unless-stopped
-      healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:5080/health"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
 
 # SSH options
 ssh:
-  user: ${KAMAL_SSH_USER:-root}
-  port: ${KAMAL_SSH_PORT:-22}
+  user: root
+  port: 22
   # Use your SSH key
   # keys: ["~/.ssh/id_ed25519"]
 

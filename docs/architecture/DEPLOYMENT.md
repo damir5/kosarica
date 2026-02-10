@@ -1,5 +1,9 @@
 # Deployment & Operations
 
+> Canonical install/deploy runbook: `docs/operations/server-install-kamal-duckdns.md`
+>
+> This document contains legacy deployment notes. For new environments, use the runbook above (DuckDNS ingress, Kamal deploys, and internal-only observability endpoints).
+
 ## Overview
 
 Kosarica is deployed to a single Hetzner VPS using **Docker-first deployment** with Kamal orchestration.
@@ -169,7 +173,8 @@ kamal app logs
 kamal rollback
 
 # Check status
-kamal app status
+kamal app version
+kamal app containers
 ```
 
 ### Build Docker Images
@@ -233,7 +238,7 @@ OpenObserve provides built-in dashboards for:
 
 ```bash
 # Node.js (exposed on port 3000)
-curl http://localhost:3000/api/health
+curl http://localhost:3000/
 
 # Go service (internal only, via Docker network)
 docker exec kosarica-price-service curl http://localhost:8080/health

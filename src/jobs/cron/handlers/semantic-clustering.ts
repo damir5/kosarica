@@ -1,12 +1,15 @@
 /**
  * Semantic Clustering Cron Handler
  *
- * Executes the feature + candidate + LLM adjudication + graph clustering pipeline.
+ * Enqueues clustering work into the task queue.
  */
 
-import { runSemanticClusteringPipeline } from "@/lib/semantic-clustering";
 import { createLogger } from "@/utils/logger";
-import type { CronExecutionContext, CronJobHandler } from "../types";
+import type {
+	CronExecutionContext,
+	CronJobHandler,
+	TaskToEnqueue,
+} from "../types";
 
 const log = createLogger("matching");
 
@@ -20,7 +23,46 @@ function parsePositiveIntEnv(name: string, fallback: number): number {
 }
 
 export const semanticClusteringHandler: CronJobHandler = {
-	async execute(context: CronExecutionContext): Promise<[]> {
+	async execute(context: CronExecutionContext): Promise<TaskToEnqueue[]> {
+		const mode = process.env.SEMANTIC_CLUSTERING_MODE ?? "pairwise";
+		if (mode === "listwise") {
+			const limit = parsePositiveIntEnv("LISTWISE_CLUSTER_LIMIT", 25);
+			const minChains = parsePositiveIntEnv("LISTWISE_MIN_CHAINS", 2);
+			const minPrimaryConfidenceRaw =
+				process.env.LISTWISE_MIN_PRIMARY_CONFIDENCE;
+			const minPrimaryConfidence = minPrimaryConfidenceRaw
+				? Number(minPrimaryConfidenceRaw)
+				: undefined;
+
+			log.info("Queueing scheduled semantic clustering (listwise)", {
+				runId: context.runId,
+				scheduledFor: context.scheduledFor.toISOString(),
+				limit,
+				minChains,
+				primaryModelId: process.env.LISTWISE_PRIMARY_MODEL_ID ?? "qwen",
+				secondaryModelId:
+					process.env.LISTWISE_SECONDARY_MODEL_ID ?? "ministral",
+				minPrimaryConfidence,
+				dryRun: process.env.LISTWISE_DRY_RUN === "1",
+			});
+
+			return [
+				{
+					type: "matching",
+					payload: {
+						type: "semanticClusteringListwise",
+						limit,
+						minChains,
+						dryRun: process.env.LISTWISE_DRY_RUN === "1",
+						minPrimaryConfidence,
+						primaryModelId: process.env.LISTWISE_PRIMARY_MODEL_ID,
+						secondaryModelId: process.env.LISTWISE_SECONDARY_MODEL_ID,
+					},
+					idempotencyKey: `semantic-clustering:listwise:${context.scheduledFor.toISOString()}`,
+				},
+			];
+		}
+
 		const maxBatches = parsePositiveIntEnv(
 			"SEMANTIC_CLUSTERING_MAX_BATCHES",
 			5,
@@ -50,7 +92,7 @@ export const semanticClusteringHandler: CronJobHandler = {
 			25,
 		);
 
-		log.info("Starting scheduled semantic clustering", {
+		log.info("Queueing scheduled semantic clustering (pairwise)", {
 			runId: context.runId,
 			scheduledFor: context.scheduledFor.toISOString(),
 			maxBatches,
@@ -62,76 +104,22 @@ export const semanticClusteringHandler: CronJobHandler = {
 			llmPromptBatchSize,
 		});
 
-		let batchesProcessed = 0;
-		let featuresUpserted = 0;
-		let featureEmbeddingsUpserted = 0;
-		let embeddingsBackfilled = 0;
-		let candidatesQueued = 0;
-		let scoringAutoApproved = 0;
-		let scoringAutoRejected = 0;
-		let scoringPendingReview = 0;
-		let pairsAdjudicated = 0;
-		let autoApproved = 0;
-		let autoRejected = 0;
-		let pendingReview = 0;
-		let systemErrors = 0;
-		let variantClusters = 0;
-		let baseClusters = 0;
-
-		for (let i = 0; i < maxBatches; i += 1) {
-			const result = await runSemanticClusteringPipeline({
-				featureBatchSize,
-				embeddingBackfillBatchSize,
-				candidateSourceBatch,
-				candidateInsertLimit,
-				adjudicationBatchSize,
-				llmPromptBatchSize,
-				rebuildClusters: true,
-			});
-			batchesProcessed += 1;
-			featuresUpserted += result.featuresUpserted;
-			featureEmbeddingsUpserted += result.featureEmbeddingsUpserted;
-			embeddingsBackfilled += result.embeddingsBackfilled;
-			candidatesQueued += result.candidatesQueued;
-			scoringAutoApproved += result.scoringAutoApproved;
-			scoringAutoRejected += result.scoringAutoRejected;
-			scoringPendingReview += result.scoringPendingReview;
-			pairsAdjudicated += result.pairsAdjudicated;
-			autoApproved += result.autoApproved;
-			autoRejected += result.autoRejected;
-			pendingReview += result.pendingReview;
-			systemErrors += result.systemErrors;
-			variantClusters = result.variantClusters;
-			baseClusters = result.baseClusters;
-
-			if (
-				result.featuresUpserted === 0 &&
-				result.candidatesQueued === 0 &&
-				result.pairsAdjudicated === 0
-			) {
-				break;
-			}
-		}
-
-		log.info("Scheduled semantic clustering completed", {
-			runId: context.runId,
-			batchesProcessed,
-			featuresUpserted,
-			featureEmbeddingsUpserted,
-			embeddingsBackfilled,
-			candidatesQueued,
-			scoringAutoApproved,
-			scoringAutoRejected,
-			scoringPendingReview,
-			pairsAdjudicated,
-			autoApproved,
-			autoRejected,
-			pendingReview,
-			systemErrors,
-			variantClusters,
-			baseClusters,
-		});
-
-		return [];
+		return [
+			{
+				type: "matching",
+				payload: {
+					type: "semanticClusteringPairwise",
+					maxBatches,
+					featureBatchSize,
+					embeddingBackfillBatchSize,
+					candidateSourceBatch,
+					candidateInsertLimit,
+					adjudicationBatchSize,
+					llmPromptBatchSize,
+					rebuildClusters: true,
+				},
+				idempotencyKey: `semantic-clustering:pairwise:${context.scheduledFor.toISOString()}`,
+			},
+		];
 	},
 };

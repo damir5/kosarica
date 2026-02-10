@@ -47,6 +47,10 @@ export interface QueryPricesOptions {
 	offset?: number;
 }
 
+function escapeSqlString(value: string): string {
+	return value.replace(/'/g, "''");
+}
+
 /**
  * ClickHouse client wrapper for price data operations.
  */
@@ -176,6 +180,21 @@ export class ClickHouseClient {
 	async truncatePrices(): Promise<void> {
 		await this.client.command({
 			query: "TRUNCATE TABLE prices",
+		});
+	}
+
+	/**
+	 * Delete one chain/day snapshot so it can be re-imported from refreshed parquet.
+	 * Uses lightweight DELETE and waits synchronously for mutation completion.
+	 */
+	async deleteSnapshot(chainSlug: string, targetDate: string): Promise<void> {
+		const safeChainSlug = escapeSqlString(chainSlug);
+		const safeTargetDate = escapeSqlString(targetDate);
+		await this.client.command({
+			query: `DELETE FROM prices WHERE chain_slug = '${safeChainSlug}' AND target_date = toDate('${safeTargetDate}')`,
+			clickhouse_settings: {
+				mutations_sync: "1",
+			},
 		});
 	}
 

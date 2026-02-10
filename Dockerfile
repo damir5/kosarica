@@ -12,7 +12,7 @@ RUN apt-get update && \
 
 # Add NodeSource repository for Node.js 24
 RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repokey.gpg | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends nodejs && \
@@ -33,20 +33,25 @@ RUN pnpm install --frozen-lockfile --prod=false
 # Stage 2: Build
 FROM ubuntu:24.04 AS build
 
-# Copy Node.js and pnpm from dependencies stage
-COPY --from=dependencies /usr/local/bin/node /usr/local/bin/node
-COPY --from=dependencies /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=dependencies /usr/local/bin/pnpm /usr/local/bin/pnpm
-COPY --from=dependencies /usr/local/bin/npm /usr/local/bin/npm
-COPY --from=dependencies /usr/local/bin/npx /usr/local/bin/npx
-
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gnupg \
         python3 \
         build-essential \
         git \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 24 and pnpm in build stage
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g pnpm && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -74,8 +79,8 @@ RUN pnpm build
 # Keep client sourcemaps private while preserving server sourcemaps for Node symbolication.
 RUN RELEASE_DIR="/app/sourcemaps/${APP_RELEASE:-${GIT_COMMIT}}" && \
     mkdir -p "$RELEASE_DIR/client" && \
-    find /app/dist/client -type f -name "*.map" -print0 | \
-      while IFS= read -r -d '' map_file; do \
+    find /app/dist/client -type f -name "*.map" | \
+      while IFS= read -r map_file; do \
         relative_path="${map_file#/app/dist/client/}"; \
         mkdir -p "$RELEASE_DIR/client/$(dirname "$relative_path")"; \
         mv "$map_file" "$RELEASE_DIR/client/$relative_path"; \
@@ -100,7 +105,7 @@ RUN apt-get update && \
 
 # Add NodeSource repository for Node.js 24
 RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repokey.gpg | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends nodejs && \
@@ -117,6 +122,7 @@ WORKDIR /app
 # Copy built application from build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/sourcemaps ./sourcemaps
+COPY --from=build /app/scripts/start-server.mjs ./scripts/start-server.mjs
 COPY --from=build /app/package.json /app/pnpm-lock.yaml ./
 
 # Install production dependencies only using pnpm for consistency
@@ -135,7 +141,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+    CMD curl -f http://localhost:3000/ || exit 1
 
 # Set default environment variables
 ENV NODE_ENV=production
@@ -150,4 +156,4 @@ ENV APP_RELEASE=${APP_RELEASE}
 ENV SOURCEMAP_STORAGE_PATH=/app/sourcemaps
 
 # Start application
-CMD ["node", "dist/server/index.js"]
+CMD ["node", "scripts/start-server.mjs"]

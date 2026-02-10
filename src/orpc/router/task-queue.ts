@@ -34,6 +34,7 @@ const TaskTypeSchema = z.enum([
 	"clickhouse",
 	"categorize",
 	"barcode-anchor",
+	"matching",
 ]);
 
 const SortFieldSchema = z.enum([

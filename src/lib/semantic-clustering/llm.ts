@@ -1,14 +1,14 @@
 import { createLogger } from "@/utils/logger";
 import {
+	type EnsembleModelConfig,
 	parseEnsembleConfig,
 	readApiKey,
 	STRICT_CASCADE_THRESHOLDS,
-	type EnsembleModelConfig,
 } from "./config";
 import type {
-	SemanticBatchPairInput,
 	CascadeResult,
 	CascadeThresholds,
+	SemanticBatchPairInput,
 	SemanticLLMItem,
 	SemanticVerdict,
 	SemanticVote,
@@ -57,7 +57,9 @@ type OpenAiResponseFormat =
 									confidence: { type: "number" };
 									reasoning: { type: "string" };
 								};
-								required: Array<"pair_id" | "verdict" | "confidence" | "reasoning">;
+								required: Array<
+									"pair_id" | "verdict" | "confidence" | "reasoning"
+								>;
 							};
 						};
 					};
@@ -65,7 +67,8 @@ type OpenAiResponseFormat =
 				};
 			};
 	  }
-	| { type: "text" };
+	| { type: "text" }
+	| { type: "none" };
 
 type OpenAiResponseFormatType = OpenAiResponseFormat["type"];
 
@@ -74,7 +77,10 @@ const OPENAI_RESPONSE_FORMAT_ORDER: OpenAiResponseFormatType[] = [
 	"json_schema",
 	"text",
 ];
-const responseFormatPreferenceByEndpoint = new Map<string, OpenAiResponseFormatType>();
+const responseFormatPreferenceByEndpoint = new Map<
+	string,
+	OpenAiResponseFormatType
+>();
 
 function clampConfidence(value: number): number {
 	if (!Number.isFinite(value)) {
@@ -118,31 +124,86 @@ Return strict JSON only with this shape:
 
 Pairs:
 ${JSON.stringify(
-		pairs.map((pair) => ({
-			pair_id: pair.pairId,
-			item_a: pair.itemA,
-			item_b: pair.itemB,
-		})),
-	)}`;
+	pairs.map((pair) => ({
+		pair_id: pair.pairId,
+		item_a: pair.itemA,
+		item_b: pair.itemB,
+	})),
+)}`;
+}
+
+function stripModelWrappers(content: string): string {
+	return content
+		.replace(/<think>[\s\S]*?<\/think>/gi, "")
+		.replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
+		.replace(/```(?:json)?/gi, "")
+		.replace(/```/g, "");
+}
+
+function extractJsonCandidates(content: string): string[] {
+	const candidates: string[] = [];
+	let depth = 0;
+	let startIndex: number | null = null;
+	let inString = false;
+	let escapeNext = false;
+	let opener: "{" | "[" | null = null;
+
+	for (let index = 0; index < content.length; index += 1) {
+		const char = content[index];
+		if (escapeNext) {
+			escapeNext = false;
+			continue;
+		}
+		if (char === "\\") {
+			escapeNext = true;
+			continue;
+		}
+		if (char === '"') {
+			inString = !inString;
+			continue;
+		}
+		if (inString) {
+			continue;
+		}
+		if (char === "{" || char === "[") {
+			if (depth === 0) {
+				startIndex = index;
+				opener = char;
+			}
+			depth += 1;
+			continue;
+		}
+		if (char === "}" || char === "]") {
+			if (depth > 0) {
+				depth -= 1;
+				if (depth === 0 && startIndex != null) {
+					const segment = content.slice(startIndex, index + 1);
+					if (segment.startsWith(opener ?? "")) {
+						candidates.push(segment);
+					}
+					startIndex = null;
+					opener = null;
+				}
+			}
+		}
+	}
+
+	return candidates;
 }
 
 export function extractJsonPayload(content: string): unknown {
-	const trimmed = content.trim();
-	if (trimmed.length === 0) {
+	const cleaned = stripModelWrappers(content).trim();
+	if (cleaned.length === 0) {
 		throw new Error("Model response is empty");
 	}
 
 	try {
-		return JSON.parse(trimmed);
+		return JSON.parse(cleaned);
 	} catch {
-		// Continue to regex fallback.
+		// Continue to candidate scanning.
 	}
 
-	const candidates = [
-		...trimmed.matchAll(/\{[\s\S]*\}/g),
-		...trimmed.matchAll(/\[[\s\S]*\]/g),
-	].map((match) => match[0]);
-
+	const candidates = extractJsonCandidates(cleaned);
 	for (const candidate of candidates) {
 		try {
 			return JSON.parse(candidate);
@@ -151,11 +212,14 @@ export function extractJsonPayload(content: string): unknown {
 		}
 	}
 
-	throw new Error("Response does not contain valid JSON");
+	const snippet = cleaned.slice(0, 320);
+	throw new Error(`Response does not contain valid JSON. Snippet: ${snippet}`);
 }
 
 function parseVerdict(value: unknown): SemanticVerdict {
-	const normalized = String(value ?? "").trim().toUpperCase();
+	const normalized = String(value ?? "")
+		.trim()
+		.toUpperCase();
 	if (ALLOWED_VERDICTS.includes(normalized as SemanticVerdict)) {
 		return normalized as SemanticVerdict;
 	}
@@ -277,7 +341,9 @@ function buildJsonSchemaResponseFormat(): OpenAiResponseFormat {
 	};
 }
 
-function responseFormatType(format: OpenAiResponseFormat): OpenAiResponseFormatType {
+function responseFormatType(
+	format: OpenAiResponseFormat,
+): OpenAiResponseFormatType {
 	return format.type;
 }
 
@@ -297,6 +363,9 @@ function buildResponseFormat(
 function orderedResponseFormats(
 	preferred: OpenAiResponseFormatType | undefined,
 ): OpenAiResponseFormat[] {
+	if (preferred === "none") {
+		return [{ type: "none" }];
+	}
 	if (!preferred) {
 		return OPENAI_RESPONSE_FORMAT_ORDER.map((formatType) =>
 			buildResponseFormat(formatType),
@@ -305,16 +374,23 @@ function orderedResponseFormats(
 
 	const order = [
 		preferred,
-		...OPENAI_RESPONSE_FORMAT_ORDER.filter((formatType) => formatType !== preferred),
+		...OPENAI_RESPONSE_FORMAT_ORDER.filter(
+			(formatType) => formatType !== preferred,
+		),
 	];
 	return order.map((formatType) => buildResponseFormat(formatType));
 }
 
-function isLikelyResponseFormatError(status: number, bodyText: string): boolean {
+function isLikelyResponseFormatError(
+	status: number,
+	bodyText: string,
+): boolean {
 	if (status !== 400 && status !== 422) {
 		return false;
 	}
-	return /response[_\s-]?format|json_schema|json_object|must be/i.test(bodyText);
+	return /response[_\s-]?format|json_schema|json_object|must be/i.test(
+		bodyText,
+	);
 }
 
 async function callOpenAiCompatibleBatch(
@@ -328,11 +404,18 @@ async function callOpenAiCompatibleBatch(
 
 	try {
 		const expectedPairIds = new Set(pairs.map((pair) => pair.pairId));
-		const preferredFormat = responseFormatPreferenceByEndpoint.get(preferenceKey);
+		const preferredFormat =
+			config.responseFormat ??
+			responseFormatPreferenceByEndpoint.get(preferenceKey);
 		const responseFormatAttempts = orderedResponseFormats(preferredFormat);
 
 		let lastError: Error | null = null;
-		for (const [attemptIndex, responseFormat] of responseFormatAttempts.entries()) {
+		for (const [
+			attemptIndex,
+			responseFormat,
+		] of responseFormatAttempts.entries()) {
+			const formatForRequest =
+				responseFormat.type === "none" ? undefined : responseFormat;
 			const response = await fetch(config.endpoint ?? "", {
 				method: "POST",
 				headers: {
@@ -342,7 +425,8 @@ async function callOpenAiCompatibleBatch(
 				body: JSON.stringify({
 					model: config.model,
 					temperature: 0,
-					response_format: responseFormat,
+					...(config.maxTokens ? { max_tokens: config.maxTokens } : {}),
+					...(formatForRequest ? { response_format: formatForRequest } : {}),
 					messages: [
 						{ role: "system", content: "Return strict JSON only." },
 						{ role: "user", content: buildBatchPrompt(pairs) },
@@ -353,14 +437,21 @@ async function callOpenAiCompatibleBatch(
 
 			if (!response.ok) {
 				const errorBody = await response.text();
-				const isLastAttempt = attemptIndex === responseFormatAttempts.length - 1;
-				if (!isLastAttempt && isLikelyResponseFormatError(response.status, errorBody)) {
-					log.warn("OpenAI-compatible endpoint rejected response_format, trying fallback", {
-						model: config.model,
-						endpoint: config.endpoint,
-						attemptFormat: responseFormat.type,
-						status: response.status,
-					});
+				const isLastAttempt =
+					attemptIndex === responseFormatAttempts.length - 1;
+				if (
+					!isLastAttempt &&
+					isLikelyResponseFormatError(response.status, errorBody)
+				) {
+					log.warn(
+						"OpenAI-compatible endpoint rejected response_format, trying fallback",
+						{
+							model: config.model,
+							endpoint: config.endpoint,
+							attemptFormat: responseFormat.type,
+							status: response.status,
+						},
+					);
 					continue;
 				}
 				lastError = new Error(
@@ -379,7 +470,9 @@ async function callOpenAiCompatibleBatch(
 			}
 
 			const activeFormat = responseFormatType(responseFormat);
-			if (responseFormatPreferenceByEndpoint.get(preferenceKey) !== activeFormat) {
+			if (
+				responseFormatPreferenceByEndpoint.get(preferenceKey) !== activeFormat
+			) {
 				responseFormatPreferenceByEndpoint.set(preferenceKey, activeFormat);
 				log.info("OpenAI-compatible response_format preference updated", {
 					model: config.model,
@@ -436,10 +529,7 @@ async function callClaudeBatch(
 		if (!textPart) {
 			throw new Error("No text content in Claude response");
 		}
-		return parseBatchJson(
-			textPart,
-			new Set(pairs.map((pair) => pair.pairId)),
-		);
+		return parseBatchJson(textPart, new Set(pairs.map((pair) => pair.pairId)));
 	} finally {
 		clearTimeout(timeout);
 	}
@@ -492,7 +582,9 @@ async function callModelBatch(
 		} catch (error) {
 			lastError = error;
 			if (attempt < config.maxRetries) {
-				await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+				await new Promise((resolve) =>
+					setTimeout(resolve, 250 * (attempt + 1)),
+				);
 			}
 		}
 	}
@@ -502,7 +594,10 @@ async function callModelBatch(
 		: new Error(`Model call failed for ${config.id}`);
 }
 
-function systemErrorResult(message: string, votes: SemanticVote[] = []): CascadeResult {
+function systemErrorResult(
+	message: string,
+	votes: SemanticVote[] = [],
+): CascadeResult {
 	return {
 		votes,
 		finalVerdict: "UNCERTAIN",
@@ -552,8 +647,7 @@ function weightedFinalize(
 		(sum, vote) => sum + (weights.get(vote.modelId) ?? 1),
 		0,
 	);
-	const finalConfidence =
-		supportWeight > 0 ? winnerScore / supportWeight : 0;
+	const finalConfidence = supportWeight > 0 ? winnerScore / supportWeight : 0;
 	const consensusScore = totalWeight > 0 ? supportWeight / totalWeight : 0;
 
 	let decisionState: CascadeResult["decisionState"] = "PENDING_REVIEW";
@@ -623,7 +717,9 @@ export async function evaluatePairsWithCascadeBatch(input: {
 		return results;
 	}
 
-	const weights = new Map(modelConfigs.map((config) => [config.id, config.weight]));
+	const weights = new Map(
+		modelConfigs.map((config) => [config.id, config.weight]),
+	);
 	const votesByPair = new Map<string, SemanticVote[]>();
 	for (const pair of input.pairs) {
 		votesByPair.set(pair.pairId, []);
@@ -648,7 +744,9 @@ export async function evaluatePairsWithCascadeBatch(input: {
 
 	let unresolvedPairs = input.pairs.filter((pair) => {
 		const votes = votesByPair.get(pair.pairId) ?? [];
-		return votes.length > 0 && votes[0].confidence < thresholds.escalateThreshold;
+		return (
+			votes.length > 0 && votes[0].confidence < thresholds.escalateThreshold
+		);
 	});
 
 	if (modelConfigs.length >= 2 && unresolvedPairs.length > 0) {

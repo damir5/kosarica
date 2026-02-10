@@ -67,8 +67,18 @@ go.work.sum
 # Dev runtime logs (e.g. mise run dev output)
 log/
 
+# Local LLM debug artifacts
+llm-test-report.*
+llm-test-summary.md
+
+# Local one-off TS experiments
+scripts/test-*.ts
+
 # Backup files (editors, git merge conflicts, etc.)
 *.bak
 *.bak2
 *.orig
 *~
+
+# Kamal local secrets
+.kamal/secrets*

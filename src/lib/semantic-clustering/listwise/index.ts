@@ -11,7 +11,13 @@ export {
 	callModel,
 	loadListwiseModelConfigs,
 	processGroupWithLLM,
+	setListwisePromptHook,
 } from "./llm-call";
+export {
+	type RunListwiseSemanticClusteringOptions,
+	type RunListwiseSemanticClusteringResult,
+	runListwiseSemanticClustering,
+} from "./pipeline";
 export { fetchMedianPrices } from "./price-fetch";
 export type {
 	BaseProductResult,

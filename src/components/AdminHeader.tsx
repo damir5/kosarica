@@ -1,12 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
 	Brain,
-	ScanBarcode,
 	Clock,
 	Database,
 	DollarSign,
 	Home,
+	Layers,
 	ListChecks,
+	ScanBarcode,
 	Settings,
 	Shield,
 	Store,
@@ -25,6 +26,7 @@ const adminNavItems = [
 	{ to: "/admin/categorization", label: "Categorization", icon: Tags },
 	{ to: "/admin/barcode-triage", label: "Barcode Triage", icon: ScanBarcode },
 	{ to: "/admin/llm-decisions", label: "LLM Decisions", icon: Brain },
+	{ to: "/admin/matching", label: "Matching", icon: Layers },
 	{ to: "/admin/clickhouse", label: "ClickHouse", icon: Table },
 	{ to: "/admin/task-queue", label: "Task Queue", icon: ListChecks },
 	{ to: "/admin/cron", label: "Cron", icon: Clock },

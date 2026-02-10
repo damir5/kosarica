@@ -23,11 +23,12 @@ import type {
 
 const log = createLogger("matching");
 
-type OpenAiResponseFormatType = "json_object" | "json_schema" | "text";
+type OpenAiResponseFormatType = "json_object" | "json_schema" | "text" | "none";
 
 type OpenAiResponseFormat =
 	| { type: "json_object" }
 	| { type: "text" }
+	| { type: "none" }
 	| {
 			type: "json_schema";
 			json_schema: {
@@ -41,6 +42,34 @@ interface ModelCallResult {
 	latencyMs: number;
 	responseText: string;
 	tokenUsage: TokenUsage;
+}
+
+type ListwisePromptStage = "extraction" | "clustering";
+
+type ListwisePromptPayload = {
+	stage: ListwisePromptStage;
+	system: string;
+	user: string;
+	jsonSchema?: PromptSchema;
+	modelId: string;
+	model: string;
+	provider: EnsembleModelConfig["provider"];
+	endpoint?: string;
+	groupId: string;
+};
+
+type ListwisePromptHook = (payload: ListwisePromptPayload) => void;
+
+let listwisePromptHook: ListwisePromptHook | null = null;
+
+export function setListwisePromptHook(hook: ListwisePromptHook | null): void {
+	listwisePromptHook = hook;
+}
+
+function emitListwisePrompt(payload: ListwisePromptPayload): void {
+	if (listwisePromptHook) {
+		listwisePromptHook(payload);
+	}
 }
 
 const DEFAULT_OPENAI_FORMAT_ORDER: OpenAiResponseFormatType[] = [
@@ -84,6 +113,9 @@ function formatFromType(
 	type: OpenAiResponseFormatType,
 	schema?: PromptSchema,
 ): OpenAiResponseFormat {
+	if (type === "none") {
+		return { type: "none" };
+	}
 	if (type === "json_schema") {
 		if (!schema) {
 			return { type: "json_object" };
@@ -99,10 +131,64 @@ function formatFromType(
 	return { type };
 }
 
+function normalizeJsonSchema(
+	schema: PromptSchema,
+	options: { nullable: boolean },
+): PromptSchema {
+	const normalizeSchemaNode = (value: unknown): unknown => {
+		if (Array.isArray(value)) {
+			return value.map((entry) => normalizeSchemaNode(entry));
+		}
+		if (!value || typeof value !== "object") {
+			return value;
+		}
+		const record = value as Record<string, unknown>;
+		const normalized: Record<string, unknown> = {};
+		for (const [key, entry] of Object.entries(record)) {
+			if (key === "type") {
+				continue;
+			}
+			normalized[key] = normalizeSchemaNode(entry);
+		}
+		const typeValue = record.type;
+		if (
+			Array.isArray(typeValue) &&
+			typeValue.every((entry) => typeof entry === "string")
+		) {
+			return {
+				anyOf: typeValue.map((entry) => ({
+					...normalized,
+					type: entry,
+				})),
+			};
+		}
+		if (typeof typeValue === "string") {
+			return {
+				...normalized,
+				type: typeValue,
+			};
+		}
+		return normalized;
+	};
+
+	const normalizedSchema = normalizeSchemaNode(schema.schema);
+	const nullableWrapped = options.nullable
+		? { anyOf: [normalizedSchema, { type: "null" }] }
+		: normalizedSchema;
+
+	return {
+		name: schema.name,
+		schema: nullableWrapped as Record<string, unknown>,
+	};
+}
+
 function orderedFormats(
 	preferred: OpenAiResponseFormatType | undefined,
 	schema?: PromptSchema,
 ): OpenAiResponseFormat[] {
+	if (preferred === "none") {
+		return [{ type: "none" }];
+	}
 	const baseOrder = schema
 		? DEFAULT_OPENAI_FORMAT_ORDER
 		: DEFAULT_OPENAI_FORMAT_ORDER_WITHOUT_SCHEMA;
@@ -230,27 +316,42 @@ async function callOpenAiCompatible(
 	jsonSchema?: PromptSchema,
 ): Promise<ModelCallResult> {
 	const apiKey = readApiKey(config);
+	const headers: Record<string, string> = {
+		Authorization: `Bearer ${apiKey}`,
+		"Content-Type": "application/json",
+	};
+	if (config.provider === "openrouter") {
+		headers["HTTP-Referer"] =
+			process.env.OPENROUTER_HTTP_REFERER ?? "https://kosarica.local";
+		headers["X-Title"] =
+			process.env.OPENROUTER_X_TITLE ?? "Kosarica Semantic Clustering";
+	}
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 	const preferenceKey = responseFormatKey(config);
-	const preferred = responseFormatPreferenceByEndpoint.get(preferenceKey);
+	const preferred =
+		config.responseFormat ??
+		responseFormatPreferenceByEndpoint.get(preferenceKey);
+	const normalizedSchema = jsonSchema
+		? normalizeJsonSchema(jsonSchema, {
+				nullable: config.jsonSchemaNullable === true,
+			})
+		: undefined;
 
 	try {
-		const formats = orderedFormats(preferred, jsonSchema);
+		const formats = orderedFormats(preferred, normalizedSchema);
 		let lastError: Error | null = null;
 
 		for (const [index, format] of formats.entries()) {
+			const responseFormat = format.type === "none" ? undefined : format;
 			const response = await fetch(config.endpoint ?? "", {
 				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					"Content-Type": "application/json",
-				},
+				headers,
 				body: JSON.stringify({
 					model: config.model,
 					temperature: 0,
-					max_tokens: 6000,
-					response_format: format,
+					max_tokens: config.maxTokens ?? 6000,
+					...(responseFormat ? { response_format: responseFormat } : {}),
 					messages: [
 						{ role: "system", content: systemMsg },
 						{ role: "user", content: userMsg },
@@ -275,6 +376,15 @@ async function callOpenAiCompatible(
 							status: response.status,
 						},
 					);
+					if (process.env.LISTWISE_DEBUG_RESPONSES === "1") {
+						log.warn("Response_format rejection body", {
+							model: config.model,
+							endpoint: config.endpoint,
+							format: format.type,
+							status: response.status,
+							errorSnippet: errorBody.slice(0, 800),
+						});
+					}
 					continue;
 				}
 				lastError = new Error(
@@ -285,7 +395,7 @@ async function callOpenAiCompatible(
 
 			const body = await response.json();
 			const isLastAttempt = index === formats.length - 1;
-			let content: string;
+			let content: string | null = null;
 			let payload: unknown;
 			try {
 				content = extractOpenAiContent(body);
@@ -293,6 +403,23 @@ async function callOpenAiCompatible(
 			} catch (error) {
 				const parseError =
 					error instanceof Error ? error.message : String(error);
+				if (process.env.LISTWISE_DEBUG_RESPONSES === "1") {
+					const fallbackContent = (() => {
+						try {
+							return extractOpenAiContent(body);
+						} catch {
+							return null;
+						}
+					})();
+					log.warn("Listwise response parse failed", {
+						model: config.model,
+						endpoint: config.endpoint,
+						format: format.type,
+						parseError,
+						responseSnippet:
+							(content ?? fallbackContent)?.slice(0, 1200) ?? null,
+					});
+				}
 				if (!isLastAttempt) {
 					log.warn(
 						"OpenAI-compatible response could not be parsed; trying fallback format",
@@ -466,6 +593,17 @@ export async function processGroupWithLLM(
 			rawName: item.rawName,
 		})),
 	);
+	emitListwisePrompt({
+		stage: "extraction",
+		system: extractionPrompt.system,
+		user: extractionPrompt.user,
+		jsonSchema: extractionPrompt.jsonSchema,
+		modelId: config.id,
+		model: config.model,
+		provider: config.provider,
+		endpoint: config.endpoint,
+		groupId: group.groupId,
+	});
 
 	const extractionCall = await callModel(
 		config,
@@ -503,6 +641,17 @@ export async function processGroupWithLLM(
 			};
 		}),
 	);
+	emitListwisePrompt({
+		stage: "clustering",
+		system: clusteringPrompt.system,
+		user: clusteringPrompt.user,
+		jsonSchema: clusteringPrompt.jsonSchema,
+		modelId: config.id,
+		model: config.model,
+		provider: config.provider,
+		endpoint: config.endpoint,
+		groupId: group.groupId,
+	});
 
 	const clusteringCall = await callModel(
 		config,

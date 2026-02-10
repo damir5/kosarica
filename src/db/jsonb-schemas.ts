@@ -31,25 +31,28 @@ export const clickhouseSyncTaskPayload = z.object({
 	mode: z.enum(["missing", "all"]),
 });
 
-export const categorizeTaskPayload = z.object({
-	type: z.literal("categorize"),
-	runId: z.string().optional(),
-	chainSlug: z.string().optional(),
-	batchSize: z.number().int().min(1).max(5000).optional(),
-	maxBatches: z.number().int().min(1).max(1000).optional(),
-}).superRefine((payload, ctx) => {
-	const hasRunId = typeof payload.runId === "string" && payload.runId.length > 0;
-	const hasChainSlug =
-		typeof payload.chainSlug === "string" && payload.chainSlug.length > 0;
-	const isRunScoped = hasRunId || hasChainSlug;
+export const categorizeTaskPayload = z
+	.object({
+		type: z.literal("categorize"),
+		runId: z.string().optional(),
+		chainSlug: z.string().optional(),
+		batchSize: z.number().int().min(1).max(5000).optional(),
+		maxBatches: z.number().int().min(1).max(1000).optional(),
+	})
+	.superRefine((payload, ctx) => {
+		const hasRunId =
+			typeof payload.runId === "string" && payload.runId.length > 0;
+		const hasChainSlug =
+			typeof payload.chainSlug === "string" && payload.chainSlug.length > 0;
+		const isRunScoped = hasRunId || hasChainSlug;
 
-	if (isRunScoped && !(hasRunId && hasChainSlug)) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			message: "categorize payload must include both runId and chainSlug",
-		});
-	}
-});
+		if (isRunScoped && !(hasRunId && hasChainSlug)) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: "categorize payload must include both runId and chainSlug",
+			});
+		}
+	});
 
 export const barcodeAnchorTaskPayload = z.object({
 	type: z.literal("barcodeAnchor"),
@@ -58,6 +61,33 @@ export const barcodeAnchorTaskPayload = z.object({
 	dryRun: z.boolean().optional(),
 });
 
+export const semanticClusteringPairwiseTaskPayload = z.object({
+	type: z.literal("semanticClusteringPairwise"),
+	maxBatches: z.number().int().min(1).max(50).optional(),
+	featureBatchSize: z.number().int().min(1).max(50_000).optional(),
+	embeddingBackfillBatchSize: z.number().int().min(1).max(50_000).optional(),
+	candidateSourceBatch: z.number().int().min(1).max(50_000).optional(),
+	candidateInsertLimit: z.number().int().min(1).max(200_000).optional(),
+	adjudicationBatchSize: z.number().int().min(1).max(10_000).optional(),
+	llmPromptBatchSize: z.number().int().min(1).max(200).optional(),
+	rebuildClusters: z.boolean().optional(),
+});
+
+export const semanticClusteringListwiseTaskPayload = z.object({
+	type: z.literal("semanticClusteringListwise"),
+	limit: z.number().int().min(1).max(500).optional(),
+	minChains: z.number().int().min(1).max(20).optional(),
+	dryRun: z.boolean().optional(),
+	minPrimaryConfidence: z.number().min(0).max(1).optional(),
+	primaryModelId: z.string().optional(),
+	secondaryModelId: z.string().optional(),
+});
+
+export const matchingTaskPayload = z.discriminatedUnion("type", [
+	semanticClusteringPairwiseTaskPayload,
+	semanticClusteringListwiseTaskPayload,
+]);
+
 export const taskQueuePayload = z.discriminatedUnion("type", [
 	ingestionTaskPayload,
 	rerunTaskPayload,
@@ -65,6 +95,8 @@ export const taskQueuePayload = z.discriminatedUnion("type", [
 	clickhouseSyncTaskPayload,
 	categorizeTaskPayload,
 	barcodeAnchorTaskPayload,
+	semanticClusteringPairwiseTaskPayload,
+	semanticClusteringListwiseTaskPayload,
 ]);
 
 // ============================================================================
@@ -149,6 +181,13 @@ export type ClickHouseSyncTaskPayload = z.infer<
 >;
 export type CategorizeTaskPayload = z.infer<typeof categorizeTaskPayload>;
 export type BarcodeAnchorTaskPayload = z.infer<typeof barcodeAnchorTaskPayload>;
+export type SemanticClusteringPairwiseTaskPayload = z.infer<
+	typeof semanticClusteringPairwiseTaskPayload
+>;
+export type SemanticClusteringListwiseTaskPayload = z.infer<
+	typeof semanticClusteringListwiseTaskPayload
+>;
+export type MatchingTaskPayload = z.infer<typeof matchingTaskPayload>;
 export type TaskQueuePayload = z.infer<typeof taskQueuePayload>;
 export type ValidationError = z.infer<typeof validationError>;
 export type ValidationErrors = z.infer<typeof validationErrors>;

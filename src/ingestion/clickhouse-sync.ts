@@ -1,4 +1,4 @@
-import { isNotNull, sql } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { getDatabase } from "@/db";
 import { parquetFiles } from "@/db/schema";
 import { getClickHouse } from "@/lib/clickhouse";
@@ -65,7 +65,42 @@ async function upsertParquetRecord(
 				importedAt,
 				updatedAt: new Date(),
 			},
+	});
+}
+
+type ParquetImportState = {
+	storageKey: string;
+	importedAt: Date | null;
+	updatedAt: Date;
+};
+
+async function loadParquetImportState(
+	keys: string[],
+): Promise<Map<string, ParquetImportState>> {
+	const db = getDatabase();
+	const states = new Map<string, ParquetImportState>();
+	if (keys.length === 0) {
+		return states;
+	}
+
+	const rows = await db
+		.select({
+			storageKey: parquetFiles.storageKey,
+			importedAt: parquetFiles.importedAt,
+			updatedAt: parquetFiles.updatedAt,
+		})
+		.from(parquetFiles)
+		.where(inArray(parquetFiles.storageKey, keys));
+
+	for (const row of rows) {
+		states.set(row.storageKey, {
+			storageKey: row.storageKey,
+			importedAt: row.importedAt ?? null,
+			updatedAt: row.updatedAt,
 		});
+	}
+
+	return states;
 }
 
 export async function loadAllToClickHouse(): Promise<{
@@ -92,48 +127,55 @@ export async function loadMissingToClickHouse(): Promise<{
 	pending: number;
 }> {
 	const clickhouse = getClickHouse();
-	const db = getDatabase();
 	const keys = await listParquetKeys();
-
-	const importedRows = await db
-		.select({ storageKey: parquetFiles.storageKey })
-		.from(parquetFiles)
-		.where(isNotNull(parquetFiles.importedAt));
-
-	const importedSet = new Set(importedRows.map((row) => row.storageKey));
-	const missing = keys.filter((key) => !importedSet.has(key));
+	const stateByKey = await loadParquetImportState(keys);
+	const pendingKeys = keys.filter((key) => {
+		const state = stateByKey.get(key);
+		if (!state) {
+			return true;
+		}
+		if (!state.importedAt) {
+			return true;
+		}
+		return state.updatedAt > state.importedAt;
+	});
 
 	let imported = 0;
-	for (const key of missing) {
+	for (const key of pendingKeys) {
+		const { chainSlug, targetDate } = parseParquetKey(key);
+		// Always clear an existing chain/day snapshot before import so sync is idempotent,
+		// even when parquet_files.imported_at is missing or stale.
+		await clickhouse.deleteSnapshot(
+			chainSlug,
+			targetDate.toISOString().slice(0, 10),
+		);
+
 		const filePath = resolveStoragePath(key);
 		await clickhouse.importParquetFile(filePath);
 		await upsertParquetRecord(key, new Date());
 		imported += 1;
 	}
 
-	return { imported, pending: 0 };
+	return { imported, pending: Math.max(pendingKeys.length - imported, 0) };
 }
 
 export async function getClickHouseSyncStatus(): Promise<ClickHouseSyncStatus> {
-	const db = getDatabase();
 	const keys = await listParquetKeys();
-
-	const [
-		{ importedCount, lastImportedAt } = {
-			importedCount: 0,
-			lastImportedAt: null,
-		},
-	] = await db
-		.select({
-			importedCount: sql<number>`count(${parquetFiles.id})`,
-			lastImportedAt: sql<Date | null>`max(${parquetFiles.importedAt})`,
-		})
-		.from(parquetFiles)
-		.where(isNotNull(parquetFiles.importedAt));
-
-	const importedFiles = Number(importedCount ?? 0);
+	const stateByKey = await loadParquetImportState(keys);
+	const importedFiles = keys.filter((key) => {
+		const state = stateByKey.get(key);
+		return Boolean(state?.importedAt && state.updatedAt <= state.importedAt);
+	}).length;
+	const pendingFiles = keys.length - importedFiles;
+	const importedTimestamps = keys
+		.map((key) => stateByKey.get(key)?.importedAt ?? null)
+		.filter((value): value is Date => value instanceof Date);
+	const lastImportedAt = importedTimestamps.reduce<Date | null>(
+		(currentMax, value) =>
+			!currentMax || value > currentMax ? value : currentMax,
+		null,
+	);
 	const totalFiles = keys.length;
-	const pendingFiles = Math.max(totalFiles - importedFiles, 0);
 
 	return {
 		totalFiles,

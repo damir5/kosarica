@@ -61,6 +61,9 @@ async function enqueueTasks(
 			case "barcode-anchor":
 				payload = { type: "barcodeAnchor", ...(task.payload ?? {}) };
 				break;
+			case "matching":
+				payload = task.payload as TaskQueuePayload;
+				break;
 			default: {
 				// @ts-expect-error - exhaustive check for unreachable code
 				const _exhaustiveCheck: never = task;

@@ -1,17 +1,18 @@
 import { getConfigInfo } from "./admin";
 import * as alerts from "./alerts";
+import * as barcodeTriage from "./barcode-triage";
 import * as basket from "./basket";
 import {
 	getCategories,
 	getStoresByChain,
 	listCatalogPrices,
 } from "./catalog-prices";
-import * as clickhouse from "./clickhouse";
 import * as categorization from "./categorization";
+import * as clickhouse from "./clickhouse";
 import * as cron from "./cron";
 import * as ingestion from "./ingestion";
-import * as barcodeTriage from "./barcode-triage";
 import * as llmDecisions from "./llm-decisions";
+import * as matching from "./matching";
 import * as prices from "./prices";
 import { getProductPrices, getSimilarVariants } from "./products-public";
 import * as search from "./search";
@@ -208,6 +209,12 @@ export default {
 			get: llmDecisions.getLlmDecision,
 			override: llmDecisions.overrideLlmDecision,
 			stats: llmDecisions.getLlmDecisionStats,
+		},
+		matching: {
+			triggerPairwiseSemanticClustering:
+				matching.triggerPairwiseSemanticClustering,
+			triggerListwiseSemanticClustering:
+				matching.triggerListwiseSemanticClustering,
 		},
 	},
 };

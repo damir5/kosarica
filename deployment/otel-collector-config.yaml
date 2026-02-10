@@ -6,12 +6,6 @@ extensions:
   health_check:
     endpoint: 0.0.0.0:13133
 
-  # Memory limiter to prevent OOM
-  memory_limiter:
-    check_interval: 10s
-    limit_mib: 512
-    spike_limit_mib: 128
-
 receivers:
   # OTLP receiver for application telemetry (gRPC)
   otlp:
@@ -93,10 +87,10 @@ processors:
 
 exporters:
   # OpenObserve exporter for logs
-  otlphttp/openobserve_logs:
-    endpoint: http://openobserve:5080/api/${ZO_ORG_ID:-default}/logs
+  otlp_http/openobserve_logs:
+    endpoint: http://kosarica-openobserve:5080/api/${env:ZO_ORG_ID}
     headers:
-      Authorization: "Basic ${ZO_BASIC_AUTH}"
+      Authorization: "Basic ${env:ZO_BASIC_AUTH}"
       stream-name: "kosarica-logs"
       stream-type: "logs"
     tls:
@@ -104,10 +98,10 @@ exporters:
     encoding: json
 
   # OpenObserve exporter for metrics
-  otlphttp/openobserve_metrics:
-    endpoint: http://openobserve:5080/api/${ZO_ORG_ID:-default}/metrics
+  otlp_http/openobserve_metrics:
+    endpoint: http://kosarica-openobserve:5080/api/${env:ZO_ORG_ID}
     headers:
-      Authorization: "Basic ${ZO_BASIC_AUTH}"
+      Authorization: "Basic ${env:ZO_BASIC_AUTH}"
       stream-name: "kosarica-metrics"
       stream-type: "metrics"
     tls:
@@ -115,10 +109,10 @@ exporters:
     encoding: json
 
   # OpenObserve exporter for traces
-  otlphttp/openobserve_traces:
-    endpoint: http://openobserve:5080/api/${ZO_ORG_ID:-default}/traces
+  otlp_http/openobserve_traces:
+    endpoint: http://kosarica-openobserve:5080/api/${env:ZO_ORG_ID}
     headers:
-      Authorization: "Basic ${ZO_BASIC_AUTH}"
+      Authorization: "Basic ${env:ZO_BASIC_AUTH}"
       stream-name: "kosarica-traces"
       stream-type: "traces"
     tls:
@@ -131,7 +125,6 @@ exporters:
 service:
   extensions:
     - health_check
-    - memory_limiter
 
   pipelines:
     # Logs pipeline
@@ -144,7 +137,7 @@ service:
         - resource
         - batch
       exporters:
-        - otlphttp/openobserve_logs
+        - otlp_http/openobserve_logs
 
     # Metrics pipeline
     metrics:
@@ -156,7 +149,7 @@ service:
         - resource
         - batch
       exporters:
-        - otlphttp/openobserve_metrics
+        - otlp_http/openobserve_metrics
 
     # Traces pipeline
     traces:
@@ -167,4 +160,4 @@ service:
         - resource
         - batch
       exporters:
-        - otlphttp/openobserve_traces
+        - otlp_http/openobserve_traces
