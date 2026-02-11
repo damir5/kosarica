@@ -51,6 +51,8 @@ env:
     - ZO_ROOT_USER_PASSWORD
     - ZO_BASIC_AUTH
     - ZO_ORG_ID
+    - LLM_ENSEMBLE_JSON
+    - LOCAL_LLM_API_KEY
 
 # Builder configuration
 builder:
