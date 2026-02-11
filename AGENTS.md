@@ -2,6 +2,20 @@
 
 **Code Review**: See [CHECKS.md](./CHECKS.md) for required verification steps.
 
+## SECRETS — CRITICAL RULES
+
+**`.env.development` is committed to git** (explicitly un-ignored in `.gitignore`).
+
+**NEVER put real API keys, tokens, or secrets in `.env.development`.**
+
+- This file is for **structure and non-sensitive defaults only** (localhost URLs, dev ports, empty placeholders).
+- All secret values (API keys, auth secrets, tokens) MUST be empty strings or placeholder text like `change-in-production`.
+- Real secrets go in `.env.local` or `.env.development.local` (which ARE gitignored via `*.local`).
+- When adding a new env var that holds a secret, set it to empty string: `MY_SECRET_KEY=`
+- NEVER paste real key values, even in comments. Comments are committed too.
+- Before any commit touching `.env*` files, verify no real secrets are present.
+- If you accidentally stage a secret, `git reset` the file and clean it before committing.
+
 ## Minimal dev & test setup
 
 Start containers first:
