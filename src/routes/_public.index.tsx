@@ -11,11 +11,10 @@ import { SearchBar, CategoryGrid, PriceDisplay, StoreChip, DealIndicator, type S
 import { STORE_DISPLAY_NAMES } from "@/components/public/domain/store-colors";
 
 export const Route = createFileRoute("/_public/")({
-	loader: async ({ context }) => {
-		const categories = await context.queryClient.ensureQueryData(
+	loader: ({ context }) => {
+		context.queryClient.prefetchQuery(
 			orpc.catalogPrices.getCategories.queryOptions({ input: {} }),
 		);
-		return { categories };
 	},
 	head: () => ({
 		meta: [{ title: "Tvoja Košarica — Usporedi cijene u Hrvatskoj" }],
@@ -24,11 +23,14 @@ export const Route = createFileRoute("/_public/")({
 });
 
 function HomePage() {
-	const { categories } = Route.useLoaderData();
 	const [searchValue, setSearchValue] = useState("");
 	const navigate = useNavigate();
 
-	const categoryItems = categories.categories.map((cat) => ({
+	const categoriesQuery = useQuery(
+		orpc.catalogPrices.getCategories.queryOptions({ input: {} }),
+	);
+
+	const categoryItems = (categoriesQuery.data?.categories ?? []).map((cat) => ({
 		slug: cat,
 		label: cat.charAt(0).toUpperCase() + cat.slice(1),
 	}));

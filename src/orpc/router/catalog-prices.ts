@@ -107,38 +107,33 @@ export const listCatalogPrices = procedure
 			params.dateTo = dateTo;
 		}
 
-		const having: string[] = [];
 		if (input.minPrice !== undefined) {
-			having.push("price_cents >= {minPrice:Int32}");
+			conditions.push("price_cents >= {minPrice:Int32}");
 			params.minPrice = input.minPrice;
 		}
 		if (input.maxPrice !== undefined) {
-			having.push("price_cents <= {maxPrice:Int32}");
+			conditions.push("price_cents <= {maxPrice:Int32}");
 			params.maxPrice = input.maxPrice;
 		}
 
 		const whereClause =
 			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-		const havingClause =
-			having.length > 0 ? `HAVING ${having.join(" AND ")}` : "";
 
 		const baseQuery = `
 			SELECT
 				chain_slug,
 				store_id,
 				retailer_item_id,
-				argMax(name, target_date) AS name,
-				argMax(brand, target_date) AS brand,
-				argMax(category, target_date) AS category,
-				argMax(price_cents, target_date) AS price_cents,
-				argMax(price_status, target_date) AS price_status,
-				argMax(price_unavailable_reason, target_date) AS price_unavailable_reason,
-				argMax(discount_price_cents, target_date) AS discount_price_cents,
-				max(target_date) AS last_seen_at
-			FROM prices
+				name,
+				brand,
+				category,
+				price_cents,
+				price_status,
+				price_unavailable_reason,
+				discount_price_cents,
+				target_date AS last_seen_at
+			FROM prices_current FINAL
 			${whereClause}
-			GROUP BY chain_slug, store_id, retailer_item_id
-			${havingClause}
 		`;
 
 		const hasStoreIdFilter = input.storeIds && input.storeIds.length > 0;

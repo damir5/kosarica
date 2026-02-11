@@ -10,6 +10,7 @@ import { barcodeAnchorBatchHandler } from "./handlers/barcode-anchor-batch";
 import { conflictCheckHandler } from "./handlers/conflict-check";
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
 import { featureMatchBatchHandler } from "./handlers/feature-match-batch";
+import { refreshPricesCurrentHandler } from "./handlers/refresh-prices-current";
 import { semanticClusteringHandler } from "./handlers/semantic-clustering";
 import { tempCleanupHandler } from "./handlers/temp-cleanup";
 import { triageQueueRefreshHandler } from "./handlers/triage-queue-refresh";
@@ -86,6 +87,16 @@ export function registerAllCronJobs(): void {
 		timezone: "UTC",
 		taskType: "matching",
 		handler: triageQueueRefreshHandler,
+	});
+
+	// Refresh prices_current materialized table after daily ingestion
+	registerCronJob({
+		id: "refresh-prices-current",
+		name: "Refresh Current Prices Table",
+		cronExpression: "0 8 * * *", // 8 AM UTC (after ingestion at 6 AM)
+		timezone: "UTC",
+		taskType: "clickhouse",
+		handler: refreshPricesCurrentHandler,
 	});
 
 	// Add more jobs here as needed:

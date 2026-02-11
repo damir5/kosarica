@@ -152,6 +152,20 @@ processors:
         - 'body != nil and IsMatch(body, "config::axum::middlewares::access_log")'
         - 'body != nil and IsMatch(body, "OpenTelemetry Collector Contrib")'
 
+  # Flatten nested Pino error objects to avoid OpenObserve type conflicts.
+  # Pino serializes errors as {code, type, name, message, stack} objects, but
+  # OpenObserve expects flat attribute values. Extract key fields and remove the map.
+  transform/flatten_errors:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["error_message"], attributes["error"]["message"]) where IsMap(attributes["error"])
+          - set(attributes["error_type"], attributes["error"]["type"]) where IsMap(attributes["error"])
+          - set(attributes["error_code"], attributes["error"]["code"]) where IsMap(attributes["error"])
+          - set(attributes["error_stack"], attributes["error"]["stack"]) where IsMap(attributes["error"])
+          - delete_key(attributes, "error") where IsMap(attributes["error"])
+
 exporters:
   # OpenObserve exporter for logs
   otlp_http/openobserve_logs:
@@ -205,6 +219,7 @@ service:
       processors:
         - memory_limiter
         - filter/drop_internal
+        - transform/flatten_errors
         - resource
         - batch
       exporters:

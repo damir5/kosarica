@@ -112,13 +112,11 @@ async function loadStorePrices(retailerItemIds: string[]) {
 			retailer_item_id,
 			chain_slug,
 			store_id,
-			argMax(price_cents, target_date) AS current_price,
-			argMax(discount_price_cents, target_date) AS discount_price,
-			max(target_date) AS last_seen_at
-		FROM prices
-		WHERE retailer_item_id IN ({itemIds:Array(String)})
-			AND target_date <= today()
-		GROUP BY retailer_item_id, chain_slug, store_id`,
+			price_cents AS current_price,
+			discount_price_cents AS discount_price,
+			target_date AS last_seen_at
+		FROM prices_current FINAL
+		WHERE retailer_item_id IN ({itemIds:Array(String)})`,
 		{ itemIds: retailerItemIds },
 	);
 
@@ -424,23 +422,10 @@ export const getSimilarVariants = procedure
 		const priceRows = await clickhouse.query<ClickHouseBestPriceRow>(
 			`SELECT
 				retailer_item_id,
-				min(effective_price) AS best_price,
-				argMin(chain_slug, effective_price) AS chain_slug
-			FROM (
-				SELECT
-					retailer_item_id,
-					chain_slug,
-					store_id,
-					if(argMax(discount_price_cents, target_date) > 0,
-						argMax(discount_price_cents, target_date),
-						argMax(price_cents, target_date)
-					) AS effective_price
-				FROM prices
-				WHERE retailer_item_id IN ({itemIds:Array(String)})
-					AND target_date >= today() - 7
-					AND target_date <= today()
-				GROUP BY retailer_item_id, chain_slug, store_id
-			)
+				min(if(discount_price_cents > 0, discount_price_cents, price_cents)) AS best_price,
+				argMin(chain_slug, if(discount_price_cents > 0, discount_price_cents, price_cents)) AS chain_slug
+			FROM prices_current FINAL
+			WHERE retailer_item_id IN ({itemIds:Array(String)})
 			GROUP BY retailer_item_id`,
 			{ itemIds },
 		);

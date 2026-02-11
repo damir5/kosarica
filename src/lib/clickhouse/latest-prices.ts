@@ -12,10 +12,9 @@ const LATEST_EFFECTIVE_PRICE_QUERY = `SELECT
 		if(discount_price_cents > 0, discount_price_cents, price_cents),
 		target_date
 	) AS effective_price
-FROM prices
+FROM prices_current FINAL
 WHERE retailer_item_id IN ({itemIds:Array(String)})
 	AND target_date >= today() - INTERVAL {days:UInt8} DAY
-	AND target_date <= today()
 GROUP BY retailer_item_id`;
 
 export async function getLatestEffectivePricesByItemId(

@@ -63,11 +63,13 @@ export class ClickHouseClient {
 	async query<T>(
 		query: string,
 		params?: Record<string, string | number | string[]>,
+		settings?: Record<string, string | number>,
 	): Promise<T[]> {
 		const result = await this.client.query({
 			query,
 			query_params: params,
 			format: "JSONEachRow",
+			clickhouse_settings: settings,
 		});
 
 		return (await result.json()) as T[];
@@ -242,6 +244,10 @@ export function getClickHouse(): ClickHouseClient {
 		database: process.env.CLICKHOUSE_DATABASE || "default",
 		username: process.env.CLICKHOUSE_USERNAME,
 		password: process.env.CLICKHOUSE_PASSWORD,
+		request_timeout: 30_000,
+		clickhouse_settings: {
+			max_execution_time: 25,
+		},
 	});
 
 	clientInstance = new ClickHouseClient(rawClient);

@@ -27,20 +27,17 @@ const PriceHistoryChart = lazy(() =>
 );
 
 export const Route = createFileRoute("/_public/product/$productId")({
-	loader: async ({ context, params }) => {
-		const data = await context.queryClient.ensureQueryData(
+	loader: ({ context, params }) => {
+		context.queryClient.prefetchQuery(
 			orpc.products.get.queryOptions({
 				input: { productId: params.productId },
 			}),
 		);
-		return data;
 	},
-	head: ({ loaderData }) => ({
+	head: () => ({
 		meta: [
 			{
-				title: loaderData
-					? `${loaderData.product.name} | Tvoja Košarica`
-					: "Proizvod | Tvoja Košarica",
+				title: "Proizvod | Tvoja Košarica",
 			},
 		],
 	}),
@@ -48,10 +45,29 @@ export const Route = createFileRoute("/_public/product/$productId")({
 });
 
 function ProductDetailPage() {
-	const data = Route.useLoaderData();
+	const { productId } = Route.useParams();
 	const router = useRouter();
 	const { priceStoreIds, isActive: locationActive } = useNearbyStores();
 	const [showAll, setShowAll] = useState(false);
+
+	const { data, isLoading } = useQuery(
+		orpc.products.get.queryOptions({
+			input: { productId },
+		}),
+	);
+
+	if (isLoading || !data) {
+		return (
+			<PageContainer>
+				<TkSkeleton className="h-8 w-48 mb-4" />
+				<TkSkeleton className="h-6 w-32 mb-6" />
+				<TkSkeleton className="h-[200px] w-full mb-4" />
+				<TkSkeleton className="h-24 w-full mb-2" />
+				<TkSkeleton className="h-24 w-full mb-2" />
+				<TkSkeleton className="h-24 w-full" />
+			</PageContainer>
+		);
+	}
 
 	const { product, storePrices, priceHistory } = data;
 
