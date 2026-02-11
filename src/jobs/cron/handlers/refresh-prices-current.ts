@@ -58,8 +58,6 @@ export const refreshPricesCurrentHandler: CronJobHandler = {
 			log.info("Refreshed chain", { chain_slug, runId: context.runId });
 		}
 
-		const refreshDuration = Date.now() - startTime;
-
 		// Refresh chain metadata
 		await clickhouse.query("TRUNCATE TABLE prices_chain_metadata");
 		await clickhouse.query(

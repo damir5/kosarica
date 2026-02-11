@@ -26,6 +26,7 @@ const ALL_LOGGER_TYPES = [
 	"temp-cleanup",
 	"matching",
 	"search",
+	"rum",
 ] as const;
 export type LoggerType = (typeof ALL_LOGGER_TYPES)[number];
 

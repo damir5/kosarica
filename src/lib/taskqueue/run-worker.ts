@@ -7,6 +7,7 @@ import type {
 	RerunTaskPayload,
 	SemanticClusteringListwiseTaskPayload,
 	SemanticClusteringPairwiseTaskPayload,
+	SemanticClusteringUnifiedTaskPayload,
 } from "@/db/jsonb-schemas";
 import {
 	loadAllToClickHouse,
@@ -21,6 +22,7 @@ import {
 import {
 	runListwiseSemanticClustering,
 	runSemanticClusteringPipeline,
+	runUnifiedMatching,
 } from "@/lib/semantic-clustering";
 import { scheduleTask } from "./index";
 import { TaskQueueWorker } from "./worker";
@@ -152,7 +154,26 @@ export function createTaskQueueWorker(options?: {
 	worker.registerHandler("matching", async (task) => {
 		const payload = task.payload as
 			| SemanticClusteringPairwiseTaskPayload
-			| SemanticClusteringListwiseTaskPayload;
+			| SemanticClusteringListwiseTaskPayload
+			| SemanticClusteringUnifiedTaskPayload;
+
+		if (payload.type === "semanticClusteringUnified") {
+			await runUnifiedMatching({
+				limit: payload.limit,
+				dryRun: payload.dryRun,
+				minPrimaryConfidence: payload.minPrimaryConfidence,
+				primaryModelId: payload.primaryModelId,
+				secondaryModelId: payload.secondaryModelId,
+				blocking: {
+					barcodeLimit: payload.barcodeLimit,
+					barcodeMinChains: payload.barcodeMinChains,
+					deterministicLimit: payload.deterministicLimit,
+					embeddingLimit: payload.embeddingLimit,
+					lexicalLimit: payload.lexicalLimit,
+				},
+			});
+			return;
+		}
 
 		if (payload.type === "semanticClusteringListwise") {
 			await runListwiseSemanticClustering({

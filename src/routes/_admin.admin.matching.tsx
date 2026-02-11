@@ -23,6 +23,17 @@ export const Route = createFileRoute("/_admin/admin/matching")({
 function AdminMatchingPage() {
 	const queryClient = useQueryClient();
 
+	// Unified matching state
+	const [unifiedLimit, setUnifiedLimit] = useState<string>("50");
+	const [unifiedDryRun, setUnifiedDryRun] = useState<boolean>(true);
+	const [unifiedMinPrimaryConfidence, setUnifiedMinPrimaryConfidence] =
+		useState<string>("0.8");
+	const [unifiedPrimaryModelId, setUnifiedPrimaryModelId] =
+		useState<string>("");
+	const [unifiedSecondaryModelId, setUnifiedSecondaryModelId] =
+		useState<string>("");
+
+	// Pairwise state
 	const [pairwiseMaxBatches, setPairwiseMaxBatches] = useState<string>("10");
 	const [pairwiseFeatureBatchSize, setPairwiseFeatureBatchSize] =
 		useState<string>("");
@@ -41,6 +52,7 @@ function AdminMatchingPage() {
 	const [pairwiseRebuildClusters, setPairwiseRebuildClusters] =
 		useState<boolean>(false);
 
+	// Listwise state
 	const [listwiseLimit, setListwiseLimit] = useState<string>("200");
 	const [listwiseMinChains, setListwiseMinChains] = useState<string>("2");
 	const [listwiseDryRun, setListwiseDryRun] = useState<boolean>(true);
@@ -57,18 +69,43 @@ function AdminMatchingPage() {
 		});
 	};
 
+	const toInt = (value: string): number | undefined => {
+		if (value.trim().length === 0) return undefined;
+		const n = Number.parseInt(value, 10);
+		return Number.isFinite(n) ? n : undefined;
+	};
+
+	const toFloat = (value: string): number | undefined => {
+		if (value.trim().length === 0) return undefined;
+		const n = Number.parseFloat(value);
+		return Number.isFinite(n) ? n : undefined;
+	};
+
+	const unifiedInput = useMemo<
+		Parameters<typeof orpc.admin.matching.triggerUnifiedMatching.call>[0]
+	>(
+		() => ({
+			limit: toInt(unifiedLimit),
+			dryRun: unifiedDryRun,
+			minPrimaryConfidence: toFloat(unifiedMinPrimaryConfidence),
+			primaryModelId: unifiedPrimaryModelId.trim() || undefined,
+			secondaryModelId: unifiedSecondaryModelId.trim() || undefined,
+		}),
+		[
+			unifiedDryRun,
+			unifiedLimit,
+			unifiedMinPrimaryConfidence,
+			unifiedPrimaryModelId,
+			unifiedSecondaryModelId,
+		],
+	);
+
 	const pairwiseInput = useMemo<
 		Parameters<
 			typeof orpc.admin.matching.triggerPairwiseSemanticClustering.call
 		>[0]
-	>(() => {
-		const toInt = (value: string): number | undefined => {
-			if (value.trim().length === 0) return undefined;
-			const n = Number.parseInt(value, 10);
-			return Number.isFinite(n) ? n : undefined;
-		};
-
-		return {
+	>(
+		() => ({
 			maxBatches: toInt(pairwiseMaxBatches),
 			featureBatchSize: toInt(pairwiseFeatureBatchSize),
 			embeddingBackfillBatchSize: toInt(pairwiseEmbeddingBackfillBatchSize),
@@ -77,50 +114,48 @@ function AdminMatchingPage() {
 			adjudicationBatchSize: toInt(pairwiseAdjudicationBatchSize),
 			llmPromptBatchSize: toInt(pairwiseLlmPromptBatchSize),
 			rebuildClusters: pairwiseRebuildClusters,
-		};
-	}, [
-		pairwiseAdjudicationBatchSize,
-		pairwiseCandidateInsertLimit,
-		pairwiseCandidateSourceBatch,
-		pairwiseEmbeddingBackfillBatchSize,
-		pairwiseFeatureBatchSize,
-		pairwiseLlmPromptBatchSize,
-		pairwiseMaxBatches,
-		pairwiseRebuildClusters,
-	]);
+		}),
+		[
+			pairwiseAdjudicationBatchSize,
+			pairwiseCandidateInsertLimit,
+			pairwiseCandidateSourceBatch,
+			pairwiseEmbeddingBackfillBatchSize,
+			pairwiseFeatureBatchSize,
+			pairwiseLlmPromptBatchSize,
+			pairwiseMaxBatches,
+			pairwiseRebuildClusters,
+		],
+	);
 
 	const listwiseInput = useMemo<
 		Parameters<
 			typeof orpc.admin.matching.triggerListwiseSemanticClustering.call
 		>[0]
-	>(() => {
-		const toInt = (value: string): number | undefined => {
-			if (value.trim().length === 0) return undefined;
-			const n = Number.parseInt(value, 10);
-			return Number.isFinite(n) ? n : undefined;
-		};
-		const toFloat = (value: string): number | undefined => {
-			if (value.trim().length === 0) return undefined;
-			const n = Number.parseFloat(value);
-			return Number.isFinite(n) ? n : undefined;
-		};
-
-		return {
+	>(
+		() => ({
 			limit: toInt(listwiseLimit),
 			minChains: toInt(listwiseMinChains),
 			dryRun: listwiseDryRun,
 			minPrimaryConfidence: toFloat(listwiseMinPrimaryConfidence),
 			primaryModelId: listwisePrimaryModelId.trim() || undefined,
 			secondaryModelId: listwiseSecondaryModelId.trim() || undefined,
-		};
-	}, [
-		listwiseDryRun,
-		listwiseLimit,
-		listwiseMinChains,
-		listwiseMinPrimaryConfidence,
-		listwisePrimaryModelId,
-		listwiseSecondaryModelId,
-	]);
+		}),
+		[
+			listwiseDryRun,
+			listwiseLimit,
+			listwiseMinChains,
+			listwiseMinPrimaryConfidence,
+			listwisePrimaryModelId,
+			listwiseSecondaryModelId,
+		],
+	);
+
+	const unifiedMutation = useMutation({
+		mutationFn: async () => {
+			return orpc.admin.matching.triggerUnifiedMatching.call(unifiedInput);
+		},
+		onSuccess: () => invalidateTaskQueue(),
+	});
 
 	const pairwiseMutation = useMutation({
 		mutationFn: async () => {
@@ -140,6 +175,11 @@ function AdminMatchingPage() {
 		onSuccess: () => invalidateTaskQueue(),
 	});
 
+	const anyPending =
+		unifiedMutation.isPending ||
+		pairwiseMutation.isPending ||
+		listwiseMutation.isPending;
+
 	const errorMessage = (error: unknown, fallback: string) => {
 		return error instanceof Error ? error.message : fallback;
 	};
@@ -152,16 +192,12 @@ function AdminMatchingPage() {
 					<div>
 						<h1 className="font-semibold text-2xl">Matching</h1>
 						<p className="text-muted-foreground text-sm">
-							Enqueue semantic clustering tasks (pairwise / listwise).
+							Enqueue matching tasks (unified / pairwise / listwise).
 						</p>
 					</div>
 				</div>
 				<div className="flex items-center gap-2">
-					<Button
-						asChild
-						variant="outline"
-						disabled={pairwiseMutation.isPending || listwiseMutation.isPending}
-					>
+					<Button asChild variant="outline" disabled={anyPending}>
 						<Link to="/admin/task-queue" search={{ search: "matching" }}>
 							Task Queue
 						</Link>
@@ -169,7 +205,7 @@ function AdminMatchingPage() {
 					<Button
 						variant="outline"
 						onClick={() => invalidateTaskQueue()}
-						disabled={pairwiseMutation.isPending || listwiseMutation.isPending}
+						disabled={anyPending}
 					>
 						<RefreshCw className="mr-2 h-4 w-4" />
 						Refresh Task Queue
@@ -177,12 +213,115 @@ function AdminMatchingPage() {
 				</div>
 			</div>
 
+			{/* Unified matching — primary */}
+			<Card className="border-primary/30">
+				<CardHeader>
+					<CardTitle>Unified Matching</CardTitle>
+					<CardDescription>
+						Multi-strategy blocking (barcode + deterministic + embedding +
+						lexical) with listwise LLM resolution. Recommended pipeline.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="space-y-4">
+					<div className="grid gap-3 md:grid-cols-3">
+						<div className="space-y-1">
+							<Label htmlFor="unifiedLimit">Group limit</Label>
+							<Input
+								id="unifiedLimit"
+								type="number"
+								min={1}
+								max={500}
+								value={unifiedLimit}
+								onChange={(e) => setUnifiedLimit(e.target.value)}
+							/>
+						</div>
+						<div className="space-y-1">
+							<Label htmlFor="unifiedMinPrimaryConfidence">
+								Min primary confidence
+							</Label>
+							<Input
+								id="unifiedMinPrimaryConfidence"
+								type="number"
+								min={0}
+								max={1}
+								step={0.01}
+								value={unifiedMinPrimaryConfidence}
+								onChange={(e) =>
+									setUnifiedMinPrimaryConfidence(e.target.value)
+								}
+							/>
+						</div>
+						<div className="space-y-1">
+							<Label>Dry run</Label>
+							<div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3">
+								<Switch
+									checked={unifiedDryRun}
+									onCheckedChange={setUnifiedDryRun}
+								/>
+								<span className="text-muted-foreground text-sm">
+									{unifiedDryRun ? "Enabled" : "Disabled"}
+								</span>
+							</div>
+						</div>
+						<div className="space-y-1 md:col-span-3">
+							<Label htmlFor="unifiedPrimaryModelId">Primary model id</Label>
+							<Input
+								id="unifiedPrimaryModelId"
+								placeholder="(optional)"
+								value={unifiedPrimaryModelId}
+								onChange={(e) => setUnifiedPrimaryModelId(e.target.value)}
+							/>
+						</div>
+						<div className="space-y-1 md:col-span-3">
+							<Label htmlFor="unifiedSecondaryModelId">
+								Secondary model id
+							</Label>
+							<Input
+								id="unifiedSecondaryModelId"
+								placeholder="(optional)"
+								value={unifiedSecondaryModelId}
+								onChange={(e) => setUnifiedSecondaryModelId(e.target.value)}
+							/>
+						</div>
+					</div>
+
+					<div className="flex flex-wrap items-center gap-2">
+						<Button
+							onClick={() => unifiedMutation.mutate()}
+							disabled={anyPending}
+						>
+							{unifiedMutation.isPending ? (
+								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+							) : null}
+							Run Matching
+						</Button>
+						{unifiedMutation.isSuccess && unifiedMutation.data?.queued ? (
+							<Badge
+								variant="secondary"
+								className="bg-green-100 text-green-700"
+							>
+								Queued: {unifiedMutation.data.taskId}
+							</Badge>
+						) : null}
+					</div>
+					{unifiedMutation.isError ? (
+						<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+							{errorMessage(
+								unifiedMutation.error,
+								"Failed to enqueue unified task",
+							)}
+						</div>
+					) : null}
+				</CardContent>
+			</Card>
+
+			{/* Legacy pipelines */}
 			<div className="grid gap-4 lg:grid-cols-2">
 				<Card>
 					<CardHeader>
 						<CardTitle>Listwise Semantic Clustering</CardTitle>
 						<CardDescription>
-							Enqueues a single task that runs the listwise pipeline.
+							Barcode-seeded groups only. Legacy pipeline.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
@@ -262,9 +401,7 @@ function AdminMatchingPage() {
 						<div className="flex flex-wrap items-center gap-2">
 							<Button
 								onClick={() => listwiseMutation.mutate()}
-								disabled={
-									listwiseMutation.isPending || pairwiseMutation.isPending
-								}
+								disabled={anyPending}
 							>
 								{listwiseMutation.isPending ? (
 									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -295,7 +432,7 @@ function AdminMatchingPage() {
 					<CardHeader>
 						<CardTitle>Pairwise Semantic Clustering</CardTitle>
 						<CardDescription>
-							Enqueues a task that runs batches until no more work remains.
+							Pair-by-pair adjudication. Legacy pipeline.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
@@ -422,9 +559,7 @@ function AdminMatchingPage() {
 						<div className="flex flex-wrap items-center gap-2">
 							<Button
 								onClick={() => pairwiseMutation.mutate()}
-								disabled={
-									pairwiseMutation.isPending || listwiseMutation.isPending
-								}
+								disabled={anyPending}
 							>
 								{pairwiseMutation.isPending ? (
 									<Loader2 className="mr-2 h-4 w-4 animate-spin" />

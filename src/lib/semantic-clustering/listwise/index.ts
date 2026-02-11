@@ -17,6 +17,7 @@ export {
 	type RunListwiseSemanticClusteringOptions,
 	type RunListwiseSemanticClusteringResult,
 	runListwiseSemanticClustering,
+	persistAcceptedGrouping,
 } from "./pipeline";
 export { fetchMedianPrices } from "./price-fetch";
 export type {

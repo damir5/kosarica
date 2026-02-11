@@ -1,3 +1,8 @@
+export {
+	type GenerateCandidateGroupsOptions,
+	type GenerateCandidateGroupsResult,
+	generateCandidateGroups,
+} from "./blocking";
 export { parseEnsembleConfig, STRICT_CASCADE_THRESHOLDS } from "./config";
 export {
 	type RunListwiseSemanticClusteringOptions,
@@ -9,3 +14,8 @@ export {
 	backfillMissingFeatureEmbeddings,
 	runSemanticClusteringPipeline,
 } from "./pipeline";
+export {
+	type RunUnifiedMatchingOptions,
+	type RunUnifiedMatchingResult,
+	runUnifiedMatching,
+} from "./unified-pipeline";

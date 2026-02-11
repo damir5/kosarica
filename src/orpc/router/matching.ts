@@ -2,6 +2,44 @@ import { z } from "zod";
 import { scheduleTask } from "@/lib/taskqueue";
 import { superadminProcedure } from "../base";
 
+export const triggerUnifiedMatching = superadminProcedure
+	.input(
+		z
+			.object({
+				limit: z.number().int().min(1).max(500).optional(),
+				dryRun: z.boolean().optional(),
+				minPrimaryConfidence: z.number().min(0).max(1).optional(),
+				primaryModelId: z.string().optional(),
+				secondaryModelId: z.string().optional(),
+				barcodeLimit: z.number().int().min(1).max(1000).optional(),
+				barcodeMinChains: z.number().int().min(1).max(20).optional(),
+				deterministicLimit: z.number().int().min(1).max(1000).optional(),
+				embeddingLimit: z.number().int().min(1).max(500).optional(),
+				lexicalLimit: z.number().int().min(1).max(500).optional(),
+			})
+			.optional(),
+	)
+	.handler(async ({ input }) => {
+		const task = await scheduleTask({
+			taskType: "matching",
+			payload: {
+				type: "semanticClusteringUnified",
+				limit: input?.limit,
+				dryRun: input?.dryRun,
+				minPrimaryConfidence: input?.minPrimaryConfidence,
+				primaryModelId: input?.primaryModelId,
+				secondaryModelId: input?.secondaryModelId,
+				barcodeLimit: input?.barcodeLimit,
+				barcodeMinChains: input?.barcodeMinChains,
+				deterministicLimit: input?.deterministicLimit,
+				embeddingLimit: input?.embeddingLimit,
+				lexicalLimit: input?.lexicalLimit,
+			},
+		});
+
+		return { queued: true, taskId: task.id };
+	});
+
 export const triggerPairwiseSemanticClustering = superadminProcedure
 	.input(
 		z

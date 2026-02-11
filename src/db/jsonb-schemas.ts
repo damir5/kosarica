@@ -83,9 +83,24 @@ export const semanticClusteringListwiseTaskPayload = z.object({
 	secondaryModelId: z.string().optional(),
 });
 
+export const semanticClusteringUnifiedTaskPayload = z.object({
+	type: z.literal("semanticClusteringUnified"),
+	limit: z.number().int().min(1).max(500).optional(),
+	dryRun: z.boolean().optional(),
+	minPrimaryConfidence: z.number().min(0).max(1).optional(),
+	primaryModelId: z.string().optional(),
+	secondaryModelId: z.string().optional(),
+	barcodeLimit: z.number().int().min(1).max(1000).optional(),
+	barcodeMinChains: z.number().int().min(1).max(20).optional(),
+	deterministicLimit: z.number().int().min(1).max(1000).optional(),
+	embeddingLimit: z.number().int().min(1).max(500).optional(),
+	lexicalLimit: z.number().int().min(1).max(500).optional(),
+});
+
 export const matchingTaskPayload = z.discriminatedUnion("type", [
 	semanticClusteringPairwiseTaskPayload,
 	semanticClusteringListwiseTaskPayload,
+	semanticClusteringUnifiedTaskPayload,
 ]);
 
 export const taskQueuePayload = z.discriminatedUnion("type", [
@@ -97,6 +112,7 @@ export const taskQueuePayload = z.discriminatedUnion("type", [
 	barcodeAnchorTaskPayload,
 	semanticClusteringPairwiseTaskPayload,
 	semanticClusteringListwiseTaskPayload,
+	semanticClusteringUnifiedTaskPayload,
 ]);
 
 // ============================================================================
@@ -186,6 +202,9 @@ export type SemanticClusteringPairwiseTaskPayload = z.infer<
 >;
 export type SemanticClusteringListwiseTaskPayload = z.infer<
 	typeof semanticClusteringListwiseTaskPayload
+>;
+export type SemanticClusteringUnifiedTaskPayload = z.infer<
+	typeof semanticClusteringUnifiedTaskPayload
 >;
 export type MatchingTaskPayload = z.infer<typeof matchingTaskPayload>;
 export type TaskQueuePayload = z.infer<typeof taskQueuePayload>;

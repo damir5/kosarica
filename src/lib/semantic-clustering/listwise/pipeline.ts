@@ -240,7 +240,7 @@ function stableSkuKey(params: {
 	return `v1|n:${name}|b:${brand}|p:${params.packAmount}|c:${container}`;
 }
 
-async function persistAcceptedGrouping(params: {
+export async function persistAcceptedGrouping(params: {
 	group: CandidateGroup;
 	llm: ListwiseLLMResult;
 	dryRun: boolean;

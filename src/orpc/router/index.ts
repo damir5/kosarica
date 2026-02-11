@@ -211,6 +211,7 @@ export default {
 			stats: llmDecisions.getLlmDecisionStats,
 		},
 		matching: {
+			triggerUnifiedMatching: matching.triggerUnifiedMatching,
 			triggerPairwiseSemanticClustering:
 				matching.triggerPairwiseSemanticClustering,
 			triggerListwiseSemanticClustering:
