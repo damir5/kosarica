@@ -83,6 +83,42 @@ function buildPackDescription(feat: {
 	return desc;
 }
 
+function buildStorePrices(
+	priceRows: ClickHouseCurrentPriceRow[],
+	chainNameMap: Map<string, string>,
+	itemNameMap: Map<string, string>,
+	featureMap: Map<
+		string,
+		{ extractedUnit: string | null; totalAmount: number | null }
+	>,
+) {
+	return priceRows.map((row) => {
+		const currentPrice = parseNumber(row.current_price);
+		const discountPrice = parseNumber(row.discount_price);
+		const effectivePrice = discountPrice ?? currentPrice;
+		const feature = featureMap.get(row.retailer_item_id);
+		const unitLabel = feature?.extractedUnit ?? null;
+		const totalAmount = feature?.totalAmount ?? null;
+		const unitPriceCents =
+			effectivePrice != null && totalAmount != null && totalAmount > 0
+				? Math.round(effectivePrice / totalAmount)
+				: null;
+		return {
+			retailerItemId: row.retailer_item_id,
+			chainSlug: row.chain_slug,
+			chainName: chainNameMap.get(row.chain_slug) ?? row.chain_slug,
+			storeId: row.store_id,
+			currentPrice,
+			discountPrice,
+			effectivePrice,
+			lastSeenAt: row.last_seen_at,
+			itemName: itemNameMap.get(row.retailer_item_id) ?? "",
+			unitPriceCents,
+			unitLabel,
+		};
+	});
+}
+
 async function loadStorePrices(retailerItemIds: string[]) {
 	const db = getDb();
 	const clickhouse = getClickHouse();
@@ -142,31 +178,12 @@ async function loadStorePrices(retailerItemIds: string[]) {
 		});
 	}
 
-	const storePrices = currentPriceRows.map((row) => {
-		const currentPrice = parseNumber(row.current_price);
-		const discountPrice = parseNumber(row.discount_price);
-		const effectivePrice = discountPrice ?? currentPrice;
-		const feature = featureMap.get(row.retailer_item_id);
-		const unitLabel = feature?.extractedUnit ?? null;
-		const totalAmount = feature?.totalAmount ?? null;
-		const unitPriceCents =
-			effectivePrice != null && totalAmount != null && totalAmount > 0
-				? Math.round(effectivePrice / totalAmount)
-				: null;
-		return {
-			retailerItemId: row.retailer_item_id,
-			chainSlug: row.chain_slug,
-			chainName: chainNameMap.get(row.chain_slug) ?? row.chain_slug,
-			storeId: row.store_id,
-			currentPrice,
-			discountPrice,
-			effectivePrice,
-			lastSeenAt: row.last_seen_at,
-			itemName: itemNameMap.get(row.retailer_item_id) ?? "",
-			unitPriceCents,
-			unitLabel,
-		};
-	});
+	let storePrices = buildStorePrices(
+		currentPriceRows,
+		chainNameMap,
+		itemNameMap,
+		featureMap,
+	);
 
 	const historyRows = await clickhouse.query<ClickHousePriceHistoryRow>(
 		`SELECT
@@ -201,6 +218,33 @@ async function loadStorePrices(retailerItemIds: string[]) {
 		.map(([date, value]) => ({ date, value }))
 		.sort((a, b) => a.date.localeCompare(b.date));
 
+	// Fallback: if prices_current returned no rows but we have history data,
+	// derive current prices from the latest entries in the raw prices table.
+	if (storePrices.length === 0 && historyRows.length > 0) {
+		const fallbackRows = await clickhouse.query<ClickHouseCurrentPriceRow>(
+			`SELECT
+				retailer_item_id,
+				chain_slug,
+				store_id,
+				argMax(price_cents, target_date) AS current_price,
+				argMax(discount_price_cents, target_date) AS discount_price,
+				max(target_date) AS last_seen_at
+			FROM prices
+			WHERE retailer_item_id IN ({itemIds:Array(String)})
+				AND target_date >= today() - 30
+				AND target_date <= today()
+			GROUP BY retailer_item_id, chain_slug, store_id`,
+			{ itemIds: retailerItemIds },
+		);
+
+		storePrices = buildStorePrices(
+			fallbackRows,
+			chainNameMap,
+			itemNameMap,
+			featureMap,
+		);
+	}
+
 	return { storePrices, priceHistory };
 }
 
@@ -213,7 +257,9 @@ async function getItemIdsForSku(skuId: string): Promise<string[]> {
 	return rows.map((row) => row.retailerItemId);
 }
 
-async function buildSkuProductPayload(skuId: string): Promise<ProductPayload | null> {
+async function buildSkuProductPayload(
+	skuId: string,
+): Promise<ProductPayload | null> {
 	const db = getDb();
 	const [sku] = await db
 		.select({
@@ -256,7 +302,9 @@ async function buildSkuProductPayload(skuId: string): Promise<ProductPayload | n
 	};
 }
 
-async function resolveProduct(inputId: string): Promise<ResolvedProduct | null> {
+async function resolveProduct(
+	inputId: string,
+): Promise<ResolvedProduct | null> {
 	const db = getDb();
 	const [directSku] = await db
 		.select({ id: canonicalSkus.id })
@@ -357,7 +405,8 @@ export const getProductPrices = procedure
 			return buildEmptyResponse(product);
 		}
 
-		const { storePrices, priceHistory } = await loadStorePrices(retailerItemIds);
+		const { storePrices, priceHistory } =
+			await loadStorePrices(retailerItemIds);
 		return {
 			product,
 			storePrices,
@@ -430,7 +479,10 @@ export const getSimilarVariants = procedure
 			{ itemIds },
 		);
 
-		const skuBestPrice = new Map<string, { priceCents: number; chainSlug: string }>();
+		const skuBestPrice = new Map<
+			string,
+			{ priceCents: number; chainSlug: string }
+		>();
 		for (const row of priceRows) {
 			const price = parseNumber(row.best_price);
 			if (price == null) {
@@ -471,7 +523,12 @@ export const getSimilarVariants = procedure
 							containerType: retailerItemFeatures.containerType,
 						})
 						.from(retailerItemFeatures)
-						.where(inArray(retailerItemFeatures.retailerItemId, representativeItemIds));
+						.where(
+							inArray(
+								retailerItemFeatures.retailerItemId,
+								representativeItemIds,
+							),
+						);
 		const featureByItem = new Map(
 			repFeatures.map((feature) => [feature.retailerItemId, feature] as const),
 		);

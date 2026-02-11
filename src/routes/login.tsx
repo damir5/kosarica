@@ -32,7 +32,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
 	return (
-		<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 to-black p-4">
+		<div className="min-h-screen flex items-center justify-center bg-tk-bg p-4">
 			<LoginForm />
 		</div>
 	);

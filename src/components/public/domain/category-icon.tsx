@@ -1,13 +1,10 @@
 import {
-	Apple,
-	Beef,
-	Candy,
-	Heart,
-	Milk,
+	Home,
 	MoreHorizontal,
-	Package,
+	ShowerHead,
 	Sparkles,
-	Wheat,
+	SprayCan,
+	UtensilsCrossed,
 	Wine,
 } from "lucide-react";
 import type * as React from "react";
@@ -16,21 +13,14 @@ import { cn } from "@/lib/utils";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
+/** Maps normalized category names (from DB) to lucide-react icons */
 const categoryIconMap: Record<string, IconComponent> = {
-	"voce-povrce": Apple,
-	"voće-povrće": Apple,
-	meso: Beef,
-	mlijeko: Milk,
-	kruh: Wheat,
-	pice: Wine,
-	piće: Wine,
-	ciscenje: Sparkles,
-	čišćenje: Sparkles,
-	higijena: Heart,
-	slatkisi: Candy,
-	slatkiši: Candy,
-	konzerve: Package,
-	ostalo: MoreHorizontal,
+	Hrana: UtensilsCrossed,
+	Kozmetika: Sparkles,
+	"Kućanstvo": Home,
+	"Piće": Wine,
+	"Sredstva za čišćenje": SprayCan,
+	"Toaletne potrepštine": ShowerHead,
 };
 
 interface CategoryIconProps {

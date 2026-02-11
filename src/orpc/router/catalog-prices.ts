@@ -26,6 +26,14 @@ const toDateOnly = (value?: string) => {
 	return date.toISOString().slice(0, 10);
 };
 
+const BrowseSortSchema = z.enum([
+	"relevance",
+	"price_asc",
+	"price_desc",
+	"name_asc",
+	"name_desc",
+]).default("relevance");
+
 export const listCatalogPrices = procedure
 	.input(
 		z.object({
@@ -33,14 +41,17 @@ export const listCatalogPrices = procedure
 			pageSize: z.number().int().min(1).max(100).default(20),
 			includeFutureDates: z.boolean().optional().default(false),
 			chainSlug: z.string().optional(),
+			chainSlugs: z.array(z.string()).optional(),
 			storeId: z.string().optional(),
 			storeIds: z.array(z.string()).optional(),
 			category: z.string().optional(),
 			search: z.string().optional(),
+			dealsOnly: z.boolean().optional().default(false),
 			minPrice: z.number().int().min(0).optional(),
 			maxPrice: z.number().int().min(0).optional(),
 			dateFrom: z.string().datetime().optional(),
 			dateTo: z.string().datetime().optional(),
+			sort: BrowseSortSchema.optional(),
 		}),
 	)
 	.handler(async ({ input }) => {
@@ -54,7 +65,10 @@ export const listCatalogPrices = procedure
 			conditions.push("target_date <= today()");
 		}
 
-		if (input.chainSlug) {
+		if (input.chainSlugs && input.chainSlugs.length > 0) {
+			conditions.push("chain_slug IN ({chainSlugs:Array(String)})");
+			(params as Record<string, unknown>).chainSlugs = input.chainSlugs;
+		} else if (input.chainSlug) {
 			conditions.push("chain_slug = {chainSlug:String}");
 			params.chainSlug = input.chainSlug;
 		}
@@ -85,12 +99,17 @@ export const listCatalogPrices = procedure
 			params.search = input.search;
 		}
 
+		// Filter to items with active discount prices
+		if (input.dealsOnly) {
+			conditions.push("discount_price_cents > 0");
+		}
+
 		const dateFrom = toDateOnly(input.dateFrom);
 		const dateTo = toDateOnly(input.dateTo);
 
 		// Prevent full table scan: add default date constraint when no filters provided
 		const hasStoreFilter = input.storeIds && input.storeIds.length > 0;
-		const hasChainFilter = Boolean(input.chainSlug);
+		const hasChainFilter = Boolean(input.chainSlug) || (input.chainSlugs != null && input.chainSlugs.length > 0);
 		const hasDateFilter = dateFrom || dateTo;
 
 		if (!hasStoreFilter && !hasChainFilter && !hasDateFilter) {
@@ -119,7 +138,28 @@ export const listCatalogPrices = procedure
 		const whereClause =
 			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-		const baseQuery = `
+		// Deduplicate by retailer_item_id for deals view to avoid showing
+		// the same product once per store. Pick the row with the lowest
+		// discount price (best deal) across all stores.
+		const baseQuery = input.dealsOnly
+			? `
+			SELECT
+				argMin(chain_slug, discount_price_cents) AS chain_slug,
+				argMin(store_id, discount_price_cents) AS store_id,
+				retailer_item_id,
+				any(name) AS name,
+				any(brand) AS brand,
+				any(category) AS category,
+				argMin(price_cents, discount_price_cents) AS price_cents,
+				any(price_status) AS price_status,
+				any(price_unavailable_reason) AS price_unavailable_reason,
+				min(discount_price_cents) AS discount_price_cents,
+				max(target_date) AS last_seen_at
+			FROM prices_current FINAL
+			${whereClause}
+			GROUP BY retailer_item_id
+		`
+			: `
 			SELECT
 				chain_slug,
 				store_id,
@@ -138,8 +178,24 @@ export const listCatalogPrices = procedure
 
 		const hasStoreIdFilter = input.storeIds && input.storeIds.length > 0;
 
+		const sortValue = input.sort ?? "relevance";
+		let orderBy: string;
+		if (input.dealsOnly && sortValue === "relevance") {
+			orderBy = "ORDER BY discount_price_cents ASC";
+		} else if (sortValue === "price_asc") {
+			orderBy = "ORDER BY if(discount_price_cents > 0, discount_price_cents, price_cents) ASC";
+		} else if (sortValue === "price_desc") {
+			orderBy = "ORDER BY if(discount_price_cents > 0, discount_price_cents, price_cents) DESC";
+		} else if (sortValue === "name_asc") {
+			orderBy = "ORDER BY name ASC";
+		} else if (sortValue === "name_desc") {
+			orderBy = "ORDER BY name DESC";
+		} else {
+			orderBy = "ORDER BY last_seen_at DESC";
+		}
+
 		const rowsPromise = clickhouse.query<ClickHouseCatalogRow>(
-			`${baseQuery} ORDER BY last_seen_at DESC LIMIT {limit:UInt32} OFFSET {offset:UInt32}`,
+			`${baseQuery} ${orderBy} LIMIT {limit:UInt32} OFFSET {offset:UInt32}`,
 			{
 				...params,
 				limit: input.pageSize,

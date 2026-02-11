@@ -70,14 +70,14 @@ export function LoginForm() {
 	};
 
 	return (
-		<div className="w-full max-w-md p-8 rounded-xl bg-zinc-900 border border-zinc-700">
-			<h1 className="text-2xl font-bold text-white mb-6">Sign In</h1>
+		<div className="w-full max-w-md p-8 rounded-[var(--tk-radius-lg,14px)] bg-tk-surface border border-tk-border shadow-tk-md">
+			<h1 className="text-2xl font-bold font-tk-sans text-tk-text mb-6">Sign In</h1>
 
 			<form onSubmit={handleSubmit} className="space-y-4">
 				<div>
 					<label
 						htmlFor="email"
-						className="block text-sm font-medium text-zinc-300 mb-1"
+						className="block text-sm font-medium font-tk-sans text-tk-text-secondary mb-1"
 					>
 						Email
 					</label>
@@ -88,7 +88,7 @@ export function LoginForm() {
 						value={email}
 						onChange={(e) => setEmail(e.target.value)}
 						autoComplete="username webauthn"
-						className="w-full px-4 py-3 rounded-lg bg-zinc-800 text-white border border-zinc-600 focus:border-blue-500 focus:outline-none"
+						className="w-full h-12 px-4 rounded-[var(--tk-radius-md,10px)] bg-tk-surface-alt text-tk-text border border-tk-border placeholder:text-tk-text-tertiary focus:ring-2 focus:ring-tk-accent/50 focus:border-tk-accent focus:outline-none transition-[color,box-shadow,border-color]"
 						required
 					/>
 				</div>
@@ -96,7 +96,7 @@ export function LoginForm() {
 				<div>
 					<label
 						htmlFor="password"
-						className="block text-sm font-medium text-zinc-300 mb-1"
+						className="block text-sm font-medium font-tk-sans text-tk-text-secondary mb-1"
 					>
 						Password
 					</label>
@@ -107,29 +107,29 @@ export function LoginForm() {
 						value={password}
 						onChange={(e) => setPassword(e.target.value)}
 						autoComplete="current-password"
-						className="w-full px-4 py-3 rounded-lg bg-zinc-800 text-white border border-zinc-600 focus:border-blue-500 focus:outline-none"
+						className="w-full h-12 px-4 rounded-[var(--tk-radius-md,10px)] bg-tk-surface-alt text-tk-text border border-tk-border placeholder:text-tk-text-tertiary focus:ring-2 focus:ring-tk-accent/50 focus:border-tk-accent focus:outline-none transition-[color,box-shadow,border-color]"
 						required
 					/>
 				</div>
 
-				{error && <p className="text-red-400 text-sm">{error}</p>}
+				{error && <p className="text-red-500 text-sm">{error}</p>}
 
 				<button
 					type="submit"
 					disabled={loading}
-					className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+					className="w-full h-12 bg-tk-accent hover:bg-tk-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-tk-accent-foreground font-medium font-tk-sans rounded-[var(--tk-radius-md,10px)] transition-colors shadow-tk-sm"
 				>
 					{loading ? "Signing in..." : "Sign In"}
 				</button>
 			</form>
 
 			{passkeyAvailable && (
-				<div className="mt-4 pt-4 border-t border-zinc-700">
+				<div className="mt-4 pt-4 border-t border-tk-border">
 					<button
 						type="button"
 						onClick={handlePasskeyLogin}
 						disabled={loading}
-						className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+						className="w-full h-12 bg-tk-surface-alt hover:bg-tk-border disabled:opacity-50 disabled:cursor-not-allowed text-tk-text font-medium font-tk-sans rounded-[var(--tk-radius-md,10px)] transition-colors flex items-center justify-center gap-2"
 					>
 						<span>🔐</span>
 						<span>Sign in with Passkey</span>

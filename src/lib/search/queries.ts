@@ -5,6 +5,7 @@ import type {
 	FullSearchResult,
 	SearchEntityType,
 	SearchFilters,
+	SearchSort,
 } from "./types";
 
 const VALID_ENTITY_TYPES = new Set<SearchEntityType>([
@@ -150,6 +151,7 @@ export async function fullSearch(
 	limit = 20,
 	offset = 0,
 	filters?: SearchFilters,
+	sort: SearchSort = "relevance",
 ): Promise<{ results: FullSearchResult[]; total: number }> {
 	const normalizedQuery = query.toLowerCase().trim();
 	if (normalizedQuery.length < 2) {
@@ -169,6 +171,13 @@ export async function fullSearch(
 		ftsWeight,
 		trigramWeight,
 	);
+
+	const orderByClause =
+		sort === "name_asc"
+			? sql`ORDER BY title ASC, score DESC`
+			: sort === "name_desc"
+				? sql`ORDER BY title DESC, score DESC`
+				: sql`ORDER BY score DESC`;
 
 	const searchQuery = sql`
 		WITH q AS (
@@ -218,7 +227,7 @@ export async function fullSearch(
 			body_highlight as "bodyHighlight"
 		FROM search_results
 		WHERE score > 0.05
-		ORDER BY score DESC
+		${orderByClause}
 		LIMIT ${limit}
 		OFFSET ${offset}
 	`;

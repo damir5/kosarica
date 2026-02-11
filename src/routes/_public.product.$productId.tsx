@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
+import { Check, ShoppingBasket } from "lucide-react";
+import { toast } from "sonner";
 import {
 	DataFreshnessBadge,
 	PriceComparisonRow,
@@ -18,6 +20,7 @@ import {
 } from "@/components/public/primitives";
 import { computeDealLevel } from "@/lib/deal-levels";
 import { useNearbyStores } from "@/hooks/use-nearby-stores";
+import { useBasket } from "@/hooks/use-basket";
 import { orpc } from "@/orpc/client";
 
 const PriceHistoryChart = lazy(() =>
@@ -49,6 +52,8 @@ function ProductDetailPage() {
 	const router = useRouter();
 	const { priceStoreIds, isActive: locationActive } = useNearbyStores();
 	const [showAll, setShowAll] = useState(false);
+	const { addItem, items } = useBasket();
+	const isInBasket = items.some((i) => i.productId === productId);
 
 	const { data, isLoading } = useQuery(
 		orpc.products.get.queryOptions({
@@ -190,7 +195,38 @@ function ProductDetailPage() {
 
 			{comparisonPrices.length > 0 && (
 				<div className="flex gap-2 mt-6 mb-8">
-					<TkButton>Dodaj u košaricu</TkButton>
+					<TkButton
+						onClick={() => {
+							addItem.mutate(
+								{
+									productId: product.id,
+									name: product.name,
+									bestPrice: bestPrice > 0 ? bestPrice : undefined,
+									bestStore:
+										uniquePrices.length > 0
+											? (uniquePrices[0].chainSlug as StoreSlug)
+											: undefined,
+								},
+								{
+									onSuccess: () => {
+										toast.success(`${product.name} dodan u košaricu`);
+									},
+								},
+							);
+						}}
+					>
+						{isInBasket ? (
+							<>
+								<Check className="size-4" />
+								U košarici &mdash; dodaj još
+							</>
+						) : (
+							<>
+								<ShoppingBasket className="size-4" />
+								Dodaj u košaricu
+							</>
+						)}
+					</TkButton>
 					<TkButton variant="outline">Postavi alarm</TkButton>
 				</div>
 			)}

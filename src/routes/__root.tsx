@@ -1,4 +1,3 @@
-import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
@@ -6,8 +5,7 @@ import {
 	redirect,
 	Scripts,
 } from "@tanstack/react-router";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { Component, useEffect } from "react";
+import { Component, Suspense, lazy, useEffect } from "react";
 import { Toaster } from "sonner";
 import {
 	installGlobalClientErrorHandlers,
@@ -16,8 +14,9 @@ import {
 import { checkSetupRequired } from "@/lib/auth-server";
 import { initPostHog } from "@/lib/posthog";
 import { initRUM } from "@/lib/rum";
-import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
+
+const DevtoolsLoader = lazy(() => import("../components/dev/devtools"));
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -95,18 +94,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<RootErrorBoundary>{children}</RootErrorBoundary>
 				<ClientObservabilityBridge />
 				<Toaster richColors position="top-right" />
-				<TanStackDevtools
-					config={{
-						position: "bottom-right",
-					}}
-					plugins={[
-						{
-							name: "Tanstack Router",
-							render: <TanStackRouterDevtoolsPanel />,
-						},
-						TanStackQueryDevtools,
-					]}
-				/>
+				{import.meta.env.DEV && (
+					<Suspense>
+						<DevtoolsLoader />
+					</Suspense>
+				)}
 				<Scripts />
 			</body>
 		</html>

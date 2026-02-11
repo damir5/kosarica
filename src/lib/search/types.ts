@@ -1,5 +1,8 @@
 export type SearchEntityType = "product" | "item" | "store";
 
+/** Sort options available for search results */
+export type SearchSort = "relevance" | "price_asc" | "price_desc" | "name_asc" | "name_desc";
+
 export interface IndexedEntity {
 	entityType: SearchEntityType;
 	entityId: string;

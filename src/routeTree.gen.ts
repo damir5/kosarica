@@ -17,8 +17,11 @@ import { Route as PublicIndexRouteImport } from './routes/_public.index'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
 import { Route as PublicStoresRouteImport } from './routes/_public.stores'
 import { Route as PublicSearchRouteImport } from './routes/_public.search'
+import { Route as PublicPrivacyRouteImport } from './routes/_public.privacy'
 import { Route as PublicProfileRouteImport } from './routes/_public.profile'
 import { Route as PublicBasketRouteImport } from './routes/_public.basket'
+import { Route as PublicFaqRouteImport } from './routes/_public.faq'
+import { Route as PublicAboutRouteImport } from './routes/_public.about'
 import { Route as PublicAlertsRouteImport } from './routes/_public.alerts'
 import { Route as AdminAdminRouteImport } from './routes/_admin.admin'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index'
@@ -83,6 +86,11 @@ const PublicSearchRoute = PublicSearchRouteImport.update({
   path: '/search',
   getParentRoute: () => PublicRouteRoute,
 } as any)
+const PublicPrivacyRoute = PublicPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
 const PublicProfileRoute = PublicProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -91,6 +99,16 @@ const PublicProfileRoute = PublicProfileRouteImport.update({
 const PublicBasketRoute = PublicBasketRouteImport.update({
   id: '/basket',
   path: '/basket',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicFaqRoute = PublicFaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicAboutRoute = PublicAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicAlertsRoute = PublicAlertsRouteImport.update({
@@ -227,9 +245,12 @@ export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/about': typeof PublicAboutRoute
   '/admin': typeof AdminAdminRouteWithChildren
   '/alerts': typeof PublicAlertsRoute
   '/basket': typeof PublicBasketRoute
+  '/faq': typeof PublicFaqRoute
+  '/privacy': typeof PublicPrivacyRoute
   '/profile': typeof PublicProfileRoute
   '/search': typeof PublicSearchRoute
   '/stores': typeof PublicStoresRoute
@@ -262,8 +283,11 @@ export interface FileRoutesByTo {
   '/': typeof PublicIndexRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/about': typeof PublicAboutRoute
   '/alerts': typeof PublicAlertsRoute
   '/basket': typeof PublicBasketRoute
+  '/faq': typeof PublicFaqRoute
+  '/privacy': typeof PublicPrivacyRoute
   '/profile': typeof PublicProfileRoute
   '/search': typeof PublicSearchRoute
   '/stores': typeof PublicStoresRoute
@@ -297,8 +321,11 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/_admin/admin': typeof AdminAdminRouteWithChildren
+  '/_public/about': typeof PublicAboutRoute
   '/_public/alerts': typeof PublicAlertsRoute
   '/_public/basket': typeof PublicBasketRoute
+  '/_public/faq': typeof PublicFaqRoute
+  '/_public/privacy': typeof PublicPrivacyRoute
   '/_public/profile': typeof PublicProfileRoute
   '/_public/search': typeof PublicSearchRoute
   '/_public/stores': typeof PublicStoresRoute
@@ -334,9 +361,12 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/setup'
+    | '/about'
     | '/admin'
     | '/alerts'
     | '/basket'
+    | '/faq'
+    | '/privacy'
     | '/profile'
     | '/search'
     | '/stores'
@@ -369,8 +399,11 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/setup'
+    | '/about'
     | '/alerts'
     | '/basket'
+    | '/faq'
+    | '/privacy'
     | '/profile'
     | '/search'
     | '/stores'
@@ -403,8 +436,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/_admin/admin'
+    | '/_public/about'
     | '/_public/alerts'
     | '/_public/basket'
+    | '/_public/faq'
+    | '/_public/privacy'
     | '/_public/profile'
     | '/_public/search'
     | '/_public/stores'
@@ -503,6 +539,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicSearchRouteImport
       parentRoute: typeof PublicRouteRoute
     }
+    '/_public/privacy': {
+      id: '/_public/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PublicPrivacyRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
     '/_public/profile': {
       id: '/_public/profile'
       path: '/profile'
@@ -515,6 +558,20 @@ declare module '@tanstack/react-router' {
       path: '/basket'
       fullPath: '/basket'
       preLoaderRoute: typeof PublicBasketRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/faq': {
+      id: '/_public/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof PublicFaqRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/about': {
+      id: '/_public/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof PublicAboutRouteImport
       parentRoute: typeof PublicRouteRoute
     }
     '/_public/alerts': {
@@ -788,8 +845,11 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 )
 
 interface PublicRouteRouteChildren {
+  PublicAboutRoute: typeof PublicAboutRoute
   PublicAlertsRoute: typeof PublicAlertsRoute
   PublicBasketRoute: typeof PublicBasketRoute
+  PublicFaqRoute: typeof PublicFaqRoute
+  PublicPrivacyRoute: typeof PublicPrivacyRoute
   PublicProfileRoute: typeof PublicProfileRoute
   PublicSearchRoute: typeof PublicSearchRoute
   PublicStoresRoute: typeof PublicStoresRoute
@@ -798,8 +858,11 @@ interface PublicRouteRouteChildren {
 }
 
 const PublicRouteRouteChildren: PublicRouteRouteChildren = {
+  PublicAboutRoute: PublicAboutRoute,
   PublicAlertsRoute: PublicAlertsRoute,
   PublicBasketRoute: PublicBasketRoute,
+  PublicFaqRoute: PublicFaqRoute,
+  PublicPrivacyRoute: PublicPrivacyRoute,
   PublicProfileRoute: PublicProfileRoute,
   PublicSearchRoute: PublicSearchRoute,
   PublicStoresRoute: PublicStoresRoute,

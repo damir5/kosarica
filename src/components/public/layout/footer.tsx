@@ -1,6 +1,14 @@
+import { Link } from "@tanstack/react-router";
+
 import { STORE_DISPLAY_NAMES } from "@/components/public/domain/store-colors";
 
 const supportedStores = Object.values(STORE_DISPLAY_NAMES);
+
+const footerLinks = [
+	{ to: "/about" as const, label: "O nama" },
+	{ to: "/faq" as const, label: "FAQ" },
+	{ to: "/privacy" as const, label: "Privatnost" },
+];
 
 export function Footer() {
 	return (
@@ -15,25 +23,15 @@ export function Footer() {
 					</span>
 
 					<nav data-slot="footer-nav" className="flex items-center gap-6">
-						{/* Plain anchors until public routes are registered */}
-						<a
-							href="/about"
-							className="text-sm text-tk-text-secondary transition-colors hover:text-tk-text"
-						>
-							O nama
-						</a>
-						<a
-							href="/faq"
-							className="text-sm text-tk-text-secondary transition-colors hover:text-tk-text"
-						>
-							FAQ
-						</a>
-						<a
-							href="/privacy"
-							className="text-sm text-tk-text-secondary transition-colors hover:text-tk-text"
-						>
-							Privatnost
-						</a>
+						{footerLinks.map((link) => (
+							<Link
+								key={link.to}
+								to={link.to}
+								className="text-sm text-tk-text-secondary transition-colors hover:text-tk-text"
+							>
+								{link.label}
+							</Link>
+						))}
 					</nav>
 				</div>
 
