@@ -1,6 +1,9 @@
 -- Pre-aggregated current prices table.
 -- Contains one row per (retailer_item_id, chain_slug, store_id) with latest values.
 -- Refreshed periodically by cron from the raw prices table.
+--
+-- Note: brand is Nullable(String), so tokenbf index is not supported on it.
+-- name is String (non-nullable), so tokenbf works.
 
 CREATE TABLE IF NOT EXISTS prices_current (
     retailer_item_id String,
@@ -17,14 +20,11 @@ CREATE TABLE IF NOT EXISTS prices_current (
     discount_price_cents Nullable(Int32),
     unit_price_cents Nullable(Int32),
     target_date Date,
-    imported_at DateTime DEFAULT now()
+    imported_at DateTime DEFAULT now(),
+    INDEX idx_category category TYPE bloom_filter GRANULARITY 1,
+    INDEX idx_name name TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1
 ) ENGINE = ReplacingMergeTree(imported_at)
 ORDER BY (retailer_item_id, chain_slug, store_id);
-
--- Skipping indexes for catalog browsing filters
-ALTER TABLE prices_current ADD INDEX IF NOT EXISTS idx_category category TYPE bloom_filter GRANULARITY 1;
-ALTER TABLE prices_current ADD INDEX IF NOT EXISTS idx_name name TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1;
-ALTER TABLE prices_current ADD INDEX IF NOT EXISTS idx_brand brand TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1;
 
 -- Chain metadata: latest date per chain for fast basket optimizer lookups.
 CREATE TABLE IF NOT EXISTS prices_chain_metadata (
