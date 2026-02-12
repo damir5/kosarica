@@ -232,45 +232,48 @@ export class StudenacAdapter extends BaseXmlAdapter {
 			return null;
 		}
 
-		const parts = identifier.split("-");
-		if (parts.length < 2) {
-			return {
-				name: `${this.name} ${identifier}`,
-			};
-		}
+		const baseName = file.filename.replace(/\.(xml|XML)$/i, "");
 
-		const streetCityPart = parts[0];
-		const streetCityParts = streetCityPart
-			.split("_")
-			.map((part) => part.trim())
-			.filter(Boolean);
+		const match = baseName.match(
+			/^SUPERMARKET-(.+)-T\d+-\d+-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}-\d+/i,
+		);
+		if (match?.[1]) {
+			const locationPart = match[1];
+			const parts = locationPart
+				.split("_")
+				.map((p) => p.trim())
+				.filter(Boolean);
 
-		let street = "";
-		let city = "";
+			if (parts.length >= 2) {
+				const splitIndex = getStreetCitySplitIndex(parts);
+				const streetParts = parts.slice(0, splitIndex);
+				const cityParts = parts.slice(splitIndex);
 
-		if (streetCityParts.length >= 2) {
-			const splitIndex = getStreetCitySplitIndex(streetCityParts);
-			let streetParts = streetCityParts.slice(0, splitIndex);
-			let cityParts = streetCityParts.slice(splitIndex);
+				const street = streetParts.join(" ").replace(/\s+/g, " ").trim();
+				const city = cityParts.join(" ").replace(/\s+/g, " ").trim();
 
-			if (streetParts.length === 0 || cityParts.length === 0) {
-				streetParts = streetCityParts.slice(
-					0,
-					Math.max(1, streetCityParts.length - 1),
-				);
-				cityParts = streetCityParts.slice(streetParts.length);
+				if (city) {
+					return {
+						name: `${this.name} ${city}`,
+						address: street || undefined,
+						city: city,
+					};
+				}
 			}
 
-			street = streetParts.join(" ").replace(/\s+/g, " ").trim();
-			city = cityParts.join(" ").replace(/\s+/g, " ").trim();
+			if (parts.length === 1) {
+				const city = parts[0]?.trim() ?? "";
+				if (city) {
+					return {
+						name: `${this.name} ${city}`,
+						city: city,
+					};
+				}
+			}
 		}
 
-		const storeName = city ? `${this.name} ${city}` : this.name;
-
 		return {
-			name: storeName,
-			address: street || undefined,
-			city: city || undefined,
+			name: `${this.name} ${identifier}`,
 		};
 	}
 }

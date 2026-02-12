@@ -91,13 +91,15 @@ describe("StudenacAdapter", () => {
 		expect(result.rows[0]?.discountPrice).toBe(400);
 		expect(result.rows[0]?.storeIdentifier).toBe("321");
 	});
+});
 
+describe("StudenacAdapter store metadata extraction", () => {
 	it("extracts full multi-word city from filename metadata", () => {
 		const adapter = new StudenacAdapter();
 		const metadata = adapter.extractStoreMetadata({
-			url: "https://example.test/Ul.I.Kukuljevića_Sakcinskog_12_SVETI_KRIŽ_ZAČRETJE-1350-257-2026-01-26-07-00-15-098306.xml",
+			url: "https://example.test/SUPERMARKET-Ul.I.Kukuljevića_Sakcinskog_12_SVETI_KRIŽ_ZAČRETJE-T1350-263-2026-01-26-07-00-13-295460.xml",
 			filename:
-				"Ul.I.Kukuljevića_Sakcinskog_12_SVETI_KRIŽ_ZAČRETJE-1350-257-2026-01-26-07-00-15-098306.xml",
+				"SUPERMARKET-Ul.I.Kukuljevića_Sakcinskog_12_SVETI_KRIŽ_ZAČRETJE-T1350-263-2026-01-26-07-00-13-295460.xml",
 			type: "xml",
 		});
 
@@ -106,5 +108,64 @@ describe("StudenacAdapter", () => {
 			address: "Ul.I.Kukuljevića Sakcinskog 12",
 			city: "SVETI KRIŽ ZAČRETJE",
 		});
+	});
+
+	it("extracts city from simple filename with single city word", () => {
+		const adapter = new StudenacAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/SUPERMARKET-Put_Gaja_17_IMOTSKI-T053-263-2026-02-01-07-00-00-080733.xml",
+			filename:
+				"SUPERMARKET-Put_Gaja_17_IMOTSKI-T053-263-2026-02-01-07-00-00-080733.xml",
+			type: "xml",
+		});
+
+		expect(metadata).toEqual({
+			name: "Studenac IMOTSKI",
+			address: "Put Gaja 17",
+			city: "IMOTSKI",
+		});
+	});
+
+	it("extracts street and city from filename with street number", () => {
+		const adapter = new StudenacAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/SUPERMARKET-Vukovarska_26_DUBROVNIK-T840-263-2026-02-01-07-00-07-828651.xml",
+			filename:
+				"SUPERMARKET-Vukovarska_26_DUBROVNIK-T840-263-2026-02-01-07-00-07-828651.xml",
+			type: "xml",
+		});
+
+		expect(metadata).toEqual({
+			name: "Studenac DUBROVNIK",
+			address: "Vukovarska 26",
+			city: "DUBROVNIK",
+		});
+	});
+
+	it("extracts multi-word city like CISTA PROVO", () => {
+		const adapter = new StudenacAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/SUPERMARKET-Domovinskog_rata_12A_CISTA_PROVO-T335-263-2026-02-01-07-00-03-589848.xml",
+			filename:
+				"SUPERMARKET-Domovinskog_rata_12A_CISTA_PROVO-T335-263-2026-02-01-07-00-03-589848.xml",
+			type: "xml",
+		});
+
+		expect(metadata).toEqual({
+			name: "Studenac CISTA PROVO",
+			address: "Domovinskog rata 12A",
+			city: "CISTA PROVO",
+		});
+	});
+
+	it("falls back to store code when pattern not matched", () => {
+		const adapter = new StudenacAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/Store_T789-265-2026-02-03.xml",
+			filename: "Store_T789-265-2026-02-03.xml",
+			type: "xml",
+		});
+
+		expect(metadata?.name).toMatch(/^Studenac/);
 	});
 });

@@ -70,7 +70,7 @@ export class EurospinAdapter extends BaseCsvAdapter {
 					"(?i)^cjenik[_-]?",
 					"(?i)^diskontna[_-]?",
 				],
-				fileExtensionPattern: /\.(csv|CSV|zip|ZIP)$/,
+				fileExtensionPattern: /\.(csv|CSV|xml|XML|zip|ZIP)$/,
 			},
 			columnMapping: eurospinColumnMapping,
 			alternativeColumnMapping: eurospinColumnMappingAlt,
@@ -182,15 +182,29 @@ export class EurospinAdapter extends BaseCsvAdapter {
 		return "";
 	}
 
-	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
-		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
-		if (!identifier) {
-			return null;
+	protected extractStoreIdentifierFromFilename(filename: string): string {
+		const match = filename.match(
+			/(?:prodavaonica|diskontna_prodavaonica)-(\d{6})-/i,
+		);
+		if (match?.[1]) {
+			return match[1];
 		}
+		const fallbackMatch = filename.match(/-(\d{6})-/);
+		if (fallbackMatch?.[1]) {
+			return fallbackMatch[1];
+		}
+		return super.extractStoreIdentifierFromFilename(filename);
+	}
 
-		const parts = identifier.split("-");
+	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
+		const baseName = file.filename.replace(/\.(csv|CSV|xml|XML)$/i, "");
+		const parts = baseName.split("-");
 
 		if (parts.length < 5) {
+			const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+			if (!identifier) {
+				return null;
+			}
 			return {
 				name: `${this.name} ${identifier}`,
 			};
@@ -218,19 +232,16 @@ export class EurospinAdapter extends BaseCsvAdapter {
 			return null;
 		}
 
-		const parts = rawIdentifier.split("-");
-		const storeCode = parts[1];
-
-		if (!storeCode || !/^\d{6}$/.test(storeCode)) {
+		if (/^\d{6}$/.test(rawIdentifier)) {
 			return {
-				type: "filename_code",
+				type: "eurospin_store_code",
 				value: rawIdentifier,
 			};
 		}
 
 		return {
-			type: "eurospin_store_code",
-			value: storeCode,
+			type: "filename_code",
+			value: rawIdentifier,
 		};
 	}
 }

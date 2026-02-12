@@ -167,15 +167,28 @@ export class KonzumAdapter extends BaseCsvAdapter {
 			.filter(Boolean);
 		const storeCode = this.extractStoreIdentifierFromFilename(file.filename);
 
-		// Common Konzum pattern: "...,<store_code>,<city/address>,..."
 		const codeIndex = parts.indexOf(storeCode);
 		if (codeIndex >= 0) {
-			const cityCandidate = parts[codeIndex + 1] ?? "";
-			const addressCandidate = parts[codeIndex + 2] ?? "";
-			if (cityCandidate || addressCandidate) {
-				const city = normalizeKonzumPart(cityCandidate);
-				const address = normalizeKonzumPart(addressCandidate);
-				const storeName = city ? `${this.name} ${city}` : `${this.name} ${storeCode}`;
+			let cityIndex = codeIndex + 1;
+			while (cityIndex < parts.length && isDateLike(parts[cityIndex] ?? "")) {
+				cityIndex += 1;
+			}
+
+			let addressIndex = cityIndex + 1;
+			while (
+				addressIndex < parts.length &&
+				isDateLike(parts[addressIndex] ?? "")
+			) {
+				addressIndex += 1;
+			}
+
+			const city = normalizeKonzumPart(parts[cityIndex] ?? "");
+			const address = normalizeKonzumPart(parts[addressIndex] ?? "");
+
+			if (city || address) {
+				const storeName = city
+					? `${this.name} ${city}`
+					: `${this.name} ${storeCode}`;
 				return {
 					name: storeName,
 					address: address || undefined,
@@ -226,4 +239,11 @@ export class KonzumAdapter extends BaseCsvAdapter {
 
 function normalizeKonzumPart(value: string): string {
 	return value.replace(/_/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function isDateLike(s: string): boolean {
+	if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return true;
+	if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return true;
+	if (/^\d{2}\.\d{2}\.\d{4}\.$/.test(s)) return true;
+	return false;
 }

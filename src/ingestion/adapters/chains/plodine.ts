@@ -283,28 +283,66 @@ export class PlodineAdapter extends BaseCsvAdapter {
 
 	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {
 		const parsed = parsePlodineMetadataFromFilename(file.filename);
-		if (!parsed) {
-			const identifier = this.extractStoreIdentifierFromFilename(file.filename);
-			if (!identifier) {
-				return null;
-			}
-			const city = identifier.trim();
-			const storeName = city
-				? `${this.name} ${capitalizeFirst(city)}`
+		if (parsed) {
+			const storeName = parsed.city
+				? `${this.name} ${capitalizeFirst(parsed.city)}`
 				: this.name;
 			return {
 				name: storeName,
+				address: parsed.address || undefined,
+				city: parsed.city || undefined,
+				postalCode: parsed.postalCode || undefined,
 			};
 		}
 
-		const storeName = parsed.city
-			? `${this.name} ${capitalizeFirst(parsed.city)}`
-			: this.name;
+		const baseName = file.filename.replace(/\.(csv|CSV)$/i, "");
+		const parts = baseName.split("_");
+
+		if (parts[0]?.toUpperCase() === "SUPERMARKET" && parts.length >= 6) {
+			const postalCodeIndex = parts.findIndex(
+				(part, index) => index > 0 && /^\d{5}$/.test(part),
+			);
+
+			if (postalCodeIndex >= 2 && postalCodeIndex < parts.length - 3) {
+				const cityParts = parts.slice(postalCodeIndex + 1, -3);
+				if (cityParts.length > 0) {
+					const city = cityParts.join(" ").trim();
+					const streetParts = parts.slice(1, postalCodeIndex);
+					const address = streetParts.join(" ").trim();
+					return {
+						name: city ? `${this.name} ${capitalizeFirst(city)}` : this.name,
+						address: address || undefined,
+						city: city || undefined,
+					};
+				}
+			}
+		}
+
+		const identifier = this.extractStoreIdentifierFromFilename(file.filename);
+		if (!identifier) {
+			return null;
+		}
+
+		if (/^\d{2,3}$/.test(identifier)) {
+			return {
+				name: `${this.name} ${identifier}`,
+			};
+		}
+
+		const meaningfulParts = parts.filter(
+			(p) =>
+				p &&
+				!/^(SUPERMARKET|cjenik|cjenici)$/i.test(p) &&
+				!/^\d{5,}$/.test(p) &&
+				p.length > 2,
+		);
+		const cityPart = meaningfulParts[0] ?? identifier;
+
 		return {
-			name: storeName,
-			address: parsed.address || undefined,
-			city: parsed.city || undefined,
-			postalCode: parsed.postalCode || undefined,
+			name: cityPart
+				? `${this.name} ${capitalizeFirst(cityPart)}`
+				: `${this.name} ${identifier}`,
+			city: cityPart || undefined,
 		};
 	}
 }
@@ -335,7 +373,8 @@ function parsePlodineMetadataFromFilename(
 	}
 
 	const postalCodeIndex = parts.findIndex(
-		(part, index) => index > 0 && index < storeCodeIndex && /^\d{5}$/.test(part),
+		(part, index) =>
+			index > 0 && index < storeCodeIndex && /^\d{5}$/.test(part),
 	);
 	if (postalCodeIndex < 2) {
 		return null;
@@ -375,7 +414,9 @@ async function requestWithRelaxedTls(
 	redirects = 0,
 ): Promise<{ status: number; body: Buffer }> {
 	if (redirects > 5) {
-		return Promise.reject(new Error(`Too many redirects while fetching ${url}`));
+		return Promise.reject(
+			new Error(`Too many redirects while fetching ${url}`),
+		);
 	}
 
 	const parsed = new URL(url);

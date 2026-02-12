@@ -35,4 +35,31 @@ describe("PlodineAdapter store metadata extraction", () => {
 			postalCode: "52466",
 		});
 	});
+
+	it("extracts city from filename with missing postal code detection", () => {
+		const adapter = new PlodineAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/SUPERMARKET_Ilica_15_10000_Zagreb_001_123_06022026.csv",
+			filename: "SUPERMARKET_Ilica_15_10000_Zagreb_001_123_06022026.csv",
+			type: "csv",
+		});
+
+		expect(metadata).toEqual({
+			name: "Plodine Zagreb",
+			address: "Ilica 15",
+			city: "Zagreb",
+			postalCode: "10000",
+		});
+	});
+
+	it("uses store code when no meaningful city found", () => {
+		const adapter = new PlodineAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/cjenici_123_06022026.csv",
+			filename: "cjenici_123_06022026.csv",
+			type: "csv",
+		});
+
+		expect(metadata?.name).toMatch(/^Plodine/);
+	});
 });

@@ -337,6 +337,26 @@ export class KtcAdapter extends BaseCsvAdapter {
 			return null;
 		}
 
+		const storeName = file.metadata?.storeName as string | undefined;
+		if (storeName) {
+			const cityMatch = storeName.match(/KTC\s*[-–,]?\s*(.+)/i);
+			const city = cityMatch?.[1]?.trim();
+			if (city) {
+				return {
+					name: `${this.name} ${city}`,
+					city: city,
+				};
+			}
+			const parts = storeName.split(/[-–,]/);
+			const lastPart = parts[parts.length - 1]?.trim();
+			if (lastPart && lastPart !== "KTC" && lastPart.length > 2) {
+				return {
+					name: `${this.name} ${lastPart}`,
+					city: lastPart,
+				};
+			}
+		}
+
 		const normalizedIdentifier = identifier.replace(/-\d+$/, "");
 		return {
 			name: `${this.name} ${normalizedIdentifier}`,

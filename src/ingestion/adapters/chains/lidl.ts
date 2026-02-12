@@ -164,12 +164,9 @@ export class LidlAdapter extends BaseCsvAdapter {
 		if (simpleMatch?.[1]) {
 			return simpleMatch[1];
 		}
-		const parts = baseName.split("_");
-		if (parts.length > 0) {
-			const firstPart = parts[0].split(" ");
-			if (firstPart.length >= 2) {
-				return parts[0];
-			}
+		const supermarketMatch = baseName.match(/^(Supermarket\s+\d+(?:_.+)?)$/i);
+		if (supermarketMatch?.[1]) {
+			return supermarketMatch[1];
 		}
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
@@ -201,17 +198,89 @@ export class LidlAdapter extends BaseCsvAdapter {
 		}
 
 		const normalizedIdentifier = identifier.replace(/\.(zip|csv)$/i, "").trim();
-		const supermarketCodeMatch = normalizedIdentifier.match(
-			/^supermarket\s+(\d+)$/i,
+
+		const supermarketOnlyMatch = normalizedIdentifier.match(
+			/^Supermarket\s+(\d+)$/i,
 		);
-		if (supermarketCodeMatch?.[1]) {
+		if (supermarketOnlyMatch?.[1]) {
 			return {
-				name: `${this.name} ${supermarketCodeMatch[1]}`,
+				name: `${this.name} ${supermarketOnlyMatch[1]}`,
 			};
 		}
 
+		const supermarketWithDetailsMatch = normalizedIdentifier.match(
+			/^Supermarket\s+(\d+)_(.+)$/i,
+		);
+		if (supermarketWithDetailsMatch) {
+			const storeCode = supermarketWithDetailsMatch[1];
+			const details = supermarketWithDetailsMatch[2] ?? "";
+			const parts = details
+				.split("_")
+				.filter(
+					(p) =>
+						p &&
+						!/^\d{8}$/.test(p) &&
+						!/^\d{2}\.\d{2}\.\d{4}$/.test(p) &&
+						!/^\d{1,2}\.\d{2}h?$/i.test(p) &&
+						!/^\d{1,2}$/i.test(p),
+				);
+
+			if (parts.length >= 2) {
+				const streetParts: string[] = [];
+				const cityParts: string[] = [];
+				let foundCityStart = false;
+
+				for (const part of parts) {
+					if (/^\d{5}$/.test(part)) {
+						foundCityStart = true;
+						continue;
+					}
+					if (foundCityStart) {
+						cityParts.push(part);
+					} else {
+						streetParts.push(part);
+					}
+				}
+
+				const street = streetParts.join(" ").replace(/\s+/g, " ").trim();
+				const city = cityParts.join(" ").replace(/\s+/g, " ").trim();
+
+				return {
+					name: city ? `${this.name} ${city}` : `${this.name} ${storeCode}`,
+					address: street || undefined,
+					city: city || undefined,
+				};
+			}
+
+			return {
+				name: `${this.name} ${storeCode}`,
+			};
+		}
+
+		if (/^\d+$/.test(normalizedIdentifier)) {
+			return {
+				name: `${this.name} ${normalizedIdentifier}`,
+			};
+		}
+
+		const parts = normalizedIdentifier
+			.split("_")
+			.filter((p) => p && !/^\d{8}$/.test(p));
+		if (parts.length === 0) {
+			return {
+				name: `${this.name} ${normalizedIdentifier}`,
+			};
+		}
+
+		const city = parts[0]?.trim() ?? "";
+		const address = parts.slice(1).join(" ").replace(/\s+/g, " ").trim();
+
 		return {
-			name: `${this.name} ${normalizedIdentifier}`,
+			name: city
+				? `${this.name} ${city}`
+				: `${this.name} ${normalizedIdentifier}`,
+			city: city || undefined,
+			address: address || undefined,
 		};
 	}
 }

@@ -42,8 +42,10 @@ describe("KtcAdapter barcode cleanup", () => {
 			),
 		).toHaveLength(2);
 	});
+});
 
-	it("normalizes store name from PJ identifier", () => {
+describe("KtcAdapter store metadata extraction", () => {
+	it("normalizes store name from PJ identifier when no metadata", () => {
 		const adapter = new KtcAdapter();
 		const metadata = adapter.extractStoreMetadata({
 			url: "https://example.test/TRGOVINA-PJ50-1-20260203-071002.csv",
@@ -53,6 +55,40 @@ describe("KtcAdapter barcode cleanup", () => {
 
 		expect(metadata).toEqual({
 			name: "KTC PJ50",
+		});
+	});
+
+	it("extracts city from discovery metadata storeName", () => {
+		const adapter = new KtcAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/TRGOVINA-PJ06-1-20260212-123456.csv",
+			filename: "TRGOVINA-PJ06-1-20260212-123456.csv",
+			type: "csv",
+			metadata: {
+				storeName: "KTC Varaždin",
+			},
+		});
+
+		expect(metadata).toEqual({
+			name: "KTC Varaždin",
+			city: "Varaždin",
+		});
+	});
+
+	it("extracts city from storeName with comma separator", () => {
+		const adapter = new KtcAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://example.test/TRGOVINA-PJ07-1-20260212-123456.csv",
+			filename: "TRGOVINA-PJ07-1-20260212-123456.csv",
+			type: "csv",
+			metadata: {
+				storeName: "KTC, Zagreb",
+			},
+		});
+
+		expect(metadata).toEqual({
+			name: "KTC Zagreb",
+			city: "Zagreb",
 		});
 	});
 });
