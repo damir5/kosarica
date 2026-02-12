@@ -7,9 +7,9 @@
 | Environment | URL | Purpose |
 |-------------|-----|---------|
 | Local dev | `http://localhost:3002` | Local development |
-| **Test** | `https://kosarica.duckdns.org` | Remote test server (deployed via Kamal) |
+| **Staging** | `https://kosarica.duckdns.org` | Remote staging server (deployed via Kamal) |
 
-**`kosarica.duckdns.org` is the TEST environment, not production.** Do not refer to it as "production" or "prod". Deployments there are for testing and validation.
+**`kosarica.duckdns.org` is the STAGING environment, not production.** Do not refer to it as "production" or "prod". Deployments there are for staging and validation.
 
 ## SECRETS — CRITICAL RULES
 
@@ -37,7 +37,7 @@ All tasks are defined in `mise.toml`. Run with `mise run <task>`.
 | `services-purge` | `mise run services-purge` | Remove dev containers and all volumes |
 | `reset-data` | `mise run reset-data` | Reset dev data (storage + DB + admin) |
 | `test-all` | `mise run test-all` | Run full test suite (auto-starts test services) |
-| `deploy-test` | `mise run deploy-test` | Deploy to test env via Kamal |
+| `deploy-staging` | `mise run deploy-staging` | Deploy to staging env via Kamal |
 
 Other useful commands:
 
@@ -50,10 +50,10 @@ Other useful commands:
 
 ## Deployment
 
-Deploy to the test server (`kosarica.duckdns.org`) using Kamal:
+Deploy to the staging server (`kosarica.duckdns.org`) using Kamal:
 
 ```bash
-mise run deploy-test
+mise run deploy-staging
 ```
 
 - Config: `kamal.yml` (project root)
@@ -298,7 +298,7 @@ For CLI scripts where console output is user-facing:
 
 ## Observability (OpenObserve + OpenTelemetry)
 
-The test server runs OpenObserve for centralized logs, metrics, and traces. Data flows through an OpenTelemetry Collector sidecar.
+The staging server runs OpenObserve for centralized logs, metrics, and traces. Data flows through an OpenTelemetry Collector sidecar.
 
 ### Architecture
 
@@ -361,7 +361,7 @@ SELECT * FROM "kosarica-traces" WHERE duration > 1000000000 ORDER BY start_time 
 
 ### Debugging Tips
 
-- **500 errors on test server**: Check `kosarica-logs` stream, filter by `severity = 'error'`
+- **500 errors on staging server**: Check `kosarica-logs` stream, filter by `severity = 'error'`
 - **Slow page loads**: Check `kosarica-traces` for long-duration spans
 - **Container crashes**: Filter logs by `container_name` (e.g., `kosarica-web-*`, `kosarica-postgres`)
 - **Ingestion failures**: Filter by `body_type = 'ingestion'` or `body_type = 'daily-ingestion'`

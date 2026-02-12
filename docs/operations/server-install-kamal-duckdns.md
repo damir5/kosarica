@@ -266,7 +266,7 @@ Applied on host:
 - persistent directories created under `/var/lib/kosarica` and `/app`
 - `/etc/docker/daemon.json` configured for Docker json log rotation
 - Kamal proxy + app deployed successfully on `https://kosarica.duckdns.org`
-- PostgreSQL migrations applied against production database
+- PostgreSQL migrations applied against staging database
 - OpenTelemetry Collector + OpenObserve running with successful OTLP ingest (`/api/default/v1/logs` and `/api/default/v1/metrics` HTTP 200)
 
 Not applied automatically (requires your credentials/secrets):

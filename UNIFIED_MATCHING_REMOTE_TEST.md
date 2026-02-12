@@ -2,7 +2,7 @@
 
 ## Task Summary
 
-Test the unified product matching pipeline on test server (kosarica.duckdns.org) with:
+Test the unified product matching pipeline on staging server (kosarica.duckdns.org) with:
 - Database: PostgreSQL on remote server
 - LLM: qwen3-4b model running on 0.0.0.0:1234
 - Small sample run (10 groups, dry run)
@@ -220,6 +220,6 @@ pnpm tsx --version
 ## Notes
 
 - Local containers already stopped: `docker compose --profile dev down`
-- Test should run on production server where qwen3-4b is accessible
+- Test should run on staging server where qwen3-4b is accessible
 - LLM endpoint is expected at `0.0.0.0:1234` (forwarded via SSH)
-- Database credentials must match production environment
+- Database credentials must match staging environment
