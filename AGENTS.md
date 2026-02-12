@@ -296,6 +296,79 @@ For CLI scripts where console output is user-facing:
 
 ---
 
+## Observability (OpenObserve + OpenTelemetry)
+
+The test server runs OpenObserve for centralized logs, metrics, and traces. Data flows through an OpenTelemetry Collector sidecar.
+
+### Architecture
+
+```
+App (Pino JSON → stdout) → Docker json-file driver → OTel Collector (filelog) → OpenObserve
+App (OTel SDK)            → OTel Collector (OTLP gRPC :4317)                  → OpenObserve
+Host metrics              → OTel Collector (hostmetrics)                       → OpenObserve
+```
+
+### Accessing OpenObserve
+
+OpenObserve is **not** exposed publicly. Access it via SSH tunnel:
+
+```bash
+# Open tunnel (runs in background)
+ssh -L 5080:kosarica-openobserve:5080 root@kosarica.duckdns.org -N &
+
+# Then open in browser
+open http://localhost:5080
+```
+
+**Credentials** (from `.kamal/secrets`):
+- Email: `admin@kosarica.local`
+- Password: value of `ZO_ROOT_USER_PASSWORD` in `.kamal/secrets`
+- Org: `default`
+
+### Data Streams
+
+| Stream | Contains | Source |
+|--------|----------|--------|
+| `kosarica-logs` | App logs (Pino JSON), Docker container logs | filelog receiver |
+| `kosarica-traces` | HTTP request traces, custom spans | OTel SDK (gRPC) |
+| `kosarica-metrics` | App metrics, host CPU/memory/disk/network | OTel SDK + hostmetrics |
+
+### Useful Queries (OpenObserve SQL)
+
+```sql
+-- Recent errors
+SELECT * FROM "kosarica-logs" WHERE severity = 'error' ORDER BY _timestamp DESC LIMIT 50
+
+-- Errors by logger type
+SELECT body_type, count(*) as cnt FROM "kosarica-logs" WHERE severity = 'error' GROUP BY body_type ORDER BY cnt DESC
+
+-- Specific RPC endpoint errors
+SELECT * FROM "kosarica-logs" WHERE body LIKE '%listPhysical%' AND severity = 'error' ORDER BY _timestamp DESC
+
+-- Slow requests (traces > 1s)
+SELECT * FROM "kosarica-traces" WHERE duration > 1000000000 ORDER BY start_time DESC LIMIT 20
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `deployment/otel-collector-config.yaml` | OTel Collector config (receivers, processors, exporters) |
+| `scripts/instrumentation.mjs` | OTel SDK bootstrap (loaded before app via `--import`) |
+| `src/telemetry.ts` | OTel SDK configuration (checks `OTEL_EXPORTER_OTLP_ENDPOINT`) |
+| `kamal.yml` (accessories) | OpenObserve + OTel Collector container definitions |
+| `.kamal/secrets` | `ZO_*` credentials, `ZO_BASIC_AUTH` for collector auth |
+
+### Debugging Tips
+
+- **500 errors on test server**: Check `kosarica-logs` stream, filter by `severity = 'error'`
+- **Slow page loads**: Check `kosarica-traces` for long-duration spans
+- **Container crashes**: Filter logs by `container_name` (e.g., `kosarica-web-*`, `kosarica-postgres`)
+- **Ingestion failures**: Filter by `body_type = 'ingestion'` or `body_type = 'daily-ingestion'`
+- **Telemetry disabled locally**: Set `OTEL_EXPORTER_OTLP_ENDPOINT=` (empty) in `.env.development`
+
+---
+
 ## Error Handling (neverthrow)
 
 The codebase uses `neverthrow` `Result`/`ResultAsync` types for type-safe error handling in adapters and infrastructure wrappers. Do NOT use try/catch in these layers — return typed errors instead.
