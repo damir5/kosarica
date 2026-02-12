@@ -8,6 +8,7 @@ import type {
 	ExpandedFile,
 	ParseOptions,
 	ParseResult,
+	StoreIdentifier,
 	StoreMetadata,
 } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
@@ -206,6 +207,30 @@ export class EurospinAdapter extends BaseCsvAdapter {
 			address: street || undefined,
 			city: city || undefined,
 			postalCode: postalCode || undefined,
+		};
+	}
+
+	extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null {
+		const rawIdentifier = this.extractStoreIdentifierFromFilename(
+			file.filename,
+		);
+		if (!rawIdentifier) {
+			return null;
+		}
+
+		const parts = rawIdentifier.split("-");
+		const storeCode = parts[1];
+
+		if (!storeCode || !/^\d{6}$/.test(storeCode)) {
+			return {
+				type: "filename_code",
+				value: rawIdentifier,
+			};
+		}
+
+		return {
+			type: "eurospin_store_code",
+			value: storeCode,
 		};
 	}
 }

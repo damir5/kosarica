@@ -7,6 +7,7 @@ import type {
 	DiscoveredFile,
 	ParseOptions,
 	ParseResult,
+	StoreIdentifier,
 	StoreMetadata,
 } from "../../types";
 import { BaseXmlAdapter } from "../base/xml";
@@ -221,7 +222,10 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 
 		// Fallback if heuristic split fails.
 		if (streetParts.length === 0 || cityParts.length === 0) {
-			streetParts = locationParts.slice(0, Math.max(1, locationParts.length - 1));
+			streetParts = locationParts.slice(
+				0,
+				Math.max(1, locationParts.length - 1),
+			);
 			cityParts = locationParts.slice(streetParts.length);
 		}
 
@@ -241,6 +245,30 @@ export class TrgocentarAdapter extends BaseXmlAdapter {
 			address: street || undefined,
 			city: city || undefined,
 			postalCode,
+		};
+	}
+
+	extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null {
+		const rawIdentifier = this.extractStoreIdentifierFromFilename(
+			file.filename,
+		);
+		if (!rawIdentifier) {
+			return null;
+		}
+
+		const parts = rawIdentifier.split("_");
+		const storeCode = parts.find((part) => /^P\d{3}$/.test(part));
+
+		if (!storeCode) {
+			return {
+				type: "filename_code",
+				value: rawIdentifier,
+			};
+		}
+
+		return {
+			type: "trgocentar_store_code",
+			value: storeCode,
 		};
 	}
 }
