@@ -25,6 +25,10 @@ run = "./scripts/reset-dev-data.sh"
 description = "Run full test suite (auto-starts docker test services)"
 run = "./scripts/test-all.sh"
 
+[tasks.staging-pull]
+description = "Pull recent data slice from staging to local dev (--days N, --storage, --yes)"
+run = "./scripts/staging-pull.sh"
+
 [tasks.deploy-staging]
 description = "Deploy to staging environment via Kamal"
 run = "mise exec ruby@3.3 -- kamal deploy -c kamal.yml"
