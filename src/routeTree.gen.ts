@@ -17,12 +17,12 @@ import { Route as PublicIndexRouteImport } from './routes/_public.index'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
 import { Route as PublicStoresRouteImport } from './routes/_public.stores'
 import { Route as PublicSearchRouteImport } from './routes/_public.search'
-import { Route as PublicPrivacyRouteImport } from './routes/_public.privacy'
 import { Route as PublicProfileRouteImport } from './routes/_public.profile'
-import { Route as PublicBasketRouteImport } from './routes/_public.basket'
+import { Route as PublicPrivacyRouteImport } from './routes/_public.privacy'
 import { Route as PublicFaqRouteImport } from './routes/_public.faq'
-import { Route as PublicAboutRouteImport } from './routes/_public.about'
+import { Route as PublicBasketRouteImport } from './routes/_public.basket'
 import { Route as PublicAlertsRouteImport } from './routes/_public.alerts'
+import { Route as PublicAboutRouteImport } from './routes/_public.about'
 import { Route as AdminAdminRouteImport } from './routes/_admin.admin'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index'
 import { Route as ApiRpcSplatRouteImport } from './routes/api.rpc.$'
@@ -86,19 +86,14 @@ const PublicSearchRoute = PublicSearchRouteImport.update({
   path: '/search',
   getParentRoute: () => PublicRouteRoute,
 } as any)
-const PublicPrivacyRoute = PublicPrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => PublicRouteRoute,
-} as any)
 const PublicProfileRoute = PublicProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
   getParentRoute: () => PublicRouteRoute,
 } as any)
-const PublicBasketRoute = PublicBasketRouteImport.update({
-  id: '/basket',
-  path: '/basket',
+const PublicPrivacyRoute = PublicPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicFaqRoute = PublicFaqRouteImport.update({
@@ -106,14 +101,19 @@ const PublicFaqRoute = PublicFaqRouteImport.update({
   path: '/faq',
   getParentRoute: () => PublicRouteRoute,
 } as any)
-const PublicAboutRoute = PublicAboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const PublicBasketRoute = PublicBasketRouteImport.update({
+  id: '/basket',
+  path: '/basket',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicAlertsRoute = PublicAlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicAboutRoute = PublicAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const AdminAdminRoute = AdminAdminRouteImport.update({
@@ -245,8 +245,8 @@ export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
-  '/about': typeof PublicAboutRoute
   '/admin': typeof AdminAdminRouteWithChildren
+  '/about': typeof PublicAboutRoute
   '/alerts': typeof PublicAlertsRoute
   '/basket': typeof PublicBasketRoute
   '/faq': typeof PublicFaqRoute
@@ -361,8 +361,8 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/setup'
-    | '/about'
     | '/admin'
+    | '/about'
     | '/alerts'
     | '/basket'
     | '/faq'
@@ -539,13 +539,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicSearchRouteImport
       parentRoute: typeof PublicRouteRoute
     }
-    '/_public/privacy': {
-      id: '/_public/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PublicPrivacyRouteImport
-      parentRoute: typeof PublicRouteRoute
-    }
     '/_public/profile': {
       id: '/_public/profile'
       path: '/profile'
@@ -553,11 +546,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicProfileRouteImport
       parentRoute: typeof PublicRouteRoute
     }
-    '/_public/basket': {
-      id: '/_public/basket'
-      path: '/basket'
-      fullPath: '/basket'
-      preLoaderRoute: typeof PublicBasketRouteImport
+    '/_public/privacy': {
+      id: '/_public/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PublicPrivacyRouteImport
       parentRoute: typeof PublicRouteRoute
     }
     '/_public/faq': {
@@ -567,11 +560,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicFaqRouteImport
       parentRoute: typeof PublicRouteRoute
     }
-    '/_public/about': {
-      id: '/_public/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof PublicAboutRouteImport
+    '/_public/basket': {
+      id: '/_public/basket'
+      path: '/basket'
+      fullPath: '/basket'
+      preLoaderRoute: typeof PublicBasketRouteImport
       parentRoute: typeof PublicRouteRoute
     }
     '/_public/alerts': {
@@ -579,6 +572,13 @@ declare module '@tanstack/react-router' {
       path: '/alerts'
       fullPath: '/alerts'
       preLoaderRoute: typeof PublicAlertsRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/about': {
+      id: '/_public/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof PublicAboutRouteImport
       parentRoute: typeof PublicRouteRoute
     }
     '/_admin/admin': {

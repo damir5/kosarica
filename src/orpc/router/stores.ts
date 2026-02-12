@@ -560,10 +560,13 @@ export const listVirtualStores = procedure
 			chainSlug: z.string().optional(),
 			status: z.enum(["active", "pending"]).optional(),
 			search: z.string().optional(),
+			page: z.number().int().min(1).default(1),
+			pageSize: z.number().int().min(1).max(100).default(20),
 		}),
 	)
 	.handler(async ({ input }) => {
 		const db = getDb();
+		const offset = (input.page - 1) * input.pageSize;
 
 		const conditions = [eq(stores.isVirtual, true)];
 
@@ -584,12 +587,19 @@ export const listVirtualStores = procedure
 			);
 		}
 
-		// Get virtual stores
-		const virtualStores = await db
-			.select()
-			.from(stores)
-			.where(and(...conditions))
-			.orderBy(desc(stores.createdAt));
+		const whereClause = and(...conditions);
+
+		// Get virtual stores (paginated) and total count in parallel
+		const [virtualStores, totalResult] = await Promise.all([
+			db
+				.select()
+				.from(stores)
+				.where(whereClause)
+				.orderBy(desc(stores.createdAt))
+				.limit(input.pageSize)
+				.offset(offset),
+			db.select({ count: count() }).from(stores).where(whereClause),
+		]);
 
 		// Get linked counts in a single query
 		let countMap = new Map<string, number>();
@@ -611,7 +621,15 @@ export const listVirtualStores = procedure
 			linkedPhysicalCount: countMap.get(store.id) ?? 0,
 		}));
 
-		return { stores: storesWithCounts };
+		const total = totalResult[0]?.count ?? 0;
+
+		return {
+			stores: storesWithCounts,
+			total,
+			page: input.page,
+			pageSize: input.pageSize,
+			totalPages: Math.ceil(total / input.pageSize),
+		};
 	});
 
 export const listPhysicalStores = procedure

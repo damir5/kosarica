@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+	AlertCircle,
 	Building2,
 	ChevronLeft,
 	ChevronRight,
@@ -104,6 +105,7 @@ function StoresPage() {
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [linkedStatusFilter, setLinkedStatusFilter] = useState<string>("all");
 	const [physicalPage, setPhysicalPage] = useState(1);
+	const [virtualPage, setVirtualPage] = useState(1);
 
 	// Modal state
 	const [linkModalStore, setLinkModalStore] = useState<PhysicalStore | null>(
@@ -123,6 +125,7 @@ function StoresPage() {
 		const timer = setTimeout(() => {
 			setDebouncedSearch(search);
 			setPhysicalPage(1);
+			setVirtualPage(1);
 		}, 300);
 		return () => clearTimeout(timer);
 	}, [search]);
@@ -131,9 +134,16 @@ function StoresPage() {
 	const [activeTab, setActiveTab] = useState<"table" | "map">("table");
 
 	// Query virtual stores
-	const { data: virtualData, isLoading: virtualLoading } = useQuery(
+	const {
+		data: virtualData,
+		isLoading: virtualLoading,
+		error: virtualError,
+		refetch: refetchVirtual,
+	} = useQuery(
 		orpc.admin.stores.listVirtual.queryOptions({
 			input: {
+				page: virtualPage,
+				pageSize: 20,
 				chainSlug: chainFilter !== "all" ? chainFilter : undefined,
 				status:
 					statusFilter !== "all"
@@ -145,7 +155,12 @@ function StoresPage() {
 	);
 
 	// Query physical stores
-	const { data: physicalData, isLoading: physicalLoading } = useQuery(
+	const {
+		data: physicalData,
+		isLoading: physicalLoading,
+		error: physicalError,
+		refetch: refetchPhysical,
+	} = useQuery(
 		orpc.admin.stores.listPhysical.queryOptions({
 			input: {
 				page: physicalPage,
@@ -164,12 +179,13 @@ function StoresPage() {
 		}),
 	);
 
-	// Query virtual stores for linking modal
-	const { data: linkingOptions } = useQuery(
-		orpc.admin.stores.getVirtualStoresForLinking.queryOptions({
-			input: { chainSlug: linkModalStore?.chainSlug || "" },
+	// Query virtual stores for linking modal — only when modal is open
+	const { data: linkingOptions } = useQuery({
+		...orpc.admin.stores.getVirtualStoresForLinking.queryOptions({
+			input: { chainSlug: linkModalStore?.chainSlug ?? "" },
 		}),
-	);
+		enabled: !!linkModalStore,
+	});
 
 	// Mutations
 	const linkMutation = useMutation({
@@ -217,8 +233,6 @@ function StoresPage() {
 		return "Just now";
 	};
 
-	const isLoading = virtualLoading || physicalLoading;
-
 	return (
 		<>
 			{/* Header */}
@@ -257,6 +271,7 @@ function StoresPage() {
 							onValueChange={(value) => {
 								setChainFilter(value);
 								setPhysicalPage(1);
+								setVirtualPage(1);
 							}}
 						>
 							<SelectTrigger className="w-[140px]">
@@ -276,6 +291,7 @@ function StoresPage() {
 							onValueChange={(value) => {
 								setStatusFilter(value);
 								setPhysicalPage(1);
+								setVirtualPage(1);
 							}}
 						>
 							<SelectTrigger className="w-[130px]">
@@ -350,14 +366,7 @@ function StoresPage() {
 					</Suspense>
 				)}
 
-				{/* Loading State */}
-				{activeTab === "table" && isLoading && (
-					<div className="flex items-center justify-center py-12">
-						<p className="text-muted-foreground">Loading stores...</p>
-					</div>
-				)}
-
-				{activeTab === "table" && !isLoading && (
+				{activeTab === "table" && (
 					<div className="space-y-8">
 						{/* Virtual Price Sources Section */}
 						<Card>
@@ -373,79 +382,151 @@ function StoresPage() {
 								</CardDescription>
 							</CardHeader>
 							<CardContent>
-								{virtualData && virtualData.stores.length > 0 ? (
-									<div className="rounded-md border">
-										<Table>
-											<TableHeader>
-												<TableRow>
-													<TableHead>Name (Identifier)</TableHead>
-													<TableHead>Chain</TableHead>
-													<TableHead>Status</TableHead>
-													<TableHead>Last Update</TableHead>
-													<TableHead>Linked Physical Stores</TableHead>
-													<TableHead className="w-[100px]">Actions</TableHead>
-												</TableRow>
-											</TableHeader>
-											<TableBody>
-												{virtualData.stores.map((store) => (
-													<TableRow key={store.id}>
-														<TableCell>
-															<div>
-																<p className="font-medium">
-																	{store.displayName ?? store.name}
-																</p>
-																<p className="text-sm text-muted-foreground font-mono">
-																	{store.name}
-																</p>
-															</div>
-														</TableCell>
-														<TableCell>
-															<Badge variant="outline">
-																{store.chainSlug}
-															</Badge>
-														</TableCell>
-														<TableCell>
-															<Badge
-																variant={
-																	store.status === "active"
-																		? "default"
-																		: "secondary"
-																}
-															>
-																{store.status}
-															</Badge>
-														</TableCell>
-														<TableCell>
-															<span className="text-sm text-muted-foreground">
-																{formatTimeAgo(store.updatedAt)}
-															</span>
-														</TableCell>
-														<TableCell>
-															<Badge variant="secondary">
-																{store.linkedPhysicalCount} Location
-																{store.linkedPhysicalCount !== 1 ? "s" : ""}{" "}
-																(Inheriting)
-															</Badge>
-														</TableCell>
-														<TableCell>
-															<Button variant="ghost" size="sm" asChild>
-																<Link
-																	to="/admin/stores/$storeId"
-																	params={{ storeId: store.id }}
-																>
-																	<ExternalLink className="h-4 w-4" />
-																	View
-																</Link>
-															</Button>
-														</TableCell>
-													</TableRow>
-												))}
-											</TableBody>
-										</Table>
+								{virtualError ? (
+									<div className="flex items-center gap-3 rounded-md border border-destructive/50 bg-destructive/10 p-4">
+										<AlertCircle className="h-5 w-5 shrink-0 text-destructive" />
+										<div className="flex-1">
+											<p className="font-medium text-destructive">
+												Failed to load virtual stores
+											</p>
+											<p className="text-sm text-muted-foreground">
+												{virtualError instanceof Error
+													? virtualError.message
+													: "An unexpected error occurred"}
+											</p>
+										</div>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => refetchVirtual()}
+										>
+											Retry
+										</Button>
 									</div>
+								) : virtualLoading ? (
+									<div className="flex items-center justify-center py-8">
+										<p className="text-muted-foreground">
+											Loading virtual stores...
+										</p>
+									</div>
+								) : virtualData && virtualData.stores.length > 0 ? (
+									<>
+										<div className="rounded-md border">
+											<Table>
+												<TableHeader>
+													<TableRow>
+														<TableHead>Name (Identifier)</TableHead>
+														<TableHead>Chain</TableHead>
+														<TableHead>Status</TableHead>
+														<TableHead>Last Update</TableHead>
+														<TableHead>Linked Physical Stores</TableHead>
+														<TableHead className="w-[100px]">
+															Actions
+														</TableHead>
+													</TableRow>
+												</TableHeader>
+												<TableBody>
+													{virtualData.stores.map((store) => (
+														<TableRow key={store.id}>
+															<TableCell>
+																<div>
+																	<p className="font-medium">
+																		{store.displayName ?? store.name}
+																	</p>
+																	<p className="text-sm text-muted-foreground font-mono">
+																		{store.name}
+																	</p>
+																</div>
+															</TableCell>
+															<TableCell>
+																<Badge variant="outline">
+																	{store.chainSlug}
+																</Badge>
+															</TableCell>
+															<TableCell>
+																<Badge
+																	variant={
+																		store.status === "active"
+																			? "default"
+																			: "secondary"
+																	}
+																>
+																	{store.status}
+																</Badge>
+															</TableCell>
+															<TableCell>
+																<span className="text-sm text-muted-foreground">
+																	{formatTimeAgo(store.updatedAt)}
+																</span>
+															</TableCell>
+															<TableCell>
+																<Badge variant="secondary">
+																	{store.linkedPhysicalCount} Location
+																	{store.linkedPhysicalCount !== 1
+																		? "s"
+																		: ""}{" "}
+																	(Inheriting)
+																</Badge>
+															</TableCell>
+															<TableCell>
+																<Button variant="ghost" size="sm" asChild>
+																	<Link
+																		to="/admin/stores/$storeId"
+																		params={{ storeId: store.id }}
+																	>
+																		<ExternalLink className="h-4 w-4" />
+																		View
+																	</Link>
+																</Button>
+															</TableCell>
+														</TableRow>
+													))}
+												</TableBody>
+											</Table>
+										</div>
+
+										{/* Virtual Stores Pagination */}
+										<div className="mt-4 flex items-center justify-between">
+											<p className="text-sm text-muted-foreground">
+												Showing {(virtualPage - 1) * 20 + 1} to{" "}
+												{Math.min(virtualPage * 20, virtualData.total)} of{" "}
+												{virtualData.total} stores
+											</p>
+											<div className="flex items-center gap-2">
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() =>
+														setVirtualPage((p) => Math.max(1, p - 1))
+													}
+													disabled={virtualPage === 1}
+												>
+													<ChevronLeft className="h-4 w-4" />
+													Previous
+												</Button>
+												<span className="text-sm">
+													Page {virtualPage} of{" "}
+													{virtualData.totalPages || 1}
+												</span>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => setVirtualPage((p) => p + 1)}
+													disabled={
+														virtualPage >= (virtualData.totalPages || 1)
+													}
+												>
+													Next
+													<ChevronRight className="h-4 w-4" />
+												</Button>
+											</div>
+										</div>
+									</>
 								) : (
 									<div className="py-8 text-center text-muted-foreground">
-										No virtual price sources found
+										{chainFilter === "all" && !debouncedSearch
+											? "No virtual price sources yet. Run the ingestion pipeline to populate stores."
+											: "No virtual price sources found matching your filters."}
 									</div>
 								)}
 							</CardContent>
@@ -495,7 +576,34 @@ function StoresPage() {
 								</div>
 							</CardHeader>
 							<CardContent>
-								{physicalData && physicalData.stores.length > 0 ? (
+								{physicalError ? (
+									<div className="flex items-center gap-3 rounded-md border border-destructive/50 bg-destructive/10 p-4">
+										<AlertCircle className="h-5 w-5 shrink-0 text-destructive" />
+										<div className="flex-1">
+											<p className="font-medium text-destructive">
+												Failed to load physical stores
+											</p>
+											<p className="text-sm text-muted-foreground">
+												{physicalError instanceof Error
+													? physicalError.message
+													: "An unexpected error occurred"}
+											</p>
+										</div>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => refetchPhysical()}
+										>
+											Retry
+										</Button>
+									</div>
+								) : physicalLoading ? (
+									<div className="flex items-center justify-center py-8">
+										<p className="text-muted-foreground">
+											Loading physical stores...
+										</p>
+									</div>
+								) : physicalData && physicalData.stores.length > 0 ? (
 									<>
 										<div className="rounded-md border">
 											<Table>
@@ -505,7 +613,9 @@ function StoresPage() {
 														<TableHead>Chain</TableHead>
 														<TableHead>City</TableHead>
 														<TableHead>Price Source</TableHead>
-														<TableHead className="w-[150px]">Actions</TableHead>
+														<TableHead className="w-[150px]">
+															Actions
+														</TableHead>
 													</TableRow>
 												</TableHeader>
 												<TableBody>
@@ -594,7 +704,7 @@ function StoresPage() {
 											</Table>
 										</div>
 
-										{/* Pagination */}
+										{/* Physical Stores Pagination */}
 										<div className="mt-4 flex items-center justify-between">
 											<p className="text-sm text-muted-foreground">
 												Showing {(physicalPage - 1) * 20 + 1} to{" "}
@@ -614,7 +724,8 @@ function StoresPage() {
 													Previous
 												</Button>
 												<span className="text-sm">
-													Page {physicalPage} of {physicalData.totalPages || 1}
+													Page {physicalPage} of{" "}
+													{physicalData.totalPages || 1}
 												</span>
 												<Button
 													variant="outline"
@@ -632,7 +743,9 @@ function StoresPage() {
 									</>
 								) : (
 									<div className="py-8 text-center text-muted-foreground">
-										No physical locations found
+										{chainFilter === "all" && !debouncedSearch
+											? "No physical locations yet. Add physical locations using the button above."
+											: "No physical locations found matching your filters."}
 									</div>
 								)}
 							</CardContent>
