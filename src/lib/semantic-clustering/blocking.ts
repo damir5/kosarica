@@ -110,6 +110,32 @@ function toGroupItem(row: ItemRow): GroupItem {
 	};
 }
 
+class UnionFind {
+	private parent = new Map<string, string>();
+
+	find(x: string): string {
+		if (!this.parent.has(x)) this.parent.set(x, x);
+		let root = x;
+		while (this.parent.get(root) !== root) {
+			root = this.parent.get(root) as string;
+		}
+		// Path compression
+		let current = x;
+		while (current !== root) {
+			const next = this.parent.get(current) as string;
+			this.parent.set(current, root);
+			current = next;
+		}
+		return root;
+	}
+
+	union(a: string, b: string): void {
+		const rootA = this.find(a);
+		const rootB = this.find(b);
+		if (rootA !== rootB) this.parent.set(rootA, rootB);
+	}
+}
+
 function dominantValue(values: readonly (string | null)[]): string | null {
 	const counts = new Map<string, number>();
 	for (const value of values) {
@@ -350,7 +376,7 @@ async function loadEmbeddingGroups(params: {
 				AND rif.embedding IS NOT NULL
 				AND rif.product_type IS NOT NULL
 				AND rif.product_type <> ''
-				AND ri.id NOT IN (SELECT UNNEST(${excludeArray}::text[]))
+				AND ri.id != ALL(${excludeArray}::text[])
 			ORDER BY random()
 			LIMIT ${params.limit * 3}
 		),
@@ -370,7 +396,7 @@ async function loadEmbeddingGroups(params: {
 					AND rif2.embedding IS NOT NULL
 					AND rif2.product_type = s.product_type
 					AND rif2.retailer_item_id <> s.retailer_item_id
-					AND ri2.id NOT IN (SELECT UNNEST(${excludeArray}::text[]))
+					AND ri2.id != ALL(${excludeArray}::text[])
 				ORDER BY rif2.embedding <=> s.embedding
 				LIMIT ${params.neighborCount}
 			) t ON true
@@ -390,30 +416,10 @@ async function loadEmbeddingGroups(params: {
 	if (pairRows.length === 0) return [];
 
 	// Union-Find to form connected components
-	const parent = new Map<string, string>();
-	function find(x: string): string {
-		if (!parent.has(x)) parent.set(x, x);
-		let root = x;
-		while (parent.get(root) !== root) {
-			root = parent.get(root) as string;
-		}
-		// Path compression
-		let current = x;
-		while (current !== root) {
-			const next = parent.get(current) as string;
-			parent.set(current, root);
-			current = next;
-		}
-		return root;
-	}
-	function union(a: string, b: string): void {
-		const rootA = find(a);
-		const rootB = find(b);
-		if (rootA !== rootB) parent.set(rootA, rootB);
-	}
+	const uf = new UnionFind();
 
 	for (const pair of pairRows) {
-		union(pair.source_id, pair.target_id);
+		uf.union(pair.source_id, pair.target_id);
 	}
 
 	// Group items by their connected component root
@@ -425,7 +431,7 @@ async function loadEmbeddingGroups(params: {
 
 	const components = new Map<string, Set<string>>();
 	for (const itemId of allItemIds) {
-		const root = find(itemId);
+		const root = uf.find(itemId);
 		if (!components.has(root)) components.set(root, new Set());
 		components.get(root)?.add(itemId);
 	}
@@ -450,7 +456,7 @@ async function loadEmbeddingGroups(params: {
 			rif.embedding AS embedding
 		FROM retailer_items ri
 		LEFT JOIN retailer_item_features rif ON rif.retailer_item_id = ri.id
-		WHERE ri.id IN (SELECT UNNEST(${itemIdsToLoad}::text[]))
+		WHERE ri.id = ANY(${itemIdsToLoad}::text[])
 	`);
 
 	const itemMap = new Map<string, GroupItem>();
@@ -467,11 +473,7 @@ async function loadEmbeddingGroups(params: {
 			.filter((item): item is GroupItem => item != null);
 		if (items.length < 2 || distinctChains(items) < 2) continue;
 		groups.push(
-			buildGroup(
-				`emb_cluster_${idx}`,
-				`embedding:cluster_${idx}`,
-				items,
-			),
+			buildGroup(`emb_cluster_${idx}`, `embedding:cluster_${idx}`, items),
 		);
 		idx += 1;
 		if (idx >= params.limit) break;
@@ -517,7 +519,7 @@ async function loadLexicalGroups(params: {
 				AND rif.normalized_name <> ''
 				AND rif.product_type IS NOT NULL
 				AND rif.product_type <> ''
-				AND ri.id NOT IN (SELECT UNNEST(${excludeArray}::text[]))
+				AND ri.id != ALL(${excludeArray}::text[])
 			ORDER BY random()
 			LIMIT ${params.limit * 5}
 		),
@@ -538,7 +540,7 @@ async function loadLexicalGroups(params: {
 					AND rif2.normalized_name <> ''
 					AND rif2.product_type = s.product_type
 					AND rif2.retailer_item_id <> s.retailer_item_id
-					AND ri2.id NOT IN (SELECT UNNEST(${excludeArray}::text[]))
+					AND ri2.id != ALL(${excludeArray}::text[])
 				ORDER BY rif2.normalized_name <-> s.normalized_name
 				LIMIT 10
 			) t ON true
@@ -558,29 +560,10 @@ async function loadLexicalGroups(params: {
 	if (pairRows.length === 0) return [];
 
 	// Union-Find for connected components
-	const parent = new Map<string, string>();
-	function find(x: string): string {
-		if (!parent.has(x)) parent.set(x, x);
-		let root = x;
-		while (parent.get(root) !== root) {
-			root = parent.get(root) as string;
-		}
-		let current = x;
-		while (current !== root) {
-			const next = parent.get(current) as string;
-			parent.set(current, root);
-			current = next;
-		}
-		return root;
-	}
-	function union(a: string, b: string): void {
-		const rootA = find(a);
-		const rootB = find(b);
-		if (rootA !== rootB) parent.set(rootA, rootB);
-	}
+	const uf = new UnionFind();
 
 	for (const pair of pairRows) {
-		union(pair.source_id, pair.target_id);
+		uf.union(pair.source_id, pair.target_id);
 	}
 
 	const allItemIds = new Set<string>();
@@ -591,7 +574,7 @@ async function loadLexicalGroups(params: {
 
 	const components = new Map<string, Set<string>>();
 	for (const itemId of allItemIds) {
-		const root = find(itemId);
+		const root = uf.find(itemId);
 		if (!components.has(root)) components.set(root, new Set());
 		components.get(root)?.add(itemId);
 	}
@@ -616,7 +599,7 @@ async function loadLexicalGroups(params: {
 			rif.embedding AS embedding
 		FROM retailer_items ri
 		LEFT JOIN retailer_item_features rif ON rif.retailer_item_id = ri.id
-		WHERE ri.id IN (SELECT UNNEST(${itemIdsToLoad}::text[]))
+		WHERE ri.id = ANY(${itemIdsToLoad}::text[])
 	`);
 
 	const itemMap = new Map<string, GroupItem>();
@@ -633,11 +616,7 @@ async function loadLexicalGroups(params: {
 			.filter((item): item is GroupItem => item != null);
 		if (items.length < 2 || distinctChains(items) < 2) continue;
 		groups.push(
-			buildGroup(
-				`lex_bucket_${idx}`,
-				`lexical:bucket_${idx}`,
-				items,
-			),
+			buildGroup(`lex_bucket_${idx}`, `lexical:bucket_${idx}`, items),
 		);
 		idx += 1;
 		if (idx >= params.limit) break;
@@ -673,8 +652,7 @@ export async function generateCandidateGroups(
 	const embeddingDistanceThreshold = options.embeddingDistanceThreshold ?? 0.15;
 	const embeddingNeighborCount = options.embeddingNeighborCount ?? 10;
 	const lexicalLimit = options.lexicalLimit ?? 100;
-	const lexicalSimilarityThreshold =
-		options.lexicalSimilarityThreshold ?? 0.4;
+	const lexicalSimilarityThreshold = options.lexicalSimilarityThreshold ?? 0.4;
 	const totalGroupLimit = options.totalGroupLimit ?? 500;
 
 	const assignedItems = new Set<string>();

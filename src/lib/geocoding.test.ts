@@ -27,12 +27,14 @@ describe("geocodeAddress confidence", () => {
 			),
 		);
 
-		const result = await geocodeAddress({
+		const outcome = await geocodeAddress({
 			address: "BANA JOSIPA JELACICA 139",
 			city: "Zapresic",
 			country: "hr",
 		});
 
+		expect(outcome.isOk()).toBe(true);
+		const result = outcome._unsafeUnwrap();
 		expect(result.found).toBe(true);
 		expect(result.confidence).toBe("high");
 	});
@@ -57,12 +59,14 @@ describe("geocodeAddress confidence", () => {
 			),
 		);
 
-		const result = await geocodeAddress({
+		const outcome = await geocodeAddress({
 			address: "VARAZDINSKA 2A",
 			city: "Zlatar",
 			country: "hr",
 		});
 
+		expect(outcome.isOk()).toBe(true);
+		const result = outcome._unsafeUnwrap();
 		expect(result.found).toBe(true);
 		expect(result.confidence).toBe("medium");
 	});
@@ -87,12 +91,14 @@ describe("geocodeAddress confidence", () => {
 			),
 		);
 
-		const result = await geocodeAddress({
+		const outcome = await geocodeAddress({
 			address: "Some Street 1",
 			city: "Zagreb",
 			country: "hr",
 		});
 
+		expect(outcome.isOk()).toBe(true);
+		const result = outcome._unsafeUnwrap();
 		expect(result.found).toBe(true);
 		expect(result.confidence).toBe("low");
 	});

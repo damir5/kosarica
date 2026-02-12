@@ -1,15 +1,18 @@
 import { logLlmDecision } from "@/lib/llm-observability";
 import { createLogger } from "@/utils/logger";
-import type { EnsembleModelConfig } from "./config";
 import {
 	type GenerateCandidateGroupsOptions,
 	generateCandidateGroups,
 } from "./blocking";
+import type { EnsembleModelConfig } from "./config";
 import { decideListwiseCascade } from "./listwise/ensemble";
-import { loadListwiseModelConfigs, processGroupWithLLM } from "./listwise/llm-call";
+import {
+	loadListwiseModelConfigs,
+	processGroupWithLLM,
+} from "./listwise/llm-call";
+import { persistAcceptedGrouping } from "./listwise/pipeline";
 import { fetchMedianPrices } from "./listwise/price-fetch";
 import type { CandidateGroup, ListwiseLLMResult } from "./listwise/types";
-import { persistAcceptedGrouping } from "./listwise/pipeline";
 
 const log = createLogger("matching");
 
@@ -109,15 +112,12 @@ export async function runUnifiedMatching(
 	options: RunUnifiedMatchingOptions = {},
 ): Promise<RunUnifiedMatchingResult> {
 	const limit =
-		options.limit ??
-		parsePositiveInt(process.env.UNIFIED_MATCHING_LIMIT, 50);
+		options.limit ?? parsePositiveInt(process.env.UNIFIED_MATCHING_LIMIT, 50);
 	const dryRun = options.dryRun ?? process.env.UNIFIED_MATCHING_DRY_RUN === "1";
 
 	const modelConfigs = loadListwiseModelConfigs();
 	const primaryModelId =
-		options.primaryModelId ??
-		process.env.LISTWISE_PRIMARY_MODEL_ID ??
-		"qwen";
+		options.primaryModelId ?? process.env.LISTWISE_PRIMARY_MODEL_ID ?? "qwen";
 	const secondaryModelId =
 		options.secondaryModelId ??
 		process.env.LISTWISE_SECONDARY_MODEL_ID ??
@@ -278,7 +278,14 @@ export async function runUnifiedMatching(
 			log.error("Unified matching: group processing failed", {
 				groupId: group.groupId,
 				seedKey: group.seedKey,
-				error,
+				error:
+					error instanceof Error
+						? {
+								name: error.name,
+								message: error.message,
+								stack: error.stack,
+							}
+						: { unknownError: String(error) },
 			});
 		}
 	}

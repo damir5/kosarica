@@ -1,6 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Building2, MapPin, Store as StoreIcon } from "lucide-react";
+import {
+	ArrowLeft,
+	Building2,
+	MapPin,
+	RotateCcw,
+	Store as StoreIcon,
+} from "lucide-react";
+import { useState } from "react";
 import { StoreEnrichmentSection } from "@/components/admin/stores/StoreEnrichmentSection";
 import { StoreLocationMap } from "@/components/admin/stores/StoreLocationMap";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +19,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { orpc } from "@/orpc/client";
 
 export const Route = createFileRoute("/_admin/admin/stores/$storeId")({
@@ -20,6 +28,9 @@ export const Route = createFileRoute("/_admin/admin/stores/$storeId")({
 
 function StoreDetailPage() {
 	const { storeId } = Route.useParams();
+	const queryClient = useQueryClient();
+	const [editingDisplayName, setEditingDisplayName] = useState(false);
+	const [displayNameValue, setDisplayNameValue] = useState("");
 
 	const {
 		data: store,
@@ -30,6 +41,21 @@ function StoreDetailPage() {
 			input: { storeId },
 		}),
 	);
+
+	const updateMutation = useMutation({
+		mutationFn: async (data: {
+			storeId: string;
+			displayName: string | null;
+		}) => {
+			return orpc.admin.stores.update.call(data);
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({
+				queryKey: orpc.admin.stores.key({ type: "query" }),
+			});
+			setEditingDisplayName(false);
+		},
+	});
 
 	if (isLoading) {
 		return (
@@ -75,9 +101,14 @@ function StoreDetailPage() {
 								<StoreIcon className="h-8 w-8 text-primary" />
 								<div>
 									<h1 className="font-semibold text-2xl text-foreground">
-										{store.name}
+										{store.displayName ?? store.name}
 									</h1>
-									<p className="mt-1 text-muted-foreground text-sm font-mono">
+									{store.displayName && store.displayName !== store.name && (
+										<p className="mt-0.5 text-muted-foreground text-sm font-mono">
+											{store.name}
+										</p>
+									)}
+									<p className="mt-0.5 text-muted-foreground text-xs font-mono">
 										{store.id}
 									</p>
 								</div>
@@ -115,6 +146,90 @@ function StoreDetailPage() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
+						{/* Display Name */}
+						<div>
+							<div className="flex items-center justify-between">
+								<div className="text-sm font-medium text-muted-foreground">
+									Display Name
+									{store.displayNameManual && (
+										<Badge variant="outline" className="ml-2 text-xs">
+											manual
+										</Badge>
+									)}
+								</div>
+								<div className="flex items-center gap-1">
+									{editingDisplayName ? (
+										<>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => setEditingDisplayName(false)}
+											>
+												Cancel
+											</Button>
+											<Button
+												size="sm"
+												onClick={() => {
+													updateMutation.mutate({
+														storeId: store.id,
+														displayName: displayNameValue || null,
+													});
+												}}
+												disabled={updateMutation.isPending}
+											>
+												Save
+											</Button>
+										</>
+									) : (
+										<>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => {
+													setDisplayNameValue(store.displayName ?? "");
+													setEditingDisplayName(true);
+												}}
+											>
+												Edit
+											</Button>
+											{store.displayNameManual && (
+												<Button
+													variant="ghost"
+													size="sm"
+													title="Reset to automatic"
+													onClick={() => {
+														updateMutation.mutate({
+															storeId: store.id,
+															displayName: null,
+														});
+													}}
+													disabled={updateMutation.isPending}
+												>
+													<RotateCcw className="h-3 w-3" />
+												</Button>
+											)}
+										</>
+									)}
+								</div>
+							</div>
+							{editingDisplayName ? (
+								<Input
+									value={displayNameValue}
+									onChange={(e) => setDisplayNameValue(e.target.value)}
+									placeholder="Enter display name (leave empty for auto)"
+									className="mt-1"
+								/>
+							) : (
+								<p className="mt-1">
+									{store.displayName ?? (
+										<span className="text-muted-foreground">
+											Not set (auto)
+										</span>
+									)}
+								</p>
+							)}
+						</div>
+
 						{/* Address Information Grid */}
 						<div className="grid gap-4 sm:grid-cols-2">
 							<div>

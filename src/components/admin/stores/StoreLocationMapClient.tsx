@@ -4,6 +4,7 @@ import {
 	MapTileLayer,
 	MapView,
 } from "@/components/ui/map";
+import { FullscreenControl } from "@/components/ui/fullscreen-control";
 
 export interface StoreLocationMapClientProps {
 	latitude: number;
@@ -30,6 +31,7 @@ export function StoreLocationMapClient({
 			className={className}
 		>
 			<MapTileLayer />
+			<FullscreenControl />
 			<MapMarker position={position}>
 				{storeName && (
 					<MapPopup>

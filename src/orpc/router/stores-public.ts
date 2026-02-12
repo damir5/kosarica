@@ -36,6 +36,7 @@ export const listNearbyStores = procedure
 			.select({
 				id: stores.id,
 				name: stores.name,
+				displayName: stores.displayName,
 				address: stores.address,
 				city: stores.city,
 				latitude: stores.latitude,

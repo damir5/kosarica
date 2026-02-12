@@ -29,19 +29,10 @@ export async function fetchMedianPrices(
 		const rows = await clickHouse.query<MedianPriceRow>(
 			`SELECT
 				retailer_item_id,
-				median(effective_price) AS median_price,
+				median(if(discount_price_cents IS NOT NULL AND discount_price_cents > 0 AND discount_price_cents < price_cents, discount_price_cents, price_cents)) AS median_price,
 				count() AS quote_count
-			FROM (
-				SELECT
-					retailer_item_id,
-					chain_slug,
-					store_id,
-					argMax(if(discount_price_cents IS NULL, price_cents, discount_price_cents), target_date) AS effective_price
-				FROM prices
-				WHERE retailer_item_id IN ({ids:Array(String)})
-					AND target_date >= today() - 30
-				GROUP BY retailer_item_id, chain_slug, store_id
-			)
+			FROM prices_current
+			WHERE retailer_item_id IN ({ids:Array(String)})
 			GROUP BY retailer_item_id`,
 			{ ids: uniqueIds },
 		);

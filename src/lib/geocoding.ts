@@ -5,6 +5,9 @@
  * More permissive than Nominatim for automated requests.
  */
 
+import { ResultAsync } from "neverthrow";
+import { fetchError, type FetchError } from "./errors";
+
 export interface GeocodingResult {
 	found: boolean;
 	latitude?: string;
@@ -12,6 +15,14 @@ export interface GeocodingResult {
 	displayName?: string;
 	confidence: "high" | "medium" | "low";
 	provider: "photon" | "nominatim" | "google";
+	// Structured address parts from Photon response
+	street?: string;
+	houseNumber?: string;
+	city?: string;
+	postcode?: string;
+	country?: string;
+	// Whether the input city matches the result city
+	cityMatch?: boolean;
 	raw?: unknown;
 }
 
@@ -28,84 +39,104 @@ const USER_AGENT = "Kosarica/1.0 (contact@kosarica.hr)";
 /**
  * Geocode an address using Photon (komoot) - OpenStreetMap based
  */
-export async function geocodeAddress(
+export function geocodeAddress(
 	input: GeocodingInput,
-): Promise<GeocodingResult> {
-	const { address, city, postalCode } = input;
+): ResultAsync<GeocodingResult, FetchError> {
+	return ResultAsync.fromPromise(
+		(async () => {
+			const { address, city, postalCode } = input;
 
-	// Build full address string
-	const addressParts = [address, city, postalCode].filter(Boolean);
-	const fullAddress = addressParts.join(", ");
+			// Build full address string
+			const addressParts = [address, city, postalCode].filter(Boolean);
+			const fullAddress = addressParts.join(", ");
 
-	if (!fullAddress.trim()) {
-		return {
-			found: false,
-			confidence: "low",
-			provider: "photon",
-		};
-	}
+			if (!fullAddress.trim()) {
+				return {
+					found: false,
+					confidence: "low",
+					provider: "photon",
+				} satisfies GeocodingResult;
+			}
 
-	const url = new URL(PHOTON_BASE_URL);
-	url.searchParams.set("q", fullAddress);
-	url.searchParams.set("limit", "1");
-	url.searchParams.set("lang", "en");
-	// Bias results towards Croatia
-	url.searchParams.set("lat", "45.1");
-	url.searchParams.set("lon", "15.2");
+			const url = new URL(PHOTON_BASE_URL);
+			url.searchParams.set("q", fullAddress);
+			url.searchParams.set("limit", "1");
+			url.searchParams.set("lang", "en");
+			// Bias results towards Croatia
+			url.searchParams.set("lat", "45.1");
+			url.searchParams.set("lon", "15.2");
 
-	const response = await globalThis.fetch(url.toString(), {
-		headers: {
-			Accept: "application/json",
-		},
-	});
+			const response = await globalThis.fetch(url.toString(), {
+				headers: {
+					Accept: "application/json",
+					"User-Agent": USER_AGENT,
+				},
+			});
 
-	if (!response.ok) {
-		return {
-			found: false,
-			confidence: "low",
-			provider: "photon",
-			raw: {
-				error: `Geocoding API error: ${response.status} ${response.statusText}`,
-				status: response.status,
-				statusText: response.statusText,
-			},
-		};
-	}
+			if (!response.ok) {
+				return {
+					found: false,
+					confidence: "low",
+					provider: "photon",
+					raw: {
+						error: `Geocoding API error: ${response.status} ${response.statusText}`,
+						status: response.status,
+						statusText: response.statusText,
+					},
+				} satisfies GeocodingResult;
+			}
 
-	const data = (await response.json()) as PhotonResponse;
+			const data = (await response.json()) as PhotonResponse;
 
-	if (!data.features || data.features.length === 0) {
-		return {
-			found: false,
-			confidence: "low",
-			provider: "photon",
-		};
-	}
+			if (!data.features || data.features.length === 0) {
+				return {
+					found: false,
+					confidence: "low",
+					provider: "photon",
+				} satisfies GeocodingResult;
+			}
 
-	const result = data.features[0];
-	const [lon, lat] = result.geometry.coordinates;
-	const props = result.properties;
-	const confidence = calculatePhotonConfidence(props, input);
+			const result = data.features[0];
+			const [lon, lat] = result.geometry.coordinates;
+			const props = result.properties;
+			const confidence = calculatePhotonConfidence(props, input);
+			const resultCity = props.city || props.town || props.village;
 
-	// Build display name from properties
-	const displayParts = [
-		props.name,
-		props.street,
-		props.housenumber,
-		props.city || props.town || props.village,
-		props.postcode,
-		props.country,
-	].filter(Boolean);
+			// Build display name from properties
+			const displayParts = [
+				props.name,
+				props.street,
+				props.housenumber,
+				resultCity,
+				props.postcode,
+				props.country,
+			].filter(Boolean);
 
-	return {
-		found: true,
-		latitude: lat.toString(),
-		longitude: lon.toString(),
-		displayName: displayParts.join(", "),
-		confidence,
-		provider: "photon",
-		raw: result,
-	};
+			return {
+				found: true,
+				latitude: lat.toString(),
+				longitude: lon.toString(),
+				displayName: displayParts.join(", "),
+				confidence,
+				provider: "photon",
+				street: props.street ?? undefined,
+				houseNumber: props.housenumber ?? undefined,
+				city: resultCity ?? undefined,
+				postcode: props.postcode ?? undefined,
+				country: props.country ?? undefined,
+				cityMatch: citiesMatch(props, input),
+				raw: result,
+			} satisfies GeocodingResult;
+		})(),
+		(e) =>
+			fetchError({
+				url: PHOTON_BASE_URL,
+				message: e instanceof Error ? e.message : "Geocoding failed",
+				retryable: true,
+				attempts: 1,
+				cause: e,
+			}),
+	);
 }
 
 /**
@@ -178,48 +209,63 @@ function citiesMatch(props: PhotonProperties, input: GeocodingInput): boolean {
 /**
  * Reverse geocode coordinates to get address
  */
-export async function reverseGeocode(
+export function reverseGeocode(
 	latitude: string,
 	longitude: string,
-): Promise<ReverseGeocodingResult> {
-	const url = new URL("https://nominatim.openstreetmap.org/reverse");
-	url.searchParams.set("lat", latitude);
-	url.searchParams.set("lon", longitude);
-	url.searchParams.set("format", "json");
-	url.searchParams.set("addressdetails", "1");
+): ResultAsync<ReverseGeocodingResult, FetchError> {
+	const nominatimUrl = "https://nominatim.openstreetmap.org/reverse";
+	return ResultAsync.fromPromise(
+		(async () => {
+			const url = new URL(nominatimUrl);
+			url.searchParams.set("lat", latitude);
+			url.searchParams.set("lon", longitude);
+			url.searchParams.set("format", "json");
+			url.searchParams.set("addressdetails", "1");
 
-	const response = await globalThis.fetch(url.toString(), {
-		headers: {
-			"User-Agent": USER_AGENT,
-		},
-	});
+			const response = await globalThis.fetch(url.toString(), {
+				headers: {
+					"User-Agent": USER_AGENT,
+				},
+			});
 
-	if (!response.ok) {
-		return {
-			displayName: "",
-			address: {},
-			raw: {
-				error: `Reverse geocoding API error: ${response.status} ${response.statusText}`,
-				status: response.status,
-				statusText: response.statusText,
-			},
-		};
-	}
+			if (!response.ok) {
+				return {
+					displayName: "",
+					address: {},
+					raw: {
+						error: `Reverse geocoding API error: ${response.status} ${response.statusText}`,
+						status: response.status,
+						statusText: response.statusText,
+					},
+				} satisfies ReverseGeocodingResult;
+			}
 
-	const result = (await response.json()) as NominatimReverseResult;
+			const result = (await response.json()) as NominatimReverseResult;
 
-	return {
-		displayName: result.display_name,
-		address: {
-			road: result.address?.road,
-			houseNumber: result.address?.house_number,
-			city:
-				result.address?.city || result.address?.town || result.address?.village,
-			postalCode: result.address?.postcode,
-			country: result.address?.country,
-		},
-		raw: result,
-	};
+			return {
+				displayName: result.display_name,
+				address: {
+					road: result.address?.road,
+					houseNumber: result.address?.house_number,
+					city:
+						result.address?.city ||
+						result.address?.town ||
+						result.address?.village,
+					postalCode: result.address?.postcode,
+					country: result.address?.country,
+				},
+				raw: result,
+			} satisfies ReverseGeocodingResult;
+		})(),
+		(e) =>
+			fetchError({
+				url: nominatimUrl,
+				message: e instanceof Error ? e.message : "Reverse geocoding failed",
+				retryable: true,
+				attempts: 1,
+				cause: e,
+			}),
+	);
 }
 
 // Types for Photon API responses

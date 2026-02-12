@@ -92,7 +92,7 @@ function StoresPage() {
 										>
 											<div className="min-w-0 flex-1">
 												<Text variant="small" className="font-medium truncate">
-													{store.name}
+													{store.displayName ?? store.name}
 												</Text>
 												{store.address && (
 													<Text variant="caption" className="text-tk-text-tertiary truncate">

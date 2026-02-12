@@ -1,13 +1,95 @@
 import { and, count, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import * as z from "zod";
-import { storeEnrichmentTasks, stores } from "@/db/schema";
+import { chains, storeEnrichmentTasks, stores } from "@/db/schema";
 import {
 	type EnrichmentContext,
 	processEnrichStore,
 } from "@/lib/store-enrichment";
+import {
+	generateDisplayNames,
+	resolveChainName,
+} from "@/lib/store-names";
 import { getDb } from "@/utils/bindings";
+import { escapeLikePattern } from "@/utils/sql";
 import { generatePrefixedId } from "@/utils/id";
 import { procedure, superadminProcedure } from "../base";
+
+// ============================================================================
+// Display Name Helpers
+// ============================================================================
+
+/**
+ * Recompute display names for all non-manual stores in the given (chainSlug, city) groups.
+ * Pass multiple groups to handle moves (old group + new group).
+ */
+async function recomputeDisplayNamesForGroups(
+	groupKeys: Array<{ chainSlug: string; city: string | null }>,
+): Promise<void> {
+	const db = getDb();
+
+	// Deduplicate group keys
+	const uniqueKeys = new Map<string, { chainSlug: string; city: string | null }>();
+	for (const key of groupKeys) {
+		const k = `${key.chainSlug}::${key.city ?? "__null__"}`;
+		uniqueKeys.set(k, key);
+	}
+
+	// Fetch all stores in the affected groups
+	const conditions = Array.from(uniqueKeys.values()).map((g) =>
+		g.city
+			? and(eq(stores.chainSlug, g.chainSlug), eq(stores.city, g.city))
+			: and(eq(stores.chainSlug, g.chainSlug), sql`${stores.city} IS NULL`),
+	);
+
+	if (conditions.length === 0) return;
+
+	const affectedStores = await db
+		.select({
+			id: stores.id,
+			chainSlug: stores.chainSlug,
+			name: stores.name,
+			address: stores.address,
+			city: stores.city,
+			postalCode: stores.postalCode,
+			displayNameManual: stores.displayNameManual,
+			chainName: chains.name,
+		})
+		.from(stores)
+		.innerJoin(chains, eq(stores.chainSlug, chains.slug))
+		.where(or(...conditions));
+
+	if (affectedStores.length === 0) return;
+
+	const storesForNaming = affectedStores.map((s) => ({
+		id: s.id,
+		chainSlug: s.chainSlug,
+		name: s.name,
+		address: s.address,
+		city: s.city,
+		postalCode: s.postalCode,
+		displayNameManual: s.displayNameManual,
+		chainName: resolveChainName(s.chainSlug, s.chainName),
+	}));
+
+	const nameMap = generateDisplayNames(storesForNaming);
+
+	// Batch update
+	const updates = Array.from(nameMap.entries());
+	if (updates.length === 0) return;
+
+	const values = sql.join(
+		updates.map(([id, name]) => sql`(${id}, ${name})`),
+		sql`, `,
+	);
+
+	await db.execute(sql`
+		UPDATE stores AS s
+		SET display_name = src.display_name,
+			updated_at = NOW()
+		FROM (VALUES ${values}) AS src(id, display_name)
+		WHERE s.id = src.id
+	`);
+}
 
 // ============================================================================
 // Core Store Operations
@@ -40,11 +122,13 @@ export const listStores = procedure
 			conditions.push(eq(stores.isVirtual, input.isVirtual));
 		}
 		if (input.search) {
+			const escaped = escapeLikePattern(input.search);
 			conditions.push(
 				or(
-					like(stores.name, `%${input.search}%`),
-					like(stores.address, `%${input.search}%`),
-					like(stores.city, `%${input.search}%`),
+					like(stores.name, `%${escaped}%`),
+					like(stores.displayName, `%${escaped}%`),
+					like(stores.address, `%${escaped}%`),
+					like(stores.city, `%${escaped}%`),
 				),
 			);
 		}
@@ -150,10 +234,18 @@ export const updateStore = procedure
 			city: z.string().optional(),
 			lat: z.string().optional(),
 			lng: z.string().optional(),
+			displayName: z.string().nullable().optional(),
 		}),
 	)
 	.handler(async ({ input }) => {
 		const db = getDb();
+
+		// Get current store for group recomputation
+		const [existing] = await db
+			.select()
+			.from(stores)
+			.where(eq(stores.id, input.storeId));
+		if (!existing) throw new Error("Store not found");
 
 		const updateData: Partial<typeof stores.$inferInsert> = {
 			updatedAt: new Date(),
@@ -165,7 +257,36 @@ export const updateStore = procedure
 		if (input.lat !== undefined) updateData.latitude = input.lat;
 		if (input.lng !== undefined) updateData.longitude = input.lng;
 
+		// Handle displayName: explicit set marks as manual, null/empty resets to auto
+		if (input.displayName !== undefined) {
+			if (input.displayName) {
+				updateData.displayName = input.displayName;
+				updateData.displayNameManual = true;
+			} else {
+				// Reset to automatic
+				updateData.displayNameManual = false;
+			}
+		}
+
 		await db.update(stores).set(updateData).where(eq(stores.id, input.storeId));
+
+		// Recompute display names if city/address changed (affects all stores in the group)
+		// or if displayName was reset to auto. The recompute function skips manual-name stores internally.
+		const cityChanged = input.city !== undefined && input.city !== existing.city;
+		const addressChanged = input.address !== undefined && input.address !== existing.address;
+		const needsRecompute =
+			cityChanged || addressChanged || input.displayName === null;
+
+		if (needsRecompute) {
+			const groupKeys = [
+				{ chainSlug: existing.chainSlug, city: input.city ?? existing.city },
+			];
+			// If city changed, also recompute the old group
+			if (cityChanged && existing.city) {
+				groupKeys.push({ chainSlug: existing.chainSlug, city: existing.city });
+			}
+			await recomputeDisplayNamesForGroups(groupKeys);
+		}
 
 		return { success: true };
 	});
@@ -453,10 +574,12 @@ export const listVirtualStores = procedure
 			conditions.push(eq(stores.status, input.status));
 		}
 		if (input.search) {
+			const escaped = escapeLikePattern(input.search);
 			conditions.push(
 				or(
-					like(stores.name, `%${input.search}%`),
-					like(stores.city, `%${input.search}%`),
+					like(stores.name, `%${escaped}%`),
+					like(stores.displayName, `%${escaped}%`),
+					like(stores.city, `%${escaped}%`),
 				) ?? sql`1=1`,
 			);
 		}
@@ -468,19 +591,25 @@ export const listVirtualStores = procedure
 			.where(and(...conditions))
 			.orderBy(desc(stores.createdAt));
 
-		// Get linked counts for each virtual store
-		const storesWithCounts = await Promise.all(
-			virtualStores.map(async (store) => {
-				const [countResult] = await db
-					.select({ count: count() })
-					.from(stores)
-					.where(eq(stores.priceSourceStoreId, store.id));
-				return {
-					...store,
-					linkedPhysicalCount: countResult?.count ?? 0,
-				};
-			}),
-		);
+		// Get linked counts in a single query
+		let countMap = new Map<string, number>();
+		if (virtualStores.length > 0) {
+			const linkedCounts = await db
+				.select({
+					priceSourceStoreId: stores.priceSourceStoreId,
+					count: count(),
+				})
+				.from(stores)
+				.where(inArray(stores.priceSourceStoreId, virtualStores.map(s => s.id)))
+				.groupBy(stores.priceSourceStoreId);
+
+			countMap = new Map(linkedCounts.map(r => [r.priceSourceStoreId!, r.count]));
+		}
+
+		const storesWithCounts = virtualStores.map(store => ({
+			...store,
+			linkedPhysicalCount: countMap.get(store.id) ?? 0,
+		}));
 
 		return { stores: storesWithCounts };
 	});
@@ -514,11 +643,13 @@ export const listPhysicalStores = procedure
 			conditions.push(sql`${stores.priceSourceStoreId} IS NULL`);
 		}
 		if (input.search) {
+			const escaped = escapeLikePattern(input.search);
 			conditions.push(
 				or(
-					like(stores.name, `%${input.search}%`),
-					like(stores.address, `%${input.search}%`),
-					like(stores.city, `%${input.search}%`),
+					like(stores.name, `%${escaped}%`),
+					like(stores.displayName, `%${escaped}%`),
+					like(stores.address, `%${escaped}%`),
+					like(stores.city, `%${escaped}%`),
 				) ?? sql`1=1`,
 			);
 		}
@@ -540,6 +671,7 @@ export const listPhysicalStores = procedure
 					id: stores.id,
 					chainSlug: stores.chainSlug,
 					name: stores.name,
+					displayName: stores.displayName,
 					address: stores.address,
 					city: stores.city,
 					postalCode: stores.postalCode,
@@ -594,6 +726,49 @@ export const getVirtualStoresForLinking = procedure
 			.orderBy(stores.name);
 
 		return { stores: virtualStores };
+	});
+
+// ============================================================================
+// Map Endpoint
+// ============================================================================
+
+export const listAllForMap = procedure
+	.input(
+		z.object({
+			chainSlug: z.string().optional(),
+			status: z.enum(["active", "pending"]).optional(),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const db = getDb();
+
+		const conditions = [];
+		if (input.chainSlug) {
+			conditions.push(eq(stores.chainSlug, input.chainSlug));
+		}
+		if (input.status) {
+			conditions.push(eq(stores.status, input.status));
+		}
+
+		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+		const storeRows = await db
+			.select({
+				id: stores.id,
+				chainSlug: stores.chainSlug,
+				name: stores.name,
+				displayName: stores.displayName,
+				city: stores.city,
+				address: stores.address,
+				latitude: stores.latitude,
+				longitude: stores.longitude,
+				isVirtual: stores.isVirtual,
+				status: stores.status,
+			})
+			.from(stores)
+			.where(whereClause);
+
+		return { stores: storeRows };
 	});
 
 // ============================================================================
@@ -795,6 +970,11 @@ export const createPhysicalStore = procedure
 			createdAt: now,
 			updatedAt: now,
 		});
+
+		// Recompute display names for the new store's group
+		await recomputeDisplayNamesForGroups([
+			{ chainSlug: input.chainSlug, city: input.city || null },
+		]);
 
 		// Fetch the created store to return it
 		const [createdStore] = await db

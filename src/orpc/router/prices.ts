@@ -3,6 +3,7 @@ import * as z from "zod";
 import { retailerItems } from "@/db/schema";
 import { getClickHouse, parseNumber } from "@/lib/clickhouse";
 import { getDb } from "@/utils/bindings";
+import { escapeLikePattern } from "@/utils/sql";
 import { procedure } from "../base";
 
 type ClickHouseStorePriceRow = {
@@ -42,18 +43,17 @@ export const getStorePrices = procedure
 		const baseQuery = `
 			SELECT
 				retailer_item_id,
-				argMax(external_id, target_date) AS item_external_id,
-				argMax(name, target_date) AS item_name,
-				argMax(brand, target_date) AS brand,
-				argMax(price_cents, target_date) AS current_price,
-				argMax(price_status, target_date) AS price_status,
-				argMax(price_unavailable_reason, target_date) AS price_unavailable_reason,
-				argMax(discount_price_cents, target_date) AS discount_price,
-				argMax(unit_price_cents, target_date) AS unit_price,
-				max(target_date) AS last_seen_at
-			FROM prices
+				external_id AS item_external_id,
+				name AS item_name,
+				brand,
+				price_cents AS current_price,
+				price_status,
+				price_unavailable_reason,
+				discount_price_cents AS discount_price,
+				unit_price_cents AS unit_price,
+				target_date AS last_seen_at
+			FROM prices_current FINAL
 			WHERE chain_slug = {chainSlug:String} AND store_id = {storeId:String} ${dateGuard}
-			GROUP BY retailer_item_id
 		`;
 
 		const rows = await clickhouse.query<ClickHouseStorePriceRow>(
@@ -123,7 +123,7 @@ export const searchItems = procedure
 	)
 	.handler(async ({ input }) => {
 		const db = getDb();
-		const search = `%${input.query}%`;
+		const search = `%${escapeLikePattern(input.query)}%`;
 
 		const conditions = [
 			or(like(retailerItems.name, search), like(retailerItems.brand, search)),

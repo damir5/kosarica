@@ -78,7 +78,27 @@ export async function processEnrichStore(
 					country: "hr",
 				};
 
-				const geocodeResult = await geocodeAddress(geocodeInput);
+				const geocodeOutcome = await geocodeAddress(geocodeInput);
+
+				if (geocodeOutcome.isErr()) {
+					const err = geocodeOutcome.error;
+					await ctx.db
+						.update(storeEnrichmentTasks)
+						.set({
+							status: "failed",
+							errorMessage: err.message,
+							updatedAt: new Date(),
+						})
+						.where(eq(storeEnrichmentTasks.id, taskId));
+					log.error("Geocoding fetch failed", {
+						storeId,
+						taskId,
+						error: err.message,
+					});
+					return;
+				}
+
+				const geocodeResult = geocodeOutcome.value;
 
 				if (!geocodeResult.found) {
 					await ctx.db

@@ -2,6 +2,15 @@
 
 **Code Review**: See [CHECKS.md](./CHECKS.md) for required verification steps.
 
+## Environments
+
+| Environment | URL | Purpose |
+|-------------|-----|---------|
+| Local dev | `http://localhost:3002` | Local development |
+| **Test** | `https://kosarica.duckdns.org` | Remote test server (deployed via Kamal) |
+
+**`kosarica.duckdns.org` is the TEST environment, not production.** Do not refer to it as "production" or "prod". Deployments there are for testing and validation.
+
 ## SECRETS — CRITICAL RULES
 
 **`.env.development` is committed to git** (explicitly un-ignored in `.gitignore`).

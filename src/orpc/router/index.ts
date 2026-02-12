@@ -37,6 +37,7 @@ import {
 	getStoreDetail,
 	getVirtualStoresForLinking,
 	linkPriceSource,
+	listAllForMap,
 	listPhysicalStores,
 	listStores,
 	listVirtualStores,
@@ -156,6 +157,7 @@ export default {
 			triggerEnrichment: triggerEnrichment,
 			getEnrichmentTasks: getEnrichmentTasks,
 			verifyEnrichment: verifyEnrichment,
+			listAllForMap: listAllForMap,
 		},
 		catalogPrices: {
 			list: listCatalogPrices,

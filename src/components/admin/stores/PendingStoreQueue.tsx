@@ -12,6 +12,8 @@ export interface PendingStore {
 	id: string;
 	chainSlug: string;
 	name: string;
+	displayName: string | null;
+	displayNameManual: boolean | null;
 	address: string | null;
 	city: string | null;
 	postalCode: string | null;

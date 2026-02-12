@@ -6,13 +6,15 @@ import {
 	ChevronRight,
 	ExternalLink,
 	Link2,
+	Map,
 	MapPin,
 	Plus,
 	Search,
 	Store,
+	TableIcon,
 	Unlink,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { StoreAddModal } from "@/components/admin/stores";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +51,12 @@ import {
 } from "@/components/ui/table";
 import { orpc } from "@/orpc/client";
 
+const StoresMapView = lazy(() =>
+	import("@/components/admin/stores/StoresMapView").then((mod) => ({
+		default: mod.StoresMapView,
+	})),
+);
+
 export const Route = createFileRoute("/_admin/admin/stores/")({
 	component: StoresPage,
 });
@@ -72,6 +80,7 @@ type PhysicalStore = {
 	id: string;
 	chainSlug: string;
 	name: string;
+	displayName: string | null;
 	address: string | null;
 	city: string | null;
 	postalCode: string | null;
@@ -117,6 +126,9 @@ function StoresPage() {
 		}, 300);
 		return () => clearTimeout(timer);
 	}, [search]);
+
+	// Tab state
+	const [activeTab, setActiveTab] = useState<"table" | "map">("table");
 
 	// Query virtual stores
 	const { data: virtualData, isLoading: virtualLoading } = useQuery(
@@ -294,14 +306,58 @@ function StoresPage() {
 					</div>
 				</div>
 
+				{/* View Tabs */}
+				<div className="mb-6 flex gap-1 rounded-lg bg-muted p-1 w-fit">
+					<button
+						type="button"
+						className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+							activeTab === "table"
+								? "bg-background text-foreground shadow-sm"
+								: "text-muted-foreground hover:text-foreground"
+						}`}
+						onClick={() => setActiveTab("table")}
+					>
+						<TableIcon className="h-4 w-4" />
+						Table
+					</button>
+					<button
+						type="button"
+						className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+							activeTab === "map"
+								? "bg-background text-foreground shadow-sm"
+								: "text-muted-foreground hover:text-foreground"
+						}`}
+						onClick={() => setActiveTab("map")}
+					>
+						<Map className="h-4 w-4" />
+						Map
+					</button>
+				</div>
+
+				{/* Map View */}
+				{activeTab === "map" && (
+					<Suspense
+						fallback={
+							<div className="flex items-center justify-center py-12">
+								<p className="text-muted-foreground">Loading map...</p>
+							</div>
+						}
+					>
+						<StoresMapView
+							chainFilter={chainFilter}
+							statusFilter={statusFilter}
+						/>
+					</Suspense>
+				)}
+
 				{/* Loading State */}
-				{isLoading && (
+				{activeTab === "table" && isLoading && (
 					<div className="flex items-center justify-center py-12">
 						<p className="text-muted-foreground">Loading stores...</p>
 					</div>
 				)}
 
-				{!isLoading && (
+				{activeTab === "table" && !isLoading && (
 					<div className="space-y-8">
 						{/* Virtual Price Sources Section */}
 						<Card>
@@ -331,68 +387,59 @@ function StoresPage() {
 												</TableRow>
 											</TableHeader>
 											<TableBody>
-												{virtualData.stores.map((store) => {
-													const storeData = store as typeof store & {
-														id: string;
-														name: string;
-														chainSlug: string;
-														status: string | null;
-														updatedAt: Date | null;
-													};
-													return (
-														<TableRow key={storeData.id}>
-															<TableCell>
-																<div>
-																	<p className="font-medium">
-																		{storeData.name}
-																	</p>
-																	<p className="text-sm text-muted-foreground font-mono">
-																		{storeData.id}
-																	</p>
-																</div>
-															</TableCell>
-															<TableCell>
-																<Badge variant="outline">
-																	{storeData.chainSlug}
-																</Badge>
-															</TableCell>
-															<TableCell>
-																<Badge
-																	variant={
-																		storeData.status === "active"
-																			? "default"
-																			: "secondary"
-																	}
+												{virtualData.stores.map((store) => (
+													<TableRow key={store.id}>
+														<TableCell>
+															<div>
+																<p className="font-medium">
+																	{store.displayName ?? store.name}
+																</p>
+																<p className="text-sm text-muted-foreground font-mono">
+																	{store.name}
+																</p>
+															</div>
+														</TableCell>
+														<TableCell>
+															<Badge variant="outline">
+																{store.chainSlug}
+															</Badge>
+														</TableCell>
+														<TableCell>
+															<Badge
+																variant={
+																	store.status === "active"
+																		? "default"
+																		: "secondary"
+																}
+															>
+																{store.status}
+															</Badge>
+														</TableCell>
+														<TableCell>
+															<span className="text-sm text-muted-foreground">
+																{formatTimeAgo(store.updatedAt)}
+															</span>
+														</TableCell>
+														<TableCell>
+															<Badge variant="secondary">
+																{store.linkedPhysicalCount} Location
+																{store.linkedPhysicalCount !== 1 ? "s" : ""}{" "}
+																(Inheriting)
+															</Badge>
+														</TableCell>
+														<TableCell>
+															<Button variant="ghost" size="sm" asChild>
+																<Link
+																	to="/admin/stores/$storeId"
+																	params={{ storeId: store.id }}
 																>
-																	{storeData.status}
-																</Badge>
-															</TableCell>
-															<TableCell>
-																<span className="text-sm text-muted-foreground">
-																	{formatTimeAgo(storeData.updatedAt)}
-																</span>
-															</TableCell>
-															<TableCell>
-																<Badge variant="secondary">
-																	{store.linkedPhysicalCount} Location
-																	{store.linkedPhysicalCount !== 1 ? "s" : ""}{" "}
-																	(Inheriting)
-																</Badge>
-															</TableCell>
-															<TableCell>
-																<Button variant="ghost" size="sm" asChild>
-																	<Link
-																		to="/admin/stores/$storeId"
-																		params={{ storeId: storeData.id }}
-																	>
-																		<ExternalLink className="h-4 w-4" />
-																		View
-																	</Link>
-																</Button>
-															</TableCell>
-														</TableRow>
-													);
-												})}
+																	<ExternalLink className="h-4 w-4" />
+																	View
+																</Link>
+															</Button>
+														</TableCell>
+													</TableRow>
+												))}
 											</TableBody>
 										</Table>
 									</div>
@@ -466,7 +513,12 @@ function StoresPage() {
 														<TableRow key={store.id}>
 															<TableCell>
 																<div>
-																	<p className="font-medium">{store.name}</p>
+																	<p className="font-medium">
+																		{store.displayName ?? store.name}
+																	</p>
+																	<p className="text-sm text-muted-foreground font-mono">
+																		{store.name}
+																	</p>
 																	{store.address && (
 																		<p className="text-sm text-muted-foreground">
 																			{store.address}

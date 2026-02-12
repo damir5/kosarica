@@ -15,4 +15,5 @@ export { type PricingMode, StoreForm, type StoreFormData } from "./StoreForm";
 export { StoreLocationMap } from "./StoreLocationMap";
 export { StoreMergeModal } from "./StoreMergeModal";
 export { StoreStatusBadge } from "./StoreStatusBadge";
+export { StoresMapView } from "./StoresMapView";
 export { VerifyLocationModal } from "./VerifyLocationModal";

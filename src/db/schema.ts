@@ -144,6 +144,8 @@ export const stores = pgTable(
 		priceSourceStoreId: text("price_source_store_id").references(
 			(): AnyPgColumn => stores.id,
 		),
+		displayName: text("display_name"),
+		displayNameManual: boolean("display_name_manual").default(false),
 		status: text("status").default("active"), // 'active' | 'pending' | 'enriched' | 'needs_review' | 'approved' | 'rejected' | 'merged' | 'failed'
 		// Approval workflow tracking
 		approvalNotes: text("approval_notes"), // Notes from approval/rejection

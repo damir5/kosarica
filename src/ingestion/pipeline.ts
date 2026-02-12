@@ -486,6 +486,7 @@ async function resolveStoreId(
 			id: storeId,
 			chainSlug,
 			name: storeName,
+			displayName: storeName,
 			address: metadata?.address,
 			city: metadata?.city,
 			postalCode: metadata?.postalCode,
