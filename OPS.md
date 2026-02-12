@@ -4,11 +4,30 @@ Central operations reference for the Kosarica staging environment and tooling.
 
 ---
 
+## Secrets
+
+All secrets live in `../shared/secrets/` — a directory shared between host and container.
+See [`../shared/secrets/README.md`](../shared/secrets/README.md) for full details.
+
+```
+../shared/secrets/
+├── setup.sh                    # Run after fresh container to restore symlinks
+├── ssh/kosarica_staging        # Ed25519 private key for staging SSH
+├── kamal/secrets               # Kamal deploy secrets (symlinked to .kamal/secrets)
+└── api-keys/staging-claude-agent  # API key for programmatic oRPC access
+```
+
+**After fresh container**: `bash ../shared/secrets/setup.sh`
+
+---
+
 ## Quick Reference
 
 ```bash
 # API key call to staging
-curl -H "x-api-key: kos_xxxxx" https://kosarica.duckdns.org/api/rpc/admin/cron/list
+curl -X POST -H "Content-Type: application/json" \
+  -H "x-api-key: $(cat ../shared/secrets/api-keys/staging-claude-agent)" \
+  -d '{}' https://kosarica.duckdns.org/api/rpc/admin/cron/list
 
 # SSH to staging server
 ssh kosarica-staging
@@ -41,18 +60,14 @@ npx tsx scripts/create-service-account.ts --name my-custom-key
 The script:
 1. Creates (or finds) a superadmin user `agent@kosarica.local`
 2. Generates an API key with prefix `kos_`
-3. Prints the full key **once** — store it immediately
+3. Prints the full key **once** — store it in `../shared/secrets/api-keys/`
 
 ### Storing the key
 
-Add to `.kamal/secrets`:
-```
-SERVICE_ACCOUNT_API_KEY=kos_xxxxx
-```
-
-For local use, add to `.env.local`:
-```
-SERVICE_ACCOUNT_API_KEY=kos_xxxxx
+```bash
+# Save to shared secrets (persists across container restarts)
+echo "kos_xxxxx" > ../shared/secrets/api-keys/staging-claude-agent
+chmod 600 ../shared/secrets/api-keys/staging-claude-agent
 ```
 
 ### Rate limits
@@ -76,27 +91,24 @@ DELETE FROM apikey WHERE name = 'claude-agent';
 
 ## SSH Access to Staging
 
-### Setup
+SSH key lives in `../shared/secrets/ssh/kosarica_staging`. The `setup.sh` script symlinks it to `~/.ssh/` and adds the SSH config entry.
 
-1. Generate key pair (one-time):
+### Manual setup (if not using setup.sh)
+
+1. Generate key pair:
    ```bash
-   ssh-keygen -t ed25519 -C "claude-agent@kosarica" -f ~/.ssh/kosarica_staging -N ""
+   ssh-keygen -t ed25519 -C "claude-agent@kosarica" -f ../shared/secrets/ssh/kosarica_staging -N ""
    ```
 
 2. Add public key to server:
    ```bash
-   # Copy the public key contents
-   cat ~/.ssh/kosarica_staging.pub
-   # Then add to root@kosarica.duckdns.org:~/.ssh/authorized_keys
+   cat ../shared/secrets/ssh/kosarica_staging.pub
+   # Add to root@kosarica.duckdns.org:~/.ssh/authorized_keys
    ```
 
-3. SSH config (`~/.ssh/config`):
-   ```
-   Host kosarica-staging
-     HostName kosarica.duckdns.org
-     User root
-     IdentityFile ~/.ssh/kosarica_staging
-     StrictHostKeyChecking accept-new
+3. Symlink and configure:
+   ```bash
+   bash ../shared/secrets/setup.sh
    ```
 
 ### Common commands
@@ -153,7 +165,7 @@ ssh -L 5080:kosarica-openobserve:5080 root@kosarica.duckdns.org -N &
 open http://localhost:5080
 ```
 
-Credentials are in `.kamal/secrets` (`ZO_ROOT_USER_PASSWORD`).
+Credentials are in `../shared/secrets/kamal/secrets` (`ZO_ROOT_USER_PASSWORD`).
 
 - **Detailed guide**: [docs/operations/observability.md](./docs/operations/observability.md)
 
