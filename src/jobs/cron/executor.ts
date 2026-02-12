@@ -155,10 +155,9 @@ export async function claimDueJobs(): Promise<ClaimedJob[]> {
 	`);
 
 	const claimedJobs: ClaimedJob[] = [];
-	const rows = ((result as { rows?: unknown[] }).rows ?? []) as Record<
-		string,
-		unknown
-	>[];
+	const rows = (
+		Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? [])
+	) as Record<string, unknown>[];
 
 	for (const row of rows) {
 		// The scheduledFor is captured from before we nulled next_run_at
