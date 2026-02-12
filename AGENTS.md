@@ -25,13 +25,49 @@
 - Before any commit touching `.env*` files, verify no real secrets are present.
 - If you accidentally stage a secret, `git reset` the file and clean it before committing.
 
+## Common Commands (mise tasks)
+
+All tasks are defined in `mise.toml`. Run with `mise run <task>`.
+
+| Task | Command | Description |
+|------|---------|-------------|
+| `dev` | `mise run dev` | Run app in dev mode (logs to `log/log.txt`) |
+| `services-up` | `mise run services-up` | Start dev containers (Postgres + ClickHouse) |
+| `services-down` | `mise run services-down` | Stop dev containers |
+| `services-purge` | `mise run services-purge` | Remove dev containers and all volumes |
+| `reset-data` | `mise run reset-data` | Reset dev data (storage + DB + admin) |
+| `test-all` | `mise run test-all` | Run full test suite (auto-starts test services) |
+| `deploy-test` | `mise run deploy-test` | Deploy to test env via Kamal |
+
+Other useful commands:
+
+| Command | Description |
+|---------|-------------|
+| `pnpm build` | Build for production (type-check) |
+| `pnpm test` | Run frontend tests only |
+| `pnpm db:generate` | Generate Drizzle migration from schema |
+| `pnpm db:migrate` | Apply Drizzle migrations |
+
+## Deployment
+
+Deploy to the test server (`kosarica.duckdns.org`) using Kamal:
+
+```bash
+mise run deploy-test
+```
+
+- Config: `kamal.yml` (project root)
+- Secrets: `.kamal/secrets`
+- Requires: `ruby@3.3` (installed via mise), SSH access to the server
+- Docker image is built locally (amd64), pushed to a local registry, then pulled on the server
+
 ## Minimal dev & test setup
 
 Start containers first:
 
 ```bash
 # Dev services (persistent data)
-docker compose --profile dev up -d
+mise run services-up
 
 # Test services (ephemeral)
 docker compose --profile test up -d

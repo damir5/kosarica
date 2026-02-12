@@ -25,6 +25,6 @@ run = "./scripts/reset-dev-data.sh"
 description = "Run full test suite (auto-starts docker test services)"
 run = "./scripts/test-all.sh"
 
-[tasks.deploy-dev]
-description = "Deploy to dev environment via Kamal"
+[tasks.deploy-test]
+description = "Deploy to test environment via Kamal"
 run = "mise exec ruby@3.3 -- kamal deploy -c kamal.yml"
