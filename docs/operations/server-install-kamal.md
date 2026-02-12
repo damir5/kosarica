@@ -1,12 +1,12 @@
-# Server Install Runbook: Kamal + DuckDNS (No Cloudflare)
+# Server Install Runbook: Kamal
 
-This runbook is the canonical, repeatable setup for deploying Kosarica to a single Ubuntu server using Docker builds and Kamal deploys with direct public ingress on `kosarica.duckdns.org`.
+This runbook is the canonical, repeatable setup for deploying Kosarica to a single Ubuntu server using Docker builds and Kamal deploys with direct public ingress on `kosarica.chickenkiller.com`.
 
 ## Scope and Constraints
 
 - Origin host: Ubuntu 24.04 (Hetzner VPS class machine)
 - Deploy model: Kamal deploys from local operator machine
-- Ingress model: direct DNS (`kosarica.duckdns.org`) to server IP
+- Ingress model: direct DNS (`kosarica.chickenkiller.com`) to server IP
 - TLS model: Kamal proxy + Let's Encrypt
 - SSH policy: key-based SSH from changing networks (no source IP allowlist)
 - SSH key policy for this setup: no forced rotation workflow
@@ -28,7 +28,7 @@ gem install kamal
 docker --version
 
 # Access check
-ssh root@kosarica.duckdns.org
+ssh root@kosarica.chickenkiller.com
 ```
 
 Container registry mode:
@@ -96,46 +96,18 @@ ufw status verbose
 systemctl is-active docker fail2ban
 ```
 
-## 3. DuckDNS Setup
-
-You already configured:
-
-- hostname: `kosarica.duckdns.org`
-
-Validate it resolves to your server IP:
-
-```bash
-dig +short kosarica.duckdns.org A
-curl -I http://kosarica.duckdns.org
-```
-
-Optional (recommended) dynamic IP updater if your server IP might change:
-
-```bash
-cat >/usr/local/bin/duckdns-update.sh <<'BASH'
-#!/usr/bin/env bash
-set -euo pipefail
-# fill these once
-DOMAIN="kosarica"
-TOKEN="<duckdns-token>"
-
-curl -fsS "https://www.duckdns.org/update?domains=${DOMAIN}&token=${TOKEN}&ip="
-BASH
-chmod +x /usr/local/bin/duckdns-update.sh
-```
-
-## 4. Repo Deployment Configuration
+## 3. Repo Deployment Configuration
 
 This repository is configured for:
 
 - App image built from `Dockerfile`
 - Kamal deploy via `kamal.yml`
-- Kamal proxy TLS termination on `kosarica.duckdns.org`
+- Kamal proxy TLS termination on `kosarica.chickenkiller.com`
 - Accessories: `postgres`, `clickhouse`, `opentelemetry-collector`, `openobserve`
 - Postgres accessory image: `pgvector/pgvector:pg16` (required for `vector` extension migrations)
 - OTel config file mounted from `deployment/otel-collector-config.yaml`
 
-## 5. Production Secrets and Env
+## 4. Production Secrets and Env
 
 Create `.kamal/secrets` (local, not committed) before running Kamal:
 
@@ -145,8 +117,8 @@ cat > .kamal/secrets <<'EOF'
 POSTGRES_PASSWORD=<strong-password>
 DATABASE_URL=postgresql://kosarica:<strong-password>@kosarica-postgres:5432/kosarica
 BETTER_AUTH_SECRET=<min-32-char-secret>
-BETTER_AUTH_URL=https://kosarica.duckdns.org
-PASSKEY_RP_ID=kosarica.duckdns.org
+BETTER_AUTH_URL=https://kosarica.chickenkiller.com
+PASSKEY_RP_ID=kosarica.chickenkiller.com
 PASSKEY_RP_NAME=Kosarica
 ZO_ROOT_USER_EMAIL=admin@kosarica.local
 ZO_ROOT_USER_PASSWORD=<strong-password>
@@ -162,7 +134,7 @@ Optional (provide when enabling semantic/LLM workflows in production):
 - `ANTHROPIC_API_KEY`
 - `OPENAI_API_KEY`
 
-## 6. First Deploy and Post-Deploy Tasks
+## 5. First Deploy and Post-Deploy Tasks
 
 ```bash
 # first-time host prep by Kamal
@@ -172,11 +144,11 @@ kamal setup
 kamal deploy
 
 # run DB migrations from operator machine via temporary SSH tunnel
-PG_IP=$(ssh root@kosarica.duckdns.org "docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kosarica-postgres")
+PG_IP=$(ssh root@kosarica.chickenkiller.com "docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kosarica-postgres")
 PG_PASS=$(sed -n 's/^POSTGRES_PASSWORD=//p' .kamal/secrets)
-ssh -f -N -L 55432:${PG_IP}:5432 root@kosarica.duckdns.org
+ssh -f -N -L 55432:${PG_IP}:5432 root@kosarica.chickenkiller.com
 DATABASE_URL="postgresql://kosarica:${PG_PASS}@127.0.0.1:55432/kosarica" pnpm db:migrate
-pkill -f "ssh -f -N -L 55432:${PG_IP}:5432 root@kosarica.duckdns.org" || true
+pkill -f "ssh -f -N -L 55432:${PG_IP}:5432 root@kosarica.chickenkiller.com" || true
 
 # verify status and logs
 kamal app version
@@ -187,17 +159,17 @@ kamal app logs --lines 200
 Smoke checks:
 
 ```bash
-curl -fsS https://kosarica.duckdns.org/
+curl -fsS https://kosarica.chickenkiller.com/
 ```
 
-## 7. Observability Runbook
+## 6. Observability Runbook
 
 OpenObserve is internal-only in this setup.
 
 Use SSH local forwarding when needed:
 
 ```bash
-ssh -L 5080:localhost:5080 root@kosarica.duckdns.org
+ssh -L 5080:localhost:5080 root@kosarica.chickenkiller.com
 # then open http://localhost:5080 locally
 ```
 
@@ -215,7 +187,7 @@ kamal accessory details opentelemetry-collector
 kamal accessory details openobserve
 ```
 
-## 8. Backup, Retention, and Recovery
+## 7. Backup, Retention, and Recovery
 
 Create backup script `/usr/local/bin/kosarica-backup.sh`:
 
@@ -242,13 +214,13 @@ Schedule nightly cron (example 02:10 UTC):
 
 Also keep sourcemap retention policy (monthly prune, keep newest 20 releases).
 
-## 9. Security and Ops Recommendations
+## 8. Security and Ops Recommendations
 
 1. Keep SSH key auth only; disable password auth.
 2. Keep SSH reachable from any network if required, but keep fail2ban enabled.
 3. Keep OpenObserve internal-only; access via SSH forward.
 4. Add health monitoring for:
-   - `https://kosarica.duckdns.org/`
+   - `https://kosarica.chickenkiller.com/`
    - disk usage on `/var/lib/kosarica`
 5. Test rollback at least once:
 
@@ -256,7 +228,7 @@ Also keep sourcemap retention policy (monthly prune, keep newest 20 releases).
 kamal rollback
 ```
 
-## 10. What Was Applied on `kosarica.private` (2026-02-10)
+## 9. What Was Applied on `kosarica.private` (2026-02-10)
 
 Applied on host:
 
@@ -265,7 +237,7 @@ Applied on host:
 - `fail2ban` enabled
 - persistent directories created under `/var/lib/kosarica` and `/app`
 - `/etc/docker/daemon.json` configured for Docker json log rotation
-- Kamal proxy + app deployed successfully on `https://kosarica.duckdns.org`
+- Kamal proxy + app deployed successfully on `https://kosarica.chickenkiller.com`
 - PostgreSQL migrations applied against staging database
 - OpenTelemetry Collector + OpenObserve running with successful OTLP ingest (`/api/default/v1/logs` and `/api/default/v1/metrics` HTTP 200)
 

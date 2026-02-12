@@ -33,14 +33,14 @@ All services run as Docker containers on the same `kamal` network, managed by Ka
 OpenObserve is internal-only. Access via SSH port forwarding:
 
 ```bash
-ssh -L 5080:172.18.0.4:5080 root@kosarica.duckdns.org
+ssh -L 5080:172.18.0.4:5080 root@kosarica.chickenkiller.com
 ```
 
 Then open http://localhost:5080
 
 > **Note**: The IP `172.18.0.4` is the OpenObserve container's Docker IP. If it changes after a restart, find the current IP:
 > ```bash
-> ssh root@kosarica.duckdns.org "docker inspect kosarica-openobserve --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'"
+> ssh root@kosarica.chickenkiller.com "docker inspect kosarica-openobserve --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'"
 > ```
 
 ### Credentials
@@ -184,24 +184,24 @@ This uploads the local `deployment/otel-collector-config.yaml` and restarts the 
 ### View Collector Logs
 
 ```bash
-ssh root@kosarica.duckdns.org "docker logs kosarica-opentelemetry-collector --since 5m"
+ssh root@kosarica.chickenkiller.com "docker logs kosarica-opentelemetry-collector --since 5m"
 ```
 
 ### View Collector Health
 
 ```bash
-ssh root@kosarica.duckdns.org "curl -s http://172.18.0.5:13133/health"
+ssh root@kosarica.chickenkiller.com "curl -s http://172.18.0.5:13133/health"
 ```
 
 > The IP `172.18.0.5` is the collector container IP. Find current IP:
 > ```bash
-> ssh root@kosarica.duckdns.org "docker inspect kosarica-opentelemetry-collector --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'"
+> ssh root@kosarica.chickenkiller.com "docker inspect kosarica-opentelemetry-collector --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'"
 > ```
 
 ### Query Logs via API
 
 ```bash
-ssh root@kosarica.duckdns.org "curl -s -u 'admin@kosarica.local:<password>' \
+ssh root@kosarica.chickenkiller.com "curl -s -u 'admin@kosarica.local:<password>' \
   'http://172.18.0.4:5080/api/default/_search?type=logs' \
   -H 'Content-Type: application/json' \
   -d '{\"query\":{\"sql\":\"SELECT * FROM kosarica_logs WHERE severity=\\\"error\\\" ORDER BY _timestamp DESC LIMIT 10\",\"from\":0,\"size\":10,\"start_time\":0,\"end_time\":0}}'"
@@ -210,14 +210,14 @@ ssh root@kosarica.duckdns.org "curl -s -u 'admin@kosarica.local:<password>' \
 ### List Streams
 
 ```bash
-ssh root@kosarica.duckdns.org "curl -s -u 'admin@kosarica.local:<password>' \
+ssh root@kosarica.chickenkiller.com "curl -s -u 'admin@kosarica.local:<password>' \
   http://172.18.0.4:5080/api/default/streams"
 ```
 
 ### List Dashboards
 
 ```bash
-ssh root@kosarica.duckdns.org "curl -s -u 'admin@kosarica.local:<password>' \
+ssh root@kosarica.chickenkiller.com "curl -s -u 'admin@kosarica.local:<password>' \
   http://172.18.0.4:5080/api/default/dashboards"
 ```
 

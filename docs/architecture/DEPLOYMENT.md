@@ -1,6 +1,6 @@
 # Deployment & Operations
 
-> Canonical install/deploy runbook: `docs/operations/server-install-kamal-duckdns.md`
+> Canonical install/deploy runbook: `docs/operations/server-install-kamal.md`
 >
 > This document contains legacy deployment notes. For new environments, use the runbook above (DuckDNS ingress, Kamal deploys, and internal-only observability endpoints).
 

@@ -6,7 +6,7 @@ set -euo pipefail
 
 DAYS=14
 CONFIRM=true
-STAGING_HOST="root@kosarica.duckdns.org"
+STAGING_HOST="root@kosarica.chickenkiller.com"
 REMOTE_STORAGE="/app/data/storage"
 
 while [[ $# -gt 0 ]]; do

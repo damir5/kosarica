@@ -102,7 +102,7 @@ async function main() {
 	console.log("Add to .kamal/secrets as: SERVICE_ACCOUNT_API_KEY=<key>");
 	console.log("\nUsage:");
 	console.log(
-		'  curl -H "x-api-key: <key>" https://kosarica.duckdns.org/api/rpc/admin/cron/list',
+		'  curl -H "x-api-key: <key>" https://kosarica.chickenkiller.com/api/rpc/admin/cron/list',
 	);
 }
 

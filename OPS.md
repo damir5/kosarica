@@ -27,7 +27,7 @@ See [`../shared/secrets/README.md`](../shared/secrets/README.md) for full detail
 # API key call to staging
 curl -X POST -H "Content-Type: application/json" \
   -H "x-api-key: $(cat ../shared/secrets/api-keys/staging-claude-agent)" \
-  -d '{}' https://kosarica.duckdns.org/api/rpc/admin/cron/list
+  -d '{}' https://kosarica.chickenkiller.com/api/rpc/admin/cron/list
 
 # SSH to staging server
 ssh kosarica-staging
@@ -103,7 +103,7 @@ SSH key lives in `../shared/secrets/ssh/kosarica_staging`. The `setup.sh` script
 2. Add public key to server:
    ```bash
    cat ../shared/secrets/ssh/kosarica_staging.pub
-   # Add to root@kosarica.duckdns.org:~/.ssh/authorized_keys
+   # Add to root@kosarica.chickenkiller.com:~/.ssh/authorized_keys
    ```
 
 3. Symlink and configure:
@@ -137,7 +137,7 @@ ssh kosarica-staging "docker ps --format 'table {{.Names}}\t{{.Status}}'"
 
 ## Staging Server
 
-- **Host**: `kosarica.duckdns.org`
+- **Host**: `kosarica.chickenkiller.com`
 - **User**: `root`
 - **Containers**: Managed by Kamal
   - `kosarica-web-*` — Node.js app
@@ -145,7 +145,7 @@ ssh kosarica-staging "docker ps --format 'table {{.Names}}\t{{.Status}}'"
   - `kosarica-clickhouse` — ClickHouse
   - `kosarica-openobserve` — OpenObserve (logs/metrics/traces)
   - `kosarica-otel-collector` — OpenTelemetry Collector
-- **Detailed setup**: [docs/operations/server-install-kamal-duckdns.md](./docs/operations/server-install-kamal-duckdns.md)
+- **Detailed setup**: [docs/operations/server-install-kamal.md](./docs/operations/server-install-kamal.md)
 
 ---
 
@@ -161,7 +161,7 @@ ssh kosarica-staging "docker ps --format 'table {{.Names}}\t{{.Status}}'"
 OpenObserve runs on staging but is **not publicly exposed**. Access via SSH tunnel:
 
 ```bash
-ssh -L 5080:kosarica-openobserve:5080 root@kosarica.duckdns.org -N &
+ssh -L 5080:kosarica-openobserve:5080 root@kosarica.chickenkiller.com -N &
 open http://localhost:5080
 ```
 

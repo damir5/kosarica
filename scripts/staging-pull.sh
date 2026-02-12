@@ -5,7 +5,7 @@ set -euo pipefail
 # Opens SSH tunnels, calls sub-scripts, cleans up on exit.
 # Usage: mise run staging-pull [--days N] [--storage] [--yes]
 #
-# NOTE: Tailscale MagicDNS breaks resolution of kosarica.duckdns.org.
+# NOTE: Tailscale MagicDNS breaks resolution of kosarica.chickenkiller.com.
 # Disable Tailscale before running, or add the IP to /etc/hosts.
 
 DAYS=14
@@ -13,7 +13,7 @@ CONFIRM=true
 SYNC_STORAGE=false
 TUNNEL_PID=""
 
-STAGING_HOST="root@kosarica.duckdns.org"
+STAGING_HOST="root@kosarica.chickenkiller.com"
 LOCAL_PG_TUNNEL_PORT=15432
 LOCAL_CH_TUNNEL_PORT=18123
 

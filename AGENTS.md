@@ -14,9 +14,9 @@ See [OPS.md](./OPS.md) for the master operations guide covering:
 | Environment | URL | Purpose |
 |-------------|-----|---------|
 | Local dev | `http://localhost:3002` | Local development |
-| **Staging** | `https://kosarica.duckdns.org` | Remote staging server (deployed via Kamal) |
+| **Staging** | `https://kosarica.chickenkiller.com` | Remote staging server (deployed via Kamal) |
 
-**`kosarica.duckdns.org` is the STAGING environment, not production.** Do not refer to it as "production" or "prod". Deployments there are for staging and validation.
+**`kosarica.chickenkiller.com` is the STAGING environment, not production.** Do not refer to it as "production" or "prod". Deployments there are for staging and validation.
 
 ## SECRETS — CRITICAL RULES
 
@@ -58,7 +58,7 @@ Other useful commands:
 
 ## Deployment
 
-Deploy to the staging server (`kosarica.duckdns.org`) using Kamal:
+Deploy to the staging server (`kosarica.chickenkiller.com`) using Kamal:
 
 ```bash
 mise run deploy-staging
@@ -336,7 +336,7 @@ OpenObserve is **not** exposed publicly. Access it via SSH tunnel:
 
 ```bash
 # Open tunnel (runs in background)
-ssh -L 5080:kosarica-openobserve:5080 root@kosarica.duckdns.org -N &
+ssh -L 5080:kosarica-openobserve:5080 root@kosarica.chickenkiller.com -N &
 
 # Then open in browser
 open http://localhost:5080

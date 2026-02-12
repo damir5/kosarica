@@ -2,7 +2,7 @@
 
 ## Task Summary
 
-Test the unified product matching pipeline on staging server (kosarica.duckdns.org) with:
+Test the unified product matching pipeline on staging server (kosarica.chickenkiller.com) with:
 - Database: PostgreSQL on remote server
 - LLM: qwen3-4b model running on 0.0.0.0:1234
 - Small sample run (10 groups, dry run)
@@ -42,7 +42,7 @@ Applied to:
 ## Prerequisites
 
 ### Remote Server Access
-- SSH access to `root@kosarica.duckdns.org`
+- SSH access to `root@kosarica.chickenkiller.com`
 - LLM model running at `http://0.0.0.0:1234/v1/chat/completions`
 - PostgreSQL running in Docker on remote server
 - Application code accessible on remote server
@@ -80,9 +80,9 @@ LLM_ENSEMBLE_JSON='[
 
 ### Step 1: Connect to Remote Server
 ```bash
-ssh root@kosarica.duckdns.org
+ssh root@kosarica.chickenkiller.com
 # Or with key:
-ssh -i /path/to/private-key root@kosarica.duckdns.org
+ssh -i /path/to/private-key root@kosarica.chickenkiller.com
 ```
 
 ### Step 2: Navigate to Application Directory
@@ -214,7 +214,7 @@ pnpm tsx --version
 
 1. **Full Run**: Set `dryRun: false` and test persistence
 2. **Scale Up**: Increase limit to 25-50 groups
-3. **Monitor**: Check Admin UI at https://kosarica.duckdns.org/admin/matching
+3. **Monitor**: Check Admin UI at https://kosarica.chickenkiller.com/admin/matching
 4. **Cron Activation**: Set `SEMANTIC_CLUSTERING_MODE=unified` on server
 
 ## Notes

@@ -2,7 +2,7 @@
 
 Use this checklist before first limited production release to avoid missing infra, keys, agents, and observability wiring.
 
-Primary setup reference: `docs/operations/server-install-kamal-duckdns.md`
+Primary setup reference: `docs/operations/server-install-kamal.md`
 
 ## 1. Server Baseline
 
@@ -163,7 +163,7 @@ kamal app logs
 4. smoke checks:
 
 ```bash
-curl -f https://kosarica.duckdns.org/
+curl -f https://kosarica.chickenkiller.com/
 kamal accessory logs openobserve --lines 100
 ```
 

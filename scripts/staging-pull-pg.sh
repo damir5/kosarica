@@ -88,7 +88,7 @@ fi
 # Verify staging tunnel is reachable
 if ! psql --no-psqlrc "${STAGING_PG}" -c "SELECT 1" >/dev/null 2>&1; then
   echo "ERROR: Cannot connect to staging PG at localhost:${STAGING_PG_PORT}"
-  echo "Ensure SSH tunnel is open: ssh -L ${STAGING_PG_PORT}:kosarica-postgres:5432 root@kosarica.duckdns.org"
+  echo "Ensure SSH tunnel is open: ssh -L ${STAGING_PG_PORT}:kosarica-postgres:5432 root@kosarica.chickenkiller.com"
   exit 1
 fi
 echo "Staging PG connection verified."
