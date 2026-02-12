@@ -1,6 +1,7 @@
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { apiKey } from "better-auth/plugins";
 import * as schema from "@/db/schema";
 import { getDb, getEnv } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
@@ -12,6 +13,7 @@ const MODEL_PREFIXES: Record<string, string> = {
 	account: "acc",
 	verification: "ver",
 	passkey: "psk",
+	apikey: "apk",
 };
 
 export function createAuth() {
@@ -31,6 +33,7 @@ export function createAuth() {
 				account: schema.account,
 				verification: schema.verification,
 				passkey: schema.passkey,
+				apikey: schema.apikey,
 			},
 		}),
 
@@ -46,6 +49,14 @@ export function createAuth() {
 				rpID: env.PASSKEY_RP_ID || "localhost",
 				rpName: env.PASSKEY_RP_NAME || "Kosarica App",
 				origin: env.BETTER_AUTH_URL || "http://localhost:3000",
+			}),
+			apiKey({
+				enableSessionForAPIKeys: true,
+				rateLimit: {
+					enabled: true,
+					timeWindow: 86_400_000,
+					maxRequests: 1000,
+				},
 			}),
 		],
 

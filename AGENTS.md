@@ -2,6 +2,13 @@
 
 **Code Review**: See [CHECKS.md](./CHECKS.md) for required verification steps.
 
+## Operations
+
+See [OPS.md](./OPS.md) for the master operations guide covering:
+- Service account / API key access
+- SSH access to staging
+- Operational playbooks and references
+
 ## Environments
 
 | Environment | URL | Purpose |
@@ -37,6 +44,7 @@ All tasks are defined in `mise.toml`. Run with `mise run <task>`.
 | `services-purge` | `mise run services-purge` | Remove dev containers and all volumes |
 | `reset-data` | `mise run reset-data` | Reset dev data (storage + DB + admin) |
 | `test-all` | `mise run test-all` | Run full test suite (auto-starts test services) |
+| `staging-pull` | `mise run staging-pull` | Pull recent staging data to local dev (`--days N`, `--storage`, `--yes`) |
 | `deploy-staging` | `mise run deploy-staging` | Deploy to staging env via Kamal |
 
 Other useful commands:
@@ -60,6 +68,20 @@ mise run deploy-staging
 - Secrets: `.kamal/secrets`
 - Requires: `ruby@3.3` (installed via mise), SSH access to the server
 - Docker image is built locally (amd64), pushed to a local registry, then pulled on the server
+
+## Staging Data Pull
+
+Pull a recent slice of staging data into local dev for realistic testing:
+
+```bash
+mise run staging-pull              # PG + CH, last 14 days
+mise run staging-pull -- --days 7  # Last 7 days only
+mise run staging-pull -- --storage # Also sync file storage (archives + parquet)
+```
+
+Sub-scripts can be run independently: `./scripts/staging-pull-pg.sh`, `./scripts/staging-pull-ch.sh`, `./scripts/staging-pull-storage.sh`.
+
+**Staging Pull Maintenance**: When adding/removing/renaming tables in `src/db/schema.ts`, update the table lists in `scripts/staging-pull-pg.sh` (`FULL_TABLES` array and date-sliced section). Tables not listed are left empty after migration.
 
 ## Minimal dev & test setup
 

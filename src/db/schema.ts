@@ -103,6 +103,40 @@ export const passkey = pgTable("passkey", {
 	createdAt: timestamp("createdAt"),
 });
 
+// Better Auth API Key plugin table
+export const apikey = pgTable(
+	"apikey",
+	{
+		id: text("id").primaryKey(),
+		name: text("name"),
+		start: text("start"),
+		prefix: text("prefix"),
+		key: text("key").notNull(),
+		userId: text("userId")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		refillInterval: integer("refillInterval"),
+		refillAmount: integer("refillAmount"),
+		lastRefillAt: timestamp("lastRefillAt"),
+		enabled: boolean("enabled").default(true),
+		rateLimitEnabled: boolean("rateLimitEnabled").default(true),
+		rateLimitTimeWindow: integer("rateLimitTimeWindow"),
+		rateLimitMax: integer("rateLimitMax"),
+		requestCount: integer("requestCount").default(0),
+		remaining: integer("remaining"),
+		lastRequest: timestamp("lastRequest"),
+		expiresAt: timestamp("expiresAt"),
+		createdAt: timestamp("createdAt").notNull(),
+		updatedAt: timestamp("updatedAt").notNull(),
+		permissions: text("permissions"),
+		metadata: text("metadata"),
+	},
+	(table) => ({
+		keyIdx: index("apikey_key_idx").on(table.key),
+		userIdIdx: index("apikey_user_id_idx").on(table.userId),
+	}),
+);
+
 // App Settings table
 export const appSettings = pgTable("app_settings", {
 	id: cuid2("cfg").primaryKey(),
