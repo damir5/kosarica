@@ -51,4 +51,63 @@ describe("parseEnsembleConfig", () => {
 		expect(config[0].endpoint).toContain("openai.com");
 		expect(config[0].apiKeyEnv).toBe("OPENAI_API_KEY");
 	});
+
+	it("rejects loopback endpoints in production by default", () => {
+		const previousNodeEnv = process.env.NODE_ENV;
+		const previousOverride = process.env.ALLOW_LOOPBACK_LLM_ENDPOINT;
+		try {
+			process.env.NODE_ENV = "production";
+			delete process.env.ALLOW_LOOPBACK_LLM_ENDPOINT;
+
+			expect(() =>
+				parseEnsembleConfig(
+					JSON.stringify([
+						{
+							id: "local",
+							provider: "openai",
+							model: "qwen/qwen3-4b",
+							endpoint: "http://127.0.0.1:1234/v1/chat/completions",
+						},
+					]),
+				),
+			).toThrow("Unsafe LLM endpoint");
+		} finally {
+			process.env.NODE_ENV = previousNodeEnv;
+			if (previousOverride === undefined) {
+				delete process.env.ALLOW_LOOPBACK_LLM_ENDPOINT;
+			} else {
+				process.env.ALLOW_LOOPBACK_LLM_ENDPOINT = previousOverride;
+			}
+		}
+	});
+
+	it("allows loopback endpoints in production with explicit override", () => {
+		const previousNodeEnv = process.env.NODE_ENV;
+		const previousOverride = process.env.ALLOW_LOOPBACK_LLM_ENDPOINT;
+		try {
+			process.env.NODE_ENV = "production";
+			process.env.ALLOW_LOOPBACK_LLM_ENDPOINT = "true";
+
+			const config = parseEnsembleConfig(
+				JSON.stringify([
+					{
+						id: "local",
+						provider: "openai",
+						model: "qwen/qwen3-4b",
+						endpoint: "http://127.0.0.1:1234/v1/chat/completions",
+					},
+				]),
+			);
+			expect(config[0].endpoint).toBe(
+				"http://127.0.0.1:1234/v1/chat/completions",
+			);
+		} finally {
+			process.env.NODE_ENV = previousNodeEnv;
+			if (previousOverride === undefined) {
+				delete process.env.ALLOW_LOOPBACK_LLM_ENDPOINT;
+			} else {
+				process.env.ALLOW_LOOPBACK_LLM_ENDPOINT = previousOverride;
+			}
+		}
+	});
 });

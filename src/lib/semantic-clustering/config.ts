@@ -53,6 +53,34 @@ function defaultApiKeyEnv(provider: EnsembleModelConfig["provider"]): string {
 	}
 }
 
+function isLoopbackHost(hostname: string): boolean {
+	const normalized = hostname.toLowerCase();
+	return (
+		normalized === "localhost" ||
+		normalized === "127.0.0.1" ||
+		normalized === "::1"
+	);
+}
+
+function enforceEndpointSafety(endpoint: string, modelId: string): void {
+	const env = (process.env.NODE_ENV ?? "development").toLowerCase();
+	if (env === "development" || env === "test") {
+		return;
+	}
+	if (process.env.ALLOW_LOOPBACK_LLM_ENDPOINT === "true") {
+		return;
+	}
+
+	const url = new URL(endpoint);
+	if (!isLoopbackHost(url.hostname)) {
+		return;
+	}
+
+	throw new Error(
+		`Unsafe LLM endpoint for model ${modelId}: loopback host '${url.hostname}' is not allowed in ${env} (set ALLOW_LOOPBACK_LLM_ENDPOINT=true to override)`,
+	);
+}
+
 export function parseEnsembleConfig(
 	raw: string | undefined,
 ): EnsembleModelConfig[] {
@@ -64,11 +92,15 @@ export function parseEnsembleConfig(
 
 	const parsed = EnsembleSchema.parse(JSON.parse(raw));
 
-	return parsed.map((entry) => ({
-		...entry,
-		endpoint: entry.endpoint ?? DEFAULT_ENDPOINTS[entry.provider],
-		apiKeyEnv: entry.apiKeyEnv ?? defaultApiKeyEnv(entry.provider),
-	}));
+	return parsed.map((entry) => {
+		const endpoint = entry.endpoint ?? DEFAULT_ENDPOINTS[entry.provider];
+		enforceEndpointSafety(endpoint, entry.id);
+		return {
+			...entry,
+			endpoint,
+			apiKeyEnv: entry.apiKeyEnv ?? defaultApiKeyEnv(entry.provider),
+		};
+	});
 }
 
 export function readApiKey(config: EnsembleModelConfig): string {

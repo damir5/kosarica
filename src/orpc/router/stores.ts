@@ -5,13 +5,10 @@ import {
 	type EnrichmentContext,
 	processEnrichStore,
 } from "@/lib/store-enrichment";
-import {
-	generateDisplayNames,
-	resolveChainName,
-} from "@/lib/store-names";
+import { generateDisplayNames, resolveChainName } from "@/lib/store-names";
 import { getDb } from "@/utils/bindings";
-import { escapeLikePattern } from "@/utils/sql";
 import { generatePrefixedId } from "@/utils/id";
+import { escapeLikePattern } from "@/utils/sql";
 import { procedure, superadminProcedure } from "../base";
 
 // ============================================================================
@@ -28,7 +25,10 @@ async function recomputeDisplayNamesForGroups(
 	const db = getDb();
 
 	// Deduplicate group keys
-	const uniqueKeys = new Map<string, { chainSlug: string; city: string | null }>();
+	const uniqueKeys = new Map<
+		string,
+		{ chainSlug: string; city: string | null }
+	>();
 	for (const key of groupKeys) {
 		const k = `${key.chainSlug}::${key.city ?? "__null__"}`;
 		uniqueKeys.set(k, key);
@@ -272,8 +272,10 @@ export const updateStore = procedure
 
 		// Recompute display names if city/address changed (affects all stores in the group)
 		// or if displayName was reset to auto. The recompute function skips manual-name stores internally.
-		const cityChanged = input.city !== undefined && input.city !== existing.city;
-		const addressChanged = input.address !== undefined && input.address !== existing.address;
+		const cityChanged =
+			input.city !== undefined && input.city !== existing.city;
+		const addressChanged =
+			input.address !== undefined && input.address !== existing.address;
 		const needsRecompute =
 			cityChanged || addressChanged || input.displayName === null;
 
@@ -610,13 +612,20 @@ export const listVirtualStores = procedure
 					count: count(),
 				})
 				.from(stores)
-				.where(inArray(stores.priceSourceStoreId, virtualStores.map(s => s.id)))
+				.where(
+					inArray(
+						stores.priceSourceStoreId,
+						virtualStores.map((s) => s.id),
+					),
+				)
 				.groupBy(stores.priceSourceStoreId);
 
-			countMap = new Map(linkedCounts.map(r => [r.priceSourceStoreId!, r.count]));
+			countMap = new Map(
+				linkedCounts.map((r) => [r.priceSourceStoreId!, r.count]),
+			);
 		}
 
-		const storesWithCounts = virtualStores.map(store => ({
+		const storesWithCounts = virtualStores.map((store) => ({
 			...store,
 			linkedPhysicalCount: countMap.get(store.id) ?? 0,
 		}));
@@ -1108,6 +1117,72 @@ export const bulkRejectStores = superadminProcedure
 		return {
 			success: true,
 			rejected: input.storeIds.length,
+		};
+	});
+
+/**
+ * Bulk geocode multiple stores that are missing coordinates.
+ * Creates enrichment tasks for each store that has city but no latitude/longitude.
+ */
+export const bulkGeocodeStores = superadminProcedure
+	.input(
+		z.object({
+			storeIds: z.array(z.string()).min(1, "At least one store ID is required"),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const db = getDb();
+
+		// Fetch all stores and verify they exist
+		const existingStores = await db
+			.select()
+			.from(stores)
+			.where(inArray(stores.id, input.storeIds));
+
+		if (existingStores.length !== input.storeIds.length) {
+			throw new Error(
+				`Some stores not found. Found ${existingStores.length} of ${input.storeIds.length}`,
+			);
+		}
+
+		// Filter to stores that need geocoding (have city but no coordinates)
+		const storesNeedingGeocoding = existingStores.filter(
+			(s) => s.city && (!s.latitude || !s.longitude),
+		);
+
+		if (storesNeedingGeocoding.length === 0) {
+			return {
+				success: true,
+				queued: 0,
+				skipped: input.storeIds.length,
+				message: "All selected stores already have coordinates",
+			};
+		}
+
+		// Create enrichment tasks for each store
+		const now = new Date();
+		const tasks = storesNeedingGeocoding.map((store) => ({
+			id: generatePrefixedId("set"),
+			storeId: store.id,
+			type: "geocode" as const,
+			status: "pending" as const,
+			inputData: JSON.stringify({
+				name: store.name,
+				address: store.address,
+				city: store.city,
+				postalCode: store.postalCode,
+				latitude: store.latitude,
+				longitude: store.longitude,
+			}),
+			createdAt: now,
+		}));
+
+		await db.insert(storeEnrichmentTasks).values(tasks);
+
+		return {
+			success: true,
+			queued: tasks.length,
+			skipped: input.storeIds.length - tasks.length,
 		};
 	});
 

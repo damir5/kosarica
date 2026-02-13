@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { readFile } from "node:fs/promises";
 import {
 	type ClickHouseClient as CHClient,
 	createClient,
@@ -51,11 +51,30 @@ function escapeSqlString(value: string): string {
 	return value.replace(/'/g, "''");
 }
 
+function toBasicAuthHeader(config: ClickHouseConfig): string | null {
+	if (!config.username) {
+		return null;
+	}
+	const password = config.password ?? "";
+	const token = Buffer.from(`${config.username}:${password}`).toString("base64");
+	return `Basic ${token}`;
+}
+
+function buildParquetInsertUrl(config: ClickHouseConfig): URL {
+	const url = new URL(config.url);
+	url.searchParams.set("query", "INSERT INTO prices FORMAT Parquet");
+	url.searchParams.set("database", config.database ?? "default");
+	return url;
+}
+
 /**
  * ClickHouse client wrapper for price data operations.
  */
 export class ClickHouseClient {
-	constructor(private client: CHClient) {}
+	constructor(
+		private client: CHClient,
+		private config: ClickHouseConfig,
+	) {}
 
 	/**
 	 * Run a raw query and return JSONEachRow results.
@@ -77,16 +96,29 @@ export class ClickHouseClient {
 
 	/**
 	 * Import a Parquet file into the prices table.
-	 * Uses ClickHouse's native Parquet import capability.
+	 * Uses ClickHouse HTTP binary upload path to avoid UTF-8 corruption
+	 * in Node stream-to-driver transcoding.
 	 */
 	async importParquetFile(filePath: string): Promise<void> {
-		const stream = createReadStream(filePath);
-
-		await this.client.insert({
-			table: "prices",
-			values: stream,
-			format: "Parquet",
+		const payload = await readFile(filePath);
+		const url = buildParquetInsertUrl(this.config);
+		const authHeader = toBasicAuthHeader(this.config);
+		const response = await fetch(url, {
+			method: "POST",
+			headers: {
+				"content-type": "application/octet-stream",
+				...(authHeader ? { authorization: authHeader } : {}),
+			},
+			body: payload,
+			signal: AbortSignal.timeout(300_000),
 		});
+
+		if (!response.ok) {
+			const errorBody = (await response.text()).slice(0, 1000);
+			throw new Error(
+				`ClickHouse parquet import failed (${response.status} ${response.statusText}): ${errorBody}`,
+			);
+		}
 	}
 
 	/**
@@ -250,7 +282,12 @@ export function getClickHouse(): ClickHouseClient {
 		},
 	});
 
-	clientInstance = new ClickHouseClient(rawClient);
+	clientInstance = new ClickHouseClient(rawClient, {
+		url,
+		database: process.env.CLICKHOUSE_DATABASE || "default",
+		username: process.env.CLICKHOUSE_USERNAME,
+		password: process.env.CLICKHOUSE_PASSWORD,
+	});
 	return clientInstance;
 }
 
@@ -266,7 +303,12 @@ export function createClickHouse(config: ClickHouseConfig): ClickHouseClient {
 		password: config.password,
 	});
 
-	return new ClickHouseClient(client);
+	return new ClickHouseClient(client, {
+		url: config.url,
+		database: config.database || "default",
+		username: config.username,
+		password: config.password,
+	});
 }
 
 /**

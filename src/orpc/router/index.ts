@@ -27,6 +27,7 @@ import { getSettings, updateSettings } from "./settings";
 import {
 	approveStore,
 	bulkApproveStores,
+	bulkGeocodeStores,
 	bulkRejectStores,
 	createPhysicalStore,
 	forceApproveStore,
@@ -149,6 +150,7 @@ export default {
 			merge: mergeStores,
 			bulkApprove: bulkApproveStores,
 			bulkReject: bulkRejectStores,
+			bulkGeocode: bulkGeocodeStores,
 			forceApprove: forceApproveStore,
 			linkPriceSource: linkPriceSource,
 			unlinkPriceSource: unlinkPriceSource,
