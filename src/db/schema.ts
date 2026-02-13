@@ -1265,3 +1265,46 @@ export const priceAlerts = pgTable(
 		),
 	}),
 );
+
+// ============================================================================
+// Croatian Administrative Divisions: Reference data for validation/normalization
+// ============================================================================
+
+export const croatianCounties = pgTable("croatian_counties", {
+	id: integer("id").primaryKey(),
+	name: text("name").notNull(),
+	externalId: integer("external_id"),
+});
+
+export const croatianMunicipalities = pgTable(
+	"croatian_municipalities",
+	{
+		id: integer("id").primaryKey(),
+		name: text("name").notNull(),
+		externalId: integer("external_id"),
+		countyId: integer("county_id")
+			.notNull()
+			.references(() => croatianCounties.id),
+	},
+	(table) => ({
+		countyIdx: index("croatian_municipalities_county_idx").on(table.countyId),
+	}),
+);
+
+export const croatianSettlements = pgTable(
+	"croatian_settlements",
+	{
+		id: integer("id").primaryKey(),
+		name: text("name").notNull(),
+		externalId: integer("external_id"),
+		municipalityId: integer("municipality_id")
+			.notNull()
+			.references(() => croatianMunicipalities.id),
+	},
+	(table) => ({
+		municipalityIdx: index("croatian_settlements_municipality_idx").on(
+			table.municipalityId,
+		),
+		nameIdx: index("croatian_settlements_name_idx").on(table.name),
+	}),
+);

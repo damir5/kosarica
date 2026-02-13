@@ -1,3 +1,4 @@
+import iconv from "iconv-lite";
 import { describe, expect, it } from "vitest";
 import { PlodineAdapter } from "./plodine";
 
@@ -61,5 +62,27 @@ describe("PlodineAdapter store metadata extraction", () => {
 		});
 
 		expect(metadata?.name).toMatch(/^Plodine/);
+	});
+
+	it("parses cp1250 csv without replacement characters", async () => {
+		const adapter = new PlodineAdapter();
+		const csv =
+			"Sifra proizvoda;Naziv proizvoda;Maloprodajna cijena;Barkod\n" +
+			"12345;ŽVAKE ČOKOLADNE;1,99;3850000000000";
+		const content = iconv.encode(csv, "windows-1250");
+
+		const parsed = await adapter.parse(
+			content,
+			"SUPERMARKET_ZAGREBACKA_ULICA_62_10380_SVETI_IVAN_ZELINA_139_267_05022026015546.csv",
+		);
+
+		expect(parsed.isOk()).toBe(true);
+		if (parsed.isErr()) {
+			throw new Error(parsed.error.message);
+		}
+
+		expect(parsed.value.validRows).toBe(1);
+		expect(parsed.value.rows[0]?.name).toBe("ŽVAKE ČOKOLADNE");
+		expect(parsed.value.rows[0]?.name.includes("�")).toBe(false);
 	});
 });

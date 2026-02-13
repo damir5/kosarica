@@ -35,6 +35,8 @@ env:
     STORAGE_PATH: /app/data/storage
     TEMP_STORAGE_PATH: /app/data/temp
     CLICKHOUSE_URL: http://kosarica-clickhouse:8123
+    CLICKHOUSE_IMPORT_MODE: infile
+    CLICKHOUSE_USER_FILES_SUBDIR: storage
     OTEL_EXPORTER_OTLP_ENDPOINT: kosarica-opentelemetry-collector:4317
     OTEL_SERVICE_NAME: kosarica-nodejs
     APP_VERSION: 0.1.0
@@ -96,6 +98,7 @@ accessories:
         CLICKHOUSE_SKIP_USER_SETUP: "1"
     directories:
       - /var/lib/kosarica/clickhouse:/var/lib/clickhouse
+      - /app/data/storage:/var/lib/clickhouse/user_files/storage
 
   # OpenTelemetry Collector
   opentelemetry-collector:

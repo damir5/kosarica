@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ClickHouseClient as CHClient } from "@clickhouse/client";
@@ -17,6 +17,9 @@ function createStubRawClient(): CHClient {
 describe("ClickHouseClient.importParquetFile", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
+		delete process.env.CLICKHOUSE_IMPORT_MODE;
+		delete process.env.CLICKHOUSE_USER_FILES_SUBDIR;
+		delete process.env.STORAGE_PATH;
 	});
 
 	it("uploads parquet using direct HTTP binary insert", async () => {
@@ -67,5 +70,32 @@ describe("ClickHouseClient.importParquetFile", () => {
 			"ClickHouse parquet import failed",
 		);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("imports parquet from ClickHouse user_files when infile mode is enabled", async () => {
+		process.env.CLICKHOUSE_IMPORT_MODE = "infile";
+		process.env.CLICKHOUSE_USER_FILES_SUBDIR = "storage";
+
+		const storageRoot = mkdtempSync(join(tmpdir(), "ch-storage-"));
+		process.env.STORAGE_PATH = storageRoot;
+
+		const parquetDir = join(storageRoot, "parquet", "interspar", "2026-02-11");
+		mkdirSync(parquetDir, { recursive: true });
+		const parquetPath = join(parquetDir, "prices.parquet");
+		writeFileSync(parquetPath, Buffer.from([0x50, 0x41, 0x52, 0x31]));
+
+		const rawClient = createStubRawClient();
+		const client = new ClickHouseClient(rawClient, {
+			url: "http://clickhouse.internal:8123",
+			database: "default",
+		});
+
+		await client.importParquetFile(parquetPath);
+
+		expect(rawClient.command).toHaveBeenCalledTimes(1);
+		expect(rawClient.command).toHaveBeenCalledWith({
+			query:
+				"INSERT INTO prices SELECT * FROM file('storage/parquet/interspar/2026-02-11/prices.parquet', 'Parquet')",
+		});
 	});
 });

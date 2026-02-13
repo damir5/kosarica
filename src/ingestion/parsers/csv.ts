@@ -2,14 +2,21 @@ import type {
 	NormalizedRow,
 	ParseError,
 	ParseResult,
+	ParseWarning,
 	PriceStatus,
 	PriceUnavailableReason,
 } from "../types";
-import { decode, detectEncoding, type Encoding } from "./charset";
+import {
+	countReplacementChars,
+	decode,
+	decodeStrict,
+	detectEncoding,
+	type Encoding,
+} from "./charset";
 import { parsePrice } from "./price";
 
 export type CsvDelimiter = "," | ";" | "\t";
-export type CsvEncoding = Encoding;
+export type CsvEncoding = Encoding | "auto";
 
 export interface CsvColumnMapping {
 	storeIdentifier?: string;
@@ -63,16 +70,24 @@ export class CsvParser {
 
 	parseWithStoreId(content: Buffer, storeId: string): ParseResult {
 		const opts = this.resolveOptions();
-		const encoding = opts.encoding ?? detectEncoding(content);
-		const decoded = decode(content, encoding);
+		const decodedResult = decodeCsvContent(content, opts.encoding);
+		const decoded = decodedResult.content;
 		const delimiter = opts.delimiter ?? detectDelimiter(decoded);
 		const rows = parseCsvRows(decoded, delimiter, opts.quoteChar ?? '"');
+		const encodingWarnings: ParseWarning[] = decodedResult.usedFallback
+			? [
+					{
+						field: "encoding",
+						message: `Fell back from ${decodedResult.requestedEncoding} to ${decodedResult.resolvedEncoding}`,
+					},
+				]
+			: [];
 
 		if (rows.length === 0) {
 			return {
 				rows: [],
 				errors: [],
-				warnings: [],
+				warnings: encodingWarnings,
 				totalRows: 0,
 				validRows: 0,
 			};
@@ -90,7 +105,7 @@ export class CsvParser {
 			return {
 				rows: [],
 				errors: [{ message: "No column mapping provided" }],
-				warnings: [],
+				warnings: encodingWarnings,
 				totalRows: Math.max(0, rows.length - dataStartRow),
 				validRows: 0,
 			};
@@ -101,7 +116,7 @@ export class CsvParser {
 			return {
 				rows: [],
 				errors: [{ message: indicesResult.error }],
-				warnings: [],
+				warnings: encodingWarnings,
 				totalRows: Math.max(0, rows.length - dataStartRow),
 				validRows: 0,
 			};
@@ -111,7 +126,7 @@ export class CsvParser {
 		const result: ParseResult = {
 			rows: [],
 			errors: [],
-			warnings: [],
+			warnings: encodingWarnings,
 			totalRows: 0,
 			validRows: 0,
 		};
@@ -152,7 +167,7 @@ export class CsvParser {
 	private resolveOptions(): CsvParserOptions {
 		return {
 			delimiter: this.options.delimiter ?? ",",
-			encoding: this.options.encoding ?? "utf-8",
+			encoding: this.options.encoding ?? "auto",
 			hasHeader: this.options.hasHeader ?? true,
 			columnMapping: this.options.columnMapping,
 			defaultStoreIdentifier: this.options.defaultStoreIdentifier,
@@ -160,6 +175,97 @@ export class CsvParser {
 			quoteChar: this.options.quoteChar ?? '"',
 		};
 	}
+}
+
+function decodeCsvContent(
+	content: Buffer,
+	requestedEncoding?: CsvEncoding,
+): {
+	content: string;
+	requestedEncoding: CsvEncoding;
+	resolvedEncoding: Encoding;
+	usedFallback: boolean;
+} {
+	const requested = requestedEncoding ?? "auto";
+	const attempted = new Set<Encoding>();
+	const orderedCandidates: Encoding[] = [];
+	const primaryCandidate =
+		requested === "auto" ? detectEncoding(content) : requested;
+	orderedCandidates.push(primaryCandidate);
+	attempted.add(primaryCandidate);
+
+	const fallbackCandidates: Encoding[] = ["utf-8", "windows-1250", "iso-8859-2"];
+	for (const candidate of fallbackCandidates) {
+		if (!attempted.has(candidate)) {
+			orderedCandidates.push(candidate);
+			attempted.add(candidate);
+		}
+	}
+
+	let bestResult:
+		| {
+				content: string;
+				encoding: Encoding;
+				replacementCount: number;
+		  }
+		| undefined;
+
+	for (const encoding of orderedCandidates) {
+		let decoded: string;
+		try {
+			decoded =
+				encoding === "utf-8"
+					? decodeStrict(content, encoding)
+					: decode(content, encoding);
+		} catch {
+			continue;
+		}
+
+		const replacementCount = countReplacementChars(decoded);
+		if (
+			!bestResult ||
+			replacementCount < bestResult.replacementCount ||
+			(replacementCount === bestResult.replacementCount &&
+				encoding === primaryCandidate)
+		) {
+			bestResult = { content: decoded, encoding, replacementCount };
+		}
+
+		if (replacementCount === 0 && encoding === primaryCandidate) {
+			return {
+				content: decoded,
+				requestedEncoding: requested,
+				resolvedEncoding: encoding,
+				usedFallback: false,
+			};
+		}
+
+		if (replacementCount === 0 && encoding !== primaryCandidate) {
+			return {
+				content: decoded,
+				requestedEncoding: requested,
+				resolvedEncoding: encoding,
+				usedFallback: true,
+			};
+		}
+	}
+
+	if (bestResult) {
+		return {
+			content: bestResult.content,
+			requestedEncoding: requested,
+			resolvedEncoding: bestResult.encoding,
+			usedFallback: bestResult.encoding !== primaryCandidate,
+		};
+	}
+
+	const fallbackEncoding = detectEncoding(content);
+	return {
+		content: decode(content, fallbackEncoding),
+		requestedEncoding: requested,
+		resolvedEncoding: fallbackEncoding,
+		usedFallback: fallbackEncoding !== primaryCandidate,
+	};
 }
 
 function parseCsvRows(

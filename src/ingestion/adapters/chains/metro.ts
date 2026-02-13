@@ -99,9 +99,10 @@ export class MetroAdapter extends BaseCsvAdapter {
 
 	private preprocessCsvContent(content: Buffer): Buffer {
 		const text = content
-			.toString("utf-8")
+			// Preserve raw bytes while normalizing unstable header suffixes.
+			.toString("latin1")
 			.replace(/SIDRENA_\d{2}_\d{2}/g, "SIDRENA");
-		return Buffer.from(text);
+		return Buffer.from(text, "latin1");
 	}
 
 	private extractDateFromFilename(filename: string): string {

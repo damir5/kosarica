@@ -7,7 +7,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        gnupg \
+        gpg \
     && rm -rf /var/lib/apt/lists/*
 
 # Add NodeSource repository for Node.js 24
@@ -38,7 +38,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        gnupg \
+        gpg \
         python3 \
         build-essential \
         git \
@@ -100,7 +100,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        gnupg \
+        gpg \
     && rm -rf /var/lib/apt/lists/*
 
 # Add NodeSource repository for Node.js 24

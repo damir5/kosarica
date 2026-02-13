@@ -113,7 +113,7 @@ async function main() {
 
 	// Query stores missing coordinates
 	const conditions = [
-		sql`${stores.latitude} IS NULL OR ${stores.longitude} IS NULL`,
+		sql`(${stores.latitude} IS NULL OR ${stores.longitude} IS NULL)`,
 	];
 	if (flags.chain) {
 		conditions.push(eq(stores.chainSlug, flags.chain));

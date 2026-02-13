@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import {
 	type ClickHouseClient as CHClient,
 	createClient,
@@ -47,6 +48,8 @@ export interface QueryPricesOptions {
 	offset?: number;
 }
 
+type ClickHouseImportMode = "http" | "infile";
+
 function escapeSqlString(value: string): string {
 	return value.replace(/'/g, "''");
 }
@@ -65,6 +68,50 @@ function buildParquetInsertUrl(config: ClickHouseConfig): URL {
 	url.searchParams.set("query", "INSERT INTO prices FORMAT Parquet");
 	url.searchParams.set("database", config.database ?? "default");
 	return url;
+}
+
+function parseImportTimeoutMs(): number {
+	const raw = process.env.CLICKHOUSE_IMPORT_TIMEOUT_MS;
+	if (!raw) {
+		return 30 * 60 * 1000;
+	}
+	const parsed = Number.parseInt(raw, 10);
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		return 30 * 60 * 1000;
+	}
+	return parsed;
+}
+
+function parseImportMode(): ClickHouseImportMode {
+	const raw = process.env.CLICKHOUSE_IMPORT_MODE?.trim().toLowerCase();
+	if (raw === "infile") {
+		return "infile";
+	}
+	return "http";
+}
+
+function parseUserFilesSubdir(): string {
+	const raw = process.env.CLICKHOUSE_USER_FILES_SUBDIR ?? "storage";
+	return raw.replace(/^\/+|\/+$/g, "");
+}
+
+function toUserFilesParquetPath(filePath: string): string {
+	const storageRoot = resolve(process.env.STORAGE_PATH ?? "./data/storage");
+	const absoluteFilePath = resolve(filePath);
+	const relativePath = relative(storageRoot, absoluteFilePath);
+	if (
+		relativePath === "" ||
+		relativePath.startsWith("..") ||
+		isAbsolute(relativePath)
+	) {
+		throw new Error(
+			`Parquet path ${filePath} is outside STORAGE_PATH (${storageRoot})`,
+		);
+	}
+
+	const unixRelative = relativePath.split(sep).join("/");
+	const subdir = parseUserFilesSubdir();
+	return subdir ? `${subdir}/${unixRelative}` : unixRelative;
 }
 
 /**
@@ -96,10 +143,27 @@ export class ClickHouseClient {
 
 	/**
 	 * Import a Parquet file into the prices table.
-	 * Uses ClickHouse HTTP binary upload path to avoid UTF-8 corruption
-	 * in Node stream-to-driver transcoding.
+	 * Supports two modes:
+	 * - `http` (default): binary upload over HTTP
+	 * - `infile`: server-side import from ClickHouse user_files mount
 	 */
 	async importParquetFile(filePath: string): Promise<void> {
+		if (parseImportMode() === "infile") {
+			await this.importParquetFileViaUserFiles(filePath);
+			return;
+		}
+		await this.importParquetFileViaHttp(filePath);
+	}
+
+	private async importParquetFileViaUserFiles(filePath: string): Promise<void> {
+		const userFilesPath = toUserFilesParquetPath(filePath);
+		const safePath = escapeSqlString(userFilesPath);
+		await this.client.command({
+			query: `INSERT INTO prices SELECT * FROM file('${safePath}', 'Parquet')`,
+		});
+	}
+
+	private async importParquetFileViaHttp(filePath: string): Promise<void> {
 		const payload = await readFile(filePath);
 		const url = buildParquetInsertUrl(this.config);
 		const authHeader = toBasicAuthHeader(this.config);
@@ -110,7 +174,7 @@ export class ClickHouseClient {
 				...(authHeader ? { authorization: authHeader } : {}),
 			},
 			body: payload,
-			signal: AbortSignal.timeout(300_000),
+			signal: AbortSignal.timeout(parseImportTimeoutMs()),
 		});
 
 		if (!response.ok) {

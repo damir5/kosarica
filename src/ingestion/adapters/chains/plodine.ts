@@ -273,12 +273,13 @@ export class PlodineAdapter extends BaseCsvAdapter {
 	}
 
 	private preprocessCsvContent(content: Buffer): Buffer {
-		let text = content.toString("utf-8");
+		// Preserve raw bytes while fixing delimiter/column quirks in exported files.
+		let text = content.toString("latin1");
 		text = text.replace(/Sidrena cijena na \d+\.\d+\.\d+/g, "Sidrena cijena");
 		text = text.replace(/;,([0-9])/g, ";0,$1");
 		text = text.replace(/^,([0-9])/g, "0,$1");
 		text = text.replace(/",([0-9])/g, '"0,$1');
-		return Buffer.from(text);
+		return Buffer.from(text, "latin1");
 	}
 
 	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {

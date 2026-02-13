@@ -15,6 +15,19 @@ describe("LidlAdapter store metadata extraction", () => {
 		});
 	});
 
+	it("extracts store code from expanded CSV file", () => {
+		const adapter = new LidlAdapter();
+		const metadata = adapter.extractStoreMetadata({
+			url: "https://tvrtka.lidl.hr/content/download/123/fileupload/po_trgovinama_na_dan_05_02_2026.zip",
+			filename: "Supermarket 112.csv",
+			type: "csv",
+		});
+
+		expect(metadata).toEqual({
+			name: "Lidl 112",
+		});
+	});
+
 	it("extracts city and address from supermarket with details", () => {
 		const adapter = new LidlAdapter();
 		const metadata = adapter.extractStoreMetadata({

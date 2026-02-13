@@ -17,6 +17,7 @@
     "db:studio": "drizzle-kit studio",
     "clickhouse:migrate": "bash scripts/clickhouse-migrate.sh",
     "clickhouse:migrate:status": "bash scripts/clickhouse-migrate.sh --status",
+    "clickhouse:import-curl": "bash scripts/clickhouse-import-curl.sh",
     "analyze:price-variation": "node scripts/analyze-price-variation.mjs",
     "clickhouse:load-all": "tsx scripts/clickhouse-sync.ts all",
     "clickhouse:load-missing": "tsx scripts/clickhouse-sync.ts missing",
@@ -46,7 +47,7 @@
   },
   "dependencies": {
     "@better-auth/passkey": "^1.4.13",
-    "@clickhouse/client": "^1.16.0",
+    "@clickhouse/client": "^1.17.0",
     "@dsnp/parquetjs": "^1.7.0",
     "@huggingface/transformers": "^3.8.1",
     "@opentelemetry/api": "^1.9.0",

@@ -38,7 +38,7 @@ export class BaseCsvAdapter extends BaseChainAdapter {
 
 		this.csvParser = new CsvParser({
 			delimiter: csvConfig?.delimiter ?? ",",
-			encoding: csvConfig?.encoding ?? "utf-8",
+			encoding: csvConfig?.encoding ?? "auto",
 			hasHeader: csvConfig?.hasHeader ?? true,
 			columnMapping: cfg.columnMapping,
 			skipEmptyRows: true,
