@@ -25,6 +25,7 @@ import {
 } from "@/ingestion/parquet";
 import type {
 	DiscoveredFile,
+	FileType,
 	NormalizedRow,
 	ParseResult,
 	PriceUnavailableReason,
@@ -32,7 +33,6 @@ import type {
 import { normalizeCategory } from "@/lib/matching/categories";
 import { computeNameHash, parseUnit } from "@/lib/matching/normalize";
 import { indexRetailerItemsBatch } from "@/lib/search";
-import { scheduleTask } from "@/lib/taskqueue";
 import {
 	buildArchiveKey,
 	buildExpandedKey,
@@ -44,6 +44,7 @@ import {
 	formatTimestamp,
 	getStorage,
 } from "@/lib/storage";
+import { scheduleTask } from "@/lib/taskqueue";
 import { generatePrefixedId } from "@/utils/id";
 import { createLogger, errorToObject } from "@/utils/logger";
 
@@ -1424,12 +1425,17 @@ async function processIngestionFile(options: {
 
 	const validRows: ValidRowForPersistence[] = [];
 	const priceAvailability = emptyPriceAvailabilityStats();
-	const storeMetadata = adapter.extractStoreMetadata(fileEntry.file);
+	const effectiveFile: DiscoveredFile = {
+		...fileEntry.file,
+		filename: fileEntry.filename,
+		type: fileEntry.type as FileType,
+	};
+	const storeMetadata = adapter.extractStoreMetadata(effectiveFile);
 
 	for (const row of parsed.rows) {
 		const storeIdentifier =
 			row.storeIdentifier?.trim() ||
-			adapter.extractStoreIdentifier(fileEntry.file)?.value ||
+			adapter.extractStoreIdentifier(effectiveFile)?.value ||
 			"";
 
 		if (!storeIdentifier) {
@@ -1833,8 +1839,7 @@ export async function runIngestion(
 		});
 
 		if (
-			pendingParquetWrites.size >=
-			performanceConfig.parquetMaxPendingWrites
+			pendingParquetWrites.size >= performanceConfig.parquetMaxPendingWrites
 		) {
 			await Promise.race(pendingParquetWrites);
 		}

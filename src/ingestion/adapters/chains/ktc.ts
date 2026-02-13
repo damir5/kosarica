@@ -357,10 +357,32 @@ export class KtcAdapter extends BaseCsvAdapter {
 			}
 		}
 
+		const cityFromFilename = this.extractCityFromFilename(file.filename);
+		if (cityFromFilename) {
+			return {
+				name: `${this.name} ${cityFromFilename}`,
+				city: cityFromFilename,
+			};
+		}
+
 		const normalizedIdentifier = identifier.replace(/-\d+$/, "");
 		return {
 			name: `${this.name} ${normalizedIdentifier}`,
 		};
+	}
+
+	private extractCityFromFilename(filename: string): string | null {
+		const decoded = safeDecodeURIComponent(filename);
+		const match = decoded.match(
+			/-([A-ZŽČĆŠĐ][A-ZŽČĆŠĐa-zžčćšđ\s]+)-PJ\d+-\d+-\d{8}/i,
+		);
+		if (match?.[1]) {
+			const city = match[1].trim();
+			if (city.length > 2 && !city.match(/^\d/)) {
+				return city;
+			}
+		}
+		return null;
 	}
 }
 
