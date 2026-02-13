@@ -33,6 +33,16 @@ function AdminMatchingPage() {
 	const [unifiedSecondaryModelId, setUnifiedSecondaryModelId] =
 		useState<string>("");
 
+	// Unified matching blocking options state
+	const [unifiedBarcodeLimit, setUnifiedBarcodeLimit] = useState<string>("");
+	const [unifiedBarcodeMinChains, setUnifiedBarcodeMinChains] =
+		useState<string>("2");
+	const [unifiedDeterministicLimit, setUnifiedDeterministicLimit] =
+		useState<string>("");
+	const [unifiedEmbeddingLimit, setUnifiedEmbeddingLimit] =
+		useState<string>("");
+	const [unifiedLexicalLimit, setUnifiedLexicalLimit] = useState<string>("");
+
 	// Pairwise state
 	const [pairwiseMaxBatches, setPairwiseMaxBatches] = useState<string>("10");
 	const [pairwiseFeatureBatchSize, setPairwiseFeatureBatchSize] =
@@ -90,6 +100,13 @@ function AdminMatchingPage() {
 			minPrimaryConfidence: toFloat(unifiedMinPrimaryConfidence),
 			primaryModelId: unifiedPrimaryModelId.trim() || undefined,
 			secondaryModelId: unifiedSecondaryModelId.trim() || undefined,
+			blocking: {
+				barcodeLimit: toInt(unifiedBarcodeLimit),
+				barcodeMinChains: toInt(unifiedBarcodeMinChains),
+				deterministicLimit: toInt(unifiedDeterministicLimit),
+				embeddingLimit: toInt(unifiedEmbeddingLimit),
+				lexicalLimit: toInt(unifiedLexicalLimit),
+			},
 		}),
 		[
 			unifiedDryRun,
@@ -97,6 +114,11 @@ function AdminMatchingPage() {
 			unifiedMinPrimaryConfidence,
 			unifiedPrimaryModelId,
 			unifiedSecondaryModelId,
+			unifiedBarcodeLimit,
+			unifiedBarcodeMinChains,
+			unifiedDeterministicLimit,
+			unifiedEmbeddingLimit,
+			unifiedLexicalLimit,
 		],
 	);
 
@@ -282,6 +304,84 @@ function AdminMatchingPage() {
 								value={unifiedSecondaryModelId}
 								onChange={(e) => setUnifiedSecondaryModelId(e.target.value)}
 							/>
+						</div>
+					</div>
+
+					{/* Blocking options */}
+					<div className="space-y-1">
+						<Label className="text-muted-foreground text-xs uppercase tracking-wide">
+							Blocking limits
+						</Label>
+						<div className="grid gap-3 md:grid-cols-5">
+							<div className="space-y-1">
+								<Label htmlFor="unifiedBarcodeLimit" className="text-xs">
+									Barcode
+								</Label>
+								<Input
+									id="unifiedBarcodeLimit"
+									type="number"
+									min={1}
+									max={1000}
+									placeholder="(default)"
+									value={unifiedBarcodeLimit}
+									onChange={(e) => setUnifiedBarcodeLimit(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-1">
+								<Label htmlFor="unifiedBarcodeMinChains" className="text-xs">
+									Min chains
+								</Label>
+								<Input
+									id="unifiedBarcodeMinChains"
+									type="number"
+									min={1}
+									max={20}
+									value={unifiedBarcodeMinChains}
+									onChange={(e) => setUnifiedBarcodeMinChains(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-1">
+								<Label htmlFor="unifiedDeterministicLimit" className="text-xs">
+									Det.
+								</Label>
+								<Input
+									id="unifiedDeterministicLimit"
+									type="number"
+									min={1}
+									max={1000}
+									placeholder="(default)"
+									value={unifiedDeterministicLimit}
+									onChange={(e) => setUnifiedDeterministicLimit(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-1">
+								<Label htmlFor="unifiedEmbeddingLimit" className="text-xs">
+									Embed
+								</Label>
+								<Input
+									id="unifiedEmbeddingLimit"
+									type="number"
+									min={1}
+									max={500}
+									placeholder="(default)"
+									value={unifiedEmbeddingLimit}
+									onChange={(e) => setUnifiedEmbeddingLimit(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-1">
+								<Label htmlFor="unifiedLexicalLimit" className="text-xs">
+									Lexical
+								</Label>
+								<Input
+									id="unifiedLexicalLimit"
+									type="number"
+									min={1}
+									max={500}
+									placeholder="(default)"
+									value={unifiedLexicalLimit}
+									onChange={(e) => setUnifiedLexicalLimit(e.target.value)}
+								/>
+							</div>
 						</div>
 					</div>
 

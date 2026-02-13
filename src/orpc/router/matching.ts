@@ -11,11 +11,15 @@ export const triggerUnifiedMatching = superadminProcedure
 				minPrimaryConfidence: z.number().min(0).max(1).optional(),
 				primaryModelId: z.string().optional(),
 				secondaryModelId: z.string().optional(),
-				barcodeLimit: z.number().int().min(1).max(1000).optional(),
-				barcodeMinChains: z.number().int().min(1).max(20).optional(),
-				deterministicLimit: z.number().int().min(1).max(1000).optional(),
-				embeddingLimit: z.number().int().min(1).max(500).optional(),
-				lexicalLimit: z.number().int().min(1).max(500).optional(),
+				blocking: z
+					.object({
+						barcodeLimit: z.number().int().min(1).max(1000).optional(),
+						barcodeMinChains: z.number().int().min(1).max(20).optional(),
+						deterministicLimit: z.number().int().min(1).max(1000).optional(),
+						embeddingLimit: z.number().int().min(1).max(500).optional(),
+						lexicalLimit: z.number().int().min(1).max(500).optional(),
+					})
+					.optional(),
 			})
 			.optional(),
 	)
@@ -29,11 +33,11 @@ export const triggerUnifiedMatching = superadminProcedure
 				minPrimaryConfidence: input?.minPrimaryConfidence,
 				primaryModelId: input?.primaryModelId,
 				secondaryModelId: input?.secondaryModelId,
-				barcodeLimit: input?.barcodeLimit,
-				barcodeMinChains: input?.barcodeMinChains,
-				deterministicLimit: input?.deterministicLimit,
-				embeddingLimit: input?.embeddingLimit,
-				lexicalLimit: input?.lexicalLimit,
+				barcodeLimit: input?.blocking?.barcodeLimit,
+				barcodeMinChains: input?.blocking?.barcodeMinChains,
+				deterministicLimit: input?.blocking?.deterministicLimit,
+				embeddingLimit: input?.blocking?.embeddingLimit,
+				lexicalLimit: input?.blocking?.lexicalLimit,
 			},
 		});
 
