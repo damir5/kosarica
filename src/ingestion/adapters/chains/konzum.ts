@@ -165,38 +165,36 @@ export class KonzumAdapter extends BaseCsvAdapter {
 			.split(",")
 			.map((part) => part.trim())
 			.filter(Boolean);
-		const storeCode = this.extractStoreIdentifierFromFilename(file.filename);
 
-		const codeIndex = parts.indexOf(storeCode);
-		if (codeIndex >= 0) {
-			let cityIndex = codeIndex + 1;
-			while (cityIndex < parts.length && isDateLike(parts[cityIndex] ?? "")) {
-				cityIndex += 1;
-			}
+		// Format: <type>,<street> <number> <postal> <city>,<store_code>,<postal_code>,<date>,<time>.CSV
+		// Example: HIPERMARKET,ANTUNA GUSTAVA MATOŠA 10 21210 SOLIN,3290,54922,13.02.2026, 05-22.CSV
+		if (parts.length >= 2) {
+			const addressCityPart = parts[1] ?? "";
+			const addressCityParts = addressCityPart.split(/\s+/);
 
-			let addressIndex = cityIndex + 1;
-			while (
-				addressIndex < parts.length &&
-				isDateLike(parts[addressIndex] ?? "")
-			) {
-				addressIndex += 1;
-			}
+			// Find the 5-digit postal code which separates street from city
+			const postalIndex = addressCityParts.findIndex((p) => /^\d{5}$/.test(p));
 
-			const city = normalizeKonzumPart(parts[cityIndex] ?? "");
-			const address = normalizeKonzumPart(parts[addressIndex] ?? "");
+			if (postalIndex >= 0 && postalIndex < addressCityParts.length - 1) {
+				const streetParts = addressCityParts.slice(0, postalIndex);
+				const cityParts = addressCityParts.slice(postalIndex + 1);
 
-			if (city || address) {
-				const storeName = city
-					? `${this.name} ${city}`
-					: `${this.name} ${storeCode}`;
-				return {
-					name: storeName,
-					address: address || undefined,
-					city: city || undefined,
-				};
+				const street = normalizeKonzumPart(streetParts.join(" "));
+				const city = normalizeKonzumPart(cityParts.join(" "));
+				const postalCode = addressCityParts[postalIndex] ?? "";
+
+				if (city) {
+					return {
+						name: `${this.name} ${city}`,
+						address: street || undefined,
+						city: city,
+						postalCode: postalCode || undefined,
+					};
+				}
 			}
 		}
 
+		const storeCode = this.extractStoreIdentifierFromFilename(file.filename);
 		return {
 			name: `${this.name} ${storeCode || baseName}`,
 		};
@@ -239,11 +237,4 @@ export class KonzumAdapter extends BaseCsvAdapter {
 
 function normalizeKonzumPart(value: string): string {
 	return value.replace(/_/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function isDateLike(s: string): boolean {
-	if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return true;
-	if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return true;
-	if (/^\d{2}\.\d{2}\.\d{4}\.$/.test(s)) return true;
-	return false;
 }
