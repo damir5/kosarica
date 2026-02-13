@@ -221,5 +221,27 @@ pnpm tsx --version
 
 - Local containers already stopped: `docker compose --profile dev down`
 - Test should run on staging server where qwen3-4b is accessible
-- LLM endpoint is expected at `0.0.0.0:1234` (forwarded via SSH)
+- LLM endpoint is at `http://100.72.112.119:1234` (Tailscale IP)
 - Database credentials must match staging environment
+- **IMPORTANT**: Must specify `primaryModelId: "qwen3-4b"` when triggering via API - the default fallback "qwen" doesn't match the LLM_ENSEMBLE_JSON config
+- Storage permissions: Run `chown -R 1001:1001 /app/data/storage` if ingestion fails with EACCES errors
+
+## Known Issues
+
+### PostgreSQL ROW Expression Limit (1664 entries)
+
+**Problem**: `loadEmbeddingGroups()` and `loadLexicalGroups()` fail when `excludeItemIds` has more than 1664 items:
+```
+PostgresError: ROW expressions can have at most 1664 entries
+```
+
+**Location**: `src/lib/semantic-clustering/blocking.ts` lines ~357 and ~457
+
+**Current Workaround**: Use smaller batch sizes (`embeddingLimit: 1`, `lexicalLimit: 1`)
+
+**Fix Required**: Batch exclusions into chunks or use temporary table approach:
+```sql
+-- Instead of: ri.id != ALL (${excludeArray}::text[])
+-- Use: CREATE TEMP TABLE excluded_ids AS SELECT unnest(${excludeArray}::text[]) AS id
+-- Then: ri.id NOT IN (SELECT id FROM excluded_ids)
+```
