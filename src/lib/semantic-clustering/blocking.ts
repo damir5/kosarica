@@ -349,6 +349,7 @@ async function loadEmbeddingGroups(params: {
 	// Find items with embeddings that haven't been grouped yet, get their
 	// nearest neighbors within the same product_type, then form connected
 	// components.
+	// Use NOT id = ANY(array) to avoid PostgreSQL ROW expression limit (1664 entries)
 	const excludeArray =
 		params.excludeItemIds.size > 0
 			? Array.from(params.excludeItemIds)
@@ -376,7 +377,7 @@ async function loadEmbeddingGroups(params: {
 				AND rif.embedding IS NOT NULL
 				AND rif.product_type IS NOT NULL
 				AND rif.product_type <> ''
-				AND ri.id != ALL(${excludeArray}::text[])
+				AND NOT ri.id = ANY(${excludeArray}::text[])
 			ORDER BY random()
 			LIMIT ${params.limit * 3}
 		),
@@ -396,7 +397,7 @@ async function loadEmbeddingGroups(params: {
 					AND rif2.embedding IS NOT NULL
 					AND rif2.product_type = s.product_type
 					AND rif2.retailer_item_id <> s.retailer_item_id
-					AND ri2.id != ALL(${excludeArray}::text[])
+					AND NOT ri2.id = ANY(${excludeArray}::text[])
 				ORDER BY rif2.embedding <=> s.embedding
 				LIMIT ${params.neighborCount}
 			) t ON true
@@ -519,7 +520,7 @@ async function loadLexicalGroups(params: {
 				AND rif.normalized_name <> ''
 				AND rif.product_type IS NOT NULL
 				AND rif.product_type <> ''
-				AND ri.id != ALL(${excludeArray}::text[])
+				AND NOT ri.id = ANY(${excludeArray}::text[])
 			ORDER BY random()
 			LIMIT ${params.limit * 5}
 		),
@@ -540,7 +541,7 @@ async function loadLexicalGroups(params: {
 					AND rif2.normalized_name <> ''
 					AND rif2.product_type = s.product_type
 					AND rif2.retailer_item_id <> s.retailer_item_id
-					AND ri2.id != ALL(${excludeArray}::text[])
+					AND NOT ri2.id = ANY(${excludeArray}::text[])
 				ORDER BY rif2.normalized_name <-> s.normalized_name
 				LIMIT 10
 			) t ON true
