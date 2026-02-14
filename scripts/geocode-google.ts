@@ -1,3 +1,11 @@
+/**
+ * One-time migration script to geocode stores using Google Places API.
+ * 
+ * For ongoing geocoding of new stores, use the default Photon geocoding
+ * in src/lib/geocoding.ts (free, no API key required).
+ * 
+ * Usage: GOOGLE_MAPS_API_KEY=xxx npx tsx scripts/geocode-google.ts
+ */
 import { isNotNull, sql } from "drizzle-orm";
 import { chains, stores } from "../src/db/schema";
 import { getDatabase } from "../src/db";
