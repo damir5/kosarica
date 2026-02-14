@@ -191,7 +191,7 @@ export class IntersparAdapter extends BaseCsvAdapter {
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {
 		const baseName = filename.replace(/\.(csv|CSV)$/i, "");
-		const match = baseName.match(/[_-](\d{4})[_-]/);
+		const match = baseName.match(/[_-](\d{4,5})[_-]/);
 		if (match?.[1]) {
 			return match[1];
 		}
@@ -214,19 +214,37 @@ export class IntersparAdapter extends BaseCsvAdapter {
 
 		const storeCode = this.extractStoreIdentifierFromFilename(file.filename);
 		const storeCodeIndex = parts.lastIndexOf(storeCode);
-		const codeAnchorIndex = parts.findIndex((part, index) => {
-			return index > 1 && index < Math.max(0, storeCodeIndex) && /^\d{5}$/.test(part);
-		});
 
-		const cityToken = parts[1] ?? "";
-		const addressTokens =
-			codeAnchorIndex > 2
-				? parts.slice(2, codeAnchorIndex)
-				: parts.slice(2, Math.max(2, storeCodeIndex));
+		if (storeCodeIndex < 2) {
+			return { name: `${this.name} ${storeCode}` };
+		}
 
-		const city = normalizeIntersparPart(cityToken);
+		const cityFromSuffix = extractCityFromSuffix(parts, storeCodeIndex);
+		if (cityFromSuffix) {
+			const addressStartIndex = findAddressStart(
+				parts.slice(1, storeCodeIndex),
+			);
+			const addressTokens = parts.slice(
+				addressStartIndex + 1 + 1,
+				storeCodeIndex,
+			);
+			const address = normalizeIntersparPart(addressTokens.join(" "));
+			return {
+				name: `${this.name} ${cityFromSuffix}`,
+				address: address || undefined,
+				city: cityFromSuffix,
+			};
+		}
+
+		const addressStartIndex = findAddressStart(parts.slice(1, storeCodeIndex));
+		const cityTokens = parts.slice(1, addressStartIndex + 1);
+		const addressTokens = parts.slice(addressStartIndex + 1, storeCodeIndex);
+
+		const city = normalizeIntersparPart(cityTokens.join(" "));
 		const address = normalizeIntersparPart(addressTokens.join(" "));
-		const storeName = city ? `${this.name} ${city}` : `${this.name} ${storeCode}`;
+		const storeName = city
+			? `${this.name} ${city}`
+			: `${this.name} ${storeCode}`;
 
 		return {
 			name: storeName.trim(),
@@ -253,10 +271,53 @@ function getIntersparNoDataState(targetDate: string): {
 	return {};
 }
 
+const ADDRESS_INDICATORS = [
+	"ulica",
+	"cesta",
+	"avenija",
+	"trg",
+	"aleja",
+	"šetalište",
+	"prilaz",
+	"natrag",
+];
+
+function extractCityFromSuffix(
+	parts: string[],
+	storeCodeIndex: number,
+): string | null {
+	const brandMarkers = ["spar", "esp", "interspar"];
+	for (let i = storeCodeIndex + 1; i < parts.length - 1; i++) {
+		const part = parts[i].toLowerCase();
+		if (brandMarkers.includes(part)) {
+			const cityTokens: string[] = [];
+			for (let j = i + 1; j < parts.length; j++) {
+				const token = parts[j];
+				if (/^\d{4}$/.test(token)) break;
+				cityTokens.push(token);
+			}
+			if (cityTokens.length > 0) {
+				return normalizeIntersparPart(cityTokens.join(" "));
+			}
+		}
+	}
+	return null;
+}
+
+function findAddressStart(parts: string[]): number {
+	for (let i = 0; i < parts.length; i++) {
+		const part = parts[i].toLowerCase().replace(/\./g, "");
+		if (ADDRESS_INDICATORS.includes(part)) {
+			return Math.max(0, i - 1);
+		}
+		if (/^\d+[a-z]?$/.test(part) && i > 0) {
+			return i - 1;
+		}
+	}
+	return Math.min(1, parts.length - 1);
+}
+
 function normalizeIntersparPart(value: string): string {
 	if (!value) return "";
-	return value
-		.replace(/_/g, " ")
-		.replace(/\s+/g, " ")
-		.trim();
+	return value.replace(/_/g, " ").replace(/\s+/g, " ").trim();
 }

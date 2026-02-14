@@ -54,7 +54,7 @@
    API_KEY=$(cat ../shared/secrets/api-keys/staging-claude-agent)
    curl -s -X POST -H "Content-Type: application/json" \
      -H "x-api-key: $API_KEY" \
-     -d '{"limit":20,"dryRun":true,"primaryModelId":"qwen3-4b","secondaryModelId":"qwen3-4b","blocking":{"barcodeLimit":50,"barcodeMinChains":2}}' \
+     -d '{"json":{"limit":20,"dryRun":true,"primaryModelId":"qwen3-4b","secondaryModelId":"qwen3-4b","blocking":{"barcodeLimit":50,"barcodeMinChains":2}}}' \
      "https://kosarica.chickenkiller.com/api/rpc/admin/matching/triggerUnifiedMatching"
    ```
 
@@ -76,7 +76,7 @@
    ```bash
    curl -s -X POST -H "Content-Type: application/json" \
      -H "x-api-key: $API_KEY" \
-     -d '{"limit":50,"dryRun":false,"primaryModelId":"qwen3-4b","secondaryModelId":"qwen3-4b","blocking":{"barcodeLimit":100,"barcodeMinChains":2}}' \
+     -d '{"json":{"limit":50,"dryRun":false,"primaryModelId":"qwen3-4b","secondaryModelId":"qwen3-4b","blocking":{"barcodeLimit":100,"barcodeMinChains":2}}}' \
      "https://kosarica.chickenkiller.com/api/rpc/admin/matching/triggerUnifiedMatching"
    ```
 
@@ -213,7 +213,7 @@ curl -s -X POST -H "Content-Type: application/json" \
 # Unified matching (with nested blocking options)
 curl -s -X POST -H "Content-Type: application/json" \
   -H "x-api-key: $API_KEY" \
-  -d '{"limit":50,"dryRun":true,"primaryModelId":"qwen3-4b","blocking":{"barcodeLimit":100,"barcodeMinChains":2}}' \
+  -d '{"json":{"limit":50,"dryRun":true,"primaryModelId":"qwen3-4b","blocking":{"barcodeLimit":100,"barcodeMinChains":2}}}' \
   "https://kosarica.chickenkiller.com/api/rpc/admin/matching/triggerUnifiedMatching"
 ```
 

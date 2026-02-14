@@ -1,4 +1,4 @@
-import { and, count, desc, eq, like, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, ne, or } from "drizzle-orm";
 import * as z from "zod";
 import { user } from "@/db/schema";
 import { getDb } from "@/utils/bindings";
@@ -23,8 +23,8 @@ export const listUsers = procedure
 		if (input.search) {
 			conditions.push(
 				or(
-					like(user.name, `%${input.search}%`),
-					like(user.email, `%${input.search}%`),
+					ilike(user.name, `%${input.search}%`),
+					ilike(user.email, `%${input.search}%`),
 				),
 			);
 		}

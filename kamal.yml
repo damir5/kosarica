@@ -55,6 +55,7 @@ env:
     - ZO_ORG_ID
     - LLM_ENSEMBLE_JSON
     - LOCAL_LLM_API_KEY
+    - GOOGLE_MAPS_API_KEY
 
 # Builder configuration
 builder:

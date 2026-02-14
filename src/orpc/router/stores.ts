@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import * as z from "zod";
 import { chains, storeEnrichmentTasks, stores } from "@/db/schema";
 import {
@@ -125,10 +125,10 @@ export const listStores = procedure
 			const escaped = escapeLikePattern(input.search);
 			conditions.push(
 				or(
-					like(stores.name, `%${escaped}%`),
-					like(stores.displayName, `%${escaped}%`),
-					like(stores.address, `%${escaped}%`),
-					like(stores.city, `%${escaped}%`),
+					ilike(stores.name, `%${escaped}%`),
+					ilike(stores.displayName, `%${escaped}%`),
+					ilike(stores.address, `%${escaped}%`),
+					ilike(stores.city, `%${escaped}%`),
 				),
 			);
 		}
@@ -582,9 +582,9 @@ export const listVirtualStores = procedure
 			const escaped = escapeLikePattern(input.search);
 			conditions.push(
 				or(
-					like(stores.name, `%${escaped}%`),
-					like(stores.displayName, `%${escaped}%`),
-					like(stores.city, `%${escaped}%`),
+					ilike(stores.name, `%${escaped}%`),
+					ilike(stores.displayName, `%${escaped}%`),
+					ilike(stores.city, `%${escaped}%`),
 				) ?? sql`1=1`,
 			);
 		}
@@ -673,10 +673,10 @@ export const listPhysicalStores = procedure
 			const escaped = escapeLikePattern(input.search);
 			conditions.push(
 				or(
-					like(stores.name, `%${escaped}%`),
-					like(stores.displayName, `%${escaped}%`),
-					like(stores.address, `%${escaped}%`),
-					like(stores.city, `%${escaped}%`),
+					ilike(stores.name, `%${escaped}%`),
+					ilike(stores.displayName, `%${escaped}%`),
+					ilike(stores.address, `%${escaped}%`),
+					ilike(stores.city, `%${escaped}%`),
 				) ?? sql`1=1`,
 			);
 		}
