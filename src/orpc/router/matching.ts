@@ -26,6 +26,7 @@ export const triggerUnifiedMatching = superadminProcedure
 	.handler(async ({ input }) => {
 		const task = await scheduleTask({
 			taskType: "matching",
+			priority: -1,
 			payload: {
 				type: "semanticClusteringUnified",
 				limit: input?.limit,
@@ -67,6 +68,7 @@ export const triggerPairwiseSemanticClustering = superadminProcedure
 	.handler(async ({ input }) => {
 		const task = await scheduleTask({
 			taskType: "matching",
+			priority: -1,
 			payload: {
 				type: "semanticClusteringPairwise",
 				maxBatches: input?.maxBatches,
@@ -99,6 +101,7 @@ export const triggerListwiseSemanticClustering = superadminProcedure
 	.handler(async ({ input }) => {
 		const task = await scheduleTask({
 			taskType: "matching",
+			priority: -1,
 			payload: {
 				type: "semanticClusteringListwise",
 				limit: input?.limit,
