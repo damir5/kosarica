@@ -303,7 +303,15 @@ export const getStoresByChain = procedure
 				isVirtual: stores.isVirtual,
 			})
 			.from(stores)
-			.where(eq(stores.chainSlug, input.chainSlug))
+			.where(
+				and(
+					eq(stores.chainSlug, input.chainSlug),
+					// ClickHouse `prices_current.store_id` is the virtual "price source" store id.
+					eq(stores.isVirtual, true),
+					// Keep merged rows for historical integrity but hide them from selectors.
+					sql`${stores.status} != 'merged'`,
+				),
+			)
 			.orderBy(stores.name);
 
 		return { stores: storesList };

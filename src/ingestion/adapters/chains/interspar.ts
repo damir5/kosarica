@@ -225,7 +225,8 @@ export class IntersparAdapter extends BaseCsvAdapter {
 				parts.slice(1, storeCodeIndex),
 			);
 			const addressTokens = parts.slice(
-				addressStartIndex + 1 + 1,
+				// addressStartIndex is relative to parts.slice(1, storeCodeIndex)
+				addressStartIndex + 2,
 				storeCodeIndex,
 			);
 			const address = normalizeIntersparPart(addressTokens.join(" "));
@@ -237,8 +238,9 @@ export class IntersparAdapter extends BaseCsvAdapter {
 		}
 
 		const addressStartIndex = findAddressStart(parts.slice(1, storeCodeIndex));
-		const cityTokens = parts.slice(1, addressStartIndex + 1);
-		const addressTokens = parts.slice(addressStartIndex + 1, storeCodeIndex);
+		// addressStartIndex is relative to parts.slice(1, storeCodeIndex)
+		const cityTokens = parts.slice(1, addressStartIndex + 2);
+		const addressTokens = parts.slice(addressStartIndex + 2, storeCodeIndex);
 
 		const city = normalizeIntersparPart(cityTokens.join(" "));
 		const address = normalizeIntersparPart(addressTokens.join(" "));
@@ -297,6 +299,13 @@ function extractCityFromSuffix(
 				cityTokens.push(token);
 			}
 			if (cityTokens.length > 0) {
+				// Many real Interspar filenames include internal location codes after the
+				// store code (e.g. `spar_zg_jurisiceva_0281_...`). Treat short prefixes
+				// like `zg`/`os` as non-city to avoid misclassifying the address/city.
+				const first = cityTokens[0]?.toLowerCase() ?? "";
+				if (/^[a-z]{1,3}$/.test(first)) {
+					return null;
+				}
 				return normalizeIntersparPart(cityTokens.join(" "));
 			}
 		}
@@ -305,10 +314,21 @@ function extractCityFromSuffix(
 }
 
 function findAddressStart(parts: string[]): number {
+	const hasIndicator = parts.some((raw) =>
+		ADDRESS_INDICATORS.includes(raw.toLowerCase().replace(/\./g, "")),
+	);
+	if (!hasIndicator) {
+		// Common filename format is `<city>_<street...>_<house>_<storeCode>_...`.
+		// Without explicit street indicators, treat the first token as the city.
+		return 0;
+	}
+
 	for (let i = 0; i < parts.length; i++) {
 		const part = parts[i].toLowerCase().replace(/\./g, "");
 		if (ADDRESS_INDICATORS.includes(part)) {
-			return Math.max(0, i - 1);
+			// Pattern usually looks like `<city>_<street>_<indicator>_...`.
+			// Return the last city token index (token before street starts).
+			return Math.max(0, i - 2);
 		}
 		if (/^\d+[a-z]?$/.test(part) && i > 0) {
 			return i - 1;

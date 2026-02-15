@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { LidlAdapter } from "./lidl";
 
 describe("LidlAdapter store metadata extraction", () => {
+	it("extracts a stable store identifier from supermarket filenames", () => {
+		const adapter = new LidlAdapter();
+		const identifier = adapter.extractStoreIdentifier({
+			url: "https://example.test/Supermarket 112.zip",
+			filename: "Supermarket 112.zip",
+			type: "zip",
+		});
+
+		expect(identifier).toEqual({ type: "lidl_store_code", value: "112" });
+	});
+
 	it("normalizes supermarket code names", () => {
 		const adapter = new LidlAdapter();
 		const metadata = adapter.extractStoreMetadata({
@@ -41,6 +52,7 @@ describe("LidlAdapter store metadata extraction", () => {
 			name: "Lidl Biograd na Moru",
 			address: "Jadranska magistrala 1a",
 			city: "Biograd na Moru",
+			postalCode: "23210",
 		});
 	});
 

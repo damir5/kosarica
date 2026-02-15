@@ -435,8 +435,7 @@ function buildStoreIdentifierType(chainSlug: string): string {
 
 async function resolveStoreId(
 	chainSlug: string,
-	storeIdentifier: string,
-	storeIdentifierType: string,
+	storeIdentifier: { type: string; value: string },
 	metadata: {
 		name?: string;
 		address?: string;
@@ -446,7 +445,11 @@ async function resolveStoreId(
 	cache: Map<string, string>,
 	inFlightResolutions?: Map<string, Promise<string>>,
 ): Promise<string> {
-	const cacheKey = `${chainSlug}:${storeIdentifier}`;
+	if (!storeIdentifier.value.trim()) {
+		throw new Error("resolveStoreId called with empty store identifier");
+	}
+
+	const cacheKey = `${chainSlug}:${storeIdentifier.type}:${storeIdentifier.value}`;
 	const cached = cache.get(cacheKey);
 	if (cached) {
 		return cached;
@@ -462,26 +465,68 @@ async function resolveStoreId(
 	const resolver = (async () => {
 		const db = getDatabase();
 		const existing = await db
-			.select({ id: stores.id })
+			.select({
+				id: stores.id,
+				name: stores.name,
+				displayName: stores.displayName,
+				displayNameManual: stores.displayNameManual,
+				address: stores.address,
+				city: stores.city,
+				postalCode: stores.postalCode,
+			})
 			.from(storeIdentifiers)
 			.innerJoin(stores, eq(stores.id, storeIdentifiers.storeId))
 			.where(
 				and(
-					eq(storeIdentifiers.value, storeIdentifier),
+					eq(storeIdentifiers.chainSlug, chainSlug),
+					eq(storeIdentifiers.type, storeIdentifier.type),
+					eq(storeIdentifiers.value, storeIdentifier.value),
 					eq(stores.chainSlug, chainSlug),
 				),
 			)
 			.limit(1);
 
 		if (existing[0]) {
-			cache.set(cacheKey, existing[0].id);
-			return existing[0].id;
+			const current = existing[0];
+			const updateData: Partial<typeof stores.$inferInsert> = {
+				updatedAt: new Date(),
+			};
+
+			if (!current.address && metadata?.address) {
+				updateData.address = metadata.address;
+			}
+			if (!current.city && metadata?.city) {
+				updateData.city = metadata.city;
+			}
+			if (!current.postalCode && metadata?.postalCode) {
+				updateData.postalCode = metadata.postalCode;
+			}
+
+			const placeholderName = `${chainSlug.toUpperCase()} ${storeIdentifier.value}`.slice(
+				0,
+				255,
+			);
+			if (
+				metadata?.name &&
+				!current.displayNameManual &&
+				(current.name === placeholderName || current.displayName === placeholderName)
+			) {
+				updateData.name = metadata.name.slice(0, 255);
+				updateData.displayName = metadata.name.slice(0, 255);
+			}
+
+			if (Object.keys(updateData).length > 1) {
+				await db.update(stores).set(updateData).where(eq(stores.id, current.id));
+			}
+
+			cache.set(cacheKey, current.id);
+			return current.id;
 		}
 
 		const storeId = generatePrefixedId("sto");
 		const storeName =
 			metadata?.name ||
-			`${chainSlug.toUpperCase()} ${storeIdentifier}`.slice(0, 255);
+			`${chainSlug.toUpperCase()} ${storeIdentifier.value}`.slice(0, 255);
 
 		await db.insert(stores).values({
 			id: storeId,
@@ -500,8 +545,9 @@ async function resolveStoreId(
 		await db.insert(storeIdentifiers).values({
 			id: generatePrefixedId("sid"),
 			storeId,
-			type: storeIdentifierType,
-			value: storeIdentifier,
+			chainSlug,
+			type: storeIdentifier.type,
+			value: storeIdentifier.value,
 			createdAt: new Date(),
 		});
 
@@ -1431,14 +1477,18 @@ async function processIngestionFile(options: {
 		type: fileEntry.type as FileType,
 	};
 	const storeMetadata = adapter.extractStoreMetadata(effectiveFile);
+	const adapterStoreIdentifier = adapter.extractStoreIdentifier(effectiveFile);
 
 	for (const row of parsed.rows) {
-		const storeIdentifier =
-			row.storeIdentifier?.trim() ||
-			adapter.extractStoreIdentifier(effectiveFile)?.value ||
-			"";
+		const fallbackIdentifierValue = row.storeIdentifier?.trim() || "";
+		const resolvedIdentifier =
+			adapterStoreIdentifier?.value?.trim()
+				? adapterStoreIdentifier
+				: fallbackIdentifierValue
+					? { type: storeIdentifierType, value: fallbackIdentifierValue }
+					: null;
 
-		if (!storeIdentifier) {
+		if (!resolvedIdentifier?.value) {
 			fileFailedRows += 1;
 			validationErrors.push({
 				runId,
@@ -1478,8 +1528,7 @@ async function processIngestionFile(options: {
 
 		const storeId = await resolveStoreId(
 			chainSlug,
-			storeIdentifier,
-			storeIdentifierType,
+			{ type: resolvedIdentifier.type, value: resolvedIdentifier.value },
 			storeMetadata,
 			storeCache,
 			storeResolveInFlight,
@@ -1510,7 +1559,7 @@ async function processIngestionFile(options: {
 		validRows.push({
 			row,
 			storeId,
-			storeIdentifier,
+			storeIdentifier: resolvedIdentifier.value,
 			hasWarning,
 		});
 	}

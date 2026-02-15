@@ -208,6 +208,10 @@ export const storeIdentifiers = pgTable(
 		storeId: text("store_id")
 			.notNull()
 			.references(() => stores.id, { onDelete: "cascade" }),
+		// Denormalized for fast/deterministic store resolution. Backfilled from stores.chain_slug.
+		chainSlug: text("chain_slug")
+			.notNull()
+			.references(() => chains.slug, { onDelete: "cascade" }),
 		type: text("type").notNull(), // 'filename_code', 'portal_id', 'internal_id', etc.
 		value: text("value").notNull(),
 		createdAt: timestamp("created_at").defaultNow(),
@@ -216,6 +220,11 @@ export const storeIdentifiers = pgTable(
 		storeTypeValueUnique: uniqueIndex(
 			"store_identifiers_store_type_value_unique",
 		).on(table.storeId, table.type, table.value),
+		chainTypeValueIdx: index("store_identifiers_chain_type_value_idx").on(
+			table.chainSlug,
+			table.type,
+			table.value,
+		),
 		typeValueIdx: index("store_identifiers_type_value_idx").on(
 			table.type,
 			table.value,

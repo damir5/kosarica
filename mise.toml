@@ -32,3 +32,8 @@ run = "./scripts/staging-pull.sh"
 [tasks.deploy-staging]
 description = "Deploy to staging environment via Kamal"
 run = "mise exec ruby@3.3 -- kamal deploy -c kamal.yml"
+
+[settings]
+
+[settings.ruby]
+compile = false

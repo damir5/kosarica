@@ -169,28 +169,41 @@ export class KonzumAdapter extends BaseCsvAdapter {
 		// Format: <type>,<street> <number> <postal> <city>,<store_code>,<postal_code>,<date>,<time>.CSV
 		// Example: HIPERMARKET,ANTUNA GUSTAVA MATOŠA 10 21210 SOLIN,3290,54922,13.02.2026, 05-22.CSV
 		if (parts.length >= 2) {
-			const addressCityPart = parts[1] ?? "";
-			const addressCityParts = addressCityPart.split(/\s+/);
+			const tryParse = (addressCityPart: string): StoreMetadata | null => {
+				const addressCityParts = addressCityPart.split(/\s+/);
 
-			// Find the 5-digit postal code which separates street from city
-			const postalIndex = addressCityParts.findIndex((p) => /^\d{5}$/.test(p));
+				// Find the 5-digit postal code which separates street from city
+				const postalIndex = addressCityParts.findIndex((p) => /^\d{5}$/.test(p));
 
-			if (postalIndex >= 0 && postalIndex < addressCityParts.length - 1) {
-				const streetParts = addressCityParts.slice(0, postalIndex);
-				const cityParts = addressCityParts.slice(postalIndex + 1);
+				if (postalIndex >= 0 && postalIndex < addressCityParts.length - 1) {
+					const streetParts = addressCityParts.slice(0, postalIndex);
+					const cityParts = addressCityParts.slice(postalIndex + 1);
 
-				const street = normalizeKonzumPart(streetParts.join(" "));
-				const city = normalizeKonzumPart(cityParts.join(" "));
-				const postalCode = addressCityParts[postalIndex] ?? "";
+					const street = normalizeKonzumPart(streetParts.join(" "));
+					const city = normalizeKonzumPart(cityParts.join(" "));
+					const postalCode = addressCityParts[postalIndex] ?? "";
 
-				if (city) {
-					return {
-						name: `${this.name} ${city}`,
-						address: street || undefined,
-						city: city,
-						postalCode: postalCode || undefined,
-					};
+					if (city) {
+						return {
+							name: `${this.name} ${city}`,
+							address: street || undefined,
+							city: city,
+							postalCode: postalCode || undefined,
+						};
+					}
 				}
+				return null;
+			};
+
+			// Some filenames contain an extra comma between street and locality/city.
+			// Example: `SUPERMARKET,PUŠKARIĆEVA 15,LUČKO 10250 ZAGREB,...`
+			const primary = tryParse(parts[1] ?? "");
+			if (primary) return primary;
+
+			if (parts.length >= 3) {
+				const combined = `${parts[1] ?? ""} ${parts[2] ?? ""}`.trim();
+				const combinedParsed = tryParse(combined);
+				if (combinedParsed) return combinedParsed;
 			}
 		}
 

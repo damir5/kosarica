@@ -122,12 +122,19 @@ WORKDIR /app
 # Copy built application from build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/sourcemaps ./sourcemaps
-COPY --from=build /app/scripts/start-server.mjs /app/scripts/instrumentation.mjs ./scripts/
+
+# Operational tooling: include scripts + drizzle + source schema so we can run
+# admin/maintenance tasks directly on staging (not production-optimized).
+COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=build /app/src ./src
+COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/package.json /app/pnpm-lock.yaml ./
 
-# Install production dependencies only using pnpm for consistency
-RUN pnpm install --frozen-lockfile --prod && \
-    pnpm store prune
+# Include dev dependencies in runtime image so `npx tsx scripts/*.ts` and
+# `drizzle-kit` migrations can run on staging.
+COPY --from=dependencies /app/node_modules ./node_modules
 
 # Create storage directory for logs and temporary files
 RUN mkdir -p /app/logs && \

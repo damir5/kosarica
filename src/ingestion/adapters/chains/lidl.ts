@@ -8,6 +8,7 @@ import type {
 	ExpandedFile,
 	ParseOptions,
 	ParseResult,
+	StoreIdentifier,
 	StoreMetadata,
 } from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
@@ -171,6 +172,25 @@ export class LidlAdapter extends BaseCsvAdapter {
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
 
+	extractStoreIdentifier(file: DiscoveredFile): StoreIdentifier | null {
+		// Prefer a stable store code identifier when present to prevent duplicates
+		// caused by filename detail changes.
+		const raw = this.extractStoreIdentifierFromFilename(file.filename);
+		if (!raw) return null;
+
+		const normalized = raw.replace(/\.(zip|csv)$/i, "").trim();
+		const supermarketMatch = normalized.match(/^Supermarket\s+(\d+)/i);
+		if (supermarketMatch?.[1]) {
+			return { type: "lidl_store_code", value: supermarketMatch[1] };
+		}
+
+		if (/^\d+$/.test(normalized)) {
+			return { type: "lidl_store_code", value: normalized };
+		}
+
+		return super.extractStoreIdentifier(file);
+	}
+
 	private postprocessMultipleGtins(result: ParseResult): ParseResult {
 		for (const row of result.rows) {
 			if (row.barcodes.length === 1) {
@@ -214,41 +234,40 @@ export class LidlAdapter extends BaseCsvAdapter {
 		if (supermarketWithDetailsMatch) {
 			const storeCode = supermarketWithDetailsMatch[1];
 			const details = supermarketWithDetailsMatch[2] ?? "";
-			const parts = details
+			const rawParts = details
 				.split("_")
-				.filter(
-					(p) =>
-						p &&
-						!/^\d{8}$/.test(p) &&
-						!/^\d{2}\.\d{2}\.\d{4}$/.test(p) &&
-						!/^\d{1,2}\.\d{2}h?$/i.test(p) &&
-						!/^\d{1,2}$/i.test(p),
-				);
+				.map((p) => p.trim())
+				.filter(Boolean);
 
-			if (parts.length >= 2) {
-				const streetParts: string[] = [];
-				const cityParts: string[] = [];
-				let foundCityStart = false;
-
-				for (const part of parts) {
-					if (/^\d{5}$/.test(part)) {
-						foundCityStart = true;
-						continue;
-					}
-					if (foundCityStart) {
-						cityParts.push(part);
-					} else {
-						streetParts.push(part);
-					}
+			// Drop known trailing tokens: batch number, date, time, etc.
+			const parts = [...rawParts];
+			while (parts.length > 0) {
+				const last = parts[parts.length - 1] ?? "";
+				if (
+					/^\d{8}$/.test(last) ||
+					/^\d{2}\.\d{2}\.\d{4}$/.test(last) ||
+					/^\d{1,2}\.\d{2}h?$/i.test(last) ||
+					/^\d{1,2}$/.test(last)
+				) {
+					parts.pop();
+					continue;
 				}
+				break;
+			}
 
+			const postalCodeIndex = parts.findIndex((p) => /^\d{5}$/.test(p));
+			if (postalCodeIndex >= 1 && postalCodeIndex < parts.length - 1) {
+				const streetParts = parts.slice(0, postalCodeIndex);
+				const cityParts = parts.slice(postalCodeIndex + 1);
 				const street = streetParts.join(" ").replace(/\s+/g, " ").trim();
 				const city = cityParts.join(" ").replace(/\s+/g, " ").trim();
+				const postalCode = parts[postalCodeIndex] ?? "";
 
 				return {
 					name: city ? `${this.name} ${city}` : `${this.name} ${storeCode}`,
 					address: street || undefined,
 					city: city || undefined,
+					postalCode: postalCode || undefined,
 				};
 			}
 
@@ -265,10 +284,32 @@ export class LidlAdapter extends BaseCsvAdapter {
 
 		const parts = normalizedIdentifier
 			.split("_")
+			.map((p) => p.trim())
 			.filter((p) => p && !/^\d{8}$/.test(p));
 		if (parts.length === 0) {
 			return {
 				name: `${this.name} ${normalizedIdentifier}`,
+			};
+		}
+
+		const postalCodeIndex = parts.findIndex((p) => /^\d{5}$/.test(p));
+		if (postalCodeIndex >= 1 && postalCodeIndex < parts.length - 1) {
+			const address = parts
+				.slice(0, postalCodeIndex)
+				.join(" ")
+				.replace(/\s+/g, " ")
+				.trim();
+			const city = parts
+				.slice(postalCodeIndex + 1)
+				.join(" ")
+				.replace(/\s+/g, " ")
+				.trim();
+			const postalCode = parts[postalCodeIndex] ?? "";
+			return {
+				name: city ? `${this.name} ${city}` : `${this.name} ${normalizedIdentifier}`,
+				city: city || undefined,
+				address: address || undefined,
+				postalCode: postalCode || undefined,
 			};
 		}
 

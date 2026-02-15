@@ -181,10 +181,16 @@ export class StudenacAdapter extends BaseXmlAdapter {
 	}
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {
-		const match = filename.match(/-T(\d+)-/);
-		if (match?.[1]) {
-			return match[1];
-		}
+		const baseName = filename.replace(/\.(xml|XML)$/i, "");
+
+		// Preferred format: `...-T1234-...`
+		const withT = baseName.match(/-T(\d+)-/);
+		if (withT?.[1]) return withT[1];
+
+		// Alternative format observed on staging: `...-1234-275-2026-02-13-...`
+		const withoutT = baseName.match(/-(\d+)-\d{3}-\d{4}-\d{2}-\d{2}-/);
+		if (withoutT?.[1]) return withoutT[1];
+
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
 
@@ -235,7 +241,7 @@ export class StudenacAdapter extends BaseXmlAdapter {
 		const baseName = file.filename.replace(/\.(xml|XML)$/i, "");
 
 		const match = baseName.match(
-			/^SUPERMARKET-(.+)-T\d+-\d+-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}-\d+/i,
+			/^SUPERMARKET-(.+)-(?:T)?\d+-\d+-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}-\d+/i,
 		);
 		if (match?.[1]) {
 			const locationPart = match[1];

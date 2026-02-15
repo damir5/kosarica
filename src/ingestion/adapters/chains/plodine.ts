@@ -265,10 +265,24 @@ export class PlodineAdapter extends BaseCsvAdapter {
 
 	protected extractStoreIdentifierFromFilename(filename: string): string {
 		const baseName = filename.replace(/\.(csv|CSV)$/i, "");
-		const parts = baseName.split("_");
-		if (parts.length >= 6) {
-			return parts[5];
+		const parts = baseName.split("_").filter(Boolean);
+
+		// Common format:
+		// `SUPERMARKET_<street...>_<postal>_<city...>_<storeCode>_<batch>_<timestamp>.csv`
+		// (Also observed with `HIPERMARKET_...`.)
+		if (parts.length >= 7) {
+			const storeCode = parts[parts.length - 3] ?? "";
+			const batch = parts[parts.length - 2] ?? "";
+			const timestamp = parts[parts.length - 1] ?? "";
+			if (
+				/^\d{2,3}$/.test(storeCode) &&
+				/^\d{2,3}$/.test(batch) &&
+				/^\d{8,14}$/.test(timestamp)
+			) {
+				return storeCode;
+			}
 		}
+
 		return super.extractStoreIdentifierFromFilename(filename);
 	}
 
@@ -358,7 +372,8 @@ function parsePlodineMetadataFromFilename(
 ): { address: string; city: string; postalCode: string } | null {
 	const baseName = filename.replace(/\.(csv|CSV)$/i, "");
 	const parts = baseName.split("_");
-	if (parts.length < 8 || parts[0]?.toUpperCase() !== "SUPERMARKET") {
+	const kind = (parts[0] ?? "").toUpperCase();
+	if (parts.length < 8 || (kind !== "SUPERMARKET" && kind !== "HIPERMARKET")) {
 		return null;
 	}
 

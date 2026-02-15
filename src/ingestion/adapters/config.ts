@@ -100,7 +100,8 @@ export const chainConfigs: Record<ChainID, ChainConfig> = {
 		supportedTypes: ["csv", "zip"],
 		csv: { delimiter: ";", encoding: "auto", hasHeader: true },
 		usesZip: true,
-		storeResolution: "national",
+		// Per-store; store metadata is encoded in filenames and identifiers should be store-specific.
+		storeResolution: "filename",
 	},
 	dm: {
 		id: "dm",
