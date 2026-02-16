@@ -1,18 +1,18 @@
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
+	type DatabaseType,
 	ingestionRuns,
 	retailerItemFeatures,
 	retailerItems,
-	type DatabaseType,
 } from "@/db";
-import {
-	parseEnsembleConfig,
-	readApiKey,
-	type EnsembleModelConfig,
-} from "@/lib/semantic-clustering/config";
 import { chunk } from "@/lib/collections/chunk";
 import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
 import { logLlmDecision } from "@/lib/llm-observability";
+import {
+	type EnsembleModelConfig,
+	parseEnsembleConfig,
+	readApiKey,
+} from "@/lib/semantic-clustering/config";
 import { extractJsonPayload } from "@/lib/semantic-clustering/llm";
 import { parseRetailerItemFeature } from "@/lib/semantic-clustering/normalize";
 import { getDb } from "@/utils/bindings";
@@ -20,8 +20,8 @@ import { generatePrefixedId } from "@/utils/id";
 import { createLogger, errorToObject } from "@/utils/logger";
 import {
 	categorizationsAgree,
-	parseCategorizationResponse,
 	type ParsedCategorization,
+	parseCategorizationResponse,
 } from "./parse";
 import {
 	buildCategorizationMessages,
@@ -167,7 +167,10 @@ function isOpenAiCompatibleProvider(config: EnsembleModelConfig): boolean {
 	);
 }
 
-function isLikelyResponseFormatError(status: number, bodyText: string): boolean {
+function isLikelyResponseFormatError(
+	status: number,
+	bodyText: string,
+): boolean {
 	if (status !== 400 && status !== 422) {
 		return false;
 	}
@@ -256,7 +259,9 @@ const CATEGORIZATION_RPM_LIMIT = parsePositiveInt(
 	0,
 );
 const categorizationRpmLimiter =
-	CATEGORIZATION_RPM_LIMIT > 0 ? createRpmLimiter(CATEGORIZATION_RPM_LIMIT) : null;
+	CATEGORIZATION_RPM_LIMIT > 0
+		? createRpmLimiter(CATEGORIZATION_RPM_LIMIT)
+		: null;
 
 async function callModel(
 	config: EnsembleModelConfig,
@@ -300,18 +305,24 @@ async function callModel(
 				}
 
 				const baseBody = {
-						model: config.model,
-						temperature: 0,
-						max_tokens: config.maxTokens ?? 9000,
-						messages: [
-							{ role: "system", content: messages.systemMessage },
-							{ role: "user", content: messages.userMessage },
-						],
-					};
+					model: config.model,
+					temperature: 0,
+					max_tokens: config.maxTokens ?? 9000,
+					messages: [
+						{ role: "system", content: messages.systemMessage },
+						{ role: "user", content: messages.userMessage },
+					],
+				};
 
 				const tryRequest = async (
 					withResponseFormat: boolean,
-				): Promise<{ ok: boolean; status: number; statusText: string; bodyText: string }> => {
+				): Promise<{
+					ok: boolean;
+					status: number;
+					statusText: string;
+					bodyText: string;
+					headers: Record<string, string>;
+				}> => {
 					if (categorizationRpmLimiter) {
 						await categorizationRpmLimiter.wait();
 					}
@@ -329,11 +340,29 @@ async function callModel(
 						signal: controller.signal,
 					});
 					const bodyText = await response.text();
+					const rateLimitHeaders: Record<string, string> = {};
+					const headerNames = [
+						"retry-after",
+						"x-ratelimit-limit",
+						"x-ratelimit-remaining",
+						"x-ratelimit-reset",
+						"x-ratelimit-reset-requests",
+						"x-ratelimit-reset-tokens",
+						"x-request-id",
+						"cf-ray",
+					];
+					for (const name of headerNames) {
+						const value = response.headers.get(name);
+						if (value) {
+							rateLimitHeaders[name] = value;
+						}
+					}
 					return {
 						ok: response.ok,
 						status: response.status,
 						statusText: response.statusText,
 						bodyText,
+						headers: rateLimitHeaders,
 					};
 				};
 
@@ -346,6 +375,15 @@ async function callModel(
 				}
 
 				if (!result.ok) {
+					log.warn("Categorization LLM HTTP error", {
+						provider: config.provider,
+						model: config.model,
+						attempt,
+						status: result.status,
+						statusText: result.statusText,
+						bodySnippet: result.bodyText.slice(0, 280),
+						rateLimitHeaders: result.headers,
+					});
 					throw new Error(
 						`${config.provider}:${config.model} HTTP ${result.status} ${result.statusText} body=${result.bodyText.slice(0, 280)}`,
 					);
@@ -359,6 +397,15 @@ async function callModel(
 			}
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
+			const isAbort = error instanceof Error && error.name === "AbortError";
+			log.warn("Categorization LLM call failed", {
+				provider: config.provider,
+				model: config.model,
+				attempt,
+				maxAttempts,
+				errorType: isAbort ? "AbortError/timeout" : error?.constructor?.name,
+				errorMessage: lastError.message.slice(0, 200),
+			});
 			if (attempt < maxAttempts) {
 				await sleep(500 * attempt);
 			}
@@ -442,15 +489,23 @@ async function persistCategorization(
 		unitQuantity: row.unitQuantity,
 	});
 
-	const fallbackPackAmount = featureInput.packAmount > 0 ? featureInput.packAmount : 1;
-	const packAmount = normalizePackAmount(categorization.packAmount, fallbackPackAmount);
+	const fallbackPackAmount =
+		featureInput.packAmount > 0 ? featureInput.packAmount : 1;
+	const packAmount = normalizePackAmount(
+		categorization.packAmount,
+		fallbackPackAmount,
+	);
 	const amount = categorization.extractedAmount;
 	const unit = categorization.extractedUnit;
 	const hasAmountData =
 		amount != null &&
 		Number.isFinite(amount) &&
 		amount > 0 &&
-		(unit === "g" || unit === "kg" || unit === "ml" || unit === "l" || unit === "kom");
+		(unit === "g" ||
+			unit === "kg" ||
+			unit === "ml" ||
+			unit === "l" ||
+			unit === "kom");
 
 	const unitAmount = hasAmountData
 		? toBaseUnitAmount(amount as number, unit as string)
@@ -459,15 +514,9 @@ async function persistCategorization(
 		hasAmountData && unitAmount != null
 			? unitAmount * packAmount
 			: featureInput.totalAmount;
-	const isCountItem = hasAmountData
-		? unit === "kom"
-		: featureInput.isCountItem;
-	const extractedAmount = hasAmountData
-		? amount
-		: featureInput.extractedAmount;
-	const extractedUnit = hasAmountData
-		? unit
-		: featureInput.extractedUnit;
+	const isCountItem = hasAmountData ? unit === "kom" : featureInput.isCountItem;
+	const extractedAmount = hasAmountData ? amount : featureInput.extractedAmount;
+	const extractedUnit = hasAmountData ? unit : featureInput.extractedUnit;
 	const normalizedCategory = hasCategoryOverride
 		? (existingFeature?.normalizedCategory ?? featureInput.normalizedCategory)
 		: featureInput.normalizedCategory;
@@ -493,7 +542,9 @@ async function persistCategorization(
 		? (existingFeature?.totalAmount ?? totalAmount)
 		: totalAmount;
 	const finalContainerType = hasUnitOverride
-		? (existingFeature?.containerType ?? categorization.containerType ?? featureInput.containerType)
+		? (existingFeature?.containerType ??
+			categorization.containerType ??
+			featureInput.containerType)
 		: (categorization.containerType ?? featureInput.containerType);
 	const finalBlockingKeys =
 		(hasCategoryOverride || hasUnitOverride) && existingFeature?.blockingKeys
@@ -699,11 +750,14 @@ async function categorizeChunk(
 	}
 
 	try {
-		const secondaryPromptItems = toPromptItems(lowConfidenceRows).map((item) => ({
-			...item,
-			itemId: llmIdByRealId.get(item.itemId) ?? item.itemId,
-		}));
-		const secondaryMessages = await buildCategorizationMessages(secondaryPromptItems);
+		const secondaryPromptItems = toPromptItems(lowConfidenceRows).map(
+			(item) => ({
+				...item,
+				itemId: llmIdByRealId.get(item.itemId) ?? item.itemId,
+			}),
+		);
+		const secondaryMessages =
+			await buildCategorizationMessages(secondaryPromptItems);
 		const secondaryStartedAt = Date.now();
 		const secondaryPayload = await callModel(
 			models.secondaryModel,
@@ -715,7 +769,9 @@ async function categorizeChunk(
 			new Set(
 				lowConfidenceRows
 					.map((row) => llmIdByRealId.get(row.itemId))
-					.filter((id): id is string => typeof id === "string" && id.length > 0),
+					.filter(
+						(id): id is string => typeof id === "string" && id.length > 0,
+					),
 			),
 		);
 		const secondaryParsed = new Map<string, ParsedCategorization>();
@@ -764,11 +820,14 @@ async function categorizeChunk(
 			});
 		}
 	} catch (error) {
-		log.warn("Secondary categorization model failed, marking escalations for review", {
-			error,
-			itemCount: lowConfidenceRows.length,
-			model: models.secondaryModel.model,
-		});
+		log.warn(
+			"Secondary categorization model failed, marking escalations for review",
+			{
+				error,
+				itemCount: lowConfidenceRows.length,
+				model: models.secondaryModel.model,
+			},
+		);
 		for (const row of lowConfidenceRows) {
 			const primary = primaryParsed.get(row.itemId);
 			if (!primary) {
@@ -826,7 +885,11 @@ export async function categorizeBatch(
 
 	for (const [batchIndex, rowBatch] of rowBatches.entries()) {
 		try {
-			const result = await categorizeChunk(rowBatch, models, confidenceThreshold);
+			const result = await categorizeChunk(
+				rowBatch,
+				models,
+				confidenceThreshold,
+			);
 			const categorizedAt = new Date();
 			for (const row of rowBatch) {
 				const parsed = result.accepted.get(row.itemId);
@@ -963,10 +1026,7 @@ export async function backfillUncategorizedItems(options?: {
 		}
 
 		const remaining = maxBatches - i;
-		const planned = Math.max(
-			1,
-			Math.min(backfillConcurrency, remaining),
-		);
+		const planned = Math.max(1, Math.min(backfillConcurrency, remaining));
 
 		const conditions = [
 			isNull(retailerItems.mergedIntoId),

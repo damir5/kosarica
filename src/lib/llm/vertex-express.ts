@@ -1,4 +1,7 @@
 import type { EnsembleModelConfig } from "@/lib/semantic-clustering/config";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("matching");
 
 export interface VertexExpressUsage {
 	promptTokens: number | null;
@@ -43,6 +46,28 @@ async function waitForVertexExpressRateLimit(): Promise<void> {
 	await vertexExpressGate;
 }
 
+function extractRateLimitHeaders(response: Response): Record<string, string> {
+	const headers: Record<string, string> = {};
+	const rateLimitHeaderNames = [
+		"retry-after",
+		"x-ratelimit-limit",
+		"x-ratelimit-remaining",
+		"x-ratelimit-reset",
+		"x-ratelimit-reset-requests",
+		"x-ratelimit-reset-tokens",
+		"x-request-id",
+		"cf-ray",
+	];
+
+	for (const name of rateLimitHeaderNames) {
+		const value = response.headers.get(name);
+		if (value) {
+			headers[name] = value;
+		}
+	}
+	return headers;
+}
+
 class VertexExpressHttpError extends Error {
 	public readonly status: number;
 
@@ -50,16 +75,20 @@ class VertexExpressHttpError extends Error {
 
 	public readonly bodySnippet: string;
 
+	public readonly rateLimitHeaders: Record<string, string>;
+
 	public constructor(input: {
 		message: string;
 		status: number;
 		statusText: string;
 		bodySnippet: string;
+		rateLimitHeaders: Record<string, string>;
 	}) {
 		super(input.message);
 		this.status = input.status;
 		this.statusText = input.statusText;
 		this.bodySnippet = input.bodySnippet;
+		this.rateLimitHeaders = input.rateLimitHeaders;
 	}
 }
 
@@ -164,7 +193,10 @@ export function extractVertexUsage(responseJson: unknown): VertexExpressUsage {
 	};
 }
 
-function isLikelySchemaOrMimeTypeError(status: number, bodyText: string): boolean {
+function isLikelySchemaOrMimeTypeError(
+	status: number,
+	bodyText: string,
+): boolean {
 	if (status !== 400 && status !== 422) {
 		return false;
 	}
@@ -241,11 +273,21 @@ async function postGenerateContent(input: {
 
 		if (!response.ok) {
 			const bodySnippet = bodyText.slice(0, 280);
+			const rateLimitHeaders = extractRateLimitHeaders(response);
+			log.warn("Vertex Express HTTP error", {
+				provider: input.config.provider,
+				model: input.config.model,
+				status: response.status,
+				statusText: response.statusText,
+				bodySnippet,
+				rateLimitHeaders,
+			});
 			throw new VertexExpressHttpError({
 				message: `${input.config.provider}:${input.config.model} HTTP ${response.status} ${response.statusText} body=${bodySnippet}`,
 				status: response.status,
 				statusText: response.statusText,
 				bodySnippet,
+				rateLimitHeaders,
 			});
 		}
 
@@ -277,7 +319,9 @@ export async function callVertexExpressGenerateContent(input: {
 	const apiKeyEnv = input.config.apiKeyEnv ?? "VERTEX_EXPRESS_API_KEY";
 	const apiKey = process.env[apiKeyEnv];
 	if (!apiKey) {
-		throw new Error(`Missing API key for model ${input.config.id}: set ${apiKeyEnv}`);
+		throw new Error(
+			`Missing API key for model ${input.config.id}: set ${apiKeyEnv}`,
+		);
 	}
 
 	const attempts: Array<{
@@ -317,6 +361,15 @@ export async function callVertexExpressGenerateContent(input: {
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
 			const isLastAttempt = index === attempts.length - 1;
+			const isAbort = error instanceof Error && error.name === "AbortError";
+			log.warn("Vertex Express request failed", {
+				provider: input.config.provider,
+				model: input.config.model,
+				attemptIndex: index,
+				isLastAttempt,
+				errorType: isAbort ? "AbortError/timeout" : error?.constructor?.name,
+				errorMessage: lastError.message.slice(0, 200),
+			});
 
 			if (
 				!isLastAttempt &&
