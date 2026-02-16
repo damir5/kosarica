@@ -442,6 +442,7 @@ async function loadEmbeddingGroups(params: {
 	const itemIdsToLoad = Array.from(allItemIds);
 	if (itemIdsToLoad.length === 0) return [];
 
+	const loadSql = `ARRAY[${itemIdsToLoad.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")}]::text[]`;
 	const itemResult = await db.execute(sql`
 		SELECT
 			ri.id AS retailer_item_id,
@@ -458,7 +459,7 @@ async function loadEmbeddingGroups(params: {
 			rif.embedding AS embedding
 		FROM retailer_items ri
 		LEFT JOIN retailer_item_features rif ON rif.retailer_item_id = ri.id
-		WHERE ri.id = ANY(${itemIdsToLoad}::text[])
+		WHERE ri.id = ANY(${sql.raw(loadSql)})
 	`);
 
 	const itemMap = new Map<string, GroupItem>();
@@ -586,6 +587,7 @@ async function loadLexicalGroups(params: {
 	const itemIdsToLoad = Array.from(allItemIds);
 	if (itemIdsToLoad.length === 0) return [];
 
+	const loadSql = `ARRAY[${itemIdsToLoad.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")}]::text[]`;
 	const itemResult = await db.execute(sql`
 		SELECT
 			ri.id AS retailer_item_id,
@@ -602,7 +604,7 @@ async function loadLexicalGroups(params: {
 			rif.embedding AS embedding
 		FROM retailer_items ri
 		LEFT JOIN retailer_item_features rif ON rif.retailer_item_id = ri.id
-		WHERE ri.id = ANY(${itemIdsToLoad}::text[])
+		WHERE ri.id = ANY(${sql.raw(loadSql)})
 	`);
 
 	const itemMap = new Map<string, GroupItem>();
