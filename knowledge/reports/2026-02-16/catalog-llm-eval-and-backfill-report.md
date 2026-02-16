@@ -95,7 +95,7 @@ Problem:
 
 Fix:
 
-- RPM limiter now gates **request start times** under a sliding window, but does **not** serialize requests.
+- RPM limiter now gates **request start times** with a fixed minimum gap (paced), but does **not** serialize requests.
 - Backfill now runs `CATEGORIZATION_BACKFILL_CONCURRENCY` batches in parallel.
 
 This allows us to hit ~10 request/minute even if each request takes ~60s, by having multiple in-flight calls while still respecting the 10 RPM start-rate.
@@ -106,7 +106,7 @@ Environment (from `kamal.yml`):
 
 - `CATEGORIZATION_RPM_LIMIT=10`
 - `CATEGORIZATION_BATCH_SIZE=30`
-- `CATEGORIZATION_BACKFILL_CONCURRENCY=10`
+- `CATEGORIZATION_BACKFILL_CONCURRENCY=20`
 
 Secrets (from `.kamal/secrets`):
 
@@ -127,14 +127,13 @@ After deploying concurrency, the task was set back to `pending` and immediately 
 
 ## Observed Staging Throughput (Post-Fix)
 
-From container logs over ~104 seconds after the concurrency deploy:
+From container logs shortly after deploying parallel backfill:
 
-- Effective request rate: ~`10.38 rpm`
-- Throughput: ~`328.7 items/min`
+- Completion throughput is typically in the `~250-450 items/min` range depending on concurrent in-flight completions (completion timestamps are bursty; start-rate is the true RPM cap).
 
 Projection for `165169` items:
 
-- `165169 / 328.7 ~= 502.5 minutes ~= 8.4 hours`
+	- At `300 items/min`, `165169 / 300 ~= 550.6 minutes ~= 9.2 hours`
 
 This fits within the 10-hour runtime budget.
 
@@ -145,4 +144,3 @@ This fits within the 10-hour runtime budget.
 - Local bench sweeps (OpenRouter + Z.ai synthetic prompt):
   - `knowledge/reports/2026-02-15/llm-bench-local-sweep.jsonl`
   - `knowledge/reports/2026-02-15/llm-bench-zai-local.jsonl`
-
