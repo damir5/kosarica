@@ -1,0 +1,60 @@
+[dotenv@17.2.3] injecting env (6) from .env.development.local -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[dotenv@17.2.3] injecting env (3) from .env.test -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.2.3] injecting env (26) from .env.development -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+{"startedAt":"2026-02-15T22:30:07.179Z","rounds":1,"rpm":10,"targetCount":5,"includeLocal":false,"includeZai":true,"discoveredOpenRouterFreeCount":0,"localModel":"qwen/qwen3-4b","localEndpoint":"http://100.72.112.119:1234/v1/chat/completions","items":10,"maxTokens":1200,"timeoutMs":60000,"localTimeoutMs":180000,"mode":"only-zai"}
+{"label":"zai:glm-4.5#1","ok":true,"httpStatus":200,"latencyMs":20935,"latency":"20.93s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":2}
+{"label":"zai:glm-4.5-air#1","ok":true,"httpStatus":200,"latencyMs":19711,"latency":"19.71s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":0}
+{"label":"zai:glm-4.6#1","ok":true,"httpStatus":200,"latencyMs":11764,"latency":"11.76s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":0}
+{"label":"zai:glm-4.7#1","ok":true,"httpStatus":200,"latencyMs":23680,"latency":"23.68s","parseOk":false,"resultCount":null,"usage":{"promptTokens":597,"completionTokens":1200,"totalTokens":1797},"overheadMs":0}
+{"label":"zai:glm-5#1","ok":true,"httpStatus":200,"latencyMs":28033,"latency":"28.03s","parseOk":false,"resultCount":null,"usage":{"promptTokens":597,"completionTokens":1200,"totalTokens":1797},"overheadMs":0}
+{
+  "finishedAt": "2026-02-15T22:31:51.310Z",
+  "summary": [
+    {
+      "provider": "zai",
+      "model": "glm-4.6",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 11764,
+      "p95Ms": 11764,
+      "avgMs": 11764
+    },
+    {
+      "provider": "zai",
+      "model": "glm-4.5-air",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 19711,
+      "p95Ms": 19711,
+      "avgMs": 19711
+    },
+    {
+      "provider": "zai",
+      "model": "glm-4.5",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 20935,
+      "p95Ms": 20935,
+      "avgMs": 20935
+    },
+    {
+      "provider": "zai",
+      "model": "glm-4.7",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 23680,
+      "p95Ms": 23680,
+      "avgMs": 23680
+    },
+    {
+      "provider": "zai",
+      "model": "glm-5",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 28033,
+      "p95Ms": 28033,
+      "avgMs": 28033
+    }
+  ]
+}

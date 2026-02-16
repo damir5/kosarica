@@ -1,0 +1,411 @@
+{
+  "startedAt": "2026-02-15T22:39:21.527Z",
+  "host": "kosarica.chickenkiller.com-c2594e2d338c",
+  "n": 300,
+  "batch": 30,
+  "batches": 10,
+  "targets": [
+    "openrouter:arcee-ai/trinity-large-preview:free",
+    "openrouter:liquid/lfm-2.5-1.2b-instruct:free",
+    "openrouter:upstage/solar-pro-3:free",
+    "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
+    "zai:glm-5",
+    "zai:glm-4.7"
+  ],
+  "results": [
+    {
+      "model": "openrouter:arcee-ai/trinity-large-preview:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 30625,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"1\",\n      \"confidence\": 0.95,\n      \"product_type\": \"maslina\",\n      \"brand\": \"AGROSEVILLA\",\n      \"everyday_name\": \"crne masline\",\n",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 45332,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"31\",\n      \"confidence\": 0.95,\n      \"product_type\": \"gel za kosu\",\n      \"brand\": \"ANNYER\",\n      \"everyday_name\": \"gel za kosu\",\n ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 47935,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"61\",\n      \"confidence\": 0.95,\n      \"product_type\": \"pelene\",\n      \"brand\": \"TOSAMA TRADE D.O.O.\",\n      \"everyday_name\": \"EVY BAB",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 47268,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"91\",\n      \"confidence\": 0.95,\n      \"product_type\": \"jadranska srđela\",\n      \"brand\": \"METRO CHEF\",\n      \"everyday_name\": \"jadran",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 46161,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\"results\": [{\"item_id\": \"121\", \"confidence\": 0.95, \"product_type\": \"bijeli \\u010daj\", \"brand\": \"ENGLISH TEA SHOP\", \"everyday_name\": \"bijeli \\u010daj\", \"variant\": \"38 g\", \"u",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:liquid/lfm-2.5-1.2b-instruct:free",
+      "calls": {
+        "total": 10,
+        "ok": 9,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 6185.222222222223,
+        "medianLatencyMs": 6621,
+        "p90LatencyMs": 7085
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 53,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 96.85534591194968,
+        "brandNonNullPct": 95.59748427672956,
+        "amountNonNullPct": 82.38993710691824,
+        "unitNonNullPct": 91.19496855345912,
+        "packNonNullPct": 6.918238993710692,
+        "containerNonNullPct": 32.075471698113205,
+        "brandMatchPct": 42.75092936802974,
+        "amountUnitMatchPct": 20.318725099601593,
+        "packMatchPct": 2.9629629629629632,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9569811320754757
+      },
+      "failures": [
+        {
+          "callIndex": 8,
+          "itemCount": 30,
+          "latencyMs": 7001,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"211\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Kozmetika\",\n      \"brand\": \"PARODONTAX\",\n      \"everyday_name\": \"PARODONTAX Č",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:upstage/solar-pro-3:free",
+      "calls": {
+        "total": 10,
+        "ok": 9,
+        "schemaRecovered": 8,
+        "avgLatencyMs": 26045.444444444445,
+        "medianLatencyMs": 26721,
+        "p90LatencyMs": 28179
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 19069,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We are given a list of items with various fields. We need to categorize each item according to the specified output schema. The output must be a JSON object with a \"results\"",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
+      "calls": {
+        "total": 10,
+        "ok": 2,
+        "schemaRecovered": 2,
+        "avgLatencyMs": 12331.5,
+        "medianLatencyMs": 12331.5,
+        "p90LatencyMs": 14307
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 11148,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Categorization response does not match expected schema",
+          "errorStage": "schema"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 13919,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object per input item. Must include fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount,",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 13975,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object containing fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount, package_size, con",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 30,
+          "latencyMs": 12631,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object containing fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount, package_size, con",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 30,
+          "latencyMs": 14209,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object containing fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount, package_size, con",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-5",
+      "calls": {
+        "total": 10,
+        "ok": 4,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 57959.25,
+        "medianLatencyMs": 58105,
+        "p90LatencyMs": 66898
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 5.666666666666666,
+        "productTypeNonNullPct": 88.23529411764706,
+        "everydayNameNonNullPct": 82.35294117647058,
+        "brandNonNullPct": 82.35294117647058,
+        "amountNonNullPct": 82.35294117647058,
+        "unitNonNullPct": 82.35294117647058,
+        "packNonNullPct": 35.294117647058826,
+        "containerNonNullPct": 11.76470588235294,
+        "brandMatchPct": 10.833333333333334,
+        "amountUnitMatchPct": 6.60377358490566,
+        "packMatchPct": 0.8333333333333334,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9311764705882355
+      },
+      "failures": [
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 82568,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 30,
+          "latencyMs": 63692,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 30,
+          "latencyMs": 120003,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 8,
+          "itemCount": 30,
+          "latencyMs": 120001,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 9,
+          "itemCount": 30,
+          "latencyMs": 85795,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-4.7",
+      "calls": {
+        "total": 10,
+        "ok": 1,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 22074,
+        "medianLatencyMs": 22074,
+        "p90LatencyMs": 22074
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 1.3333333333333335,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 75,
+        "brandNonNullPct": 50,
+        "amountNonNullPct": 50,
+        "unitNonNullPct": 75,
+        "packNonNullPct": 50,
+        "containerNonNullPct": 25,
+        "brandMatchPct": 6.666666666666667,
+        "amountUnitMatchPct": 7.142857142857142,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9375
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 28444,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 24078,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 23424,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 26357,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 33973,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        }
+      ]
+    }
+  ]
+}

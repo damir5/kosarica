@@ -1,4 +1,5 @@
 import { createLogger } from "@/utils/logger";
+import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
 import {
 	type EnsembleModelConfig,
 	parseEnsembleConfig,
@@ -535,6 +536,44 @@ async function callClaudeBatch(
 	}
 }
 
+function buildVertexBatchResponseSchema(): Record<string, unknown> {
+	return {
+		type: "object",
+		properties: {
+			results: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						pair_id: { type: "string" },
+						verdict: { type: "string", enum: ALLOWED_VERDICTS },
+						confidence: { type: "number" },
+						reasoning: { type: "string" },
+					},
+					required: ["pair_id", "verdict", "confidence", "reasoning"],
+				},
+			},
+		},
+		required: ["results"],
+	};
+}
+
+async function callVertexExpressBatch(
+	config: EnsembleModelConfig,
+	pairs: SemanticBatchPairInput[],
+): Promise<Map<string, LLMJsonResponse>> {
+	const expectedPairIds = new Set(pairs.map((pair) => pair.pairId));
+	const { responseText } = await callVertexExpressGenerateContent({
+		config,
+		systemMsg: "Return strict JSON only.",
+		userMsg: buildBatchPrompt(pairs),
+		responseMimeType: "application/json",
+		responseSchema: buildVertexBatchResponseSchema(),
+	});
+
+	return parseBatchJson(responseText, expectedPairIds);
+}
+
 async function callModelBatch(
 	config: EnsembleModelConfig,
 	pairs: SemanticBatchPairInput[],
@@ -550,6 +589,8 @@ async function callModelBatch(
 			const parsedMap =
 				config.provider === "claude"
 					? await callClaudeBatch(config, pairs)
+					: config.provider === "vertex-express"
+						? await callVertexExpressBatch(config, pairs)
 					: await callOpenAiCompatibleBatch(config, pairs);
 
 			const latencyMs = Date.now() - start;

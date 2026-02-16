@@ -11,13 +11,18 @@ import {
 	type EnsembleModelConfig,
 } from "@/lib/semantic-clustering/config";
 import { chunk } from "@/lib/collections/chunk";
+import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
 import { logLlmDecision } from "@/lib/llm-observability";
 import { extractJsonPayload } from "@/lib/semantic-clustering/llm";
 import { parseRetailerItemFeature } from "@/lib/semantic-clustering/normalize";
 import { getDb } from "@/utils/bindings";
 import { generatePrefixedId } from "@/utils/id";
 import { createLogger, errorToObject } from "@/utils/logger";
-import { categorizationsAgree, parseCategorizationResponse } from "./parse";
+import {
+	categorizationsAgree,
+	parseCategorizationResponse,
+	type ParsedCategorization,
+} from "./parse";
 import {
 	buildCategorizationMessages,
 	type CategorizationPromptItem,
@@ -155,7 +160,20 @@ function getCategorizationModels(): {
 }
 
 function isOpenAiCompatibleProvider(config: EnsembleModelConfig): boolean {
-	return config.provider === "openrouter" || config.provider === "openai";
+	return (
+		config.provider === "openrouter" ||
+		config.provider === "openai" ||
+		config.provider === "zai"
+	);
+}
+
+function isLikelyResponseFormatError(status: number, bodyText: string): boolean {
+	if (status !== 400 && status !== 422) {
+		return false;
+	}
+	return /response[_\s-]?format|json_schema|json_object|unsupported\s+media\s+type/i.test(
+		bodyText,
+	);
 }
 
 function extractMessageContent(data: unknown): string {
@@ -198,63 +216,162 @@ async function sleep(ms: number): Promise<void> {
 	});
 }
 
+type RpmLimiter = {
+	wait: () => Promise<void>;
+};
+
+function createRpmLimiter(rpm: number): RpmLimiter {
+	const safeRpm = Math.max(1, Math.floor(rpm));
+	const windowMs = 60_000;
+
+	// Reserve start times under a sliding window, but do not serialize the actual requests.
+	// This keeps us under the RPM cap while allowing multiple in-flight calls.
+	let reservations: number[] = [];
+	let stateChain: Promise<void> = Promise.resolve();
+
+	return {
+		wait: async () => {
+			let scheduledAt = 0;
+			const step = stateChain.then(() => {
+				const now = Date.now();
+				const cutoff = now - windowMs;
+				reservations = reservations.filter((t) => t >= cutoff).sort((a, b) => a - b);
+
+				if (reservations.length < safeRpm) {
+					scheduledAt = now;
+				} else {
+					// Earliest reservation exits the window first; schedule right after that.
+					scheduledAt = Math.max(now, (reservations[0] as number) + windowMs);
+				}
+
+				reservations.push(scheduledAt);
+				reservations.sort((a, b) => a - b);
+			});
+
+			stateChain = step.catch(() => {
+				// Keep the chain alive even if a caller fails.
+			});
+			await step;
+
+			const waitMs = scheduledAt - Date.now();
+			if (waitMs > 0) {
+				await sleep(waitMs);
+			}
+		},
+	};
+}
+
+const CATEGORIZATION_RPM_LIMIT = parsePositiveInt(
+	process.env.CATEGORIZATION_RPM_LIMIT,
+	0,
+);
+const categorizationRpmLimiter =
+	CATEGORIZATION_RPM_LIMIT > 0 ? createRpmLimiter(CATEGORIZATION_RPM_LIMIT) : null;
+
 async function callModel(
 	config: EnsembleModelConfig,
 	messages: { systemMessage: string; userMessage: string },
 ): Promise<unknown> {
-	if (!isOpenAiCompatibleProvider(config)) {
-		throw new Error(
-			`Unsupported categorization provider "${config.provider}" for model ${config.id}`,
-		);
-	}
-
-	const apiKey = readApiKey(config);
 	const maxAttempts = (config.maxRetries ?? 0) + 1;
 	let lastError: Error | null = null;
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
-
 		try {
-			const response = await fetch(config.endpoint ?? "", {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					"Content-Type": "application/json",
-					"HTTP-Referer": "https://kosarica.local",
-					"X-Title": "Kosarica Categorization",
-				},
-				body: JSON.stringify({
-					model: config.model,
-					temperature: 0,
-					max_tokens: 9000,
-					response_format: { type: "json_object" },
-					messages: [
-						{ role: "system", content: messages.systemMessage },
-						{ role: "user", content: messages.userMessage },
-					],
-				}),
-				signal: controller.signal,
-			});
+			if (config.provider === "vertex-express") {
+				const result = await callVertexExpressGenerateContent({
+					config,
+					systemMsg: messages.systemMessage,
+					userMsg: messages.userMessage,
+					responseMimeType: "application/json",
+				});
+				return extractJsonPayload(result.responseText);
+			}
 
-			if (!response.ok) {
-				const body = await response.text();
+			if (!isOpenAiCompatibleProvider(config)) {
 				throw new Error(
-					`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText} body=${body.slice(0, 280)}`,
+					`Unsupported categorization provider "${config.provider}" for model ${config.id}`,
 				);
 			}
 
-			const jsonBody = await response.json();
-			const content = extractMessageContent(jsonBody);
-			return extractJsonPayload(content);
+			const apiKey = readApiKey(config);
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+
+			try {
+				const headers: Record<string, string> = {
+					Authorization: `Bearer ${apiKey}`,
+					"Content-Type": "application/json",
+				};
+				if (config.provider === "openrouter") {
+					headers["HTTP-Referer"] =
+						process.env.OPENROUTER_HTTP_REFERER ?? "https://kosarica.local";
+					headers["X-Title"] =
+						process.env.OPENROUTER_X_TITLE ?? "Kosarica Categorization";
+				}
+
+				const baseBody = {
+						model: config.model,
+						temperature: 0,
+						max_tokens: config.maxTokens ?? 9000,
+						messages: [
+							{ role: "system", content: messages.systemMessage },
+							{ role: "user", content: messages.userMessage },
+						],
+					};
+
+				const tryRequest = async (
+					withResponseFormat: boolean,
+				): Promise<{ ok: boolean; status: number; statusText: string; bodyText: string }> => {
+					if (categorizationRpmLimiter) {
+						await categorizationRpmLimiter.wait();
+					}
+					const response = await fetch(config.endpoint ?? "", {
+						method: "POST",
+						headers,
+						body: JSON.stringify(
+							withResponseFormat
+								? {
+										...baseBody,
+										response_format: { type: "json_object" },
+									}
+								: baseBody,
+						),
+						signal: controller.signal,
+					});
+					const bodyText = await response.text();
+					return {
+						ok: response.ok,
+						status: response.status,
+						statusText: response.statusText,
+						bodyText,
+					};
+				};
+
+				let result = await tryRequest(true);
+				if (
+					!result.ok &&
+					isLikelyResponseFormatError(result.status, result.bodyText)
+				) {
+					result = await tryRequest(false);
+				}
+
+				if (!result.ok) {
+					throw new Error(
+						`${config.provider}:${config.model} HTTP ${result.status} ${result.statusText} body=${result.bodyText.slice(0, 280)}`,
+					);
+				}
+
+				const jsonBody = JSON.parse(result.bodyText) as unknown;
+				const content = extractMessageContent(jsonBody);
+				return extractJsonPayload(content);
+			} finally {
+				clearTimeout(timeout);
+			}
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
 			if (attempt < maxAttempts) {
 				await sleep(500 * attempt);
 			}
-		} finally {
-			clearTimeout(timeout);
 		}
 	}
 
@@ -488,12 +605,36 @@ async function categorizeChunk(
 	failedItemIds: Set<string>;
 	escalatedCount: number;
 }> {
-	const itemIds = new Set(rows.map((row) => row.itemId));
-	const primaryMessages = await buildCategorizationMessages(toPromptItems(rows));
+	// Short IDs are intentional: models often fail to copy long DB IDs verbatim,
+	// which then causes strict schema parsing to drop results.
+	const llmIdByRealId = new Map<string, string>();
+	for (const [index, row] of rows.entries()) {
+		// Avoid numeric-only IDs because models sometimes emit them as JSON numbers.
+		llmIdByRealId.set(row.itemId, `i${index + 1}`);
+	}
+
+	const llmExpectedIds = new Set<string>(Array.from(llmIdByRealId.values()));
+	const primaryPromptItems = toPromptItems(rows).map((item) => ({
+		...item,
+		itemId: llmIdByRealId.get(item.itemId) ?? item.itemId,
+	}));
+
+	const primaryMessages = await buildCategorizationMessages(primaryPromptItems);
 	const primaryStartedAt = Date.now();
 	const primaryPayload = await callModel(models.primaryModel, primaryMessages);
 	const primaryLatencyMs = Date.now() - primaryStartedAt;
-	const primaryParsed = parseCategorizationResponse(primaryPayload, itemIds);
+	const primaryParsedByLlmId = parseCategorizationResponse(
+		primaryPayload,
+		llmExpectedIds,
+	);
+	const primaryParsed = new Map<string, ParsedCategorization>();
+	for (const row of rows) {
+		const llmId = llmIdByRealId.get(row.itemId);
+		if (!llmId) continue;
+		const parsed = primaryParsedByLlmId.get(llmId);
+		if (!parsed) continue;
+		primaryParsed.set(row.itemId, { ...parsed, itemId: row.itemId });
+	}
 	await tryLogCategorizationDecision({
 		model: models.primaryModel,
 		itemIds: rows.map((row) => row.itemId),
@@ -568,19 +709,33 @@ async function categorizeChunk(
 	}
 
 	try {
-		const secondaryMessages = await buildCategorizationMessages(
-			toPromptItems(lowConfidenceRows),
-		);
+		const secondaryPromptItems = toPromptItems(lowConfidenceRows).map((item) => ({
+			...item,
+			itemId: llmIdByRealId.get(item.itemId) ?? item.itemId,
+		}));
+		const secondaryMessages = await buildCategorizationMessages(secondaryPromptItems);
 		const secondaryStartedAt = Date.now();
 		const secondaryPayload = await callModel(
 			models.secondaryModel,
 			secondaryMessages,
 		);
 		const secondaryLatencyMs = Date.now() - secondaryStartedAt;
-		const secondaryParsed = parseCategorizationResponse(
+		const secondaryParsedByLlmId = parseCategorizationResponse(
 			secondaryPayload,
-			new Set(lowConfidenceRows.map((row) => row.itemId)),
+			new Set(
+				lowConfidenceRows
+					.map((row) => llmIdByRealId.get(row.itemId))
+					.filter((id): id is string => typeof id === "string" && id.length > 0),
+			),
 		);
+		const secondaryParsed = new Map<string, ParsedCategorization>();
+		for (const row of lowConfidenceRows) {
+			const llmId = llmIdByRealId.get(row.itemId);
+			if (!llmId) continue;
+			const parsed = secondaryParsedByLlmId.get(llmId);
+			if (!parsed) continue;
+			secondaryParsed.set(row.itemId, { ...parsed, itemId: row.itemId });
+		}
 		await tryLogCategorizationDecision({
 			model: models.secondaryModel,
 			itemIds: lowConfidenceRows.map((row) => row.itemId),
@@ -780,16 +935,44 @@ export async function backfillUncategorizedItems(options?: {
 	batchSize?: number;
 	maxBatches?: number;
 	chainSlug?: string;
+	maxRuntimeMinutes?: number;
 }): Promise<CategorizationBatchResult & { batchesProcessed: number }> {
 	const db = getDb();
-	const batchSize = options?.batchSize ?? 1000;
+	const defaultBatchSize = parsePositiveInt(
+		process.env.CATEGORIZATION_BATCH_SIZE,
+		DEFAULT_BATCH_SIZE,
+	);
+	const batchSize = options?.batchSize ?? defaultBatchSize;
+	const backfillConcurrency = parsePositiveInt(
+		process.env.CATEGORIZATION_BACKFILL_CONCURRENCY,
+		1,
+	);
 	const maxBatches = options?.maxBatches ?? 200;
 	let batchesProcessed = 0;
 	let succeeded = 0;
 	let failed = 0;
 	let escalated = 0;
+	const maxRuntimeMs =
+		options?.maxRuntimeMinutes && options.maxRuntimeMinutes > 0
+			? options.maxRuntimeMinutes * 60_000
+			: null;
+	const startedAtMs = Date.now();
 
-	for (let i = 0; i < maxBatches; i += 1) {
+	for (let i = 0; i < maxBatches; ) {
+		if (maxRuntimeMs != null && Date.now() - startedAtMs >= maxRuntimeMs) {
+			log.info("Stopping categorization backfill due to runtime limit", {
+				batchesProcessed,
+				maxRuntimeMinutes: options?.maxRuntimeMinutes,
+			});
+			break;
+		}
+
+		const remaining = maxBatches - i;
+		const planned = Math.max(
+			1,
+			Math.min(backfillConcurrency, remaining),
+		);
+
 		const conditions = [
 			isNull(retailerItems.mergedIntoId),
 			or(
@@ -810,22 +993,49 @@ export async function backfillUncategorizedItems(options?: {
 			)
 			.where(and(...conditions))
 			.orderBy(retailerItems.createdAt)
-			.limit(batchSize);
+			.limit(batchSize * planned);
 
 		if (rows.length === 0) {
 			break;
 		}
 
-		const result = await categorizeBatch(rows.map((row) => row.itemId));
-		batchesProcessed += 1;
-		succeeded += result.succeeded;
-		failed += result.failed;
-		escalated += result.escalated;
+		const groups = chunk(rows, batchSize).slice(0, planned);
+		const settled = await Promise.allSettled(
+			groups.map((group) => categorizeBatch(group.map((row) => row.itemId))),
+		);
 
-		if (result.succeeded === 0 && result.failed > 0) {
+		let waveSucceeded = 0;
+		let waveFailed = 0;
+		let waveEscalated = 0;
+
+		for (const [groupIndex, result] of settled.entries()) {
+			const groupSize = groups[groupIndex]?.length ?? 0;
+			if (result.status === "fulfilled") {
+				waveSucceeded += result.value.succeeded;
+				waveFailed += result.value.failed;
+				waveEscalated += result.value.escalated;
+			} else {
+				waveFailed += groupSize;
+				log.error("Categorization backfill batch failed", {
+					error: errorToObject(result.reason),
+					groupIndex: groupIndex + 1,
+					groupCount: groups.length,
+					itemsInGroup: groupSize,
+				});
+			}
+		}
+
+		batchesProcessed += groups.length;
+		i += groups.length;
+		succeeded += waveSucceeded;
+		failed += waveFailed;
+		escalated += waveEscalated;
+
+		if (waveSucceeded === 0 && waveFailed > 0) {
 			log.warn("Stopping categorization backfill early due to full batch failure", {
 				batchIndex: batchesProcessed,
-				failed: result.failed,
+				failed: waveFailed,
+				concurrency: planned,
 			});
 			break;
 		}

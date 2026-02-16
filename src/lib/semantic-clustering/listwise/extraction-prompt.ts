@@ -39,6 +39,29 @@ const EXTRACTION_SCHEMA: BuiltPrompt["jsonSchema"] = {
 	},
 };
 
+const BULK_EXTRACTION_SCHEMA: BuiltPrompt["jsonSchema"] = {
+	name: "bulk_offer_spec_extraction",
+	schema: {
+		type: "object",
+		properties: {
+			groups: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						group_id: { type: "string" },
+						items: EXTRACTION_SCHEMA.schema.properties.items,
+					},
+					required: ["group_id", "items"],
+					additionalProperties: true,
+				},
+			},
+		},
+		required: ["groups"],
+		additionalProperties: true,
+	},
+};
+
 const ExtractionEntrySchema = z.object({
 	id: z.string().min(1),
 	brand: z.string().nullable().optional(),
@@ -171,6 +194,22 @@ function readEntries(payload: unknown): unknown[] {
 	return [];
 }
 
+function readGroupEntries(payload: unknown): unknown[] {
+	if (Array.isArray(payload)) {
+		return payload;
+	}
+	if (payload && typeof payload === "object") {
+		const candidate = payload as { groups?: unknown; results?: unknown };
+		if (Array.isArray(candidate.groups)) {
+			return candidate.groups;
+		}
+		if (Array.isArray(candidate.results)) {
+			return candidate.results;
+		}
+	}
+	return [];
+}
+
 export function buildExtractionPrompt(
 	items: Array<{ id: string; rawName: string }>,
 ): BuiltPrompt {
@@ -209,6 +248,58 @@ Return JSON only in this shape:
 Items:
 ${lines}`,
 		jsonSchema: EXTRACTION_SCHEMA,
+	};
+}
+
+export function buildBulkExtractionPrompt(
+	groups: Array<{
+		groupId: string;
+		items: Array<{ id: string; rawName: string }>;
+	}>,
+): BuiltPrompt {
+	const payload = groups.map((group) => ({
+		group_id: group.groupId,
+		items: group.items,
+	}));
+
+	return {
+		system: "Return strict JSON only.",
+		user: `You are an expert product data analyst for Croatian grocery retail catalogs.
+Extract structured offer fields from raw product titles.
+
+Croatian rules:
+- "kom" means piece/count.
+- "dag" and "dkg" mean 10g.
+- Multipacks such as "6x330ml" or "4 x 80 g" must set pack_count and per-unit amount.
+- Infer container when possible from terms like: boca, limenka, staklo, pak.
+- Keep brand/product/variant conservative and literal from title.
+
+Return JSON only in this shape:
+{
+  "groups": [
+    {
+      "group_id": "string",
+      "items": [
+        {
+          "id": "string",
+          "brand": "string|null",
+          "product": "string|null",
+          "variant": "string|null",
+          "pack_count": 1,
+          "unit_size": "string|null",
+          "unit_amount_ml_or_g": 330,
+          "container": "string|null",
+          "total_quantity": 1,
+          "total_amount_ml_or_g": 330
+        }
+      ]
+    }
+  ]
+}
+
+Groups:
+${JSON.stringify(payload, null, 2)}`,
+		jsonSchema: BULK_EXTRACTION_SCHEMA,
 	};
 }
 
@@ -258,4 +349,44 @@ export function parseExtractionResponse(
 		items,
 		missingItemIds,
 	};
+}
+
+export function parseBulkExtractionResponse(
+	raw: unknown,
+	groups: readonly { groupId: string; items: readonly GroupItem[] }[],
+): Map<string, ExtractionResult> {
+	const byGroupId = new Map<string, unknown>();
+	for (const entry of readGroupEntries(raw)) {
+		if (!entry || typeof entry !== "object") {
+			continue;
+		}
+		const record = entry as {
+			group_id?: unknown;
+			groupId?: unknown;
+			items?: unknown;
+		};
+		const groupId =
+			typeof record.group_id === "string"
+				? record.group_id.trim()
+				: typeof record.groupId === "string"
+					? record.groupId.trim()
+					: "";
+		if (groupId.length === 0) {
+			continue;
+		}
+		byGroupId.set(groupId, record.items);
+	}
+
+	const results = new Map<string, ExtractionResult>();
+	for (const group of groups) {
+		const groupItems = byGroupId.get(group.groupId);
+		results.set(
+			group.groupId,
+			parseExtractionResponse(
+				groupItems != null ? { items: groupItems } : { items: [] },
+				group.items,
+			),
+		);
+	}
+	return results;
 }

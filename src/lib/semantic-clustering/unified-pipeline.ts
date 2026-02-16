@@ -8,6 +8,7 @@ import type { EnsembleModelConfig } from "./config";
 import { decideListwiseCascade } from "./listwise/ensemble";
 import {
 	loadListwiseModelConfigs,
+	processGroupsWithLLM,
 	processGroupWithLLM,
 } from "./listwise/llm-call";
 import { persistAcceptedGrouping } from "./listwise/pipeline";
@@ -29,6 +30,10 @@ export interface RunUnifiedMatchingOptions {
 	secondaryModelId?: string;
 	/** Blocking options for candidate group generation. */
 	blocking?: GenerateCandidateGroupsOptions;
+	/** Max items per LLM prompt (large groups are split by brand). */
+	maxGroupSize?: number;
+	/** How many candidate groups to pack into one LLM request (bulk listwise). */
+	groupsPerCall?: number;
 }
 
 export interface RunUnifiedMatchingResult {
@@ -60,6 +65,12 @@ function parsePositiveInt(value: unknown, fallback: number): number {
 	const parsed =
 		typeof value === "string" ? Number.parseInt(value, 10) : Number(value);
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parsePositiveIntEnv(name: string, fallback: number): number {
+	const raw = process.env[name];
+	if (!raw) return fallback;
+	return parsePositiveInt(raw, fallback);
 }
 
 function pickModel(
@@ -137,7 +148,9 @@ export async function runUnifiedMatching(
 	const blocking = await generateCandidateGroups(options.blocking);
 
 	// Expand large groups into brand-scoped sub-groups
-	const maxGroupSize = 30;
+	const maxGroupSize =
+		options.maxGroupSize ??
+		parsePositiveIntEnv("UNIFIED_MATCHING_MAX_GROUP_SIZE", 45);
 	const expandedGroups: CandidateGroup[] = [];
 	for (const group of blocking.groups) {
 		expandedGroups.push(...splitGroupByBrand(group, maxGroupSize));
@@ -145,6 +158,10 @@ export async function runUnifiedMatching(
 
 	// Limit total groups to process
 	const groupsToProcess = expandedGroups.slice(0, limit);
+
+	const groupsPerCall =
+		options.groupsPerCall ??
+		parsePositiveIntEnv("UNIFIED_MATCHING_GROUPS_PER_CALL", 3);
 
 	// Prefetch prices for all items
 	const allItemIds = groupsToProcess.flatMap((group) =>
@@ -159,29 +176,122 @@ export async function runUnifiedMatching(
 	let linkedItems = 0;
 	let errorGroups = 0;
 
-	// Stage 3: RESOLVE + Stage 4: PERSIST
-	for (const group of groupsToProcess) {
-		const groupItemCount = group.items.length;
-
-		// Skip singleton groups
-		if (groupItemCount < 2) {
+	const processableGroups = groupsToProcess.filter((group) => {
+		if (group.items.length < 2) {
 			skippedGroups += 1;
-			continue;
+			return false;
 		}
+		return true;
+	});
 
-		processedGroups += 1;
+	const maxGroupsPerCall = Math.max(1, Math.min(20, groupsPerCall));
 
-		log.info("Unified matching: processing group", {
-			groupId: group.groupId,
-			seedKey: group.seedKey,
-			itemCount: groupItemCount,
+	async function safeProcessBatch(
+		model: EnsembleModelConfig,
+		groups: readonly CandidateGroup[],
+	): Promise<Map<string, ListwiseLLMResult>> {
+		try {
+			const results = await processGroupsWithLLM(model, groups, prices);
+			return new Map(results.map((result) => [result.groupId, result] as const));
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			if (/\\bHTTP\\s+(401|403)\\b/.test(errorMessage)) {
+				log.error(
+					"Unified matching: LLM authentication failed; aborting run",
+					{
+						modelId: model.id,
+						groupCount: groups.length,
+						errorMessage,
+					},
+				);
+				throw error instanceof Error ? error : new Error(errorMessage);
+			}
+
+			log.warn("Unified matching: bulk LLM call failed; falling back to per-group", {
+				modelId: model.id,
+				groupCount: groups.length,
+				error:
+					error instanceof Error
+						? { name: error.name, message: error.message }
+						: { unknownError: String(error) },
+			});
+
+			const map = new Map<string, ListwiseLLMResult>();
+			for (const group of groups) {
+				try {
+					const result = await processGroupWithLLM(model, group, prices);
+					map.set(group.groupId, result);
+				} catch (groupError) {
+					const groupErrorMessage =
+						groupError instanceof Error ? groupError.message : String(groupError);
+					if (/\\bHTTP\\s+(401|403)\\b/.test(groupErrorMessage)) {
+						log.error(
+							"Unified matching: LLM authentication failed; aborting run",
+							{
+								modelId: model.id,
+								groupId: group.groupId,
+								errorMessage: groupErrorMessage,
+							},
+						);
+						throw groupError instanceof Error
+							? groupError
+							: new Error(groupErrorMessage);
+					}
+
+					errorGroups += 1;
+					log.error("Unified matching: group LLM processing failed", {
+						groupId: group.groupId,
+						seedKey: group.seedKey,
+						modelId: model.id,
+						error:
+							groupError instanceof Error
+								? {
+										name: groupError.name,
+										message: groupError.message,
+										stack: groupError.stack,
+									}
+								: { unknownError: String(groupError) },
+					});
+				}
+			}
+			return map;
+		}
+	}
+
+	type GroupResolution = {
+		group: CandidateGroup;
+		primary: ListwiseLLMResult;
+		cascade: ReturnType<typeof decideListwiseCascade>;
+		accepted: ListwiseLLMResult;
+	};
+
+	// Stage 3: RESOLVE (primary) + Stage 4: PERSIST (after possible escalation)
+	for (let offset = 0; offset < processableGroups.length; offset += maxGroupsPerCall) {
+		const batch = processableGroups.slice(offset, offset + maxGroupsPerCall);
+		processedGroups += batch.length;
+
+		log.info("Unified matching: processing batch", {
+			batchIndex: Math.floor(offset / maxGroupsPerCall) + 1,
+			batchSize: batch.length,
 			primaryModel: primaryModel.id,
 			dryRun,
 		});
 
-		try {
-			// Run LLM extraction + clustering
-			const primary = await processGroupWithLLM(primaryModel, group, prices);
+		const primaryByGroupId = await safeProcessBatch(primaryModel, batch);
+		const resolutions: GroupResolution[] = [];
+		const escalations: CandidateGroup[] = [];
+		const escalationCascadeById = new Map<string, ReturnType<typeof decideListwiseCascade>>();
+		const primaryResultById = new Map<string, ListwiseLLMResult>();
+
+		for (const group of batch) {
+			const primary = primaryByGroupId.get(group.groupId);
+			if (!primary) {
+				errorGroups += 1;
+				continue;
+			}
+
+			const groupItemCount = group.items.length;
 			const cascade = decideListwiseCascade({
 				primary,
 				primaryModel,
@@ -189,6 +299,8 @@ export async function runUnifiedMatching(
 				itemCount: groupItemCount,
 				minPrimaryConfidence: options.minPrimaryConfidence,
 			});
+
+			primaryResultById.set(group.groupId, primary);
 
 			await logLlmDecision({
 				taskType: "unified_matching",
@@ -224,15 +336,43 @@ export async function runUnifiedMatching(
 				tokenCount: primary.tokenEstimates.total,
 			});
 
-			let accepted: ListwiseLLMResult;
 			if (cascade.shouldEscalate) {
 				escalatedGroups += 1;
-				const secondary = await processGroupWithLLM(
-					secondaryModel,
+				escalations.push(group);
+				escalationCascadeById.set(group.groupId, cascade);
+			} else {
+				resolutions.push({
 					group,
-					prices,
-				);
-				accepted = secondary;
+					primary,
+					cascade,
+					accepted: primary,
+				});
+			}
+		}
+
+		// Secondary verification (batched)
+		for (let i = 0; i < escalations.length; i += maxGroupsPerCall) {
+			const escalationBatch = escalations.slice(i, i + maxGroupsPerCall);
+			log.info("Unified matching: verifying escalation batch", {
+				batchIndex: Math.floor(i / maxGroupsPerCall) + 1,
+				batchSize: escalationBatch.length,
+				secondaryModel: secondaryModel.id,
+				dryRun,
+			});
+
+			const secondaryByGroupId = await safeProcessBatch(
+				secondaryModel,
+				escalationBatch,
+			);
+
+			for (const group of escalationBatch) {
+				const primary = primaryResultById.get(group.groupId);
+				const cascade = escalationCascadeById.get(group.groupId);
+				const secondary = secondaryByGroupId.get(group.groupId);
+				if (!primary || !cascade || !secondary) {
+					errorGroups += 1;
+					continue;
+				}
 
 				await logLlmDecision({
 					taskType: "unified_matching_verify",
@@ -261,32 +401,41 @@ export async function runUnifiedMatching(
 					latencyMs: secondary.totalLatencyMs,
 					tokenCount: secondary.tokenEstimates.total,
 				});
-			} else {
-				accepted = primary;
-			}
 
-			// Persist results
-			const persisted = await persistAcceptedGrouping({
-				group,
-				llm: accepted,
-				dryRun,
-			});
-			createdSkus += persisted.createdSkus;
-			linkedItems += persisted.linkedItems;
-		} catch (error) {
-			errorGroups += 1;
-			log.error("Unified matching: group processing failed", {
-				groupId: group.groupId,
-				seedKey: group.seedKey,
-				error:
-					error instanceof Error
-						? {
-								name: error.name,
-								message: error.message,
-								stack: error.stack,
-							}
-						: { unknownError: String(error) },
-			});
+				resolutions.push({
+					group,
+					primary,
+					cascade,
+					accepted: secondary,
+				});
+			}
+		}
+
+		// Persist all accepted groupings
+		for (const resolution of resolutions) {
+			try {
+				const persisted = await persistAcceptedGrouping({
+					group: resolution.group,
+					llm: resolution.accepted,
+					dryRun,
+				});
+				createdSkus += persisted.createdSkus;
+				linkedItems += persisted.linkedItems;
+			} catch (error) {
+				errorGroups += 1;
+				log.error("Unified matching: persistence failed", {
+					groupId: resolution.group.groupId,
+					seedKey: resolution.group.seedKey,
+					error:
+						error instanceof Error
+							? {
+									name: error.name,
+									message: error.message,
+									stack: error.stack,
+								}
+							: { unknownError: String(error) },
+				});
+			}
 		}
 	}
 

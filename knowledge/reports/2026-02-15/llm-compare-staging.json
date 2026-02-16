@@ -1,0 +1,659 @@
+{
+  "startedAt": "2026-02-15T21:00:30.013Z",
+  "host": "kosarica.chickenkiller.com-2ad02655540d",
+  "n": 80,
+  "batch": 10,
+  "batches": 8,
+  "targets": [
+    "openrouter:liquid/lfm-2.5-1.2b-instruct:free",
+    "openrouter:arcee-ai/trinity-large-preview:free",
+    "openrouter:arcee-ai/trinity-mini:free",
+    "openrouter:nvidia/nemotron-nano-9b-v2:free",
+    "openrouter:stepfun/step-3.5-flash:free",
+    "openrouter:openbmb/miniCPM-o-2_6:free",
+    "zai:glm-5",
+    "zai:glm-4.7",
+    "zai:glm-4.6",
+    "zai:glm-4.5-air",
+    "zai:glm-4.5"
+  ],
+  "results": [
+    {
+      "model": "openrouter:liquid/lfm-2.5-1.2b-instruct:free",
+      "calls": {
+        "total": 8,
+        "ok": 7,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 3650.1428571428573,
+        "medianLatencyMs": 3460,
+        "p90LatencyMs": 4408
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 85,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 100,
+        "amountNonNullPct": 89.70588235294117,
+        "unitNonNullPct": 91.17647058823529,
+        "packNonNullPct": 13.23529411764706,
+        "containerNonNullPct": 61.76470588235294,
+        "brandMatchPct": 81.42857142857143,
+        "amountUnitMatchPct": 55.55555555555556,
+        "packMatchPct": 8.571428571428571,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.25147058823529417
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 10,
+          "latencyMs": 4165,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"1\",\n      \"confidence\": 0.98,\n      \"product_type\": \"Hrana\",\n      \"brand\": \"AGROSEVILLA\",\n      \"everyday_name\": \"MASLINE CRNE BEZ ",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:arcee-ai/trinity-large-preview:free",
+      "calls": {
+        "total": 8,
+        "ok": 8,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 21345.125,
+        "medianLatencyMs": 22049.5,
+        "p90LatencyMs": 26914
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 100,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 93.75,
+        "amountNonNullPct": 87.5,
+        "unitNonNullPct": 95,
+        "packNonNullPct": 56.25,
+        "containerNonNullPct": 30,
+        "brandMatchPct": 88.75,
+        "amountUnitMatchPct": 52.77777777777778,
+        "packMatchPct": 12.5,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9499999999999993
+      },
+      "failures": []
+    },
+    {
+      "model": "openrouter:arcee-ai/trinity-mini:free",
+      "calls": {
+        "total": 8,
+        "ok": 5,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 10111.8,
+        "medianLatencyMs": 9583,
+        "p90LatencyMs": 12936
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 61.25000000000001,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 95.91836734693877,
+        "amountNonNullPct": 87.75510204081633,
+        "unitNonNullPct": 87.75510204081633,
+        "packNonNullPct": 26.53061224489796,
+        "containerNonNullPct": 44.89795918367347,
+        "brandMatchPct": 86,
+        "amountUnitMatchPct": 60.46511627906976,
+        "packMatchPct": 6,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9346938775510207
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 10,
+          "latencyMs": 11450,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"1\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Masline\",\n      \"brand\": \"AGROSEVILLA\",\n      \"everyday_name\": \"Masline crne\",\n",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 10,
+          "latencyMs": 10955,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Categorization response does not match expected schema",
+          "errorStage": "schema"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 10,
+          "latencyMs": 13254,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n\"results\": [\n    {\n      \"item_id\": \"61\",\n      \"confidence\": 0.95,\n      \"product_type\": \"toilet paper\",\n      \"brand\": \"TOSAMA TRADE D.O.O.\",\n      \"everyday_name\": \"Jum",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:nvidia/nemotron-nano-9b-v2:free",
+      "calls": {
+        "total": 8,
+        "ok": 5,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 56161.8,
+        "medianLatencyMs": 42942,
+        "p90LatencyMs": 85227
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 62.5,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 94,
+        "amountNonNullPct": 96,
+        "unitNonNullPct": 92,
+        "packNonNullPct": 18,
+        "containerNonNullPct": 20,
+        "brandMatchPct": 86,
+        "amountUnitMatchPct": 62.22222222222222,
+        "packMatchPct": 8,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9500000000000005
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 10,
+          "latencyMs": 41347,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"1\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Hrana\",\n      \"brand\": \"AGROSEVILLA\",\n      \"everyday_name\": \"Masline crno bez ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 10,
+          "latencyMs": 94014,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"21\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Panceta\",\n      \"brand\": \"VINDIJA VIR\",\n      \"everyday_name\": \"Dalmatinska di",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 10,
+          "latencyMs": 44323,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"61\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Toaletne potrepštine\",\n      \"brand\": \"TOSAMA TRADE D.O.O.\",\n      \"everyday_n",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:stepfun/step-3.5-flash:free",
+      "calls": {
+        "total": 8,
+        "ok": 8,
+        "schemaRecovered": 8,
+        "avgLatencyMs": 12685.125,
+        "medianLatencyMs": 13053.5,
+        "p90LatencyMs": 14051
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": []
+    },
+    {
+      "model": "openrouter:openbmb/miniCPM-o-2_6:free",
+      "calls": {
+        "total": 8,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 10,
+          "latencyMs": 227,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 400 Bad Request body={\"error\":{\"message\":\"openbmb/miniCPM-o-2_6:free is not a valid model ID\",\"code\":400},\"user_id\":\"user_2qsdastRlkWdeY3v02J7J8wNV56\"}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 10,
+          "latencyMs": 557,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 400 Bad Request body={\"error\":{\"message\":\"openbmb/miniCPM-o-2_6:free is not a valid model ID\",\"code\":400},\"user_id\":\"user_2qsdastRlkWdeY3v02J7J8wNV56\"}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 10,
+          "latencyMs": 445,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 400 Bad Request body={\"error\":{\"message\":\"openbmb/miniCPM-o-2_6:free is not a valid model ID\",\"code\":400},\"user_id\":\"user_2qsdastRlkWdeY3v02J7J8wNV56\"}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 10,
+          "latencyMs": 520,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 400 Bad Request body={\"error\":{\"message\":\"openbmb/miniCPM-o-2_6:free is not a valid model ID\",\"code\":400},\"user_id\":\"user_2qsdastRlkWdeY3v02J7J8wNV56\"}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 10,
+          "latencyMs": 523,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 400 Bad Request body={\"error\":{\"message\":\"openbmb/miniCPM-o-2_6:free is not a valid model ID\",\"code\":400},\"user_id\":\"user_2qsdastRlkWdeY3v02J7J8wNV56\"}",
+          "errorStage": "http"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-5",
+      "calls": {
+        "total": 8,
+        "ok": 6,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 35424,
+        "medianLatencyMs": 33542.5,
+        "p90LatencyMs": 45869
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 75,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 95,
+        "amountNonNullPct": 91.66666666666666,
+        "unitNonNullPct": 98.33333333333333,
+        "packNonNullPct": 53.333333333333336,
+        "containerNonNullPct": 13.333333333333334,
+        "brandMatchPct": 80,
+        "amountUnitMatchPct": 57.407407407407405,
+        "packMatchPct": 8.333333333333332,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9258333333333337
+      },
+      "failures": [
+        {
+          "callIndex": 2,
+          "itemCount": 10,
+          "latencyMs": 74515,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"11\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Sir\",\n      \"brand\": \"Gligora\",\n      \"everyday_name\": \"Kravlji sir s bučinim ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 10,
+          "latencyMs": 68900,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"21\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Suho meso\",\n      \"brand\": \"Vindija\",\n      \"everyday_name\": \"Dalmatinska panc",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-4.7",
+      "calls": {
+        "total": 8,
+        "ok": 1,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 30454,
+        "medianLatencyMs": 30454,
+        "p90LatencyMs": 30454
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 12.5,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 90,
+        "amountNonNullPct": 100,
+        "unitNonNullPct": 100,
+        "packNonNullPct": 90,
+        "containerNonNullPct": 10,
+        "brandMatchPct": 90,
+        "amountUnitMatchPct": 30,
+        "packMatchPct": 40,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9399999999999998
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 10,
+          "latencyMs": 45818,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 10,
+          "latencyMs": 24067,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 10,
+          "latencyMs": 25078,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"21\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Dimljeno meso\",\n      \"brand\": \"VINDIJA VIR\",\n      \"everyday_name\": \"Panceta\"",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 10,
+          "latencyMs": 42800,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 10,
+          "latencyMs": 31826,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"51\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Oprema za ljubimce\",\n      \"brand\": \"Vitakraft\",\n      \"everyday_name\": \"Ogrli",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-4.6",
+      "calls": {
+        "total": 8,
+        "ok": 3,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 12679.666666666666,
+        "medianLatencyMs": 12736,
+        "p90LatencyMs": 13256
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 37.5,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 96.66666666666667,
+        "amountNonNullPct": 86.66666666666667,
+        "unitNonNullPct": 96.66666666666667,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 30,
+        "brandMatchPct": 90,
+        "amountUnitMatchPct": 39.285714285714285,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9433333333333327
+      },
+      "failures": [
+        {
+          "callIndex": 2,
+          "itemCount": 10,
+          "latencyMs": 26875,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 10,
+          "latencyMs": 21759,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\"results\": [{\"item_id\": \"21\", \"confidence\": 0.95, \"product_type\": \"Dimljeno meso\", \"brand\": \"VINDIJA VIR\", \"everyday_name\": \"Panceta\", \"variant\": \"Dalmatinska dimljena\", \"u",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 10,
+          "latencyMs": 27105,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 10,
+          "latencyMs": 26265,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 8,
+          "itemCount": 10,
+          "latencyMs": 20191,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"71\",\n      \"confidence\": 0.95,\n      \"product_type\": \"veganski proizvodi\",\n      \"brand\": \"Vemondo\",\n      \"everyday_name\": \"vegansk",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-4.5-air",
+      "calls": {
+        "total": 8,
+        "ok": 4,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 29828,
+        "medianLatencyMs": 28501.5,
+        "p90LatencyMs": 37410
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 50,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 92.5,
+        "amountNonNullPct": 87.5,
+        "unitNonNullPct": 90,
+        "packNonNullPct": 35,
+        "containerNonNullPct": 35,
+        "brandMatchPct": 87.5,
+        "amountUnitMatchPct": 52.94117647058824,
+        "packMatchPct": 5,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9350000000000005
+      },
+      "failures": [
+        {
+          "callIndex": 2,
+          "itemCount": 10,
+          "latencyMs": 47564,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"11\",\n      \"confidence\": 0.95,\n      \"product_type\": \"sir\",\n      \"brand\": \"SIRANA GLIGORA DOO\",\n      \"everyday_name\": \"kravlji sir",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 10,
+          "latencyMs": 52190,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"21\",\n      \"confidence\": 0.95,\n      \"product_type\": \"mesne proizvode\",\n      \"brand\": \"VINDIJA VIR\",\n      \"everyday_name\": \"dalmat",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 10,
+          "latencyMs": 51878,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"31\",\n      \"confidence\": 0.95,\n      \"product_type\": \"gel\",\n      \"brand\": \"ANNYER\",\n      \"everyday_name\": \"gel\",\n      \"variant\": ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 10,
+          "latencyMs": 44865,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-4.5",
+      "calls": {
+        "total": 8,
+        "ok": 4,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 45510.5,
+        "medianLatencyMs": 49145.5,
+        "p90LatencyMs": 60882
+      },
+      "items": {
+        "total": 80,
+        "coveragePct": 50,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 92.5,
+        "amountNonNullPct": 90,
+        "unitNonNullPct": 100,
+        "packNonNullPct": 67.5,
+        "containerNonNullPct": 32.5,
+        "brandMatchPct": 87.5,
+        "amountUnitMatchPct": 51.35135135135135,
+        "packMatchPct": 17.5,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9337500000000006
+      },
+      "failures": [
+        {
+          "callIndex": 5,
+          "itemCount": 10,
+          "latencyMs": 71890,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"41\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Brijalice\",\n      \"brand\": \"VENUS\",\n      \"everyday_name\": \"Patrone za brijali",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 10,
+          "latencyMs": 20398,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 10,
+          "latencyMs": 73394,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"61\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Pamperi\",\n      \"brand\": \"TOSAMA\",\n      \"everyday_name\": \"Pamperi za bebe\",\n ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 8,
+          "itemCount": 10,
+          "latencyMs": 22479,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        }
+      ]
+    }
+  ]
+}

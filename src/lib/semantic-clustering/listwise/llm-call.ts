@@ -4,14 +4,22 @@ import {
 	parseEnsembleConfig,
 	readApiKey,
 } from "../config";
+import {
+	callVertexExpressGenerateContent,
+	type VertexExpressUsage,
+} from "@/lib/llm/vertex-express";
 import { extractJsonPayload } from "../llm";
 import {
 	buildClusteringPrompt,
+	buildBulkClusteringPrompt,
 	parseClusteringResponse,
+	parseBulkClusteringResponse,
 } from "./clustering-prompt";
 import {
 	buildExtractionPrompt,
+	buildBulkExtractionPrompt,
 	parseExtractionResponse,
+	parseBulkExtractionResponse,
 } from "./extraction-prompt";
 import type {
 	CandidateGroup,
@@ -232,6 +240,28 @@ function addNullable(a: number | null, b: number | null): number | null {
 	return (a ?? 0) + (b ?? 0);
 }
 
+function divNullable(value: number | null, divisor: number): number | null {
+	if (value == null) return null;
+	if (!Number.isFinite(value) || divisor <= 0) return null;
+	return Math.floor(value / divisor);
+}
+
+function splitTokenUsage(usage: TokenUsage, parts: number): TokenUsage {
+	return {
+		promptTokens: divNullable(usage.promptTokens, parts),
+		completionTokens: divNullable(usage.completionTokens, parts),
+		totalTokens: divNullable(usage.totalTokens, parts),
+		costUsd: divNullable(usage.costUsd, parts),
+	};
+}
+
+function splitEstimate(value: number, parts: number): number {
+	if (!Number.isFinite(value) || value <= 0 || parts <= 1) {
+		return value;
+	}
+	return Math.ceil(value / parts);
+}
+
 function extractOpenAiTokenUsage(data: unknown): TokenUsage {
 	if (!data || typeof data !== "object") {
 		return EMPTY_USAGE;
@@ -245,6 +275,15 @@ function extractOpenAiTokenUsage(data: unknown): TokenUsage {
 		completionTokens: toFiniteNumber(usage.completion_tokens),
 		totalTokens: toFiniteNumber(usage.total_tokens),
 		costUsd: toFiniteNumber(usage.cost),
+	};
+}
+
+function extractVertexTokenUsage(usage: VertexExpressUsage): TokenUsage {
+	return {
+		promptTokens: usage.promptTokens,
+		completionTokens: usage.completionTokens,
+		totalTokens: usage.totalTokens,
+		costUsd: null,
 	};
 }
 
@@ -307,6 +346,34 @@ function extractOpenAiContent(data: unknown): string {
 	}
 
 	throw new Error("No text content in OpenAI-compatible response");
+}
+
+async function callVertexExpress(
+	config: EnsembleModelConfig,
+	systemMsg: string,
+	userMsg: string,
+	jsonSchema?: PromptSchema,
+): Promise<ModelCallResult> {
+	const normalizedSchema = jsonSchema
+		? normalizeJsonSchema(jsonSchema, {
+				nullable: config.jsonSchemaNullable === true,
+			})
+		: undefined;
+
+	const result = await callVertexExpressGenerateContent({
+		config,
+		systemMsg,
+		userMsg,
+		responseMimeType: "application/json",
+		responseSchema: normalizedSchema?.schema,
+	});
+
+	return {
+		payload: extractJsonPayload(result.responseText),
+		latencyMs: 0,
+		responseText: result.responseText,
+		tokenUsage: extractVertexTokenUsage(result.usage),
+	};
 }
 
 async function callOpenAiCompatible(
@@ -547,6 +614,8 @@ export async function callModel(
 			const result =
 				config.provider === "claude"
 					? await callClaude(config, systemMsg, userMsg)
+					: config.provider === "vertex-express"
+						? await callVertexExpress(config, systemMsg, userMsg, jsonSchema)
 					: await callOpenAiCompatible(config, systemMsg, userMsg, jsonSchema);
 
 			const latencyMs = Date.now() - startedAt;
@@ -707,4 +776,168 @@ export async function processGroupWithLLM(
 			},
 		},
 	};
+}
+
+export async function processGroupsWithLLM(
+	config: EnsembleModelConfig,
+	groups: readonly CandidateGroup[],
+	prices: ReadonlyMap<string, PriceSignal>,
+): Promise<ListwiseLLMResult[]> {
+	if (groups.length === 0) {
+		return [];
+	}
+	if (groups.length === 1) {
+		return [await processGroupWithLLM(config, groups[0], prices)];
+	}
+
+	const bulkLabel = `bulk:${groups[0].groupId}+${groups.length - 1}`;
+
+	const extractionPrompt = buildBulkExtractionPrompt(
+		groups.map((group) => ({
+			groupId: group.groupId,
+			items: group.items.map((item) => ({
+				id: item.retailerItemId,
+				rawName: item.rawName,
+			})),
+		})),
+	);
+	emitListwisePrompt({
+		stage: "extraction",
+		system: extractionPrompt.system,
+		user: extractionPrompt.user,
+		jsonSchema: extractionPrompt.jsonSchema,
+		modelId: config.id,
+		model: config.model,
+		provider: config.provider,
+		endpoint: config.endpoint,
+		groupId: bulkLabel,
+	});
+
+	const extractionCall = await callModel(
+		config,
+		extractionPrompt.system,
+		extractionPrompt.user,
+		extractionPrompt.jsonSchema,
+	);
+	const extractionByGroup = parseBulkExtractionResponse(
+		extractionCall.payload,
+		groups.map((group) => ({ groupId: group.groupId, items: group.items })),
+	);
+
+	const clusteringPrompt = buildBulkClusteringPrompt(
+		groups.map((group) => {
+			const extraction = extractionByGroup.get(group.groupId);
+			const specById = new Map(
+				(extraction?.items ?? []).map((item) => [item.id, item.spec] as const),
+			);
+
+			return {
+				groupId: group.groupId,
+				items: group.items.map((item) => {
+					const price = prices.get(item.retailerItemId);
+					return {
+						id: item.retailerItemId,
+						rawName: item.rawName,
+						spec: specById.get(item.retailerItemId) ?? {
+							brand: item.brand,
+							product: item.normalizedName,
+							variant: null,
+							packCount: item.packAmount,
+							unitSize: null,
+							unitAmountMlOrG: null,
+							container: item.containerType,
+							totalQuantity: item.packAmount,
+							totalAmountMlOrG: null,
+						},
+						medianPriceEur: price ? price.medianPriceCents / 100 : null,
+						chainSlug: item.chainSlug,
+					};
+				}),
+			};
+		}),
+	);
+	emitListwisePrompt({
+		stage: "clustering",
+		system: clusteringPrompt.system,
+		user: clusteringPrompt.user,
+		jsonSchema: clusteringPrompt.jsonSchema,
+		modelId: config.id,
+		model: config.model,
+		provider: config.provider,
+		endpoint: config.endpoint,
+		groupId: bulkLabel,
+	});
+
+	const clusteringCall = await callModel(
+		config,
+		clusteringPrompt.system,
+		clusteringPrompt.user,
+		clusteringPrompt.jsonSchema,
+	);
+	const clusteringByGroup = parseBulkClusteringResponse(
+		clusteringCall.payload,
+		groups.map((group) => ({ groupId: group.groupId, items: group.items })),
+	);
+
+	const parts = groups.length;
+	const extractionTokenUsage = splitTokenUsage(extractionCall.tokenUsage, parts);
+	const clusteringTokenUsage = splitTokenUsage(clusteringCall.tokenUsage, parts);
+	const perGroupExtractionLatency = Math.ceil(extractionCall.latencyMs / parts);
+	const perGroupClusteringLatency = Math.ceil(clusteringCall.latencyMs / parts);
+
+	return groups.map((group) => {
+		const extraction =
+			extractionByGroup.get(group.groupId) ??
+			parseExtractionResponse({ items: [] }, group.items);
+		const clustering =
+			clusteringByGroup.get(group.groupId) ??
+			parseClusteringResponse({}, group.items);
+
+		return {
+			modelId: config.id,
+			provider: config.provider,
+			groupId: group.groupId,
+			extraction,
+			clustering,
+			extractionLatencyMs: perGroupExtractionLatency,
+			clusteringLatencyMs: perGroupClusteringLatency,
+			totalLatencyMs: perGroupExtractionLatency + perGroupClusteringLatency,
+			tokenEstimates: {
+				extractionPrompt: splitEstimate(extractionCall.promptTokenEstimate, parts),
+				extractionResponse: splitEstimate(
+					extractionCall.responseTokenEstimate,
+					parts,
+				),
+				clusteringPrompt: splitEstimate(clusteringCall.promptTokenEstimate, parts),
+				clusteringResponse: splitEstimate(
+					clusteringCall.responseTokenEstimate,
+					parts,
+				),
+				total:
+					splitEstimate(extractionCall.promptTokenEstimate, parts) +
+					splitEstimate(extractionCall.responseTokenEstimate, parts) +
+					splitEstimate(clusteringCall.promptTokenEstimate, parts) +
+					splitEstimate(clusteringCall.responseTokenEstimate, parts),
+			},
+			tokenUsage: {
+				extraction: extractionTokenUsage,
+				clustering: clusteringTokenUsage,
+				total: {
+					promptTokens: addNullable(
+						extractionTokenUsage.promptTokens,
+						clusteringTokenUsage.promptTokens,
+					),
+					completionTokens: addNullable(
+						extractionTokenUsage.completionTokens,
+						clusteringTokenUsage.completionTokens,
+					),
+					totalTokens: addNullable(
+						extractionTokenUsage.totalTokens,
+						clusteringTokenUsage.totalTokens,
+					),
+					costUsd: addNullable(extractionTokenUsage.costUsd, clusteringTokenUsage.costUsd),
+				},
+			},
+		};
+	});
 }

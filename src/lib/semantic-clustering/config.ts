@@ -1,7 +1,13 @@
 import { z } from "zod";
 import type { CascadeThresholds } from "./types";
 
-const ProviderSchema = z.enum(["openai", "claude", "openrouter"]);
+const ProviderSchema = z.enum([
+	"openai",
+	"claude",
+	"openrouter",
+	"vertex-express",
+	"zai",
+]);
 
 const ResponseFormatSchema = z.enum([
 	"json_object",
@@ -32,6 +38,8 @@ const DEFAULT_ENDPOINTS: Record<EnsembleModelConfig["provider"], string> = {
 	openai: "https://api.openai.com/v1/chat/completions",
 	openrouter: "https://openrouter.ai/api/v1/chat/completions",
 	claude: "https://api.anthropic.com/v1/messages",
+	"vertex-express": "https://aiplatform.googleapis.com/v1",
+	zai: "https://api.z.ai/api/coding/paas/v4/chat/completions",
 };
 
 export const STRICT_CASCADE_THRESHOLDS: CascadeThresholds = {
@@ -50,6 +58,10 @@ function defaultApiKeyEnv(provider: EnsembleModelConfig["provider"]): string {
 			return "OPENROUTER_API_KEY";
 		case "claude":
 			return "ANTHROPIC_API_KEY";
+		case "vertex-express":
+			return "VERTEX_EXPRESS_API_KEY";
+		case "zai":
+			return "ZAI_API_KEY";
 	}
 }
 

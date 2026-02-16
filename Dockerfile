@@ -2,6 +2,10 @@
 # Stage 1: Dependencies
 FROM ubuntu:24.04 AS dependencies
 
+# Avoid tzdata interactive prompts during apt installs.
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
 # Install Node.js 24 via NodeSource repository
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -32,6 +36,10 @@ RUN pnpm install --frozen-lockfile --prod=false
 
 # Stage 2: Build
 FROM ubuntu:24.04 AS build
+
+# Avoid tzdata interactive prompts during apt installs.
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
 
 # Install build dependencies
 RUN apt-get update && \
@@ -95,6 +103,10 @@ ARG BUILD_ENV=production
 ARG APP_VERSION=0.1.0
 ARG APP_RELEASE
 
+# Avoid tzdata interactive prompts during apt installs.
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
 # Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -118,6 +130,9 @@ RUN groupadd -r kosarica -g 1001 && \
 
 # Set working directory
 WORKDIR /app
+
+# Categorization prompt is loaded from disk at runtime.
+COPY --from=build /app/docs/categorization/categorization-prompt.md ./docs/categorization/categorization-prompt.md
 
 # Copy built application from build stage
 COPY --from=build /app/dist ./dist

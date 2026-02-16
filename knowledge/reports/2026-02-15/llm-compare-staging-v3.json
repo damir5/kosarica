@@ -1,0 +1,1491 @@
+{
+  "startedAt": "2026-02-15T23:20:00.218Z",
+  "host": "kosarica.chickenkiller.com-f4ef38ac0d59",
+  "n": 300,
+  "batch": 30,
+  "batches": 10,
+  "targets": [
+    "openrouter:arcee-ai/trinity-large-preview:free",
+    "openrouter:arcee-ai/trinity-mini:free",
+    "openrouter:liquid/lfm-2.5-1.2b-instruct:free",
+    "openrouter:liquid/lfm-2.5-1.2b-thinking:free",
+    "openrouter:nvidia/nemotron-nano-9b-v2:free",
+    "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
+    "openrouter:stepfun/step-3.5-flash:free",
+    "openrouter:upstage/solar-pro-3:free",
+    "openrouter:google/gemma-3-27b-it:free",
+    "openrouter:meta-llama/llama-3.3-70b-instruct:free",
+    "openrouter:mistralai/mistral-small-3.1-24b-instruct:free",
+    "openrouter:qwen/qwen3-4b:free",
+    "openrouter:deepseek/deepseek-r1-0528:free",
+    "openrouter:openai/gpt-oss-20b:free",
+    "openrouter:openai/gpt-oss-120b:free",
+    "openrouter:z-ai/glm-4.5-air:free",
+    "zai:glm-5",
+    "zai:glm-4.7",
+    "local:qwen/qwen3-4b"
+  ],
+  "results": [
+    {
+      "model": "openrouter:arcee-ai/trinity-large-preview:free",
+      "calls": {
+        "total": 10,
+        "ok": 1,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 27216,
+        "medianLatencyMs": 27216,
+        "p90LatencyMs": 27216
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 10,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 96.66666666666667,
+        "amountNonNullPct": 83.33333333333334,
+        "unitNonNullPct": 100,
+        "packNonNullPct": 96.66666666666667,
+        "containerNonNullPct": 3.3333333333333335,
+        "brandMatchPct": 96.66666666666667,
+        "amountUnitMatchPct": 30,
+        "packMatchPct": 30,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9499999999999994
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 29693,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i1\",\n      \"confidence\": 0.95,\n      \"product_type\": \"masline\",\n      \"brand\": \"AGROSEVILLA\",\n      \"everyday_name\": \"crne masline\",",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 43503,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i31\",\n      \"confidence\": 0.95,\n      \"product_type\": \"gel za kosu\",\n      \"brand\": \"ANNYER\",\n      \"everyday_name\": \"gel za kosu\",\n",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 56578,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i61\",\n      \"confidence\": 0.95,\n      \"product_type\": \"pelene\",\n      \"brand\": \"TOSAMA TRADE D.O.O.\",\n      \"everyday_name\": \"EVY BA",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 39587,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i91\",\n      \"confidence\": 0.95,\n      \"product_type\": \"jadranska riba\",\n      \"brand\": \"METRO CHEF\",\n      \"everyday_name\": \"srđela\"",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 41703,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i121\",\n      \"confidence\": 0.95,\n      \"product_type\": \"čaj\",\n      \"brand\": \"ENGLISH TEA SHOP\",\n      \"everyday_name\": \"čaj bijela\"",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:arcee-ai/trinity-mini:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 11085,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n\"item_id\": \"i1\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Hrana\",\n      \"brand\": \"AGROSEVILLA\",\n      \"everyday_name\": \"Masline crne bez košta",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 10926,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: [\n  {\n\"item_id\": \"i31\",\n    \"confidence\": 0.95,\n    \"product_type\": \"GEL\",\n    \"brand\": \"ANNYER\",\n    \"everyday_name\": \"Extra Strong Gel\",\n    \"variant\": \"POWER INVISIBE\",\n ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 10956,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n{\n      \"item_id\": \"i61\",\n      \"confidence\": 0.95,\n      \"product_type\": \"diapers\",\n      \"brand\": \"TOSAMA TRADE D.O.O.\",\n      \"everyday_name\": \"JUMBO 80K",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 11433,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Okay, let's tackle this problem step by step. I need to categorize each grocery item according to the given rules and output a strict JSON format. The user is a Croatian gro",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 120012,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:liquid/lfm-2.5-1.2b-instruct:free",
+      "calls": {
+        "total": 10,
+        "ok": 7,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 6273.857142857143,
+        "medianLatencyMs": 6314,
+        "p90LatencyMs": 6723
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 43,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 100,
+        "amountNonNullPct": 59.68992248062015,
+        "unitNonNullPct": 67.44186046511628,
+        "packNonNullPct": 9.30232558139535,
+        "containerNonNullPct": 6.2015503875969,
+        "brandMatchPct": 34.76190476190476,
+        "amountUnitMatchPct": 7.772020725388601,
+        "packMatchPct": 3.3333333333333335,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9517829457364325
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 6779,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i1\",\n      \"confidence\": 0.98,\n      \"product_type\": \"Hrana\",\n      \"brand\": \"AGROSEVILLA\",\n      \"everyday_name\": \"MASLINE CRNE BEZ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 5482,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i61\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Toaletne potrepštine\",\n      \"brand\": \"TOSAMA TRADE D.O.O.\",\n      \"category\"",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 30,
+          "latencyMs": 6923,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i151\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Kosmetika\",\n      \"brand\": \"Nivea\",\n      \"everyday_name\": \"KREMA NIVEA HRAN",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:liquid/lfm-2.5-1.2b-thinking:free",
+      "calls": {
+        "total": 10,
+        "ok": 5,
+        "schemaRecovered": 3,
+        "avgLatencyMs": 7675.2,
+        "medianLatencyMs": 7522,
+        "p90LatencyMs": 8255
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0.6666666666666667,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 100,
+        "amountNonNullPct": 50,
+        "unitNonNullPct": 50,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 1.342281879194631,
+        "amountUnitMatchPct": 0.7299270072992701,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.95
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 7420,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Okay, let's tackle this. The user wants me to categorize all items in the provided JSON array according to specific rules. The output needs to be a strict JSON object with a",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 7286,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Okay, let's tackle this. The user wants me to categorize all items in the provided JSON array according to specific rules. The output needs to be a strict JSON object with a",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 7411,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Okay, let's tackle this. The user wants me to categorize all items in the provided JSON array according to specific rules. The output needs to be a strict JSON object with a",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 30,
+          "latencyMs": 7467,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 10,
+          "itemCount": 30,
+          "latencyMs": 8299,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Okay, let's tackle this. The user wants me to categorize all items in the provided JSON array according to specific rules. The output needs to be a strict JSON object with a",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:nvidia/nemotron-nano-9b-v2:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 47748,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Okay, let's tackle this. I need to categorize each item in the input JSON array according to the given rules. The output must be a strict JSON with specific keys. Let me sta",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 45334,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i31\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Kozmetika\",\n      \"brand\": \"ANNYER\",\n      \"everyday_name\": \"Gel za kosu\",\n  ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 43753,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Okay, let's tackle this. I need to categorize each item in the input JSON array according to the given rules. The output must be a strict JSON with specific keys. First, I'l",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 40946,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: {\n  \"results\": [\n    {\n      \"item_id\": \"i91\",\n      \"confidence\": 0.95,\n      \"product_type\": \"Hrana\",\n      \"brand\": \"MET",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 58223,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Okay, let's tackle this. I need to categorize each item in the input JSON array according to the given rules. The output must be a strict JSON with specific keys. Let me sta",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
+      "calls": {
+        "total": 10,
+        "ok": 3,
+        "schemaRecovered": 3,
+        "avgLatencyMs": 14960,
+        "medianLatencyMs": 14870,
+        "p90LatencyMs": 19619
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 13957,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object containing fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount, package_size, con",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 9777,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object per input item. Must include fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount,",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 10992,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object containing fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount, package_size, con",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 30,
+          "latencyMs": 13005,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object containing fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount, package_size, con",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 7,
+          "itemCount": 30,
+          "latencyMs": 15378,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with \"results\" array, each object containing fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount, package_size, con",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:stepfun/step-3.5-flash:free",
+      "calls": {
+        "total": 10,
+        "ok": 1,
+        "schemaRecovered": 1,
+        "avgLatencyMs": 12914,
+        "medianLatencyMs": 12914,
+        "p90LatencyMs": 12914
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 12436,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We are categorizing each item. We must output exactly one result per input item, with the same item_id.\n We are to use Croatian for product_type and everyday_name.\n We have ",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 13441,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We are given an array of items. For each item, we must produce an object with the specified fields.\n Steps:\n 1. Copy item_id exactly.\n 2. Set confidence: we are to be confid",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 12084,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We are categorizing each item. We must output exactly one result per input item, with the same item_id.\n We need to fill in the fields: confidence, product_type, everyday_na",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 12024,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We are given an array of items. For each item, we must produce an object with the specified fields.\n Steps:\n 1. Copy item_id exactly.\n 2. Set confidence: we are to be confid",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 30,
+          "latencyMs": 11839,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We are given an array of items. For each item, we need to produce an object with the specified fields.\n Steps:\n 1. We must copy the item_id exactly.\n 2. We need to assign a ",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:upstage/solar-pro-3:free",
+      "calls": {
+        "total": 10,
+        "ok": 7,
+        "schemaRecovered": 7,
+        "avgLatencyMs": 23432.428571428572,
+        "medianLatencyMs": 22806,
+        "p90LatencyMs": 27715
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 26160,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We are given a list of items with various fields. We need to categorize each item according to the specified output schema. The output must be a JSON object with a \"results\"",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 16491,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We need to output JSON with results array, each entry containing fields: item_id, confidence, product_type, brand, everyday_name, variant, unit, amount, package_size, contai",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 30,
+          "latencyMs": 20422,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: We are given a list of items with fields: item_id, name, brand, category, subcategory, unit, unit_quantity, chain_slug.\n\nWe need to output a JSON object with key \"results\" c",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:google/gemma-3-27b-it:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 446,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to ac",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 576,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to ac",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 562,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to ac",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 569,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to ac",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 573,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to ac",
+          "errorStage": "http"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:meta-llama/llama-3.3-70b-instruct:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 1828,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 402 Payment Required body={\"error\":{\"message\":\"Provider returned error\",\"code\":402,\"metadata\":{\"raw\":\"{\\\"error\\\":\\\"API key USD spend limit exceeded. Your account may still have USD balance, but this API key has reac",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 675,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your o",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 785,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your o",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 710,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your o",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 717,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your o",
+          "errorStage": "http"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:mistralai/mistral-small-3.1-24b-instruct:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 713,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 842,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 782,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 712,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 719,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add",
+          "errorStage": "http"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:qwen/qwen3-4b:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 1102,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-4b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 733,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-4b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 737,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-4b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 698,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-4b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 809,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 429 Too Many Requests body={\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-4b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate",
+          "errorStage": "http"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:deepseek/deepseek-r1-0528:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 120002,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 120002,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 120001,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 120001,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 120000,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:openai/gpt-oss-20b:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 552,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 539,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 528,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 514,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 535,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:openai/gpt-oss-120b:free",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 215,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 445,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 436,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 444,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 457,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "HTTP 404 Not Found body={\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}",
+          "errorStage": "http"
+        }
+      ]
+    },
+    {
+      "model": "openrouter:z-ai/glm-4.5-air:free",
+      "calls": {
+        "total": 10,
+        "ok": 4,
+        "schemaRecovered": 4,
+        "avgLatencyMs": 101469.25,
+        "medianLatencyMs": 98473,
+        "p90LatencyMs": 112870
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 107909,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Let me categorize each item according to the rules:\n\n1. MASLINE CRNE BEZ KOŠ. 75g AGROSEVILLA\n- item_id: \"i1\"\n- product_type: \"Masline\" (Olives)\n- brand: \"AGROSEVILLA\"\n- eve",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 91042,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Response does not contain valid JSON. Snippet: Let me categorize each item according to the rules. I'll analyze each product and provide the appropriate Croatian product_type and everyday_name, keeping other fields consi",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 120001,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 8,
+          "itemCount": 30,
+          "latencyMs": 120002,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 9,
+          "itemCount": 30,
+          "latencyMs": 120002,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-5",
+      "calls": {
+        "total": 10,
+        "ok": 3,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 64005,
+        "medianLatencyMs": 63702,
+        "p90LatencyMs": 65457
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 8.666666666666668,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 96.15384615384616,
+        "brandNonNullPct": 96.15384615384616,
+        "amountNonNullPct": 84.61538461538461,
+        "unitNonNullPct": 88.46153846153845,
+        "packNonNullPct": 34.61538461538461,
+        "containerNonNullPct": 11.538461538461538,
+        "brandMatchPct": 27.77777777777778,
+        "amountUnitMatchPct": 13.253012048192772,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.9465384615384613
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 120002,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 120001,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "This operation was aborted",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 63866,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Categorization response does not match expected schema",
+          "errorStage": "schema"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 67670,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 6,
+          "itemCount": 30,
+          "latencyMs": 95512,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "zai:glm-4.7",
+      "calls": {
+        "total": 10,
+        "ok": 1,
+        "schemaRecovered": 0,
+        "avgLatencyMs": 39165,
+        "medianLatencyMs": 39165,
+        "p90LatencyMs": 39165
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 1.3333333333333335,
+        "productTypeNonNullPct": 100,
+        "everydayNameNonNullPct": 100,
+        "brandNonNullPct": 100,
+        "amountNonNullPct": 75,
+        "unitNonNullPct": 100,
+        "packNonNullPct": 75,
+        "containerNonNullPct": 50,
+        "brandMatchPct": 13.333333333333334,
+        "amountUnitMatchPct": 3.3333333333333335,
+        "packMatchPct": 3.3333333333333335,
+        "containerMatchPct": 0,
+        "avgConfidence": 0.95
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 38846,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 38129,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 34207,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 35410,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 30179,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "Model response is empty",
+          "errorStage": "extract_json"
+        }
+      ]
+    },
+    {
+      "model": "local:qwen/qwen3-4b",
+      "calls": {
+        "total": 10,
+        "ok": 0,
+        "schemaRecovered": 0,
+        "avgLatencyMs": null,
+        "medianLatencyMs": null,
+        "p90LatencyMs": null
+      },
+      "items": {
+        "total": 300,
+        "coveragePct": 0,
+        "productTypeNonNullPct": 0,
+        "everydayNameNonNullPct": 0,
+        "brandNonNullPct": 0,
+        "amountNonNullPct": 0,
+        "unitNonNullPct": 0,
+        "packNonNullPct": 0,
+        "containerNonNullPct": 0,
+        "brandMatchPct": 0,
+        "amountUnitMatchPct": 0,
+        "packMatchPct": 0,
+        "containerMatchPct": 0,
+        "avgConfidence": null
+      },
+      "failures": [
+        {
+          "callIndex": 1,
+          "itemCount": 30,
+          "latencyMs": 10492,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "fetch failed",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 2,
+          "itemCount": 30,
+          "latencyMs": 10495,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "fetch failed",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 3,
+          "itemCount": 30,
+          "latencyMs": 10495,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "fetch failed",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 4,
+          "itemCount": 30,
+          "latencyMs": 10493,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "fetch failed",
+          "errorStage": "unknown"
+        },
+        {
+          "callIndex": 5,
+          "itemCount": 30,
+          "latencyMs": 10495,
+          "httpStatus": null,
+          "parseOk": false,
+          "schemaRecovered": false,
+          "error": "fetch failed",
+          "errorStage": "unknown"
+        }
+      ]
+    }
+  ]
+}

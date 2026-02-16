@@ -1,0 +1,351 @@
+[dotenv@17.2.3] injecting env (6) from .env.development.local -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (3) from .env.test -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (26) from .env.development -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+{"startedAt":"2026-02-15T22:16:37.457Z","rounds":2,"rpm":10,"targetCount":31,"includeLocal":false,"includeZai":true,"discoveredOpenRouterFreeCount":26,"localModel":"qwen/qwen3-4b","localEndpoint":"http://100.72.112.119:1234/v1/chat/completions","items":10,"maxTokens":1200,"timeoutMs":60000,"localTimeoutMs":180000,"mode":"all"}
+{"label":"openrouter:stepfun/step-3.5-flash:free#1","ok":true,"httpStatus":200,"latencyMs":9237,"latency":"9.24s","parseOk":true,"resultCount":null,"usage":{"promptTokens":579,"completionTokens":1200,"totalTokens":1779},"overheadMs":4}
+{"label":"openrouter:stepfun/step-3.5-flash:free#2","ok":true,"httpStatus":200,"latencyMs":7676,"latency":"7.68s","parseOk":false,"resultCount":null,"usage":{"promptTokens":579,"completionTokens":1200,"totalTokens":1779},"overheadMs":3}
+{"label":"openrouter:arcee-ai/trinity-large-preview:free#1","ok":true,"httpStatus":200,"latencyMs":19755,"latency":"19.75s","parseOk":true,"resultCount":10,"usage":{"promptTokens":526,"completionTokens":787,"totalTokens":1313},"overheadMs":0}
+{"label":"openrouter:arcee-ai/trinity-large-preview:free#2","ok":true,"httpStatus":200,"latencyMs":15375,"latency":"15.38s","parseOk":true,"resultCount":10,"usage":{"promptTokens":526,"completionTokens":822,"totalTokens":1348},"overheadMs":0}
+{"label":"openrouter:upstage/solar-pro-3:free#1","ok":true,"httpStatus":200,"latencyMs":14011,"latency":"14.01s","parseOk":true,"resultCount":null,"usage":{"promptTokens":677,"completionTokens":1200,"totalTokens":1877},"overheadMs":2}
+{"label":"openrouter:upstage/solar-pro-3:free#2","ok":true,"httpStatus":200,"latencyMs":14637,"latency":"14.64s","parseOk":false,"resultCount":null,"usage":{"promptTokens":677,"completionTokens":1200,"totalTokens":1877},"overheadMs":1}
+{"label":"openrouter:liquid/lfm-2.5-1.2b-thinking:free#1","ok":true,"httpStatus":200,"latencyMs":4159,"latency":"4.16s","parseOk":false,"resultCount":null,"usage":{"promptTokens":601,"completionTokens":1200,"totalTokens":1801},"overheadMs":2}
+{"label":"openrouter:liquid/lfm-2.5-1.2b-thinking:free#2","ok":true,"httpStatus":200,"latencyMs":3881,"latency":"3.88s","parseOk":false,"resultCount":null,"usage":{"promptTokens":601,"completionTokens":1200,"totalTokens":1801},"overheadMs":0}
+{"label":"openrouter:liquid/lfm-2.5-1.2b-instruct:free#1","ok":true,"httpStatus":200,"latencyMs":3667,"latency":"3.67s","parseOk":true,"resultCount":10,"usage":{"promptTokens":601,"completionTokens":1073,"totalTokens":1674},"overheadMs":1}
+{"label":"openrouter:liquid/lfm-2.5-1.2b-instruct:free#2","ok":true,"httpStatus":200,"latencyMs":3583,"latency":"3.58s","parseOk":true,"resultCount":10,"usage":{"promptTokens":601,"completionTokens":1073,"totalTokens":1674},"overheadMs":1}
+{"label":"openrouter:nvidia/nemotron-3-nano-30b-a3b:free#1","ok":true,"httpStatus":200,"latencyMs":6417,"latency":"6.42s","parseOk":true,"resultCount":null,"usage":{"promptTokens":582,"completionTokens":1200,"totalTokens":1782},"overheadMs":0}
+{"label":"openrouter:nvidia/nemotron-3-nano-30b-a3b:free#2","ok":true,"httpStatus":200,"latencyMs":6336,"latency":"6.34s","parseOk":true,"resultCount":null,"usage":{"promptTokens":582,"completionTokens":1200,"totalTokens":1782},"overheadMs":13}
+{"label":"openrouter:arcee-ai/trinity-mini:free#1","ok":true,"httpStatus":200,"latencyMs":6031,"latency":"6.03s","parseOk":false,"resultCount":null,"usage":{"promptTokens":527,"completionTokens":1200,"totalTokens":1727},"overheadMs":1}
+{"label":"openrouter:arcee-ai/trinity-mini:free#2","ok":true,"httpStatus":200,"latencyMs":5625,"latency":"5.63s","parseOk":false,"resultCount":null,"usage":{"promptTokens":527,"completionTokens":1200,"totalTokens":1727},"overheadMs":1}
+{"label":"openrouter:nvidia/nemotron-nano-12b-v2-vl:free#1","ok":true,"httpStatus":200,"latencyMs":14363,"latency":"14.36s","parseOk":false,"resultCount":null,"usage":{"promptTokens":569,"completionTokens":1200,"totalTokens":1769},"overheadMs":0}
+{"label":"openrouter:nvidia/nemotron-nano-12b-v2-vl:free#2","ok":true,"httpStatus":200,"latencyMs":14243,"latency":"14.24s","parseOk":false,"resultCount":null,"usage":{"promptTokens":569,"completionTokens":1200,"totalTokens":1769},"overheadMs":1}
+{"label":"openrouter:qwen/qwen3-next-80b-a3b-instruct:free#1","ok":false,"httpStatus":429,"latencyMs":663,"latency":"663ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":2,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-next-80b-a3b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openro"}
+{"label":"openrouter:qwen/qwen3-next-80b-a3b-instruct:free#2","ok":false,"httpStatus":429,"latencyMs":1038,"latency":"1.04s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-next-80b-a3b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openro"}
+{"label":"openrouter:nvidia/nemotron-nano-9b-v2:free#1","ok":true,"httpStatus":200,"latencyMs":20889,"latency":"20.89s","parseOk":true,"resultCount":null,"usage":{"promptTokens":578,"completionTokens":1200,"totalTokens":1778},"overheadMs":0}
+{"label":"openrouter:nvidia/nemotron-nano-9b-v2:free#2","ok":true,"httpStatus":200,"latencyMs":19741,"latency":"19.74s","parseOk":true,"resultCount":null,"usage":{"promptTokens":578,"completionTokens":1200,"totalTokens":1778},"overheadMs":0}
+{"label":"openrouter:openai/gpt-oss-120b:free#1","ok":false,"httpStatus":404,"latencyMs":406,"latency":"406ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}"}
+{"label":"openrouter:openai/gpt-oss-120b:free#2","ok":false,"httpStatus":404,"latencyMs":675,"latency":"675ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}"}
+{"label":"openrouter:openai/gpt-oss-20b:free#1","ok":false,"httpStatus":404,"latencyMs":645,"latency":"645ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}"}
+{"label":"openrouter:openai/gpt-oss-20b:free#2","ok":false,"httpStatus":404,"latencyMs":798,"latency":"798ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":2,"error":"{\"error\":{\"message\":\"No endpoints found matching your data policy (Free model publication). Configure: https://openrouter.ai/settings/privacy\",\"code\":404}}"}
+{"label":"openrouter:z-ai/glm-4.5-air:free#1","ok":false,"httpStatus":429,"latencyMs":2064,"latency":"2.06s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"z-ai/glm-4.5-air:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings"}
+{"label":"openrouter:z-ai/glm-4.5-air:free#2","ok":false,"httpStatus":null,"latencyMs":60036,"latency":"60.04s","parseOk":false,"error":"This operation was aborted"}
+{"label":"openrouter:qwen/qwen3-coder:free#1","ok":false,"httpStatus":429,"latencyMs":976,"latency":"976ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-coder:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings"}
+{"label":"openrouter:qwen/qwen3-coder:free#2","ok":false,"httpStatus":429,"latencyMs":1012,"latency":"1.01s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-coder:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings"}
+{"label":"openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free#1","ok":false,"httpStatus":429,"latencyMs":955,"latency":"955ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"cognitivecomputations/dolphin-mistral-24b-venice-edition:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rat"}
+{"label":"openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free#2","ok":false,"httpStatus":429,"latencyMs":1003,"latency":"1.00s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"cognitivecomputations/dolphin-mistral-24b-venice-edition:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rat"}
+{"label":"openrouter:google/gemma-3n-e2b-it:free#1","ok":false,"httpStatus":429,"latencyMs":984,"latency":"984ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":1,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-3n-e2b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/se"}
+{"label":"openrouter:google/gemma-3n-e2b-it:free#2","ok":false,"httpStatus":400,"latencyMs":964,"latency":"964ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n \\\"error\\\": {\\n \\\"code\\\": 400,\\n \\\"message\\\": \\\"Developer instruction is not enabled for models/gemma-3n-e2b-it\\\",\\n \\\"status\\\": \\\"INVALID_ARGUMENT\\\"\\n"}
+{"label":"openrouter:deepseek/deepseek-r1-0528:free#1","ok":false,"httpStatus":null,"latencyMs":60019,"latency":"60.02s","parseOk":false,"error":"This operation was aborted"}
+{"label":"openrouter:deepseek/deepseek-r1-0528:free#2","ok":false,"httpStatus":null,"latencyMs":60039,"latency":"60.04s","parseOk":false,"error":"This operation was aborted"}
+{"label":"openrouter:google/gemma-3n-e4b-it:free#1","ok":false,"httpStatus":400,"latencyMs":1263,"latency":"1.26s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n \\\"error\\\": {\\n \\\"code\\\": 400,\\n \\\"message\\\": \\\"Developer instruction is not enabled for models/gemma-3n-e4b-it\\\",\\n \\\"status\\\": \\\"INVALID_ARGUMENT\\\"\\n"}
+{"label":"openrouter:google/gemma-3n-e4b-it:free#2","ok":false,"httpStatus":400,"latencyMs":1050,"latency":"1.05s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n \\\"error\\\": {\\n \\\"code\\\": 400,\\n \\\"message\\\": \\\"Developer instruction is not enabled for models/gemma-3n-e4b-it\\\",\\n \\\"status\\\": \\\"INVALID_ARGUMENT\\\"\\n"}
+{"label":"openrouter:qwen/qwen3-4b:free#1","ok":false,"httpStatus":429,"latencyMs":1062,"latency":"1.06s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-4b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/in"}
+{"label":"openrouter:qwen/qwen3-4b:free#2","ok":false,"httpStatus":429,"latencyMs":1077,"latency":"1.08s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"qwen/qwen3-4b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/in"}
+{"label":"openrouter:mistralai/mistral-small-3.1-24b-instruct:free#1","ok":false,"httpStatus":429,"latencyMs":1023,"latency":"1.02s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https:"}
+{"label":"openrouter:mistralai/mistral-small-3.1-24b-instruct:free#2","ok":false,"httpStatus":429,"latencyMs":1030,"latency":"1.03s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https:"}
+{"label":"openrouter:google/gemma-3-4b-it:free#1","ok":false,"httpStatus":400,"latencyMs":878,"latency":"878ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n \\\"error\\\": {\\n \\\"code\\\": 400,\\n \\\"message\\\": \\\"Developer instruction is not enabled for models/gemma-3-4b-it\\\",\\n \\\"status\\\": \\\"INVALID_ARGUMENT\\\"\\n "}
+{"label":"openrouter:google/gemma-3-4b-it:free#2","ok":false,"httpStatus":400,"latencyMs":856,"latency":"856ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":1,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n \\\"error\\\": {\\n \\\"code\\\": 400,\\n \\\"message\\\": \\\"Developer instruction is not enabled for models/gemma-3-4b-it\\\",\\n \\\"status\\\": \\\"INVALID_ARGUMENT\\\"\\n "}
+{"label":"openrouter:google/gemma-3-12b-it:free#1","ok":false,"httpStatus":400,"latencyMs":907,"latency":"907ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n \\\"error\\\": {\\n \\\"code\\\": 400,\\n \\\"message\\\": \\\"Developer instruction is not enabled for models/gemma-3-12b-it\\\",\\n \\\"status\\\": \\\"INVALID_ARGUMENT\\\"\\n "}
+{"label":"openrouter:google/gemma-3-12b-it:free#2","ok":false,"httpStatus":400,"latencyMs":973,"latency":"973ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n \\\"error\\\": {\\n \\\"code\\\": 400,\\n \\\"message\\\": \\\"Developer instruction is not enabled for models/gemma-3-12b-it\\\",\\n \\\"status\\\": \\\"INVALID_ARGUMENT\\\"\\n "}
+{"label":"openrouter:google/gemma-3-27b-it:free#1","ok":false,"httpStatus":429,"latencyMs":936,"latency":"936ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/set"}
+{"label":"openrouter:google/gemma-3-27b-it:free#2","ok":false,"httpStatus":429,"latencyMs":865,"latency":"865ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/set"}
+{"label":"openrouter:meta-llama/llama-3.3-70b-instruct:free#1","ok":false,"httpStatus":429,"latencyMs":936,"latency":"936ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openr"}
+{"label":"openrouter:meta-llama/llama-3.3-70b-instruct:free#2","ok":false,"httpStatus":429,"latencyMs":1055,"latency":"1.05s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":1,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openr"}
+{"label":"openrouter:meta-llama/llama-3.2-3b-instruct:free#1","ok":false,"httpStatus":429,"latencyMs":1019,"latency":"1.02s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.2-3b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openro"}
+{"label":"openrouter:meta-llama/llama-3.2-3b-instruct:free#2","ok":false,"httpStatus":429,"latencyMs":826,"latency":"826ms","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.2-3b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openro"}
+{"label":"openrouter:nousresearch/hermes-3-llama-3.1-405b:free#1","ok":false,"httpStatus":429,"latencyMs":1066,"latency":"1.07s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":0,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"nousresearch/hermes-3-llama-3.1-405b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://op"}
+{"label":"openrouter:nousresearch/hermes-3-llama-3.1-405b:free#2","ok":false,"httpStatus":402,"latencyMs":2564,"latency":"2.56s","parseOk":false,"resultCount":null,"usage":null,"overheadMs":1,"error":"{\"error\":{\"message\":\"Provider returned error\",\"code\":402,\"metadata\":{\"raw\":\"{\\\"error\\\":\\\"API key USD spend limit exceeded. Your account may still have USD balance, but this API key has reached its configured USD spending limit.\\\"}\",\"provide"}
+{"label":"zai:glm-4.5#1","ok":true,"httpStatus":200,"latencyMs":25441,"latency":"25.44s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":1}
+{"label":"zai:glm-4.5#2","ok":true,"httpStatus":200,"latencyMs":25985,"latency":"25.98s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":0}
+{"label":"zai:glm-4.5-air#1","ok":true,"httpStatus":200,"latencyMs":18220,"latency":"18.22s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":0}
+{"label":"zai:glm-4.5-air#2","ok":true,"httpStatus":200,"latencyMs":15152,"latency":"15.15s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":0}
+{"label":"zai:glm-4.6#1","ok":true,"httpStatus":200,"latencyMs":9430,"latency":"9.43s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":0}
+{"label":"zai:glm-4.6#2","ok":true,"httpStatus":200,"latencyMs":12799,"latency":"12.80s","parseOk":false,"resultCount":null,"usage":{"promptTokens":598,"completionTokens":1200,"totalTokens":1798},"overheadMs":0}
+{"label":"zai:glm-4.7#1","ok":true,"httpStatus":200,"latencyMs":8346,"latency":"8.35s","parseOk":false,"resultCount":null,"usage":{"promptTokens":597,"completionTokens":1200,"totalTokens":1797},"overheadMs":0}
+{"label":"zai:glm-4.7#2","ok":true,"httpStatus":200,"latencyMs":10057,"latency":"10.06s","parseOk":false,"resultCount":null,"usage":{"promptTokens":597,"completionTokens":1200,"totalTokens":1797},"overheadMs":0}
+{"label":"zai:glm-5#1","ok":true,"httpStatus":200,"latencyMs":24690,"latency":"24.69s","parseOk":false,"resultCount":null,"usage":{"promptTokens":597,"completionTokens":1200,"totalTokens":1797},"overheadMs":1}
+{"label":"zai:glm-5#2","ok":true,"httpStatus":200,"latencyMs":19459,"latency":"19.46s","parseOk":false,"resultCount":null,"usage":{"promptTokens":597,"completionTokens":1200,"totalTokens":1797},"overheadMs":1}
+{
+  "finishedAt": "2026-02-15T22:28:52.026Z",
+  "summary": [
+    {
+      "provider": "openrouter",
+      "model": "liquid/lfm-2.5-1.2b-instruct:free",
+      "okRate": 1,
+      "parseRate": 1,
+      "p50Ms": 3625,
+      "p95Ms": 3662.8,
+      "avgMs": 3625
+    },
+    {
+      "provider": "openrouter",
+      "model": "liquid/lfm-2.5-1.2b-thinking:free",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 4020,
+      "p95Ms": 4145.1,
+      "avgMs": 4020
+    },
+    {
+      "provider": "openrouter",
+      "model": "arcee-ai/trinity-mini:free",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 5828,
+      "p95Ms": 6010.7,
+      "avgMs": 5828
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "okRate": 1,
+      "parseRate": 1,
+      "p50Ms": 6376.5,
+      "p95Ms": 6412.95,
+      "avgMs": 6376.5
+    },
+    {
+      "provider": "openrouter",
+      "model": "stepfun/step-3.5-flash:free",
+      "okRate": 1,
+      "parseRate": 0.5,
+      "p50Ms": 8456.5,
+      "p95Ms": 9158.95,
+      "avgMs": 8456.5
+    },
+    {
+      "provider": "zai",
+      "model": "glm-4.7",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 9201.5,
+      "p95Ms": 9971.45,
+      "avgMs": 9201.5
+    },
+    {
+      "provider": "zai",
+      "model": "glm-4.6",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 11114.5,
+      "p95Ms": 12630.55,
+      "avgMs": 11114.5
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-nano-12b-v2-vl:free",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 14303,
+      "p95Ms": 14357,
+      "avgMs": 14303
+    },
+    {
+      "provider": "openrouter",
+      "model": "upstage/solar-pro-3:free",
+      "okRate": 1,
+      "parseRate": 0.5,
+      "p50Ms": 14324,
+      "p95Ms": 14605.7,
+      "avgMs": 14324
+    },
+    {
+      "provider": "zai",
+      "model": "glm-4.5-air",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 16686,
+      "p95Ms": 18066.6,
+      "avgMs": 16686
+    },
+    {
+      "provider": "openrouter",
+      "model": "arcee-ai/trinity-large-preview:free",
+      "okRate": 1,
+      "parseRate": 1,
+      "p50Ms": 17565,
+      "p95Ms": 19536,
+      "avgMs": 17565
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-nano-9b-v2:free",
+      "okRate": 1,
+      "parseRate": 1,
+      "p50Ms": 20315,
+      "p95Ms": 20831.6,
+      "avgMs": 20315
+    },
+    {
+      "provider": "zai",
+      "model": "glm-5",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 22074.5,
+      "p95Ms": 24428.45,
+      "avgMs": 22074.5
+    },
+    {
+      "provider": "zai",
+      "model": "glm-4.5",
+      "okRate": 1,
+      "parseRate": 0,
+      "p50Ms": 25713,
+      "p95Ms": 25957.8,
+      "avgMs": 25713
+    },
+    {
+      "provider": "openrouter",
+      "model": "qwen/qwen3-next-80b-a3b-instruct:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "openai/gpt-oss-120b:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "openai/gpt-oss-20b:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "z-ai/glm-4.5-air:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "qwen/qwen3-coder:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "google/gemma-3n-e2b-it:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-r1-0528:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "google/gemma-3n-e4b-it:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "qwen/qwen3-4b:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "mistralai/mistral-small-3.1-24b-instruct:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "google/gemma-3-4b-it:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "google/gemma-3-12b-it:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "google/gemma-3-27b-it:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.2-3b-instruct:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "nousresearch/hermes-3-llama-3.1-405b:free",
+      "okRate": 0,
+      "parseRate": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "avgMs": null
+    }
+  ]
+}

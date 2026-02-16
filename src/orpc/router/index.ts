@@ -216,8 +216,6 @@ export default {
 		},
 		matching: {
 			triggerUnifiedMatching: matching.triggerUnifiedMatching,
-			triggerPairwiseSemanticClustering:
-				matching.triggerPairwiseSemanticClustering,
 			triggerListwiseSemanticClustering:
 				matching.triggerListwiseSemanticClustering,
 		},

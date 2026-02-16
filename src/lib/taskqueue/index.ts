@@ -159,6 +159,8 @@ export async function failTask(
 					WHEN ${shouldRetry} AND retry_count < max_retries THEN 'pending'
 					ELSE 'failed'
 				END,
+				worker_id = NULL,
+				started_at = NULL,
 				retry_count = CASE
 					WHEN ${shouldRetry} AND retry_count < max_retries THEN retry_count + 1
 					ELSE retry_count

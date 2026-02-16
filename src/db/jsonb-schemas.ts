@@ -37,7 +37,8 @@ export const categorizeTaskPayload = z
 		runId: z.string().optional(),
 		chainSlug: z.string().optional(),
 		batchSize: z.number().int().min(1).max(5000).optional(),
-		maxBatches: z.number().int().min(1).max(1000).optional(),
+		maxBatches: z.number().int().min(1).max(20_000).optional(),
+		maxRuntimeMinutes: z.number().int().min(1).max(24 * 60).optional(),
 	})
 	.superRefine((payload, ctx) => {
 		const hasRunId =
@@ -90,6 +91,8 @@ export const semanticClusteringUnifiedTaskPayload = z.object({
 	minPrimaryConfidence: z.number().min(0).max(1).optional(),
 	primaryModelId: z.string().optional(),
 	secondaryModelId: z.string().optional(),
+	maxGroupSize: z.number().int().min(2).max(200).optional(),
+	groupsPerCall: z.number().int().min(1).max(20).optional(),
 	barcodeLimit: z.number().int().min(1).max(1000).optional(),
 	barcodeMinChains: z.number().int().min(1).max(20).optional(),
 	deterministicLimit: z.number().int().min(1).max(1000).optional(),

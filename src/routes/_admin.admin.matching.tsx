@@ -32,6 +32,8 @@ function AdminMatchingPage() {
 		useState<string>("");
 	const [unifiedSecondaryModelId, setUnifiedSecondaryModelId] =
 		useState<string>("");
+	const [unifiedGroupsPerCall, setUnifiedGroupsPerCall] =
+		useState<string>("3");
 
 	// Unified matching blocking options state
 	const [unifiedBarcodeLimit, setUnifiedBarcodeLimit] = useState<string>("");
@@ -42,25 +44,6 @@ function AdminMatchingPage() {
 	const [unifiedEmbeddingLimit, setUnifiedEmbeddingLimit] =
 		useState<string>("");
 	const [unifiedLexicalLimit, setUnifiedLexicalLimit] = useState<string>("");
-
-	// Pairwise state
-	const [pairwiseMaxBatches, setPairwiseMaxBatches] = useState<string>("10");
-	const [pairwiseFeatureBatchSize, setPairwiseFeatureBatchSize] =
-		useState<string>("");
-	const [
-		pairwiseEmbeddingBackfillBatchSize,
-		setPairwiseEmbeddingBackfillBatchSize,
-	] = useState<string>("");
-	const [pairwiseCandidateSourceBatch, setPairwiseCandidateSourceBatch] =
-		useState<string>("");
-	const [pairwiseCandidateInsertLimit, setPairwiseCandidateInsertLimit] =
-		useState<string>("");
-	const [pairwiseAdjudicationBatchSize, setPairwiseAdjudicationBatchSize] =
-		useState<string>("");
-	const [pairwiseLlmPromptBatchSize, setPairwiseLlmPromptBatchSize] =
-		useState<string>("");
-	const [pairwiseRebuildClusters, setPairwiseRebuildClusters] =
-		useState<boolean>(false);
 
 	// Listwise state
 	const [listwiseLimit, setListwiseLimit] = useState<string>("200");
@@ -100,6 +83,7 @@ function AdminMatchingPage() {
 			minPrimaryConfidence: toFloat(unifiedMinPrimaryConfidence),
 			primaryModelId: unifiedPrimaryModelId.trim() || undefined,
 			secondaryModelId: unifiedSecondaryModelId.trim() || undefined,
+			groupsPerCall: toInt(unifiedGroupsPerCall),
 			blocking: {
 				barcodeLimit: toInt(unifiedBarcodeLimit),
 				barcodeMinChains: toInt(unifiedBarcodeMinChains),
@@ -114,38 +98,12 @@ function AdminMatchingPage() {
 			unifiedMinPrimaryConfidence,
 			unifiedPrimaryModelId,
 			unifiedSecondaryModelId,
+			unifiedGroupsPerCall,
 			unifiedBarcodeLimit,
 			unifiedBarcodeMinChains,
 			unifiedDeterministicLimit,
 			unifiedEmbeddingLimit,
 			unifiedLexicalLimit,
-		],
-	);
-
-	const pairwiseInput = useMemo<
-		Parameters<
-			typeof orpc.admin.matching.triggerPairwiseSemanticClustering.call
-		>[0]
-	>(
-		() => ({
-			maxBatches: toInt(pairwiseMaxBatches),
-			featureBatchSize: toInt(pairwiseFeatureBatchSize),
-			embeddingBackfillBatchSize: toInt(pairwiseEmbeddingBackfillBatchSize),
-			candidateSourceBatch: toInt(pairwiseCandidateSourceBatch),
-			candidateInsertLimit: toInt(pairwiseCandidateInsertLimit),
-			adjudicationBatchSize: toInt(pairwiseAdjudicationBatchSize),
-			llmPromptBatchSize: toInt(pairwiseLlmPromptBatchSize),
-			rebuildClusters: pairwiseRebuildClusters,
-		}),
-		[
-			pairwiseAdjudicationBatchSize,
-			pairwiseCandidateInsertLimit,
-			pairwiseCandidateSourceBatch,
-			pairwiseEmbeddingBackfillBatchSize,
-			pairwiseFeatureBatchSize,
-			pairwiseLlmPromptBatchSize,
-			pairwiseMaxBatches,
-			pairwiseRebuildClusters,
 		],
 	);
 
@@ -179,15 +137,6 @@ function AdminMatchingPage() {
 		onSuccess: () => invalidateTaskQueue(),
 	});
 
-	const pairwiseMutation = useMutation({
-		mutationFn: async () => {
-			return orpc.admin.matching.triggerPairwiseSemanticClustering.call(
-				pairwiseInput,
-			);
-		},
-		onSuccess: () => invalidateTaskQueue(),
-	});
-
 	const listwiseMutation = useMutation({
 		mutationFn: async () => {
 			return orpc.admin.matching.triggerListwiseSemanticClustering.call(
@@ -198,9 +147,7 @@ function AdminMatchingPage() {
 	});
 
 	const anyPending =
-		unifiedMutation.isPending ||
-		pairwiseMutation.isPending ||
-		listwiseMutation.isPending;
+		unifiedMutation.isPending || listwiseMutation.isPending;
 
 	const errorMessage = (error: unknown, fallback: string) => {
 		return error instanceof Error ? error.message : fallback;
@@ -214,7 +161,7 @@ function AdminMatchingPage() {
 					<div>
 						<h1 className="font-semibold text-2xl">Matching</h1>
 						<p className="text-muted-foreground text-sm">
-							Enqueue matching tasks (unified / pairwise / listwise).
+							Enqueue matching tasks (unified / listwise).
 						</p>
 					</div>
 				</div>
@@ -245,7 +192,7 @@ function AdminMatchingPage() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">
-					<div className="grid gap-3 md:grid-cols-3">
+					<div className="grid gap-3 md:grid-cols-4">
 						<div className="space-y-1">
 							<Label htmlFor="unifiedLimit">Group limit</Label>
 							<Input
@@ -255,6 +202,17 @@ function AdminMatchingPage() {
 								max={500}
 								value={unifiedLimit}
 								onChange={(e) => setUnifiedLimit(e.target.value)}
+							/>
+						</div>
+						<div className="space-y-1">
+							<Label htmlFor="unifiedGroupsPerCall">Groups per call</Label>
+							<Input
+								id="unifiedGroupsPerCall"
+								type="number"
+								min={1}
+								max={20}
+								value={unifiedGroupsPerCall}
+								onChange={(e) => setUnifiedGroupsPerCall(e.target.value)}
 							/>
 						</div>
 						<div className="space-y-1">
@@ -522,164 +480,6 @@ function AdminMatchingPage() {
 								{errorMessage(
 									listwiseMutation.error,
 									"Failed to enqueue listwise task",
-								)}
-							</div>
-						) : null}
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader>
-						<CardTitle>Pairwise Semantic Clustering</CardTitle>
-						<CardDescription>
-							Pair-by-pair adjudication. Legacy pipeline.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<div className="grid gap-3 md:grid-cols-2">
-							<div className="space-y-1">
-								<Label htmlFor="pairwiseMaxBatches">Max batches</Label>
-								<Input
-									id="pairwiseMaxBatches"
-									type="number"
-									min={1}
-									max={50}
-									value={pairwiseMaxBatches}
-									onChange={(e) => setPairwiseMaxBatches(e.target.value)}
-								/>
-							</div>
-							<div className="space-y-1">
-								<Label>Rebuild clusters</Label>
-								<div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3">
-									<Switch
-										checked={pairwiseRebuildClusters}
-										onCheckedChange={setPairwiseRebuildClusters}
-									/>
-									<span className="text-muted-foreground text-sm">
-										{pairwiseRebuildClusters ? "Enabled" : "Disabled"}
-									</span>
-								</div>
-							</div>
-							<div className="space-y-1">
-								<Label htmlFor="pairwiseFeatureBatchSize">
-									Feature batch size
-								</Label>
-								<Input
-									id="pairwiseFeatureBatchSize"
-									type="number"
-									min={1}
-									max={50000}
-									placeholder="(optional)"
-									value={pairwiseFeatureBatchSize}
-									onChange={(e) => setPairwiseFeatureBatchSize(e.target.value)}
-								/>
-							</div>
-							<div className="space-y-1">
-								<Label htmlFor="pairwiseEmbeddingBackfillBatchSize">
-									Embedding backfill batch size
-								</Label>
-								<Input
-									id="pairwiseEmbeddingBackfillBatchSize"
-									type="number"
-									min={1}
-									max={50000}
-									placeholder="(optional)"
-									value={pairwiseEmbeddingBackfillBatchSize}
-									onChange={(e) =>
-										setPairwiseEmbeddingBackfillBatchSize(e.target.value)
-									}
-								/>
-							</div>
-							<div className="space-y-1">
-								<Label htmlFor="pairwiseCandidateSourceBatch">
-									Candidate source batch
-								</Label>
-								<Input
-									id="pairwiseCandidateSourceBatch"
-									type="number"
-									min={1}
-									max={50000}
-									placeholder="(optional)"
-									value={pairwiseCandidateSourceBatch}
-									onChange={(e) =>
-										setPairwiseCandidateSourceBatch(e.target.value)
-									}
-								/>
-							</div>
-							<div className="space-y-1">
-								<Label htmlFor="pairwiseCandidateInsertLimit">
-									Candidate insert limit
-								</Label>
-								<Input
-									id="pairwiseCandidateInsertLimit"
-									type="number"
-									min={1}
-									max={200000}
-									placeholder="(optional)"
-									value={pairwiseCandidateInsertLimit}
-									onChange={(e) =>
-										setPairwiseCandidateInsertLimit(e.target.value)
-									}
-								/>
-							</div>
-							<div className="space-y-1">
-								<Label htmlFor="pairwiseAdjudicationBatchSize">
-									Adjudication batch size
-								</Label>
-								<Input
-									id="pairwiseAdjudicationBatchSize"
-									type="number"
-									min={1}
-									max={10000}
-									placeholder="(optional)"
-									value={pairwiseAdjudicationBatchSize}
-									onChange={(e) =>
-										setPairwiseAdjudicationBatchSize(e.target.value)
-									}
-								/>
-							</div>
-							<div className="space-y-1">
-								<Label htmlFor="pairwiseLlmPromptBatchSize">
-									LLM prompt batch size
-								</Label>
-								<Input
-									id="pairwiseLlmPromptBatchSize"
-									type="number"
-									min={1}
-									max={200}
-									placeholder="(optional)"
-									value={pairwiseLlmPromptBatchSize}
-									onChange={(e) =>
-										setPairwiseLlmPromptBatchSize(e.target.value)
-									}
-								/>
-							</div>
-						</div>
-
-						<div className="flex flex-wrap items-center gap-2">
-							<Button
-								onClick={() => pairwiseMutation.mutate()}
-								disabled={anyPending}
-							>
-								{pairwiseMutation.isPending ? (
-									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-								) : null}
-								Enqueue pairwise task
-							</Button>
-							{pairwiseMutation.isSuccess && pairwiseMutation.data?.queued ? (
-								<Badge
-									variant="secondary"
-									className="bg-green-100 text-green-700"
-								>
-									Queued: {pairwiseMutation.data.taskId}
-								</Badge>
-							) : null}
-						</div>
-						{pairwiseMutation.isError ? (
-							<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-								{errorMessage(
-									pairwiseMutation.error,
-									"Failed to enqueue pairwise task",
 								)}
 							</div>
 						) : null}

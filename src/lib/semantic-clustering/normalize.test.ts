@@ -52,6 +52,22 @@ describe("parseEnsembleConfig", () => {
 		expect(config[0].apiKeyEnv).toBe("OPENAI_API_KEY");
 	});
 
+	it("supports vertex-express with default endpoint and api key env", () => {
+		const config = parseEnsembleConfig(
+			JSON.stringify([
+				{
+					id: "vertex",
+					provider: "vertex-express",
+					model: "gemini-2.5-flash",
+				},
+			]),
+		);
+
+		expect(config).toHaveLength(1);
+		expect(config[0].endpoint).toContain("aiplatform.googleapis.com");
+		expect(config[0].apiKeyEnv).toBe("VERTEX_EXPRESS_API_KEY");
+	});
+
 	it("rejects loopback endpoints in production by default", () => {
 		const previousNodeEnv = process.env.NODE_ENV;
 		const previousOverride = process.env.ALLOW_LOOPBACK_LLM_ENDPOINT;

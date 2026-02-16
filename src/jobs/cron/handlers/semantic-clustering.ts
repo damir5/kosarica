@@ -33,7 +33,7 @@ function parseConfidenceEnv(name: string): number | undefined {
 
 export const semanticClusteringHandler: CronJobHandler = {
 	async execute(context: CronExecutionContext): Promise<TaskToEnqueue[]> {
-		const mode = process.env.SEMANTIC_CLUSTERING_MODE ?? "pairwise";
+		const mode = process.env.SEMANTIC_CLUSTERING_MODE ?? "unified";
 
 		if (mode === "unified") {
 			const limit = parsePositiveIntEnv("UNIFIED_MATCHING_LIMIT", 50);
@@ -100,63 +100,22 @@ export const semanticClusteringHandler: CronJobHandler = {
 			];
 		}
 
-		const maxBatches = parsePositiveIntEnv(
-			"SEMANTIC_CLUSTERING_MAX_BATCHES",
-			5,
-		);
-		const featureBatchSize = parsePositiveIntEnv(
-			"SEMANTIC_CLUSTERING_FEATURE_BATCH_SIZE",
-			2000,
-		);
-		const candidateSourceBatch = parsePositiveIntEnv(
-			"SEMANTIC_CLUSTERING_CANDIDATE_SOURCE_BATCH",
-			1000,
-		);
-		const embeddingBackfillBatchSize = parsePositiveIntEnv(
-			"SEMANTIC_CLUSTERING_EMBEDDING_BACKFILL_BATCH_SIZE",
-			2000,
-		);
-		const candidateInsertLimit = parsePositiveIntEnv(
-			"SEMANTIC_CLUSTERING_CANDIDATE_INSERT_LIMIT",
-			5000,
-		);
-		const adjudicationBatchSize = parsePositiveIntEnv(
-			"SEMANTIC_CLUSTERING_ADJUDICATION_BATCH_SIZE",
-			200,
-		);
-		const llmPromptBatchSize = parsePositiveIntEnv(
-			"SEMANTIC_CLUSTERING_LLM_PROMPT_BATCH_SIZE",
-			25,
-		);
+		if (mode === "pairwise") {
+			log.warn(
+				"Skipping scheduled semantic clustering (pairwise disabled)",
+				{
+					runId: context.runId,
+					scheduledFor: context.scheduledFor.toISOString(),
+				},
+			);
+			return [];
+		}
 
-		log.info("Queueing scheduled semantic clustering (pairwise)", {
+		log.warn("Skipping scheduled semantic clustering (unknown mode)", {
 			runId: context.runId,
 			scheduledFor: context.scheduledFor.toISOString(),
-			maxBatches,
-			featureBatchSize,
-			embeddingBackfillBatchSize,
-			candidateSourceBatch,
-			candidateInsertLimit,
-			adjudicationBatchSize,
-			llmPromptBatchSize,
+			mode,
 		});
-
-		return [
-			{
-				type: "matching",
-				payload: {
-					type: "semanticClusteringPairwise",
-					maxBatches,
-					featureBatchSize,
-					embeddingBackfillBatchSize,
-					candidateSourceBatch,
-					candidateInsertLimit,
-					adjudicationBatchSize,
-					llmPromptBatchSize,
-					rebuildClusters: true,
-				},
-				idempotencyKey: `semantic-clustering:pairwise:${context.scheduledFor.toISOString()}`,
-			},
-		];
+		return [];
 	},
 };

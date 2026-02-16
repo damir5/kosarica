@@ -1,4 +1,4 @@
-generated_at: 2026-02-16T02:12:28.955Z
+generated_at: 2026-02-15T11:38:32.584Z
 loop_state:
   shard_count: 64
   completed_shards: 0
@@ -15,7 +15,7 @@ metrics:
   stores_needs_review: 0
   stores_ungeocoded_active: 0
 alerts:
-  - at: 2026-02-16T02:12:28.955Z
+  - at: 2026-02-15T11:38:32.584Z
     severity: critical
     metric: loop_shards_missing
     value: 64

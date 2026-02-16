@@ -352,7 +352,8 @@ export const triggerCategorization = superadminProcedure
 				runId: z.string().optional(),
 				chainSlug: z.string().optional(),
 				batchSize: z.number().int().min(1).max(5000).optional(),
-				maxBatches: z.number().int().min(1).max(1000).optional(),
+				maxBatches: z.number().int().min(1).max(20_000).optional(),
+				maxRuntimeMinutes: z.number().int().min(1).max(24 * 60).optional(),
 				async: z.boolean().optional(),
 			})
 			.optional(),
@@ -378,6 +379,7 @@ export const triggerCategorization = superadminProcedure
 					chainSlug: input.chainSlug,
 					batchSize: input.batchSize,
 					maxBatches: input.maxBatches,
+					maxRuntimeMinutes: input.maxRuntimeMinutes,
 				},
 			});
 			return { queued: true, taskId: task.id };
@@ -387,6 +389,7 @@ export const triggerCategorization = superadminProcedure
 			batchSize: input?.batchSize,
 			maxBatches: input?.maxBatches,
 			chainSlug: input?.chainSlug,
+			maxRuntimeMinutes: input?.maxRuntimeMinutes,
 		});
 		return {
 			queued: false,

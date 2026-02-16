@@ -21,11 +21,13 @@ import {
 } from "@/lib/categorization";
 import {
 	runListwiseSemanticClustering,
-	runSemanticClusteringPipeline,
 	runUnifiedMatching,
 } from "@/lib/semantic-clustering";
+import { createLogger } from "@/utils/logger";
 import { scheduleTask } from "./index";
 import { TaskQueueWorker } from "./worker";
+
+const log = createLogger("matching");
 
 function parsePositiveIntEnv(name: string, fallback: number): number {
 	const raw = process.env[name];
@@ -135,6 +137,7 @@ export function createTaskQueueWorker(options?: {
 			chainSlug: payload.chainSlug,
 			batchSize: payload.batchSize,
 			maxBatches: payload.maxBatches,
+			maxRuntimeMinutes: payload.maxRuntimeMinutes,
 		});
 	});
 
@@ -164,6 +167,8 @@ export function createTaskQueueWorker(options?: {
 				minPrimaryConfidence: payload.minPrimaryConfidence,
 				primaryModelId: payload.primaryModelId,
 				secondaryModelId: payload.secondaryModelId,
+				maxGroupSize: payload.maxGroupSize,
+				groupsPerCall: payload.groupsPerCall,
 				blocking: {
 					barcodeLimit: payload.barcodeLimit,
 					barcodeMinChains: payload.barcodeMinChains,
@@ -191,26 +196,13 @@ export function createTaskQueueWorker(options?: {
 			throw new Error("Invalid payload for matching task");
 		}
 
-		const maxBatches = payload.maxBatches ?? 5;
-		for (let i = 0; i < maxBatches; i += 1) {
-			const result = await runSemanticClusteringPipeline({
-				featureBatchSize: payload.featureBatchSize,
-				embeddingBackfillBatchSize: payload.embeddingBackfillBatchSize,
-				candidateSourceBatch: payload.candidateSourceBatch,
-				candidateInsertLimit: payload.candidateInsertLimit,
-				adjudicationBatchSize: payload.adjudicationBatchSize,
-				llmPromptBatchSize: payload.llmPromptBatchSize,
-				rebuildClusters: payload.rebuildClusters,
-			});
-
-			if (
-				result.featuresUpserted === 0 &&
-				result.candidatesQueued === 0 &&
-				result.pairsAdjudicated === 0
-			) {
-				break;
-			}
-		}
+		// Pairwise pipeline is currently disabled (legacy + inefficient).
+		// We keep the payload type for backwards compatibility with existing tasks,
+		// but avoid doing any work here.
+		log.warn("Skipping pairwise semantic clustering task (disabled)", {
+			taskId: task.id,
+		});
+		return;
 	});
 
 	return worker;

@@ -1175,7 +1175,7 @@ export async function runSemanticClusteringPipeline(
 	const candidateSourceBatch = options.candidateSourceBatch ?? 1000;
 	const candidateInsertLimit = options.candidateInsertLimit ?? 5000;
 	const adjudicationBatchSize = options.adjudicationBatchSize ?? 200;
-	const llmPromptBatchSize = options.llmPromptBatchSize ?? 25;
+	const llmPromptBatchSize = options.llmPromptBatchSize ?? 50;
 	const semanticNeighborCount = options.semanticNeighborCount ?? 80;
 	const lexicalNeighborCount = options.lexicalNeighborCount ?? 80;
 	const scoreAutoApproveThreshold = options.scoreAutoApproveThreshold ?? 0.93;

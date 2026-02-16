@@ -11,6 +11,8 @@ export const triggerUnifiedMatching = superadminProcedure
 				minPrimaryConfidence: z.number().min(0).max(1).optional(),
 				primaryModelId: z.string().optional(),
 				secondaryModelId: z.string().optional(),
+				maxGroupSize: z.number().int().min(2).max(200).optional(),
+				groupsPerCall: z.number().int().min(1).max(20).optional(),
 				blocking: z
 					.object({
 						barcodeLimit: z.number().int().min(1).max(1000).optional(),
@@ -34,51 +36,13 @@ export const triggerUnifiedMatching = superadminProcedure
 				minPrimaryConfidence: input?.minPrimaryConfidence,
 				primaryModelId: input?.primaryModelId,
 				secondaryModelId: input?.secondaryModelId,
+				maxGroupSize: input?.maxGroupSize,
+				groupsPerCall: input?.groupsPerCall,
 				barcodeLimit: input?.blocking?.barcodeLimit,
 				barcodeMinChains: input?.blocking?.barcodeMinChains,
 				deterministicLimit: input?.blocking?.deterministicLimit,
 				embeddingLimit: input?.blocking?.embeddingLimit,
 				lexicalLimit: input?.blocking?.lexicalLimit,
-			},
-		});
-
-		return { queued: true, taskId: task.id };
-	});
-
-export const triggerPairwiseSemanticClustering = superadminProcedure
-	.input(
-		z
-			.object({
-				maxBatches: z.number().int().min(1).max(50).optional(),
-				featureBatchSize: z.number().int().min(1).max(50_000).optional(),
-				embeddingBackfillBatchSize: z
-					.number()
-					.int()
-					.min(1)
-					.max(50_000)
-					.optional(),
-				candidateSourceBatch: z.number().int().min(1).max(50_000).optional(),
-				candidateInsertLimit: z.number().int().min(1).max(200_000).optional(),
-				adjudicationBatchSize: z.number().int().min(1).max(10_000).optional(),
-				llmPromptBatchSize: z.number().int().min(1).max(200).optional(),
-				rebuildClusters: z.boolean().optional(),
-			})
-			.optional(),
-	)
-	.handler(async ({ input }) => {
-		const task = await scheduleTask({
-			taskType: "matching",
-			priority: -1,
-			payload: {
-				type: "semanticClusteringPairwise",
-				maxBatches: input?.maxBatches,
-				featureBatchSize: input?.featureBatchSize,
-				embeddingBackfillBatchSize: input?.embeddingBackfillBatchSize,
-				candidateSourceBatch: input?.candidateSourceBatch,
-				candidateInsertLimit: input?.candidateInsertLimit,
-				adjudicationBatchSize: input?.adjudicationBatchSize,
-				llmPromptBatchSize: input?.llmPromptBatchSize,
-				rebuildClusters: input?.rebuildClusters,
 			},
 		});
 

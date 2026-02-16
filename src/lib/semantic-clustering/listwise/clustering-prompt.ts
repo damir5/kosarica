@@ -56,6 +56,32 @@ const CLUSTERING_SCHEMA: BuiltPrompt["jsonSchema"] = {
 	},
 };
 
+const BULK_CLUSTERING_SCHEMA: BuiltPrompt["jsonSchema"] = {
+	name: "bulk_offer_cluster_output",
+	schema: {
+		type: "object",
+		properties: {
+			groups: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						group_id: { type: "string" },
+						base_products: CLUSTERING_SCHEMA.schema.properties.base_products,
+						unclassified: CLUSTERING_SCHEMA.schema.properties.unclassified,
+						confidence: CLUSTERING_SCHEMA.schema.properties.confidence,
+						reasoning: CLUSTERING_SCHEMA.schema.properties.reasoning,
+					},
+					required: ["group_id", "base_products", "unclassified"],
+					additionalProperties: true,
+				},
+			},
+		},
+		required: ["groups"],
+		additionalProperties: true,
+	},
+};
+
 const VariantSchema = z.object({
 	variant_key: z.string().min(1),
 	variant_label: z.string().min(1),
@@ -121,6 +147,22 @@ function toInputArray(payload: unknown): unknown {
 	};
 }
 
+function readGroupEntries(payload: unknown): unknown[] {
+	if (Array.isArray(payload)) {
+		return payload;
+	}
+	if (payload && typeof payload === "object") {
+		const candidate = payload as { groups?: unknown; results?: unknown };
+		if (Array.isArray(candidate.groups)) {
+			return candidate.groups;
+		}
+		if (Array.isArray(candidate.results)) {
+			return candidate.results;
+		}
+	}
+	return [];
+}
+
 export function buildClusteringPrompt(
 	items: readonly ClusteringPromptItem[],
 ): BuiltPrompt {
@@ -170,6 +212,66 @@ Return JSON only in this shape:
 Items:
 ${lines}`,
 		jsonSchema: CLUSTERING_SCHEMA,
+	};
+}
+
+export function buildBulkClusteringPrompt(
+	groups: Array<{ groupId: string; items: readonly ClusteringPromptItem[] }>,
+): BuiltPrompt {
+	const payload = groups.map((group) => ({
+		group_id: group.groupId,
+		items: group.items,
+	}));
+
+	return {
+		system: "Return strict JSON only.",
+		user: `You are an expert product clustering system for Croatian grocery retail.
+For each group independently, cluster items into base products and pack variants.
+
+Definitions:
+- Base Product: abstract product concept (brand + product + flavor/variant family).
+- Pack Variant: same base product but different size, pack count, or container.
+
+Rules:
+1) Different brands are always different base products.
+2) Different flavors/variants are different base products.
+3) Same physical product across different chains should be grouped together.
+4) Use price ratio as a hint, not a hard rule (2x volume often means ~2x price).
+5) Be conservative: prefer splitting over merging when uncertain.
+
+Return JSON only in this shape:
+{
+  "groups": [
+    {
+      "group_id": "string",
+      "base_products": [
+        {
+          "base_id": "string",
+          "canonical_name": "string",
+          "brand": "string|null",
+          "category": "string|null",
+          "pack_variants": [
+            {
+              "variant_key": "string",
+              "variant_label": "string",
+              "item_ids": ["id1", "id2"],
+              "unit_size": "string|null",
+              "pack_count": 1,
+              "container": "string|null"
+            }
+          ]
+        }
+      ],
+      "unclassified": ["id3"],
+      "confidence": 0.0,
+      "reasoning": "short explanation"
+    }
+  ]
+}
+
+Groups:
+${JSON.stringify(payload, null, 2)}`,
+		jsonSchema: BULK_CLUSTERING_SCHEMA,
 	};
 }
 
@@ -253,4 +355,37 @@ export function parseClusteringResponse(
 		missingItemIds,
 		duplicateItemIds: Array.from(new Set(duplicateItemIds)),
 	};
+}
+
+export function parseBulkClusteringResponse(
+	raw: unknown,
+	groups: readonly { groupId: string; items: readonly GroupItem[] }[],
+): Map<string, ClusteringResult> {
+	const byGroupId = new Map<string, unknown>();
+	for (const entry of readGroupEntries(raw)) {
+		if (!entry || typeof entry !== "object") {
+			continue;
+		}
+		const record = entry as { group_id?: unknown; groupId?: unknown };
+		const groupId =
+			typeof record.group_id === "string"
+				? record.group_id.trim()
+				: typeof record.groupId === "string"
+					? record.groupId.trim()
+					: "";
+		if (groupId.length === 0) {
+			continue;
+		}
+		byGroupId.set(groupId, record);
+	}
+
+	const results = new Map<string, ClusteringResult>();
+	for (const group of groups) {
+		const entry = byGroupId.get(group.groupId);
+		results.set(
+			group.groupId,
+			parseClusteringResponse(entry ?? {}, group.items),
+		);
+	}
+	return results;
 }
