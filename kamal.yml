@@ -5,9 +5,9 @@ service: kosarica
 image: kosarica/app
 registry:
   # Kamal local registry mode (no external container registry)
-  # When server starts with "localhost", Kamal bootstraps a registry on the host.
-  # Use 5500 to avoid common host conflicts on macOS with system services on 5000.
-  server: localhost:5500
+  # Default works for host-native deploys. In containerized operator environments,
+  # override with KAMAL_REGISTRY_SERVER=host.docker.internal:5500.
+  server: <%= ENV.fetch("KAMAL_REGISTRY_SERVER", "localhost:5500") %>
 
 # Public app host (TLS via kamal-proxy + Let's Encrypt)
 proxy:

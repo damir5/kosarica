@@ -942,6 +942,11 @@ export async function backfillUncategorizedItems(options?: {
 	let succeeded = 0;
 	let failed = 0;
 	let escalated = 0;
+	let consecutiveWaveFailures = 0;
+	const maxConsecutiveWaveFailures = parsePositiveInt(
+		process.env.CATEGORIZATION_MAX_CONSECUTIVE_WAVE_FAILURES,
+		5,
+	);
 	const maxRuntimeMs =
 		options?.maxRuntimeMinutes && options.maxRuntimeMinutes > 0
 			? options.maxRuntimeMinutes * 60_000
@@ -1022,13 +1027,34 @@ export async function backfillUncategorizedItems(options?: {
 		escalated += waveEscalated;
 
 		if (waveSucceeded === 0 && waveFailed > 0) {
-			log.warn("Stopping categorization backfill early due to full batch failure", {
+			consecutiveWaveFailures += 1;
+			log.warn("Categorization backfill wave failed", {
 				batchIndex: batchesProcessed,
 				failed: waveFailed,
 				concurrency: planned,
+				consecutiveWaveFailures,
+				maxConsecutiveWaveFailures,
 			});
-			break;
+
+			if (consecutiveWaveFailures >= maxConsecutiveWaveFailures) {
+				log.warn(
+					"Stopping categorization backfill after repeated full-wave failures",
+					{
+						batchIndex: batchesProcessed,
+						failed: waveFailed,
+						consecutiveWaveFailures,
+						maxConsecutiveWaveFailures,
+					},
+				);
+				break;
+			}
+
+			// Allow transient provider failures (429/timeout) to recover.
+			await sleep(Math.min(30_000, 2_000 * consecutiveWaveFailures));
+			continue;
 		}
+
+		consecutiveWaveFailures = 0;
 	}
 
 	return { batchesProcessed, succeeded, failed, escalated };
