@@ -222,30 +222,20 @@ type RpmLimiter = {
 
 function createRpmLimiter(rpm: number): RpmLimiter {
 	const safeRpm = Math.max(1, Math.floor(rpm));
-	const windowMs = 60_000;
+	const gapMs = Math.ceil(60_000 / safeRpm);
 
-	// Reserve start times under a sliding window, but do not serialize the actual requests.
+	// Reserve start times with a fixed minimum gap, but do not serialize the actual requests.
 	// This keeps us under the RPM cap while allowing multiple in-flight calls.
-	let reservations: number[] = [];
 	let stateChain: Promise<void> = Promise.resolve();
+	let nextAllowedAt = 0;
 
 	return {
 		wait: async () => {
 			let scheduledAt = 0;
 			const step = stateChain.then(() => {
 				const now = Date.now();
-				const cutoff = now - windowMs;
-				reservations = reservations.filter((t) => t >= cutoff).sort((a, b) => a - b);
-
-				if (reservations.length < safeRpm) {
-					scheduledAt = now;
-				} else {
-					// Earliest reservation exits the window first; schedule right after that.
-					scheduledAt = Math.max(now, (reservations[0] as number) + windowMs);
-				}
-
-				reservations.push(scheduledAt);
-				reservations.sort((a, b) => a - b);
+				scheduledAt = Math.max(now, nextAllowedAt);
+				nextAllowedAt = scheduledAt + gapMs;
 			});
 
 			stateChain = step.catch(() => {

@@ -50,7 +50,8 @@ env:
     CATEGORIZATION_RPM_LIMIT: 10
     CATEGORIZATION_BATCH_SIZE: 30
     # Parallel in-flight requests, still gated by CATEGORIZATION_RPM_LIMIT.
-    CATEGORIZATION_BACKFILL_CONCURRENCY: 10
+    # Use > RPM to keep the pipeline full when individual requests take >60s.
+    CATEGORIZATION_BACKFILL_CONCURRENCY: 20
   secret:
     # Secret env vars
     - POSTGRES_PASSWORD
