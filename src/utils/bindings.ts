@@ -23,8 +23,6 @@ export interface AppEnv {
 	STORAGE_PATH: string;
 	/** ClickHouse database URL */
 	CLICKHOUSE_URL: string;
-	/** Ordered LLM ensemble model config in JSON format */
-	LLM_ENSEMBLE_JSON: string;
 }
 
 /**
@@ -50,7 +48,6 @@ export function getEnv(): AppEnv {
 		INGESTION_CHAINS: process.env.INGESTION_CHAINS || "",
 		STORAGE_PATH: process.env.STORAGE_PATH || "./data/storage",
 		CLICKHOUSE_URL,
-		LLM_ENSEMBLE_JSON: process.env.LLM_ENSEMBLE_JSON || "",
 	};
 }
 

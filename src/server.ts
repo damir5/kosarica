@@ -11,6 +11,7 @@ import tanstackHandler, {
 import { config } from "dotenv";
 import { closeDatabase } from "@/db";
 import { startScheduler, stopScheduler } from "@/jobs/scheduler";
+import { validateRoutingConfiguration } from "@/lib/llm-routing";
 import { startWorker } from "@/lib/taskqueue/run-worker";
 import type { TaskQueueWorker } from "@/lib/taskqueue/worker";
 import { createLogger } from "@/utils/logger";
@@ -54,6 +55,9 @@ async function initServer(): Promise<void> {
 		logger.info("Background services skipped (HTTP-only worker)");
 		return;
 	}
+
+	// Validate DB-managed LLM endpoint routing before background jobs start.
+	await validateRoutingConfiguration();
 
 	// Start the job scheduler
 	try {

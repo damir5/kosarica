@@ -11,6 +11,7 @@ import * as categorization from "./categorization";
 import * as clickhouse from "./clickhouse";
 import * as cron from "./cron";
 import * as ingestion from "./ingestion";
+import * as llmEndpoints from "./llm-endpoints";
 import * as llmDecisions from "./llm-decisions";
 import * as matching from "./matching";
 import * as prices from "./prices";
@@ -213,6 +214,15 @@ export default {
 			get: llmDecisions.getLlmDecision,
 			override: llmDecisions.overrideLlmDecision,
 			stats: llmDecisions.getLlmDecisionStats,
+		},
+		llmEndpoints: {
+			list: llmEndpoints.list,
+			create: llmEndpoints.create,
+			toggle: llmEndpoints.toggle,
+			setCapabilities: llmEndpoints.setCapabilities,
+			health: llmEndpoints.health,
+			quality: llmEndpoints.quality,
+			stats: llmEndpoints.stats,
 		},
 		matching: {
 			triggerUnifiedMatching: matching.triggerUnifiedMatching,

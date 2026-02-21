@@ -165,8 +165,6 @@ export function createTaskQueueWorker(options?: {
 				limit: payload.limit,
 				dryRun: payload.dryRun,
 				minPrimaryConfidence: payload.minPrimaryConfidence,
-				primaryModelId: payload.primaryModelId,
-				secondaryModelId: payload.secondaryModelId,
 				maxGroupSize: payload.maxGroupSize,
 				groupsPerCall: payload.groupsPerCall,
 				blocking: {
@@ -186,8 +184,6 @@ export function createTaskQueueWorker(options?: {
 				minChains: payload.minChains,
 				dryRun: payload.dryRun,
 				minPrimaryConfidence: payload.minPrimaryConfidence,
-				primaryModelId: payload.primaryModelId,
-				secondaryModelId: payload.secondaryModelId,
 			});
 			return;
 		}

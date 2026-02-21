@@ -11,6 +11,7 @@ export interface LogLlmDecisionInput {
 	output?: Record<string, unknown> | null;
 	modelId: string;
 	provider: string;
+	endpointId?: string | null;
 	latencyMs?: number | null;
 	tokenCount?: number | null;
 	costCents?: number | null;

@@ -865,6 +865,169 @@ export const skuItemLinks = pgTable(
 	}),
 );
 
+export const llmEndpoints = pgTable(
+	"llm_endpoints",
+	{
+		id: cuid2("lep").primaryKey(),
+		name: text("name").notNull(),
+		provider: text("provider").notNull(),
+		model: text("model").notNull(),
+		endpoint: text("endpoint").notNull(),
+		apiKeyEnv: text("api_key_env").notNull(),
+		enabled: boolean("enabled").notNull().default(true),
+		baseWeight: real("base_weight").notNull().default(1),
+		timeoutMs: integer("timeout_ms").notNull().default(20_000),
+		maxRetries: integer("max_retries").notNull().default(1),
+		responseFormat: text("response_format"),
+		jsonSchemaNullable: boolean("json_schema_nullable")
+			.notNull()
+			.default(false),
+		maxTokens: integer("max_tokens"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		enabledIdx: index("llm_endpoints_enabled_idx").on(table.enabled),
+		providerIdx: index("llm_endpoints_provider_idx").on(table.provider),
+		modelIdx: index("llm_endpoints_model_idx").on(table.model),
+		nameUnique: uniqueIndex("llm_endpoints_name_unique").on(table.name),
+	}),
+);
+
+export const llmEndpointCapabilities = pgTable(
+	"llm_endpoint_capabilities",
+	{
+		id: cuid2("lec").primaryKey(),
+		endpointId: text("endpoint_id")
+			.notNull()
+			.references(() => llmEndpoints.id, { onDelete: "cascade" }),
+		capability: text("capability").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		endpointIdx: index("llm_endpoint_capabilities_endpoint_idx").on(
+			table.endpointId,
+		),
+		capabilityIdx: index("llm_endpoint_capabilities_capability_idx").on(
+			table.capability,
+		),
+		endpointCapabilityUnique: uniqueIndex(
+			"llm_endpoint_capabilities_endpoint_capability_unique",
+		).on(table.endpointId, table.capability),
+	}),
+);
+
+export const llmEndpointRuntime = pgTable(
+	"llm_endpoint_runtime",
+	{
+		endpointId: text("endpoint_id")
+			.primaryKey()
+			.references(() => llmEndpoints.id, { onDelete: "cascade" }),
+		circuitState: text("circuit_state").notNull().default("closed"),
+		cooldownUntil: timestamp("cooldown_until", { withTimezone: true }),
+		consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+		successRate: real("success_rate").notNull().default(1),
+		errorRate: real("error_rate").notNull().default(0),
+		avgLatencyMs: real("avg_latency_ms"),
+		lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+		lastFailureAt: timestamp("last_failure_at", { withTimezone: true }),
+		lastErrorMessage: text("last_error_message"),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		circuitStateIdx: index("llm_endpoint_runtime_circuit_state_idx").on(
+			table.circuitState,
+		),
+		cooldownIdx: index("llm_endpoint_runtime_cooldown_idx").on(
+			table.cooldownUntil,
+		),
+	}),
+);
+
+export const llmEndpointHealthChecks = pgTable(
+	"llm_endpoint_health_checks",
+	{
+		id: bigserial("id", { mode: "bigint" }).primaryKey(),
+		endpointId: text("endpoint_id")
+			.notNull()
+			.references(() => llmEndpoints.id, { onDelete: "cascade" }),
+		checkType: text("check_type").notNull(),
+		success: boolean("success").notNull(),
+		latencyMs: integer("latency_ms"),
+		statusCode: integer("status_code"),
+		errorMessage: text("error_message"),
+		checkedAt: timestamp("checked_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		endpointCheckedAtIdx: index("llm_endpoint_health_checks_endpoint_checked_at_idx")
+			.on(table.endpointId, table.checkedAt),
+		checkedAtIdx: index("llm_endpoint_health_checks_checked_at_idx").on(
+			table.checkedAt,
+		),
+	}),
+);
+
+export const llmEndpointQualityDaily = pgTable(
+	"llm_endpoint_quality_daily",
+	{
+		id: cuid2("lqd").primaryKey(),
+		endpointId: text("endpoint_id")
+			.notNull()
+			.references(() => llmEndpoints.id, { onDelete: "cascade" }),
+		day: date("day").notNull(),
+		decisionCount: integer("decision_count").notNull().default(0),
+		overrideCount: integer("override_count").notNull().default(0),
+		lowConfidenceCount: integer("low_confidence_count").notNull().default(0),
+		qualityScore: real("quality_score").notNull().default(1),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		endpointDayUnique: uniqueIndex("llm_endpoint_quality_daily_endpoint_day_unique")
+			.on(table.endpointId, table.day),
+		endpointIdx: index("llm_endpoint_quality_daily_endpoint_idx").on(
+			table.endpointId,
+		),
+		dayIdx: index("llm_endpoint_quality_daily_day_idx").on(table.day),
+	}),
+);
+
+export const llmRoutingDecisions = pgTable(
+	"llm_routing_decisions",
+	{
+		id: cuid2("lrd").primaryKey(),
+		capability: text("capability").notNull(),
+		selectedEndpointId: text("selected_endpoint_id").references(
+			() => llmEndpoints.id,
+			{ onDelete: "set null" },
+		),
+		reason: text("reason"),
+		selectedScore: real("selected_score"),
+		candidateCount: integer("candidate_count").notNull().default(0),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		capabilityCreatedAtIdx: index("llm_routing_decisions_capability_created_at_idx")
+			.on(table.capability, table.createdAt),
+		selectedEndpointIdx: index("llm_routing_decisions_selected_endpoint_idx").on(
+			table.selectedEndpointId,
+		),
+	}),
+);
+
 export const llmDecisionLog = pgTable(
 	"llm_decision_log",
 	{
@@ -875,6 +1038,9 @@ export const llmDecisionLog = pgTable(
 		output: typedJsonb(llmDecisionOutput, "output"),
 		modelId: text("model_id").notNull(),
 		provider: text("provider").notNull(),
+		endpointId: text("endpoint_id").references(() => llmEndpoints.id, {
+			onDelete: "set null",
+		}),
 		latencyMs: integer("latency_ms"),
 		tokenCount: integer("token_count"),
 		costCents: integer("cost_cents"),
@@ -899,6 +1065,10 @@ export const llmDecisionLog = pgTable(
 		),
 		modelCreatedAtIdx: index("llm_decision_log_model_created_at_idx").on(
 			table.modelId,
+			table.createdAt,
+		),
+		endpointCreatedAtIdx: index("llm_decision_log_endpoint_created_at_idx").on(
+			table.endpointId,
 			table.createdAt,
 		),
 		inputHashIdx: index("llm_decision_log_input_hash_idx").on(table.inputHash),

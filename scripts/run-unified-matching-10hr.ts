@@ -11,8 +11,6 @@ async function main() {
 		limit: 1500,
 		dryRun: false,
 		minPrimaryConfidence: 0.8,
-		primaryModelId: "qwen3-4b",
-		secondaryModelId: "qwen3-4b",
 		blocking: {
 			barcodeLimit: 1500,
 			barcodeMinChains: 2,

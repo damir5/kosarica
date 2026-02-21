@@ -80,8 +80,6 @@ export const semanticClusteringListwiseTaskPayload = z.object({
 	minChains: z.number().int().min(1).max(20).optional(),
 	dryRun: z.boolean().optional(),
 	minPrimaryConfidence: z.number().min(0).max(1).optional(),
-	primaryModelId: z.string().optional(),
-	secondaryModelId: z.string().optional(),
 });
 
 export const semanticClusteringUnifiedTaskPayload = z.object({
@@ -89,8 +87,6 @@ export const semanticClusteringUnifiedTaskPayload = z.object({
 	limit: z.number().int().min(1).max(500).optional(),
 	dryRun: z.boolean().optional(),
 	minPrimaryConfidence: z.number().min(0).max(1).optional(),
-	primaryModelId: z.string().optional(),
-	secondaryModelId: z.string().optional(),
 	maxGroupSize: z.number().int().min(2).max(200).optional(),
 	groupsPerCall: z.number().int().min(1).max(20).optional(),
 	barcodeLimit: z.number().int().min(1).max(1000).optional(),

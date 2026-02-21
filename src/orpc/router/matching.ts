@@ -9,8 +9,6 @@ export const triggerUnifiedMatching = superadminProcedure
 				limit: z.number().int().min(1).max(500).optional(),
 				dryRun: z.boolean().optional(),
 				minPrimaryConfidence: z.number().min(0).max(1).optional(),
-				primaryModelId: z.string().optional(),
-				secondaryModelId: z.string().optional(),
 				maxGroupSize: z.number().int().min(2).max(200).optional(),
 				groupsPerCall: z.number().int().min(1).max(20).optional(),
 				blocking: z
@@ -34,8 +32,6 @@ export const triggerUnifiedMatching = superadminProcedure
 				limit: input?.limit,
 				dryRun: input?.dryRun,
 				minPrimaryConfidence: input?.minPrimaryConfidence,
-				primaryModelId: input?.primaryModelId,
-				secondaryModelId: input?.secondaryModelId,
 				maxGroupSize: input?.maxGroupSize,
 				groupsPerCall: input?.groupsPerCall,
 				barcodeLimit: input?.blocking?.barcodeLimit,
@@ -57,8 +53,6 @@ export const triggerListwiseSemanticClustering = superadminProcedure
 				minChains: z.number().int().min(1).max(20).optional(),
 				dryRun: z.boolean().optional(),
 				minPrimaryConfidence: z.number().min(0).max(1).optional(),
-				primaryModelId: z.string().optional(),
-				secondaryModelId: z.string().optional(),
 			})
 			.optional(),
 	)
@@ -72,8 +66,6 @@ export const triggerListwiseSemanticClustering = superadminProcedure
 				minChains: input?.minChains,
 				dryRun: input?.dryRun,
 				minPrimaryConfidence: input?.minPrimaryConfidence,
-				primaryModelId: input?.primaryModelId,
-				secondaryModelId: input?.secondaryModelId,
 			},
 		});
 

@@ -9,7 +9,6 @@ export {
 export { type BuildGroupQuery, buildGroupFromQuery } from "./group-gen";
 export {
 	callModel,
-	loadListwiseModelConfigs,
 	processGroupWithLLM,
 	setListwisePromptHook,
 } from "./llm-call";

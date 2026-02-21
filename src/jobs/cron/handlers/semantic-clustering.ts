@@ -56,8 +56,6 @@ export const semanticClusteringHandler: CronJobHandler = {
 						limit,
 						dryRun: process.env.UNIFIED_MATCHING_DRY_RUN === "1",
 						minPrimaryConfidence,
-						primaryModelId: process.env.LISTWISE_PRIMARY_MODEL_ID,
-						secondaryModelId: process.env.LISTWISE_SECONDARY_MODEL_ID,
 					},
 					idempotencyKey: `semantic-clustering:unified:${context.scheduledFor.toISOString()}`,
 				},
@@ -76,9 +74,6 @@ export const semanticClusteringHandler: CronJobHandler = {
 				scheduledFor: context.scheduledFor.toISOString(),
 				limit,
 				minChains,
-				primaryModelId: process.env.LISTWISE_PRIMARY_MODEL_ID ?? "qwen",
-				secondaryModelId:
-					process.env.LISTWISE_SECONDARY_MODEL_ID ?? "ministral",
 				minPrimaryConfidence,
 				dryRun: process.env.LISTWISE_DRY_RUN === "1",
 			});
@@ -92,8 +87,6 @@ export const semanticClusteringHandler: CronJobHandler = {
 						minChains,
 						dryRun: process.env.LISTWISE_DRY_RUN === "1",
 						minPrimaryConfidence,
-						primaryModelId: process.env.LISTWISE_PRIMARY_MODEL_ID,
-						secondaryModelId: process.env.LISTWISE_SECONDARY_MODEL_ID,
 					},
 					idempotencyKey: `semantic-clustering:listwise:${context.scheduledFor.toISOString()}`,
 				},

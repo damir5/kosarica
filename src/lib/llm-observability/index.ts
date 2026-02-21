@@ -41,6 +41,7 @@ export async function logLlmDecision(
 			output: input.output ?? null,
 			modelId: input.modelId,
 			provider: input.provider,
+			endpointId: input.endpointId ?? null,
 			latencyMs: input.latencyMs ?? null,
 			tokenCount: input.tokenCount ?? null,
 			costCents: input.costCents ?? null,

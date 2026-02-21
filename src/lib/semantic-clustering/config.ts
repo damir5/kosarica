@@ -97,9 +97,7 @@ export function parseEnsembleConfig(
 	raw: string | undefined,
 ): EnsembleModelConfig[] {
 	if (!raw || raw.trim().length === 0) {
-		throw new Error(
-			'LLM_ENSEMBLE_JSON is required. Example: [{"id":"fast","provider":"openai","model":"gpt-4o-mini"}]',
-		);
+		throw new Error("Model config JSON is required");
 	}
 
 	const parsed = EnsembleSchema.parse(JSON.parse(raw));

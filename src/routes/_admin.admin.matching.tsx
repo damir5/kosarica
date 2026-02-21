@@ -28,10 +28,6 @@ function AdminMatchingPage() {
 	const [unifiedDryRun, setUnifiedDryRun] = useState<boolean>(true);
 	const [unifiedMinPrimaryConfidence, setUnifiedMinPrimaryConfidence] =
 		useState<string>("0.8");
-	const [unifiedPrimaryModelId, setUnifiedPrimaryModelId] =
-		useState<string>("");
-	const [unifiedSecondaryModelId, setUnifiedSecondaryModelId] =
-		useState<string>("");
 	const [unifiedGroupsPerCall, setUnifiedGroupsPerCall] =
 		useState<string>("3");
 
@@ -51,10 +47,6 @@ function AdminMatchingPage() {
 	const [listwiseDryRun, setListwiseDryRun] = useState<boolean>(true);
 	const [listwiseMinPrimaryConfidence, setListwiseMinPrimaryConfidence] =
 		useState<string>("0.8");
-	const [listwisePrimaryModelId, setListwisePrimaryModelId] =
-		useState<string>("");
-	const [listwiseSecondaryModelId, setListwiseSecondaryModelId] =
-		useState<string>("");
 
 	const invalidateTaskQueue = () => {
 		queryClient.invalidateQueries({
@@ -81,8 +73,6 @@ function AdminMatchingPage() {
 			limit: toInt(unifiedLimit),
 			dryRun: unifiedDryRun,
 			minPrimaryConfidence: toFloat(unifiedMinPrimaryConfidence),
-			primaryModelId: unifiedPrimaryModelId.trim() || undefined,
-			secondaryModelId: unifiedSecondaryModelId.trim() || undefined,
 			groupsPerCall: toInt(unifiedGroupsPerCall),
 			blocking: {
 				barcodeLimit: toInt(unifiedBarcodeLimit),
@@ -96,8 +86,6 @@ function AdminMatchingPage() {
 			unifiedDryRun,
 			unifiedLimit,
 			unifiedMinPrimaryConfidence,
-			unifiedPrimaryModelId,
-			unifiedSecondaryModelId,
 			unifiedGroupsPerCall,
 			unifiedBarcodeLimit,
 			unifiedBarcodeMinChains,
@@ -117,16 +105,12 @@ function AdminMatchingPage() {
 			minChains: toInt(listwiseMinChains),
 			dryRun: listwiseDryRun,
 			minPrimaryConfidence: toFloat(listwiseMinPrimaryConfidence),
-			primaryModelId: listwisePrimaryModelId.trim() || undefined,
-			secondaryModelId: listwiseSecondaryModelId.trim() || undefined,
 		}),
 		[
 			listwiseDryRun,
 			listwiseLimit,
 			listwiseMinChains,
 			listwiseMinPrimaryConfidence,
-			listwisePrimaryModelId,
-			listwiseSecondaryModelId,
 		],
 	);
 
@@ -242,26 +226,6 @@ function AdminMatchingPage() {
 									{unifiedDryRun ? "Enabled" : "Disabled"}
 								</span>
 							</div>
-						</div>
-						<div className="space-y-1 md:col-span-3">
-							<Label htmlFor="unifiedPrimaryModelId">Primary model id</Label>
-							<Input
-								id="unifiedPrimaryModelId"
-								placeholder="(optional)"
-								value={unifiedPrimaryModelId}
-								onChange={(e) => setUnifiedPrimaryModelId(e.target.value)}
-							/>
-						</div>
-						<div className="space-y-1 md:col-span-3">
-							<Label htmlFor="unifiedSecondaryModelId">
-								Secondary model id
-							</Label>
-							<Input
-								id="unifiedSecondaryModelId"
-								placeholder="(optional)"
-								value={unifiedSecondaryModelId}
-								onChange={(e) => setUnifiedSecondaryModelId(e.target.value)}
-							/>
 						</div>
 					</div>
 
@@ -433,26 +397,6 @@ function AdminMatchingPage() {
 										{listwiseDryRun ? "Enabled" : "Disabled"}
 									</span>
 								</div>
-							</div>
-							<div className="space-y-1 md:col-span-2">
-								<Label htmlFor="listwisePrimaryModelId">Primary model id</Label>
-								<Input
-									id="listwisePrimaryModelId"
-									placeholder="(optional)"
-									value={listwisePrimaryModelId}
-									onChange={(e) => setListwisePrimaryModelId(e.target.value)}
-								/>
-							</div>
-							<div className="space-y-1 md:col-span-2">
-								<Label htmlFor="listwiseSecondaryModelId">
-									Secondary model id
-								</Label>
-								<Input
-									id="listwiseSecondaryModelId"
-									placeholder="(optional)"
-									value={listwiseSecondaryModelId}
-									onChange={(e) => setListwiseSecondaryModelId(e.target.value)}
-								/>
 							</div>
 						</div>
 

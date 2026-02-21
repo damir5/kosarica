@@ -166,6 +166,9 @@ FULL_TABLES=(
   cluster_members
   cluster_relations
   search_index
+  llm_endpoints
+  llm_endpoint_capabilities
+  llm_endpoint_runtime
 )
 
 echo "Full-copy tables:"
@@ -212,6 +215,15 @@ copy_sliced_table "llm_decision_log" \
 
 copy_sliced_table "llm_decision_cache" \
   "SELECT * FROM llm_decision_cache WHERE updated_at >= '${CUTOFF}'"
+
+copy_sliced_table "llm_endpoint_health_checks" \
+  "SELECT * FROM llm_endpoint_health_checks WHERE checked_at >= '${CUTOFF}'"
+
+copy_sliced_table "llm_endpoint_quality_daily" \
+  "SELECT * FROM llm_endpoint_quality_daily WHERE day >= '${CUTOFF}'"
+
+copy_sliced_table "llm_routing_decisions" \
+  "SELECT * FROM llm_routing_decisions WHERE created_at >= '${CUTOFF}'"
 
 copy_sliced_table "store_enrichment_tasks" \
   "SELECT * FROM store_enrichment_tasks WHERE created_at >= '${CUTOFF}'"

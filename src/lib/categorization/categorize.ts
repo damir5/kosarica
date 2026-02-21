@@ -7,10 +7,14 @@ import {
 } from "@/db";
 import { chunk } from "@/lib/collections/chunk";
 import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
+import {
+	chooseEndpointForCapability,
+	endpointToModelConfig,
+	recordEndpointResult,
+} from "@/lib/llm-routing";
 import { logLlmDecision } from "@/lib/llm-observability";
 import {
 	type EnsembleModelConfig,
-	parseEnsembleConfig,
 	readApiKey,
 } from "@/lib/semantic-clustering/config";
 import { extractJsonPayload } from "@/lib/semantic-clustering/llm";
@@ -29,25 +33,6 @@ import {
 } from "./prompt";
 
 const log = createLogger("matching");
-
-const DEFAULT_CATEGORIZATION_ENSEMBLE_JSON = JSON.stringify([
-	{
-		id: "deepseek-primary",
-		provider: "openrouter",
-		model: "deepseek/deepseek-v3.2",
-		apiKeyEnv: "OPENROUTER_API_KEY",
-		timeoutMs: 180000,
-		maxRetries: 1,
-	},
-	{
-		id: "gpt-oss-secondary",
-		provider: "openrouter",
-		model: "openai/gpt-oss-20b",
-		apiKeyEnv: "OPENROUTER_API_KEY",
-		timeoutMs: 180000,
-		maxRetries: 1,
-	},
-]);
 
 const DEFAULT_BATCH_SIZE = 200;
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.8;
@@ -104,6 +89,7 @@ async function tryLogCategorizationDecision(input: {
 			},
 			modelId: input.model.model,
 			provider: input.model.provider,
+			endpointId: input.model.id,
 			latencyMs: input.latencyMs,
 			verdict: "BATCH_CATEGORIZATION",
 			confidence: avgConfidence,
@@ -142,20 +128,19 @@ function parseConfidenceThreshold(raw: string | undefined): number {
 	return Math.max(0, Math.min(1, parsed));
 }
 
-function getCategorizationModels(): {
+async function getCategorizationModels(): Promise<{
 	primaryModel: EnsembleModelConfig;
 	secondaryModel: EnsembleModelConfig | null;
-} {
-	const raw =
-		process.env.CATEGORIZATION_ENSEMBLE_JSON ??
-		DEFAULT_CATEGORIZATION_ENSEMBLE_JSON;
-	const parsed = parseEnsembleConfig(raw);
-	if (parsed.length === 0) {
-		throw new Error("No categorization models configured");
-	}
+}> {
+	const primaryDecision = await chooseEndpointForCapability(
+		"categorization_primary",
+	);
+	const secondaryDecision = await chooseEndpointForCapability(
+		"categorization_secondary",
+	);
 	return {
-		primaryModel: parsed[0],
-		secondaryModel: parsed[1] ?? null,
+		primaryModel: endpointToModelConfig(primaryDecision),
+		secondaryModel: endpointToModelConfig(secondaryDecision),
 	};
 }
 
@@ -662,7 +647,22 @@ async function categorizeChunk(
 
 	const primaryMessages = await buildCategorizationMessages(primaryPromptItems);
 	const primaryStartedAt = Date.now();
-	const primaryPayload = await callModel(models.primaryModel, primaryMessages);
+	let primaryPayload: unknown;
+	try {
+		primaryPayload = await callModel(models.primaryModel, primaryMessages);
+		const primaryLatencyMs = Date.now() - primaryStartedAt;
+		await recordEndpointResult(models.primaryModel.id, {
+			success: true,
+			latencyMs: primaryLatencyMs,
+		});
+	} catch (error) {
+		await recordEndpointResult(models.primaryModel.id, {
+			success: false,
+			latencyMs: Date.now() - primaryStartedAt,
+			errorMessage: error instanceof Error ? error.message : String(error),
+		});
+		throw error;
+	}
 	const primaryLatencyMs = Date.now() - primaryStartedAt;
 	const primaryParsedByLlmId = parseCategorizationResponse(
 		primaryPayload,
@@ -759,10 +759,21 @@ async function categorizeChunk(
 		const secondaryMessages =
 			await buildCategorizationMessages(secondaryPromptItems);
 		const secondaryStartedAt = Date.now();
-		const secondaryPayload = await callModel(
-			models.secondaryModel,
-			secondaryMessages,
-		);
+		let secondaryPayload: unknown;
+		try {
+			secondaryPayload = await callModel(models.secondaryModel, secondaryMessages);
+			await recordEndpointResult(models.secondaryModel.id, {
+				success: true,
+				latencyMs: Date.now() - secondaryStartedAt,
+			});
+		} catch (error) {
+			await recordEndpointResult(models.secondaryModel.id, {
+				success: false,
+				latencyMs: Date.now() - secondaryStartedAt,
+				errorMessage: error instanceof Error ? error.message : String(error),
+			});
+			throw error;
+		}
 		const secondaryLatencyMs = Date.now() - secondaryStartedAt;
 		const secondaryParsedByLlmId = parseCategorizationResponse(
 			secondaryPayload,
@@ -869,7 +880,7 @@ export async function categorizeBatch(
 		return { succeeded: 0, failed: dedupedIds.length, escalated: 0 };
 	}
 
-	const models = getCategorizationModels();
+	const models = await getCategorizationModels();
 	const batchSize = parsePositiveInt(
 		process.env.CATEGORIZATION_BATCH_SIZE,
 		DEFAULT_BATCH_SIZE,

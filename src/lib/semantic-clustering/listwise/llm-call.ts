@@ -1,7 +1,6 @@
 import { createLogger } from "@/utils/logger";
 import {
 	type EnsembleModelConfig,
-	parseEnsembleConfig,
 	readApiKey,
 } from "../config";
 import {
@@ -95,9 +94,6 @@ const responseFormatPreferenceByEndpoint = new Map<
 	string,
 	OpenAiResponseFormatType
 >();
-
-let cachedRawConfig = "__unset__";
-let cachedConfigs: EnsembleModelConfig[] = [];
 
 const EMPTY_USAGE: TokenUsage = {
 	promptTokens: null,
@@ -638,17 +634,6 @@ export async function callModel(
 	throw lastError instanceof Error
 		? lastError
 		: new Error(`Model call failed for ${config.id}`);
-}
-
-export function loadListwiseModelConfigs(
-	rawConfig = process.env.LLM_ENSEMBLE_JSON,
-): EnsembleModelConfig[] {
-	const raw = rawConfig ?? "";
-	if (raw !== cachedRawConfig) {
-		cachedConfigs = parseEnsembleConfig(raw);
-		cachedRawConfig = raw;
-	}
-	return cachedConfigs;
 }
 
 export async function processGroupWithLLM(

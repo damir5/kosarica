@@ -1,3 +1,8 @@
+import {
+	chooseEndpointForCapability,
+	endpointToModelConfig,
+	recordEndpointResult,
+} from "@/lib/llm-routing";
 import { logLlmDecision } from "@/lib/llm-observability";
 import { createLogger } from "@/utils/logger";
 import {
@@ -7,7 +12,6 @@ import {
 import type { EnsembleModelConfig } from "./config";
 import { decideListwiseCascade } from "./listwise/ensemble";
 import {
-	loadListwiseModelConfigs,
 	processGroupsWithLLM,
 	processGroupWithLLM,
 } from "./listwise/llm-call";
@@ -24,10 +28,6 @@ export interface RunUnifiedMatchingOptions {
 	dryRun?: boolean;
 	/** Min confidence from primary model before escalation. */
 	minPrimaryConfidence?: number;
-	/** Primary LLM model id from ensemble config. */
-	primaryModelId?: string;
-	/** Secondary LLM model id for cascade escalation. */
-	secondaryModelId?: string;
 	/** Blocking options for candidate group generation. */
 	blocking?: GenerateCandidateGroupsOptions;
 	/** Max items per LLM prompt (large groups are split by brand). */
@@ -73,17 +73,6 @@ function parsePositiveIntEnv(name: string, fallback: number): number {
 	return parsePositiveInt(raw, fallback);
 }
 
-function pickModel(
-	configs: EnsembleModelConfig[],
-	modelId: string,
-): EnsembleModelConfig {
-	const found = configs.find((config) => config.id === modelId);
-	if (!found) {
-		throw new Error(`Missing model config: ${modelId}`);
-	}
-	return found;
-}
-
 /** Split large groups into sub-groups by brand for focused LLM prompts. */
 function splitGroupByBrand(
 	group: CandidateGroup,
@@ -126,23 +115,19 @@ export async function runUnifiedMatching(
 		options.limit ?? parsePositiveInt(process.env.UNIFIED_MATCHING_LIMIT, 50);
 	const dryRun = options.dryRun ?? process.env.UNIFIED_MATCHING_DRY_RUN === "1";
 
-	const modelConfigs = loadListwiseModelConfigs();
-	const primaryModelId =
-		options.primaryModelId ?? process.env.LISTWISE_PRIMARY_MODEL_ID ?? "qwen";
-	const secondaryModelId =
-		options.secondaryModelId ??
-		process.env.LISTWISE_SECONDARY_MODEL_ID ??
-		"ministral";
-
-	const primaryModel = pickModel(modelConfigs, primaryModelId);
-	const secondaryModel = pickModel(modelConfigs, secondaryModelId);
+	const primaryModel = endpointToModelConfig(
+		await chooseEndpointForCapability("matching_primary"),
+	);
+	const secondaryModel = endpointToModelConfig(
+		await chooseEndpointForCapability("matching_secondary"),
+	);
 
 	// Stage 2: BLOCK — generate candidate groups
 	log.info("Unified matching: generating candidate groups", {
 		limit,
 		dryRun,
-		primaryModel: primaryModelId,
-		secondaryModel: secondaryModelId,
+		primaryModel: primaryModel.id,
+		secondaryModel: secondaryModel.id,
 	});
 
 	const blocking = await generateCandidateGroups(options.blocking);
@@ -190,10 +175,20 @@ export async function runUnifiedMatching(
 		model: EnsembleModelConfig,
 		groups: readonly CandidateGroup[],
 	): Promise<Map<string, ListwiseLLMResult>> {
+		const startedAt = Date.now();
 		try {
 			const results = await processGroupsWithLLM(model, groups, prices);
+			await recordEndpointResult(model.id, {
+				success: true,
+				latencyMs: Date.now() - startedAt,
+			});
 			return new Map(results.map((result) => [result.groupId, result] as const));
 		} catch (error) {
+			await recordEndpointResult(model.id, {
+				success: false,
+				latencyMs: Date.now() - startedAt,
+				errorMessage: error instanceof Error ? error.message : String(error),
+			});
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
 			if (/\\bHTTP\\s+(401|403)\\b/.test(errorMessage)) {
@@ -329,6 +324,7 @@ export async function runUnifiedMatching(
 				},
 				modelId: primary.modelId,
 				provider: primary.provider,
+				endpointId: primary.modelId,
 				verdict: cascade.shouldEscalate ? "ESCALATE" : "ACCEPT",
 				confidence: primary.clustering.confidence,
 				reasoning: cascade.reason,
@@ -395,6 +391,7 @@ export async function runUnifiedMatching(
 					},
 					modelId: secondary.modelId,
 					provider: secondary.provider,
+					endpointId: secondary.modelId,
 					verdict: "VERIFIED",
 					confidence: secondary.clustering.confidence,
 					reasoning: "Secondary model verification",

@@ -1,8 +1,11 @@
 import { createLogger } from "@/utils/logger";
+import {
+	chooseEndpointForCapability,
+	endpointToModelConfig,
+} from "@/lib/llm-routing";
 import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
 import {
 	type EnsembleModelConfig,
-	parseEnsembleConfig,
 	readApiKey,
 	STRICT_CASCADE_THRESHOLDS,
 } from "./config";
@@ -16,8 +19,6 @@ import type {
 } from "./types";
 
 const log = createLogger("matching");
-let cachedRawConfig = "__unset__";
-let cachedConfig: EnsembleModelConfig[] = [];
 
 const ALLOWED_VERDICTS: SemanticVerdict[] = [
 	"EXACT_MATCH",
@@ -649,13 +650,14 @@ function systemErrorResult(
 	};
 }
 
-function loadModelConfigs(): EnsembleModelConfig[] {
-	const rawConfig = process.env.LLM_ENSEMBLE_JSON ?? "";
-	if (rawConfig !== cachedRawConfig) {
-		cachedConfig = parseEnsembleConfig(rawConfig);
-		cachedRawConfig = rawConfig;
-	}
-	return cachedConfig;
+async function loadModelConfigs(): Promise<EnsembleModelConfig[]> {
+	const primary = endpointToModelConfig(
+		await chooseEndpointForCapability("matching_primary"),
+	);
+	const secondary = endpointToModelConfig(
+		await chooseEndpointForCapability("matching_secondary"),
+	);
+	return [primary, secondary];
 }
 
 function weightedFinalize(
@@ -749,9 +751,9 @@ export async function evaluatePairsWithCascadeBatch(input: {
 	const thresholds = input.thresholds ?? STRICT_CASCADE_THRESHOLDS;
 	let modelConfigs: EnsembleModelConfig[];
 	try {
-		modelConfigs = loadModelConfigs();
+		modelConfigs = await loadModelConfigs();
 	} catch (error) {
-		const message = `Invalid ensemble configuration: ${String(error)}`;
+		const message = `Invalid endpoint routing configuration: ${String(error)}`;
 		for (const pair of input.pairs) {
 			results.set(pair.pairId, systemErrorResult(message));
 		}

@@ -10,6 +10,7 @@ import { barcodeAnchorBatchHandler } from "./handlers/barcode-anchor-batch";
 import { conflictCheckHandler } from "./handlers/conflict-check";
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
 import { featureMatchBatchHandler } from "./handlers/feature-match-batch";
+import { llmEndpointHealthCheckHandler } from "./handlers/llm-endpoint-health-check";
 import { refreshPricesCurrentHandler } from "./handlers/refresh-prices-current";
 import { semanticClusteringHandler } from "./handlers/semantic-clustering";
 import { tempCleanupHandler } from "./handlers/temp-cleanup";
@@ -60,6 +61,15 @@ export function registerAllCronJobs(): void {
 		timezone: "UTC",
 		taskType: "barcode-anchor",
 		handler: barcodeAnchorBatchHandler,
+	});
+
+	registerCronJob({
+		id: "llm-endpoint-health-check",
+		name: "LLM Endpoint Health Check",
+		cronExpression: "*/5 * * * *",
+		timezone: "UTC",
+		taskType: "matching",
+		handler: llmEndpointHealthCheckHandler,
 	});
 
 	registerCronJob({

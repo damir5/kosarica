@@ -1,12 +1,16 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import { canonicalSkus, retailerItemBarcodes, skuItemLinks } from "@/db/schema";
+import {
+	chooseEndpointForCapability,
+	endpointToModelConfig,
+	recordEndpointResult,
+} from "@/lib/llm-routing";
 import { logLlmDecision } from "@/lib/llm-observability";
 import { normalizeProductName } from "@/lib/matching/normalize";
 import { getDb } from "@/utils/bindings";
 import { createLogger } from "@/utils/logger";
-import type { EnsembleModelConfig } from "../config";
 import { decideListwiseCascade } from "./ensemble";
-import { loadListwiseModelConfigs, processGroupWithLLM } from "./llm-call";
+import { processGroupWithLLM } from "./llm-call";
 import { fetchMedianPrices } from "./price-fetch";
 import type { CandidateGroup, GroupItem, ListwiseLLMResult } from "./types";
 
@@ -17,8 +21,6 @@ export interface RunListwiseSemanticClusteringOptions {
 	minChains?: number;
 	dryRun?: boolean;
 	minPrimaryConfidence?: number;
-	primaryModelId?: string;
-	secondaryModelId?: string;
 }
 
 export interface RunListwiseSemanticClusteringResult {
@@ -217,17 +219,6 @@ async function loadBarcodeGroups(params: {
 	return groups;
 }
 
-function pickModel(
-	configs: EnsembleModelConfig[],
-	modelId: string,
-): EnsembleModelConfig {
-	const found = configs.find((config) => config.id === modelId);
-	if (!found) {
-		throw new Error(`Missing model config: ${modelId}`);
-	}
-	return found;
-}
-
 function stableSkuKey(params: {
 	canonicalName: string;
 	brand: string | null;
@@ -378,16 +369,12 @@ export async function runListwiseSemanticClustering(
 		options.minChains ?? parsePositiveInt(process.env.LISTWISE_MIN_CHAINS, 2);
 	const dryRun = options.dryRun ?? process.env.LISTWISE_DRY_RUN === "1";
 
-	const modelConfigs = loadListwiseModelConfigs();
-	const primaryModelId =
-		options.primaryModelId ?? process.env.LISTWISE_PRIMARY_MODEL_ID ?? "qwen";
-	const secondaryModelId =
-		options.secondaryModelId ??
-		process.env.LISTWISE_SECONDARY_MODEL_ID ??
-		"ministral";
-
-	const primaryModel = pickModel(modelConfigs, primaryModelId);
-	const secondaryModel = pickModel(modelConfigs, secondaryModelId);
+	const primaryModel = endpointToModelConfig(
+		await chooseEndpointForCapability("matching_primary"),
+	);
+	const secondaryModel = endpointToModelConfig(
+		await chooseEndpointForCapability("matching_secondary"),
+	);
 
 	const groups = await loadBarcodeGroups({ limit, minChains });
 	const allItemIds = groups.flatMap((group) =>
@@ -418,7 +405,12 @@ export async function runListwiseSemanticClustering(
 			dryRun,
 		});
 
+		const primaryStart = Date.now();
 		const primary = await processGroupWithLLM(primaryModel, group, prices);
+		await recordEndpointResult(primaryModel.id, {
+			success: true,
+			latencyMs: Date.now() - primaryStart,
+		});
 		const cascade = decideListwiseCascade({
 			primary,
 			primaryModel,
@@ -454,6 +446,7 @@ export async function runListwiseSemanticClustering(
 			},
 			modelId: primary.modelId,
 			provider: primary.provider,
+			endpointId: primary.modelId,
 			verdict: cascade.shouldEscalate ? "ESCALATE" : "ACCEPT",
 			confidence: primary.clustering.confidence,
 			reasoning: cascade.reason,
@@ -465,7 +458,12 @@ export async function runListwiseSemanticClustering(
 		let secondary: ListwiseLLMResult | null = null;
 		if (cascade.shouldEscalate) {
 			escalatedGroups += 1;
+			const secondaryStart = Date.now();
 			secondary = await processGroupWithLLM(secondaryModel, group, prices);
+			await recordEndpointResult(secondaryModel.id, {
+				success: true,
+				latencyMs: Date.now() - secondaryStart,
+			});
 			accepted = secondary;
 
 			await logLlmDecision({
@@ -491,6 +489,7 @@ export async function runListwiseSemanticClustering(
 				},
 				modelId: secondary.modelId,
 				provider: secondary.provider,
+				endpointId: secondary.modelId,
 				verdict: "VERIFIED",
 				confidence: secondary.clustering.confidence,
 				reasoning: "Secondary model verification run",
