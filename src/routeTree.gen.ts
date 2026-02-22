@@ -33,6 +33,7 @@ import { Route as AdminAdminTaskQueueRouteImport } from './routes/_admin.admin.t
 import { Route as AdminAdminStoresRouteImport } from './routes/_admin.admin.stores'
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as AdminAdminMatchingRouteImport } from './routes/_admin.admin.matching'
+import { Route as AdminAdminLlmEndpointsRouteImport } from './routes/_admin.admin.llm-endpoints'
 import { Route as AdminAdminLlmDecisionsRouteImport } from './routes/_admin.admin.llm-decisions'
 import { Route as AdminAdminIngestionRouteImport } from './routes/_admin.admin.ingestion'
 import { Route as AdminAdminCronRouteImport } from './routes/_admin.admin.cron'
@@ -166,6 +167,11 @@ const AdminAdminMatchingRoute = AdminAdminMatchingRouteImport.update({
   path: '/matching',
   getParentRoute: () => AdminAdminRoute,
 } as any)
+const AdminAdminLlmEndpointsRoute = AdminAdminLlmEndpointsRouteImport.update({
+  id: '/llm-endpoints',
+  path: '/llm-endpoints',
+  getParentRoute: () => AdminAdminRoute,
+} as any)
 const AdminAdminLlmDecisionsRoute = AdminAdminLlmDecisionsRouteImport.update({
   id: '/llm-decisions',
   path: '/llm-decisions',
@@ -262,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/admin/cron': typeof AdminAdminCronRoute
   '/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/admin/llm-decisions': typeof AdminAdminLlmDecisionsRoute
+  '/admin/llm-endpoints': typeof AdminAdminLlmEndpointsRoute
   '/admin/matching': typeof AdminAdminMatchingRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/stores': typeof AdminAdminStoresRouteWithChildren
@@ -298,6 +305,7 @@ export interface FileRoutesByTo {
   '/admin/clickhouse': typeof AdminAdminClickhouseRoute
   '/admin/cron': typeof AdminAdminCronRoute
   '/admin/llm-decisions': typeof AdminAdminLlmDecisionsRoute
+  '/admin/llm-endpoints': typeof AdminAdminLlmEndpointsRoute
   '/admin/matching': typeof AdminAdminMatchingRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/task-queue': typeof AdminAdminTaskQueueRoute
@@ -338,6 +346,7 @@ export interface FileRoutesById {
   '/_admin/admin/cron': typeof AdminAdminCronRoute
   '/_admin/admin/ingestion': typeof AdminAdminIngestionRouteWithChildren
   '/_admin/admin/llm-decisions': typeof AdminAdminLlmDecisionsRoute
+  '/_admin/admin/llm-endpoints': typeof AdminAdminLlmEndpointsRoute
   '/_admin/admin/matching': typeof AdminAdminMatchingRoute
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
   '/_admin/admin/stores': typeof AdminAdminStoresRouteWithChildren
@@ -378,6 +387,7 @@ export interface FileRouteTypes {
     | '/admin/cron'
     | '/admin/ingestion'
     | '/admin/llm-decisions'
+    | '/admin/llm-endpoints'
     | '/admin/matching'
     | '/admin/settings'
     | '/admin/stores'
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
     | '/admin/clickhouse'
     | '/admin/cron'
     | '/admin/llm-decisions'
+    | '/admin/llm-endpoints'
     | '/admin/matching'
     | '/admin/settings'
     | '/admin/task-queue'
@@ -453,6 +464,7 @@ export interface FileRouteTypes {
     | '/_admin/admin/cron'
     | '/_admin/admin/ingestion'
     | '/_admin/admin/llm-decisions'
+    | '/_admin/admin/llm-endpoints'
     | '/_admin/admin/matching'
     | '/_admin/admin/settings'
     | '/_admin/admin/stores'
@@ -651,6 +663,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminMatchingRouteImport
       parentRoute: typeof AdminAdminRoute
     }
+    '/_admin/admin/llm-endpoints': {
+      id: '/_admin/admin/llm-endpoints'
+      path: '/llm-endpoints'
+      fullPath: '/admin/llm-endpoints'
+      preLoaderRoute: typeof AdminAdminLlmEndpointsRouteImport
+      parentRoute: typeof AdminAdminRoute
+    }
     '/_admin/admin/llm-decisions': {
       id: '/_admin/admin/llm-decisions'
       path: '/llm-decisions'
@@ -802,6 +821,7 @@ interface AdminAdminRouteChildren {
   AdminAdminCronRoute: typeof AdminAdminCronRoute
   AdminAdminIngestionRoute: typeof AdminAdminIngestionRouteWithChildren
   AdminAdminLlmDecisionsRoute: typeof AdminAdminLlmDecisionsRoute
+  AdminAdminLlmEndpointsRoute: typeof AdminAdminLlmEndpointsRoute
   AdminAdminMatchingRoute: typeof AdminAdminMatchingRoute
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
   AdminAdminStoresRoute: typeof AdminAdminStoresRouteWithChildren
@@ -819,6 +839,7 @@ const AdminAdminRouteChildren: AdminAdminRouteChildren = {
   AdminAdminCronRoute: AdminAdminCronRoute,
   AdminAdminIngestionRoute: AdminAdminIngestionRouteWithChildren,
   AdminAdminLlmDecisionsRoute: AdminAdminLlmDecisionsRoute,
+  AdminAdminLlmEndpointsRoute: AdminAdminLlmEndpointsRoute,
   AdminAdminMatchingRoute: AdminAdminMatchingRoute,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,
   AdminAdminStoresRoute: AdminAdminStoresRouteWithChildren,
