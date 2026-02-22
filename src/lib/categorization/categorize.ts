@@ -148,6 +148,7 @@ function isOpenAiCompatibleProvider(config: EnsembleModelConfig): boolean {
 	return (
 		config.provider === "openrouter" ||
 		config.provider === "openai" ||
+		config.provider === "nvidia-nim" ||
 		config.provider === "zai"
 	);
 }

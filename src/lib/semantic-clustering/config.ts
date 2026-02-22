@@ -6,6 +6,7 @@ const ProviderSchema = z.enum([
 	"claude",
 	"openrouter",
 	"vertex-express",
+	"nvidia-nim",
 	"zai",
 ]);
 
@@ -39,6 +40,7 @@ const DEFAULT_ENDPOINTS: Record<EnsembleModelConfig["provider"], string> = {
 	openrouter: "https://openrouter.ai/api/v1/chat/completions",
 	claude: "https://api.anthropic.com/v1/messages",
 	"vertex-express": "https://aiplatform.googleapis.com/v1",
+	"nvidia-nim": "https://integrate.api.nvidia.com/v1/chat/completions",
 	zai: "https://api.z.ai/api/coding/paas/v4/chat/completions",
 };
 
@@ -60,6 +62,8 @@ function defaultApiKeyEnv(provider: EnsembleModelConfig["provider"]): string {
 			return "ANTHROPIC_API_KEY";
 		case "vertex-express":
 			return "VERTEX_EXPRESS_API_KEY";
+		case "nvidia-nim":
+			return "NIM_API_KEY";
 		case "zai":
 			return "ZAI_API_KEY";
 	}

@@ -15,6 +15,7 @@ const providerSchema = z.enum([
 	"claude",
 	"openrouter",
 	"vertex-express",
+	"nvidia-nim",
 	"zai",
 ]);
 

@@ -29,7 +29,13 @@ export interface SemanticBatchPairInput {
 
 export interface SemanticVote {
 	modelId: string;
-	provider: "openai" | "claude" | "openrouter" | "vertex-express" | "zai";
+	provider:
+		| "openai"
+		| "claude"
+		| "openrouter"
+		| "vertex-express"
+		| "nvidia-nim"
+		| "zai";
 	verdict: SemanticVerdict;
 	confidence: number;
 	reasoning: string;

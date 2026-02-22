@@ -10,6 +10,7 @@ export type LlmProvider =
 	| "claude"
 	| "openrouter"
 	| "vertex-express"
+	| "nvidia-nim"
 	| "zai";
 
 export type LlmCapability =

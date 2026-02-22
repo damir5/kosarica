@@ -68,6 +68,24 @@ describe("parseEnsembleConfig", () => {
 		expect(config[0].apiKeyEnv).toBe("VERTEX_EXPRESS_API_KEY");
 	});
 
+	it("supports nvidia-nim with default endpoint and api key env", () => {
+		const config = parseEnsembleConfig(
+			JSON.stringify([
+				{
+					id: "nim",
+					provider: "nvidia-nim",
+					model: "meta/llama-3.1-8b-instruct",
+				},
+			]),
+		);
+
+		expect(config).toHaveLength(1);
+		expect(config[0].endpoint).toBe(
+			"https://integrate.api.nvidia.com/v1/chat/completions",
+		);
+		expect(config[0].apiKeyEnv).toBe("NIM_API_KEY");
+	});
+
 	it("rejects loopback endpoints in production by default", () => {
 		const previousNodeEnv = process.env.NODE_ENV;
 		const previousOverride = process.env.ALLOW_LOOPBACK_LLM_ENDPOINT;
