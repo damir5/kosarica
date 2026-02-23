@@ -85,6 +85,7 @@ const config = defineConfig({
   ssr: {
     // Externalize native Node.js modules and OpenTelemetry packages
     external: [
+      'undici',
       'bree',
       '@opentelemetry/sdk-node',
       '@opentelemetry/resources',

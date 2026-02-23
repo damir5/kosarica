@@ -81,6 +81,7 @@ async function enqueueTasks(
 			await scheduleTask({
 				taskType: task.type as TaskType,
 				payload,
+				priority: task.priority,
 			});
 			enqueued += 1;
 		} catch (error) {

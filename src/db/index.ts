@@ -2,6 +2,9 @@ import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
+// Note: undici global dispatcher is configured in scripts/instrumentation.mjs
+// which is loaded via --import flag before the app starts.
+
 export type DatabaseType = PostgresJsDatabase<typeof schema>;
 
 let dbInstance: DatabaseType | null = null;

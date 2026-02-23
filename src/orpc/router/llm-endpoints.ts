@@ -14,6 +14,7 @@ const providerSchema = z.enum([
 	"openai",
 	"claude",
 	"openrouter",
+	"ollama",
 	"vertex-express",
 	"nvidia-nim",
 	"zai",

@@ -134,6 +134,13 @@
       "when": 1771678035526,
       "tag": "0018_loving_tana_nile",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1771787643123,
+      "tag": "0019_known_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

@@ -9,15 +9,22 @@ export type LlmProvider =
 	| "openai"
 	| "claude"
 	| "openrouter"
+	| "ollama"
 	| "vertex-express"
 	| "nvidia-nim"
 	| "zai";
+
+export type ModelClass = "fast" | "standard" | "quality";
 
 export type LlmCapability =
 	| "matching_primary"
 	| "matching_secondary"
 	| "categorization_primary"
-	| "categorization_secondary";
+	| "categorization_secondary"
+	| "categorization_fast"
+	| "categorization_quality"
+	| "matching_fast"
+	| "matching_quality";
 
 export type CircuitState = "closed" | "open" | "half_open";
 

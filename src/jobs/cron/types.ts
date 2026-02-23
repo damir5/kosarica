@@ -42,31 +42,37 @@ export type TaskToEnqueue =
 			type: "ingestion";
 			payload: TaskPayloadByType["ingestion"];
 			idempotencyKey?: string;
+			priority?: number;
 	  }
 	| {
 			type: "rerun";
 			payload: TaskPayloadByType["rerun"];
 			idempotencyKey?: string;
+			priority?: number;
 	  }
 	| {
 			type: "cleanup";
 			payload?: TaskPayloadByType["cleanup"];
 			idempotencyKey?: string;
+			priority?: number;
 	  }
 	| {
 			type: "clickhouse";
 			payload: TaskPayloadByType["clickhouse"];
 			idempotencyKey?: string;
+			priority?: number;
 	  }
 	| {
 			type: "barcode-anchor";
 			payload?: TaskPayloadByType["barcode-anchor"];
 			idempotencyKey?: string;
+			priority?: number;
 	  }
 	| {
 			type: "matching";
 			payload: TaskPayloadByType["matching"];
 			idempotencyKey?: string;
+			priority?: number;
 	  };
 
 /**

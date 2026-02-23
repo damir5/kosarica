@@ -1,13 +1,24 @@
+export type { ConsensusConfig, ConsensusPlan } from "./consensus";
+export {
+	aggregateConsensus,
+	createConsensusPlan,
+	DEFAULT_CONSENSUS_CONFIG,
+	getDiverseEndpoints,
+	getModelClassForJob,
+	selectEndpointsForConsensus,
+	shouldUseConsensus,
+} from "./consensus";
+export { runActiveHealthChecks } from "./health-probe";
 export {
 	chooseEndpointForCapability,
 	endpointToModelConfig,
 	recordEndpointResult,
 	validateRoutingConfiguration,
 } from "./router";
-export { runActiveHealthChecks } from "./health-probe";
 export type {
 	EndpointResultMetrics,
 	LlmCapability,
-	RoutingDecision,
+	ModelClass,
 	RoutedModelConfig,
+	RoutingDecision,
 } from "./types";

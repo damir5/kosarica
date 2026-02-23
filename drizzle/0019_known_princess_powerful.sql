@@ -1,0 +1,1 @@
+ALTER TABLE "llm_endpoints" ADD COLUMN "model_class" text DEFAULT 'standard' NOT NULL;

@@ -44,6 +44,7 @@ const PROVIDERS: Array<CreateInput["provider"]> = [
 	"openai",
 	"claude",
 	"openrouter",
+	"ollama",
 	"vertex-express",
 	"nvidia-nim",
 	"zai",

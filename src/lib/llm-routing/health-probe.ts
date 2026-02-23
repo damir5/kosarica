@@ -6,6 +6,10 @@ import type { RoutedModelConfig } from "./types";
 
 const log = createLogger("scheduler");
 
+function toOllamaChatEndpoint(endpoint: string): string {
+	return endpoint.replace(/\/v1\/chat\/completions\/?$/i, "/api/chat");
+}
+
 async function probeEndpoint(config: RoutedModelConfig): Promise<{ success: boolean; statusCode?: number; errorMessage?: string; latencyMs: number }> {
 	const startedAt = Date.now();
 	try {
@@ -41,13 +45,45 @@ async function probeEndpoint(config: RoutedModelConfig): Promise<{ success: bool
 			};
 		}
 
-		const headers: Record<string, string> = {
-			Authorization: `Bearer ${readApiKey(config)}`,
-			"Content-Type": "application/json",
-		};
-		if (config.provider === "openrouter") {
-			headers["HTTP-Referer"] = process.env.OPENROUTER_HTTP_REFERER ?? "https://kosarica.local";
-			headers["X-Title"] = process.env.OPENROUTER_X_TITLE ?? "Kosarica Health Check";
+		if (config.provider === "ollama") {
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+			};
+			const apiKey = readApiKey(config);
+			if (apiKey.length > 0) {
+				headers.Authorization = `Bearer ${apiKey}`;
+			}
+			const response = await fetch(toOllamaChatEndpoint(config.endpoint), {
+				method: "POST",
+				headers,
+				body: JSON.stringify({
+					model: config.model,
+					stream: false,
+					options: { temperature: 0 },
+					messages: [
+						{ role: "system", content: "Reply with compact JSON only." },
+						{ role: "user", content: "{\"ping\":true}" },
+					],
+				}),
+			});
+			return {
+				success: response.ok,
+				statusCode: response.status,
+				errorMessage: response.ok ? undefined : await response.text(),
+				latencyMs: Date.now() - startedAt,
+			};
+		}
+
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+			};
+			const apiKey = readApiKey(config);
+			if (apiKey.length > 0) {
+				headers.Authorization = `Bearer ${apiKey}`;
+			}
+			if (config.provider === "openrouter") {
+				headers["HTTP-Referer"] = process.env.OPENROUTER_HTTP_REFERER ?? "https://kosarica.local";
+				headers["X-Title"] = process.env.OPENROUTER_X_TITLE ?? "Kosarica Health Check";
 		}
 		const response = await fetch(config.endpoint, {
 			method: "POST",

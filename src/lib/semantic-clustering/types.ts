@@ -33,6 +33,7 @@ export interface SemanticVote {
 		| "openai"
 		| "claude"
 		| "openrouter"
+		| "ollama"
 		| "vertex-express"
 		| "nvidia-nim"
 		| "zai";

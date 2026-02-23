@@ -883,6 +883,7 @@ export const llmEndpoints = pgTable(
 			.notNull()
 			.default(false),
 		maxTokens: integer("max_tokens"),
+		modelClass: text("model_class").notNull().default("standard"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),

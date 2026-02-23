@@ -11,6 +11,21 @@
 
 const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
+// Configure global undici dispatcher with longer timeouts to prevent 6s AbortError
+try {
+	const { Agent, setGlobalDispatcher } = await import("undici");
+	setGlobalDispatcher(
+		new Agent({
+			headersTimeout: 300_000,
+			bodyTimeout: 300_000,
+			connectTimeout: 60_000,
+		}),
+	);
+	console.log("[Fetch] Global undici dispatcher configured with 300s timeouts");
+} catch (err) {
+	console.error("[Fetch] Failed to configure global undici dispatcher:", err);
+}
+
 if (endpoint) {
 	const { NodeSDK } = await import("@opentelemetry/sdk-node");
 	const { Resource } = await import("@opentelemetry/resources");

@@ -5,6 +5,7 @@ const ProviderSchema = z.enum([
 	"openai",
 	"claude",
 	"openrouter",
+	"ollama",
 	"vertex-express",
 	"nvidia-nim",
 	"zai",
@@ -38,6 +39,7 @@ export type EnsembleModelConfig = z.infer<typeof EnsembleModelSchema>;
 const DEFAULT_ENDPOINTS: Record<EnsembleModelConfig["provider"], string> = {
 	openai: "https://api.openai.com/v1/chat/completions",
 	openrouter: "https://openrouter.ai/api/v1/chat/completions",
+	ollama: "http://localhost:11434/v1/chat/completions",
 	claude: "https://api.anthropic.com/v1/messages",
 	"vertex-express": "https://aiplatform.googleapis.com/v1",
 	"nvidia-nim": "https://integrate.api.nvidia.com/v1/chat/completions",
@@ -53,15 +55,17 @@ export const STRICT_CASCADE_THRESHOLDS: CascadeThresholds = {
 };
 
 function defaultApiKeyEnv(provider: EnsembleModelConfig["provider"]): string {
-	switch (provider) {
-		case "openai":
-			return "OPENAI_API_KEY";
-		case "openrouter":
-			return "OPENROUTER_API_KEY";
-		case "claude":
-			return "ANTHROPIC_API_KEY";
-		case "vertex-express":
-			return "VERTEX_EXPRESS_API_KEY";
+		switch (provider) {
+			case "openai":
+				return "OPENAI_API_KEY";
+			case "openrouter":
+				return "OPENROUTER_API_KEY";
+			case "ollama":
+				return "OLLAMA_API_KEY";
+			case "claude":
+				return "ANTHROPIC_API_KEY";
+			case "vertex-express":
+				return "VERTEX_EXPRESS_API_KEY";
 		case "nvidia-nim":
 			return "NIM_API_KEY";
 		case "zai":
@@ -118,6 +122,11 @@ export function parseEnsembleConfig(
 }
 
 export function readApiKey(config: EnsembleModelConfig): string {
+	if (config.provider === "ollama") {
+		const envName = config.apiKeyEnv;
+		return envName ? (process.env[envName] ?? "") : "";
+	}
+
 	const envName = config.apiKeyEnv ?? defaultApiKeyEnv(config.provider);
 	const apiKey = process.env[envName];
 	if (!apiKey) {

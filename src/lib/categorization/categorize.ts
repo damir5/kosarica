@@ -7,12 +7,12 @@ import {
 } from "@/db";
 import { chunk } from "@/lib/collections/chunk";
 import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
+import { logLlmDecision } from "@/lib/llm-observability";
 import {
 	chooseEndpointForCapability,
 	endpointToModelConfig,
 	recordEndpointResult,
 } from "@/lib/llm-routing";
-import { logLlmDecision } from "@/lib/llm-observability";
 import {
 	type EnsembleModelConfig,
 	readApiKey,
@@ -147,6 +147,7 @@ async function getCategorizationModels(): Promise<{
 function isOpenAiCompatibleProvider(config: EnsembleModelConfig): boolean {
 	return (
 		config.provider === "openrouter" ||
+		config.provider === "ollama" ||
 		config.provider === "openai" ||
 		config.provider === "nvidia-nim" ||
 		config.provider === "zai"
@@ -197,6 +198,23 @@ function extractMessageContent(data: unknown): string {
 		}
 	}
 	throw new Error("No message content returned by LLM provider");
+}
+
+function toOllamaChatEndpoint(endpoint: string): string {
+	return endpoint.replace(/\/v1\/chat\/completions\/?$/i, "/api/chat");
+}
+
+function extractOllamaMessageContent(data: unknown): string {
+	if (!data || typeof data !== "object") {
+		throw new Error("Invalid Ollama response payload");
+	}
+
+	const message = (data as { message?: { content?: unknown } }).message;
+	const content = message?.content;
+	if (typeof content === "string" && content.trim().length > 0) {
+		return content;
+	}
+	throw new Error("No message content returned by Ollama");
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -268,6 +286,66 @@ async function callModel(
 				return extractJsonPayload(result.responseText);
 			}
 
+			if (config.provider === "ollama") {
+				try {
+					const headers: Record<string, string> = {
+						"Content-Type": "application/json",
+					};
+					const apiKey = readApiKey(config);
+					if (apiKey.length > 0) {
+						headers.Authorization = `Bearer ${apiKey}`;
+					}
+					if (categorizationRpmLimiter) {
+						await categorizationRpmLimiter.wait();
+					}
+
+					const controller = new AbortController();
+					const timeoutMs = config.timeoutMs ?? 300_000;
+					const timeout = setTimeout(() => {
+						log.warn("Aborting Ollama call due to fetch timeout", {
+							provider: config.provider,
+							model: config.model,
+							timeoutMs,
+						});
+						controller.abort();
+					}, timeoutMs);
+
+					try {
+						const response = await fetch(
+							toOllamaChatEndpoint(config.endpoint ?? ""),
+							{
+								method: "POST",
+								headers,
+								body: JSON.stringify({
+									model: config.model,
+									stream: false,
+									options: { temperature: 0 },
+									messages: [
+										{ role: "system", content: messages.systemMessage },
+										{ role: "user", content: messages.userMessage },
+									],
+								}),
+								signal: controller.signal,
+							},
+						);
+						const bodyText = await response.text();
+						if (!response.ok) {
+							throw new Error(
+								`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText} body=${bodyText.slice(0, 280)}`,
+							);
+						}
+
+						const jsonBody = JSON.parse(bodyText) as unknown;
+						const content = extractOllamaMessageContent(jsonBody);
+						return extractJsonPayload(content);
+					} finally {
+						clearTimeout(timeout);
+					}
+				} catch (error) {
+					throw error;
+				}
+			}
+
 			if (!isOpenAiCompatibleProvider(config)) {
 				throw new Error(
 					`Unsupported categorization provider "${config.provider}" for model ${config.id}`,
@@ -275,14 +353,13 @@ async function callModel(
 			}
 
 			const apiKey = readApiKey(config);
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
-
 			try {
 				const headers: Record<string, string> = {
-					Authorization: `Bearer ${apiKey}`,
 					"Content-Type": "application/json",
 				};
+				if (apiKey.length > 0) {
+					headers.Authorization = `Bearer ${apiKey}`;
+				}
 				if (config.provider === "openrouter") {
 					headers["HTTP-Referer"] =
 						process.env.OPENROUTER_HTTP_REFERER ?? "https://kosarica.local";
@@ -312,44 +389,60 @@ async function callModel(
 					if (categorizationRpmLimiter) {
 						await categorizationRpmLimiter.wait();
 					}
-					const response = await fetch(config.endpoint ?? "", {
-						method: "POST",
-						headers,
-						body: JSON.stringify(
-							withResponseFormat
-								? {
-										...baseBody,
-										response_format: { type: "json_object" },
-									}
-								: baseBody,
-						),
-						signal: controller.signal,
-					});
-					const bodyText = await response.text();
-					const rateLimitHeaders: Record<string, string> = {};
-					const headerNames = [
-						"retry-after",
-						"x-ratelimit-limit",
-						"x-ratelimit-remaining",
-						"x-ratelimit-reset",
-						"x-ratelimit-reset-requests",
-						"x-ratelimit-reset-tokens",
-						"x-request-id",
-						"cf-ray",
-					];
-					for (const name of headerNames) {
-						const value = response.headers.get(name);
-						if (value) {
-							rateLimitHeaders[name] = value;
+					// Start timeout AFTER the RPM wait to ensure fetch has the full time window
+					const controller = new AbortController();
+					const timeoutMs = config.timeoutMs ?? 300_000;
+					const timeout = setTimeout(() => {
+						log.warn("Aborting LLM call due to fetch timeout", {
+							provider: config.provider,
+							model: config.model,
+							timeoutMs,
+						});
+						controller.abort();
+					}, timeoutMs);
+
+					try {
+						const response = await fetch(config.endpoint ?? "", {
+							method: "POST",
+							headers,
+							body: JSON.stringify(
+								withResponseFormat
+									? {
+											...baseBody,
+											response_format: { type: "json_object" },
+										}
+									: baseBody,
+							),
+							signal: controller.signal,
+						});
+						const bodyText = await response.text();
+						const rateLimitHeaders: Record<string, string> = {};
+						const headerNames = [
+							"retry-after",
+							"x-ratelimit-limit",
+							"x-ratelimit-remaining",
+							"x-ratelimit-reset",
+							"x-ratelimit-reset-requests",
+							"x-ratelimit-reset-tokens",
+							"x-request-id",
+							"cf-ray",
+						];
+						for (const name of headerNames) {
+							const value = response.headers.get(name);
+							if (value) {
+								rateLimitHeaders[name] = value;
+							}
 						}
+						return {
+							ok: response.ok,
+							status: response.status,
+							statusText: response.statusText,
+							bodyText,
+							headers: rateLimitHeaders,
+						};
+					} finally {
+						clearTimeout(timeout);
 					}
-					return {
-						ok: response.ok,
-						status: response.status,
-						statusText: response.statusText,
-						bodyText,
-						headers: rateLimitHeaders,
-					};
 				};
 
 				let result = await tryRequest(true);
@@ -378,8 +471,8 @@ async function callModel(
 				const jsonBody = JSON.parse(result.bodyText) as unknown;
 				const content = extractMessageContent(jsonBody);
 				return extractJsonPayload(content);
-			} finally {
-				clearTimeout(timeout);
+			} catch (error) {
+				throw error;
 			}
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
@@ -762,7 +855,10 @@ async function categorizeChunk(
 		const secondaryStartedAt = Date.now();
 		let secondaryPayload: unknown;
 		try {
-			secondaryPayload = await callModel(models.secondaryModel, secondaryMessages);
+			secondaryPayload = await callModel(
+				models.secondaryModel,
+				secondaryMessages,
+			);
 			await recordEndpointResult(models.secondaryModel.id, {
 				success: true,
 				latencyMs: Date.now() - secondaryStartedAt,

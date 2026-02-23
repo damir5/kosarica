@@ -344,6 +344,43 @@ function extractOpenAiContent(data: unknown): string {
 	throw new Error("No text content in OpenAI-compatible response");
 }
 
+function toOllamaChatEndpoint(endpoint: string): string {
+	return endpoint.replace(/\/v1\/chat\/completions\/?$/i, "/api/chat");
+}
+
+function extractOllamaContent(data: unknown): string {
+	if (!data || typeof data !== "object") {
+		throw new Error("Ollama response body is invalid");
+	}
+	const message = (data as { message?: { content?: unknown } }).message;
+	const content = message?.content;
+	if (typeof content === "string") {
+		const trimmed = content.trim();
+		if (trimmed.length > 0) {
+			return trimmed;
+		}
+	}
+	throw new Error("No text content in Ollama response");
+}
+
+function extractOllamaTokenUsage(data: unknown): TokenUsage {
+	if (!data || typeof data !== "object") {
+		return EMPTY_USAGE;
+	}
+	const payload = data as {
+		prompt_eval_count?: unknown;
+		eval_count?: unknown;
+	};
+	const promptTokens = toFiniteNumber(payload.prompt_eval_count);
+	const completionTokens = toFiniteNumber(payload.eval_count);
+	return {
+		promptTokens,
+		completionTokens,
+		totalTokens: addNullable(promptTokens, completionTokens),
+		costUsd: null,
+	};
+}
+
 async function callVertexExpress(
 	config: EnsembleModelConfig,
 	systemMsg: string,
@@ -380,9 +417,11 @@ async function callOpenAiCompatible(
 ): Promise<ModelCallResult> {
 	const apiKey = readApiKey(config);
 	const headers: Record<string, string> = {
-		Authorization: `Bearer ${apiKey}`,
 		"Content-Type": "application/json",
 	};
+	if (apiKey.length > 0) {
+		headers.Authorization = `Bearer ${apiKey}`;
+	}
 	if (config.provider === "openrouter") {
 		headers["HTTP-Referer"] =
 			process.env.OPENROUTER_HTTP_REFERER ?? "https://kosarica.local";
@@ -524,6 +563,58 @@ async function callOpenAiCompatible(
 	}
 }
 
+async function callOllamaNative(
+	config: EnsembleModelConfig,
+	systemMsg: string,
+	userMsg: string,
+): Promise<ModelCallResult> {
+	const apiKey = readApiKey(config);
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+	};
+	if (apiKey.length > 0) {
+		headers.Authorization = `Bearer ${apiKey}`;
+	}
+
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+
+	try {
+		const response = await fetch(toOllamaChatEndpoint(config.endpoint ?? ""), {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				model: config.model,
+				stream: false,
+				options: { temperature: 0 },
+				messages: [
+					{ role: "system", content: systemMsg },
+					{ role: "user", content: userMsg },
+				],
+			}),
+			signal: controller.signal,
+		});
+
+		if (!response.ok) {
+			const body = await response.text();
+			throw new Error(
+				`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText} body=${body.slice(0, 280)}`,
+			);
+		}
+
+		const data = await response.json();
+		const text = extractOllamaContent(data);
+		return {
+			payload: extractJsonPayload(text),
+			latencyMs: 0,
+			responseText: text,
+			tokenUsage: extractOllamaTokenUsage(data),
+		};
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
 async function callClaude(
 	config: EnsembleModelConfig,
 	systemMsg: string,
@@ -612,7 +703,9 @@ export async function callModel(
 					? await callClaude(config, systemMsg, userMsg)
 					: config.provider === "vertex-express"
 						? await callVertexExpress(config, systemMsg, userMsg, jsonSchema)
-					: await callOpenAiCompatible(config, systemMsg, userMsg, jsonSchema);
+						: config.provider === "ollama"
+							? await callOllamaNative(config, systemMsg, userMsg)
+						: await callOpenAiCompatible(config, systemMsg, userMsg, jsonSchema);
 
 			const latencyMs = Date.now() - startedAt;
 			return {

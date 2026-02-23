@@ -395,6 +395,25 @@ function isLikelyResponseFormatError(
 	);
 }
 
+function toOllamaChatEndpoint(endpoint: string): string {
+	return endpoint.replace(/\/v1\/chat\/completions\/?$/i, "/api/chat");
+}
+
+function extractOllamaMessageContent(data: unknown): string {
+	if (!data || typeof data !== "object") {
+		throw new Error("Invalid Ollama response payload");
+	}
+	const message = (data as { message?: { content?: unknown } }).message;
+	const content = message?.content;
+	if (typeof content === "string") {
+		const trimmed = content.trim();
+		if (trimmed.length > 0) {
+			return trimmed;
+		}
+	}
+	throw new Error("No message content returned by Ollama");
+}
+
 async function callOpenAiCompatibleBatch(
 	config: EnsembleModelConfig,
 	pairs: SemanticBatchPairInput[],
@@ -418,12 +437,14 @@ async function callOpenAiCompatibleBatch(
 		] of responseFormatAttempts.entries()) {
 			const formatForRequest =
 				responseFormat.type === "none" ? undefined : responseFormat;
-			const response = await fetch(config.endpoint ?? "", {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					"Content-Type": "application/json",
-				},
+				const response = await fetch(config.endpoint ?? "", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						...(apiKey.length > 0
+							? { Authorization: `Bearer ${apiKey}` }
+							: {}),
+					},
 				body: JSON.stringify({
 					model: config.model,
 					temperature: 0,
@@ -487,6 +508,52 @@ async function callOpenAiCompatibleBatch(
 		}
 
 		throw lastError ?? new Error("OpenAI-compatible batch request failed");
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+async function callOllamaBatch(
+	config: EnsembleModelConfig,
+	pairs: SemanticBatchPairInput[],
+): Promise<Map<string, LLMJsonResponse>> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+
+	try {
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
+		const apiKey = readApiKey(config);
+		if (apiKey.length > 0) {
+			headers.Authorization = `Bearer ${apiKey}`;
+		}
+
+		const response = await fetch(toOllamaChatEndpoint(config.endpoint ?? ""), {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				model: config.model,
+				stream: false,
+				options: { temperature: 0 },
+				messages: [
+					{ role: "system", content: "Return strict JSON only." },
+					{ role: "user", content: buildBatchPrompt(pairs) },
+				],
+			}),
+			signal: controller.signal,
+		});
+
+		if (!response.ok) {
+			const body = await response.text();
+			throw new Error(
+				`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText} body=${body.slice(0, 280)}`,
+			);
+		}
+
+		const data = await response.json();
+		const content = extractOllamaMessageContent(data);
+		return parseBatchJson(content, new Set(pairs.map((pair) => pair.pairId)));
 	} finally {
 		clearTimeout(timeout);
 	}
@@ -592,6 +659,8 @@ async function callModelBatch(
 					? await callClaudeBatch(config, pairs)
 					: config.provider === "vertex-express"
 						? await callVertexExpressBatch(config, pairs)
+						: config.provider === "ollama"
+							? await callOllamaBatch(config, pairs)
 					: await callOpenAiCompatibleBatch(config, pairs);
 
 			const latencyMs = Date.now() - start;

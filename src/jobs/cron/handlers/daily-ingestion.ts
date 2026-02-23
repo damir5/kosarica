@@ -50,6 +50,7 @@ export const dailyIngestionHandler: CronJobHandler = {
 					source: "scheduled",
 				},
 				idempotencyKey: `ingestion:${chain}:${targetDate}`,
+				priority: 10, // Higher than categorize (5) to ensure ingestion runs first
 			});
 		}
 
