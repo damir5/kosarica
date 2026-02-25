@@ -33,6 +33,10 @@ run = "./scripts/staging-pull.sh"
 description = "Deploy to staging environment via Kamal"
 run = "./scripts/deploy-staging.sh"
 
+[tasks.reverify-categorizations]
+description = "Re-verify low-confidence categorizations with multi-LLM consensus"
+run = "mise exec node@24 -- pnpm tsx scripts/reverify-categorizations.ts"
+
 [settings]
 
 [settings.ruby]

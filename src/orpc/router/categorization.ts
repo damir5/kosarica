@@ -2,6 +2,13 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { retailerItemFeatures, retailerItems } from "@/db/schema";
 import { backfillUncategorizedItems } from "@/lib/categorization";
+import {
+	approveCategorization,
+	countItemsNeedingReview,
+	getReviewQueue,
+	rejectCategorization,
+	reverifyItems,
+} from "@/lib/categorization/reverify";
 import { parseRetailerItemFeature } from "@/lib/semantic-clustering/normalize";
 import { scheduleTask } from "@/lib/taskqueue";
 import { getDb } from "@/utils/bindings";
@@ -62,7 +69,9 @@ export const listCategorizations = superadminProcedure
 			);
 		}
 		if (status === "escalated") {
-			conditions.push(sql`COALESCE(rif.categorization_needs_review, false) = true`);
+			conditions.push(
+				sql`COALESCE(rif.categorization_needs_review, false) = true`,
+			);
 		}
 		if (status === "done") {
 			conditions.push(
@@ -236,10 +245,9 @@ export const updateCategorization = superadminProcedure
 			.limit(1);
 
 		const everydayName =
-			input.fields.everydayName ??
-			existingFeature?.everydayName ??
-			item.name;
-		const brand = input.fields.brand ?? existingFeature?.extractedBrand ?? item.brand;
+			input.fields.everydayName ?? existingFeature?.everydayName ?? item.name;
+		const brand =
+			input.fields.brand ?? existingFeature?.extractedBrand ?? item.brand;
 		const featureInput = parseRetailerItemFeature({
 			retailerItemId: item.id,
 			name: everydayName ?? item.name,
@@ -250,7 +258,9 @@ export const updateCategorization = superadminProcedure
 		});
 
 		const packAmount = parsePositiveNumber(
-			input.fields.packAmount ?? existingFeature?.packAmount ?? featureInput.packAmount,
+			input.fields.packAmount ??
+				existingFeature?.packAmount ??
+				featureInput.packAmount,
 			1,
 		);
 		const extractedAmount =
@@ -271,12 +281,12 @@ export const updateCategorization = superadminProcedure
 				extractedUnit === "l" ||
 				extractedUnit === "kom");
 
-			const unitAmount = hasAmountData
-				? toBaseUnitAmount(extractedAmount as number, extractedUnit as string)
-				: featureInput.unitAmount;
-			const totalAmount = hasAmountData
-				? (unitAmount ?? 0) * packAmount
-				: featureInput.totalAmount;
+		const unitAmount = hasAmountData
+			? toBaseUnitAmount(extractedAmount as number, extractedUnit as string)
+			: featureInput.unitAmount;
+		const totalAmount = hasAmountData
+			? (unitAmount ?? 0) * packAmount
+			: featureInput.totalAmount;
 		const categorizedAt = new Date();
 
 		await db
@@ -302,9 +312,11 @@ export const updateCategorization = superadminProcedure
 					featureInput.containerType,
 				blockingKeys: featureInput.blockingKeys,
 				everydayName,
-				productType: input.fields.productType ?? existingFeature?.productType ?? null,
+				productType:
+					input.fields.productType ?? existingFeature?.productType ?? null,
 				variant: input.fields.variant ?? existingFeature?.variant ?? null,
-				searchTags: input.fields.searchTags ?? existingFeature?.searchTags ?? [],
+				searchTags:
+					input.fields.searchTags ?? existingFeature?.searchTags ?? [],
 				categorizedAt,
 				categorizationModel: "manual-override",
 				categorizationConfidence: 1,
@@ -334,7 +346,8 @@ export const updateCategorization = superadminProcedure
 					productType:
 						input.fields.productType ?? existingFeature?.productType ?? null,
 					variant: input.fields.variant ?? existingFeature?.variant ?? null,
-					searchTags: input.fields.searchTags ?? existingFeature?.searchTags ?? [],
+					searchTags:
+						input.fields.searchTags ?? existingFeature?.searchTags ?? [],
 					categorizedAt,
 					categorizationModel: "manual-override",
 					categorizationConfidence: 1,
@@ -353,7 +366,12 @@ export const triggerCategorization = superadminProcedure
 				chainSlug: z.string().optional(),
 				batchSize: z.number().int().min(1).max(5000).optional(),
 				maxBatches: z.number().int().min(1).max(20_000).optional(),
-				maxRuntimeMinutes: z.number().int().min(1).max(24 * 60).optional(),
+				maxRuntimeMinutes: z
+					.number()
+					.int()
+					.min(1)
+					.max(24 * 60)
+					.optional(),
 				async: z.boolean().optional(),
 			})
 			.optional(),
@@ -394,5 +412,129 @@ export const triggerCategorization = superadminProcedure
 		return {
 			queued: false,
 			result,
+		};
+	});
+
+export const getReviewQueueStats = superadminProcedure.handler(async () => {
+	const count = await countItemsNeedingReview();
+	return { needsReview: count };
+});
+
+export const listReviewQueue = superadminProcedure
+	.input(
+		z.object({
+			limit: z.number().int().min(1).max(200).default(50),
+			offset: z.number().int().min(0).default(0),
+			confidenceBelow: z.number().min(0).max(1).optional(),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const result = await getReviewQueue({
+			limit: input.limit,
+			offset: input.offset,
+			confidenceBelow: input.confidenceBelow,
+		});
+
+		return {
+			items: result.items.map((item) => ({
+				itemId: item.itemId,
+				chainSlug: item.chainSlug,
+				originalName: item.originalName,
+				everydayName: item.everydayName,
+				productType: item.productType,
+				brand: item.brand,
+				confidence: item.confidence,
+				model: item.model,
+				categorizedAt: item.categorizedAt,
+			})),
+			total: result.total,
+			limit: input.limit,
+			offset: input.offset,
+		};
+	});
+
+export const approveReviewItem = superadminProcedure
+	.input(
+		z.object({
+			itemId: z.string().min(1),
+			override: z
+				.object({
+					everydayName: z.string().optional(),
+					productType: z.string().optional(),
+					brand: z.string().optional(),
+					variant: z.string().optional(),
+					extractedAmount: z.number().optional(),
+					extractedUnit: z.enum(["g", "kg", "ml", "l", "kom"]).optional(),
+					packAmount: z.number().int().min(1).max(999).optional(),
+					containerType: z
+						.enum(["pet", "limenka", "staklo", "tetrapak", "tuba"])
+						.optional(),
+					searchTags: z.array(z.string()).max(10).optional(),
+				})
+				.optional(),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const result = await approveCategorization(input.itemId, input.override);
+		return result;
+	});
+
+export const rejectReviewItem = superadminProcedure
+	.input(
+		z.object({
+			itemId: z.string().min(1),
+			correction: z.object({
+				everydayName: z.string().optional(),
+				productType: z.string().optional(),
+				brand: z.string().optional(),
+				variant: z.string().optional(),
+				extractedAmount: z.number().optional(),
+				extractedUnit: z.enum(["g", "kg", "ml", "l", "kom"]).optional(),
+				packAmount: z.number().int().min(1).max(999).optional(),
+				containerType: z
+					.enum(["pet", "limenka", "staklo", "tetrapak", "tuba"])
+					.optional(),
+				searchTags: z.array(z.string()).max(10).optional(),
+			}),
+		}),
+	)
+	.handler(async ({ input }) => {
+		const result = await rejectCategorization(input.itemId, input.correction);
+		return result;
+	});
+
+export const triggerReverification = superadminProcedure
+	.input(
+		z
+			.object({
+				itemIds: z.array(z.string()).optional(),
+				modelCount: z.number().int().min(2).max(5).default(3),
+				confidenceThreshold: z.number().min(0).max(1).default(0.8),
+				requireUnanimousForZeroConfidence: z.boolean().default(true),
+			})
+			.optional(),
+	)
+	.handler(async ({ input }) => {
+		const result = await reverifyItems(input?.itemIds, {
+			modelCount: input?.modelCount ?? 3,
+			confidenceThreshold: input?.confidenceThreshold ?? 0.8,
+			requireUnanimousForZeroConfidence:
+				input?.requireUnanimousForZeroConfidence ?? true,
+		});
+
+		return {
+			totalProcessed: result.totalProcessed,
+			consensusReached: result.consensusReached,
+			needsHumanReview: result.needsHumanReview,
+			results: result.results.map((r) => ({
+				itemId: r.itemId,
+				originalConfidence: r.originalConfidence,
+				voteCount: r.votes.length,
+				consensusType: r.consensusType,
+				agreementRatio: r.agreementRatio,
+				consensusReached: r.consensusReached,
+				needsHumanReview: r.needsHumanReview,
+				finalConfidence: r.finalCategorization?.confidence ?? null,
+			})),
 		};
 	});

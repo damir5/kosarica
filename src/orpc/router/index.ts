@@ -11,8 +11,8 @@ import * as categorization from "./categorization";
 import * as clickhouse from "./clickhouse";
 import * as cron from "./cron";
 import * as ingestion from "./ingestion";
-import * as llmEndpoints from "./llm-endpoints";
 import * as llmDecisions from "./llm-decisions";
+import * as llmEndpoints from "./llm-endpoints";
 import * as matching from "./matching";
 import * as prices from "./prices";
 import { getProductPrices, getSimilarVariants } from "./products-public";
@@ -198,6 +198,11 @@ export default {
 			getStats: categorization.getStats,
 			update: categorization.updateCategorization,
 			trigger: categorization.triggerCategorization,
+			getReviewQueueStats: categorization.getReviewQueueStats,
+			listReviewQueue: categorization.listReviewQueue,
+			approveReviewItem: categorization.approveReviewItem,
+			rejectReviewItem: categorization.rejectReviewItem,
+			triggerReverification: categorization.triggerReverification,
 		},
 		barcodeTriage: {
 			getQueue: barcodeTriage.getTriageQueue,
