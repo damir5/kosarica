@@ -2,7 +2,12 @@ import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
-import type { DiscoveredFile, StoreMetadata } from "../../types";
+import type {
+	DiscoveredFile,
+	NormalizedRow,
+	NormalizedRowValidation,
+	StoreMetadata,
+} from "../../types";
 import { BaseCsvAdapter } from "../base/csv";
 import { chainConfigs } from "../config";
 
@@ -47,6 +52,20 @@ const kauflandColumnMappingAlt: CsvColumnMapping = {
 	unitPriceBaseQuantity: "Količina za jedinicu mjere",
 	unitPriceBaseUnit: "Jedinica mjere za cijenu",
 };
+
+const KAUFLAND_CATEGORY_VALUES = new Set([
+	"KOZMETIKA",
+	"HRANA",
+	"PIĆE",
+	"DODACI PREHRANI",
+	"KUĆNA NJEGA",
+	"KUĆANSTVO",
+	"DJECA",
+]);
+
+const DECIMAL_NUMERIC_PATTERN = /^\d+[.,]\d+$/;
+const LONG_INTEGER_PATTERN = /^\d{8,}$/;
+const INTEGER_PATTERN = /^\d+$/;
 
 export class KauflandAdapter extends BaseCsvAdapter {
 	private discoveryDate?: string;
@@ -188,6 +207,37 @@ export class KauflandAdapter extends BaseCsvAdapter {
 			city: city || undefined,
 		};
 	}
+
+	validateRow(row: NormalizedRow): NormalizedRowValidation {
+		const baseValidation = super.validateRow(row);
+		const errors = [...baseValidation.errors];
+		const warnings = [...baseValidation.warnings];
+
+		const normalizedBrand = normalizeValidationValue(row.brand);
+		if (normalizedBrand && KAUFLAND_CATEGORY_VALUES.has(normalizedBrand)) {
+			errors.push("Brand column contains category value (possible CSV column shift)");
+		}
+		if (
+			normalizedBrand &&
+			(DECIMAL_NUMERIC_PATTERN.test(normalizedBrand) ||
+				LONG_INTEGER_PATTERN.test(normalizedBrand))
+		) {
+			errors.push(
+				"Brand column contains numeric value (possible CSV column shift)",
+			);
+		}
+
+		const normalizedName = normalizeValidationValue(row.name);
+		if (normalizedName && INTEGER_PATTERN.test(normalizedName)) {
+			errors.push("Name is numeric-only (possible CSV column shift)");
+		}
+
+		return {
+			isValid: errors.length === 0,
+			errors,
+			warnings,
+		};
+	}
 }
 
 function getStreetCitySplitIndex(parts: string[]): number {
@@ -202,4 +252,11 @@ function getStreetCitySplitIndex(parts: string[]): number {
 
 function normalizeKauflandPart(value: string): string {
 	return value.replace(/_/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function normalizeValidationValue(value?: string): string {
+	if (!value) {
+		return "";
+	}
+	return value.trim().replace(/\s+/g, " ").toUpperCase();
 }
