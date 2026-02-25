@@ -20,9 +20,13 @@ import type {
 import { BaseXlsxAdapter, newHeaderIndex, newNumericIndex } from "../base/xlsx";
 import { chainConfigs } from "../config";
 
-const dmPortalURL =
-	"https://www.dm.hr/novo/promocije/nove-oznake-cijena-i-vazeci-cjenik-u-dm-u-2906632";
-const dmPriceListURL =
+const dmContentBaseURL = "https://content.services.dmtech.com";
+const dmContentRootContext = "rootpage-dm-shop-hr-hr";
+const dmPortalPath =
+	"/novo/promocije/nove-oznake-cijena-i-vazeci-cjenik-u-dm-u-2906632";
+const dmPortalURL = `https://www.dm.hr${dmPortalPath}`;
+const dmPortalContentURL = `${dmContentBaseURL}/${dmContentRootContext}${dmPortalPath}`;
+const dmLegacyPriceListURL =
 	"https://content.services.dmtech.com/rootpage-dm-shop-hr-hr/resource/blob/3245770/0a2d2d47073cad06c1f3a8d4fbba2e50/vlada-oznacavanje-cijena-cijenik-236-data.xlsx";
 const dmNationalStoreIdentifier = "dm_national";
 const dmSourceMode = "snapshot";
@@ -120,28 +124,14 @@ export class DmAdapter extends BaseXlsxAdapter {
 			requestedDate = formatDateInTimezone(new Date(), ZAGREB_TIMEZONE);
 		}
 
-		return this.fetchWithRetry(dmPriceListURL)
-			.andThen((response) =>
-				ResultAsync.fromPromise(response.arrayBuffer(), (e) =>
-					fetchError({
-						url: dmPriceListURL,
-						message:
-							e instanceof Error ? e.message : "Failed to read response body",
-						retryable: false,
-						attempts: 1,
-						cause: e,
-					}),
-				).map((arrayBuffer) => ({
-					response,
-					body: Buffer.from(arrayBuffer),
-				})),
-			)
-			.andThen(({ response, body }) => {
+		return this.resolvePriceListCandidates()
+			.andThen((candidateUrls) => this.fetchFirstAvailablePriceList(candidateUrls))
+			.andThen(({ response, body, priceListUrl }) => {
 				const inferredDate = inferDateFromXlsxContent(body);
 
 				const contentLength = response.headers.get("Content-Length");
 				const lastModified = response.headers.get("Last-Modified");
-				const urlParts = dmPriceListURL.split("/");
+				const urlParts = priceListUrl.split("/");
 				const urlFilename = urlParts[urlParts.length - 1] || "dm-cjenik.xlsx";
 
 				let size: number | undefined;
@@ -179,7 +169,7 @@ export class DmAdapter extends BaseXlsxAdapter {
 								sourceMode: dmSourceMode,
 								requestedTargetDate: requestedDate,
 								resolvedSnapshotDate,
-								sourceUrl: dmPriceListURL,
+								sourceUrl: priceListUrl,
 								timezone: ZAGREB_TIMEZONE,
 							},
 						}),
@@ -188,13 +178,13 @@ export class DmAdapter extends BaseXlsxAdapter {
 
 				const files: DiscoveredFile[] = [
 					{
-						url: dmPriceListURL,
+						url: priceListUrl,
 						filename: urlFilename,
 						type: "xlsx",
 						size,
 						lastModified: modTime,
 						metadata: {
-							source: "dm_web",
+							source: "dm_content",
 							discoveredAt: new Date().toISOString(),
 							portalUrl: dmPortalURL,
 							portalDate: resolvedSnapshotDate,
@@ -208,6 +198,79 @@ export class DmAdapter extends BaseXlsxAdapter {
 			.orElse((error) => {
 				if (error._tag === "FetchError" && error.status === 404) {
 					return okAsync<DiscoveredFile[]>([]);
+				}
+				return errAsync(error);
+			});
+	}
+
+	private resolvePriceListCandidates(): ResultAsync<string[], FetchError> {
+		return this.fetchWithRetry(dmPortalContentURL)
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.text(), (e) =>
+					fetchError({
+						url: dmPortalContentURL,
+						message:
+							e instanceof Error ? e.message : "Failed to read DM portal response",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				),
+			)
+			.map((portalContent) => {
+				const discovered = extractDmPriceListUrlsFromPortalContent(portalContent);
+				const withFallback = [...discovered, dmLegacyPriceListURL];
+				return dedupeStrings(withFallback);
+			})
+			.orElse((error) => {
+				if (error._tag === "FetchError" && error.status === 404) {
+					return okAsync([dmLegacyPriceListURL]);
+				}
+				return errAsync(error);
+			});
+	}
+
+	private fetchFirstAvailablePriceList(
+		candidateUrls: string[],
+		startIndex: number = 0,
+	): ResultAsync<
+		{ response: Response; body: Buffer; priceListUrl: string },
+		FetchError
+	> {
+		if (startIndex >= candidateUrls.length) {
+			return errAsync(
+				fetchError({
+					url: dmPortalContentURL,
+					status: 404,
+					message: "No DM price list URL is currently reachable",
+					retryable: false,
+					attempts: 1,
+				}),
+			);
+		}
+
+		const priceListUrl = candidateUrls[startIndex] ?? dmLegacyPriceListURL;
+
+		return this.fetchWithRetry(priceListUrl)
+			.andThen((response) =>
+				ResultAsync.fromPromise(response.arrayBuffer(), (e) =>
+					fetchError({
+						url: priceListUrl,
+						message:
+							e instanceof Error ? e.message : "Failed to read response body",
+						retryable: false,
+						attempts: 1,
+						cause: e,
+					}),
+				).map((arrayBuffer) => ({
+					response,
+					body: Buffer.from(arrayBuffer),
+					priceListUrl,
+				})),
+			)
+			.orElse((error) => {
+				if (error._tag === "FetchError" && error.status === 404) {
+					return this.fetchFirstAvailablePriceList(candidateUrls, startIndex + 1);
 				}
 				return errAsync(error);
 			});
@@ -314,6 +377,98 @@ function inferDateFromXlsxContent(content: Buffer): string {
 		return "";
 	}
 	return "";
+}
+
+export function extractDmPriceListUrlsFromPortalContent(
+	portalContent: string,
+): string[] {
+	try {
+		const parsed = JSON.parse(portalContent) as unknown;
+		const rawStrings: string[] = [];
+		collectStringValues(parsed, rawStrings);
+
+		const candidates = rawStrings
+			.filter((value) => /\.(xlsx|xls)(?:$|\?)/i.test(value))
+			.map((value) => normalizeDmPortalFileUrl(value))
+			.filter((value): value is string => Boolean(value))
+			.filter((value) => /cijenik-\d+-data\.(xlsx|xls)(?:$|\?)/i.test(value));
+
+		const uniqueCandidates = dedupeStrings(candidates);
+		uniqueCandidates.sort((left, right) => {
+			const versionDiff =
+				extractDmPriceListVersion(right) - extractDmPriceListVersion(left);
+			if (versionDiff !== 0) {
+				return versionDiff;
+			}
+			return left.localeCompare(right);
+		});
+
+		return uniqueCandidates;
+	} catch {
+		return [];
+	}
+}
+
+function collectStringValues(value: unknown, output: string[]): void {
+	if (typeof value === "string") {
+		output.push(value);
+		return;
+	}
+	if (Array.isArray(value)) {
+		for (const entry of value) {
+			collectStringValues(entry, output);
+		}
+		return;
+	}
+	if (!value || typeof value !== "object") {
+		return;
+	}
+	for (const nested of Object.values(value)) {
+		collectStringValues(nested, output);
+	}
+}
+
+function normalizeDmPortalFileUrl(rawUrl: string): string | null {
+	const trimmed = rawUrl.trim();
+	if (!trimmed) {
+		return null;
+	}
+	if (/^https?:\/\//i.test(trimmed)) {
+		return trimmed;
+	}
+
+	const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+	if (path.startsWith(`/${dmContentRootContext}/`)) {
+		return `${dmContentBaseURL}${path}`;
+	}
+	if (path.startsWith("/resource/")) {
+		return `${dmContentBaseURL}/${dmContentRootContext}${path}`;
+	}
+
+	return null;
+}
+
+function dedupeStrings(values: string[]): string[] {
+	const seen = new Set<string>();
+	const unique: string[] = [];
+
+	for (const value of values) {
+		if (!seen.has(value)) {
+			seen.add(value);
+			unique.push(value);
+		}
+	}
+
+	return unique;
+}
+
+function extractDmPriceListVersion(url: string): number {
+	const match = url.match(/cijenik-(\d+)-/i);
+	if (!match) {
+		return 0;
+	}
+	const parsed = Number.parseInt(match[1], 10);
+	return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function extractDateFromText(text: string): string {
