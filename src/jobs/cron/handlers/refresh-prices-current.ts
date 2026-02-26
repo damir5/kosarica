@@ -60,7 +60,9 @@ export const refreshPricesCurrentHandler: CronJobHandler = {
 		const clickhouse = getClickHouseBatch();
 		const startTime = Date.now();
 
-		// Step 0: Sync pending parquet files so the raw prices table is up-to-date
+		// Step 0: Sync pending parquet files so the raw prices table is up-to-date.
+		// loadMissing uses deleteSnapshot mutations which can crash ClickHouse on
+		// low-disk servers. We catch errors and wait briefly to let CH recover.
 		try {
 			const syncResult = await loadMissingToClickHouse();
 			log.info("Synced pending parquet files before refresh", {
@@ -73,6 +75,8 @@ export const refreshPricesCurrentHandler: CronJobHandler = {
 				error: syncError,
 				runId: context.runId,
 			});
+			// Give ClickHouse time to recover if the sync crashed it
+			await new Promise((resolve) => { setTimeout(resolve, 10_000); });
 		}
 
 		// Step 1: Get all chains from the raw prices table
