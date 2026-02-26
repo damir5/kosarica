@@ -49,6 +49,13 @@ async function initServer(): Promise<void> {
 	}
 	globalState.__kosaricaBackgroundStarted = true;
 
+	// Register cron handlers in ALL workers so manual API triggers work
+	// regardless of which worker receives the request.
+	const { registerAllCronJobs: registerHandlers } = await import(
+		"@/jobs/cron/jobs"
+	);
+	registerHandlers();
+
 	// In cluster mode, only worker 0 runs background services.
 	// Other workers are HTTP-only (set by start-server.mjs).
 	if (process.env.SKIP_BACKGROUND_SERVICES === "1") {
@@ -59,7 +66,7 @@ async function initServer(): Promise<void> {
 	// Validate DB-managed LLM endpoint routing before background jobs start.
 	await validateRoutingConfiguration();
 
-	// Start the job scheduler
+	// Start the job scheduler (tick loop only — handlers already registered above)
 	try {
 		await startScheduler();
 		logger.info("Job scheduler started");
