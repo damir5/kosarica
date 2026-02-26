@@ -10,6 +10,7 @@ import tanstackHandler, {
 } from "@tanstack/react-start/server-entry";
 import { config } from "dotenv";
 import { closeDatabase } from "@/db";
+import { registerAllCronJobs } from "@/jobs/cron/jobs";
 import { startScheduler, stopScheduler } from "@/jobs/scheduler";
 import { validateRoutingConfiguration } from "@/lib/llm-routing";
 import { startWorker } from "@/lib/taskqueue/run-worker";
@@ -51,10 +52,7 @@ async function initServer(): Promise<void> {
 
 	// Register cron handlers in ALL workers so manual API triggers work
 	// regardless of which worker receives the request.
-	const { registerAllCronJobs: registerHandlers } = await import(
-		"@/jobs/cron/jobs"
-	);
-	registerHandlers();
+	registerAllCronJobs();
 
 	// In cluster mode, only worker 0 runs background services.
 	// Other workers are HTTP-only (set by start-server.mjs).
@@ -68,7 +66,7 @@ async function initServer(): Promise<void> {
 
 	// Start the job scheduler (tick loop only — handlers already registered above)
 	try {
-		await startScheduler();
+		startScheduler();
 		logger.info("Job scheduler started");
 	} catch (error) {
 		logger.error("Failed to start job scheduler", { error });
@@ -91,7 +89,7 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
 	logger.info(`Received ${signal}, shutting down gracefully...`);
 
 	try {
-		await stopScheduler();
+		stopScheduler();
 		logger.info("Job scheduler stopped");
 	} catch (error) {
 		logger.error("Error stopping scheduler", { error });
