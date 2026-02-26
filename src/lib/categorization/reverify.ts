@@ -549,7 +549,8 @@ export async function countItemsNeedingReview(): Promise<number> {
 		FROM retailer_item_features
 		WHERE categorization_needs_review = true
 	`);
-	const row = (result as { rows?: Array<{ count?: number }> }).rows?.[0];
+	const rows = result as Array<{ count?: number }>;
+	const row = rows[0];
 	return row?.count ?? 0;
 }
 
