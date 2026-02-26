@@ -142,6 +142,22 @@ export class ClickHouseClient {
 	}
 
 	/**
+	 * Run a DDL or DML command that returns no result set.
+	 * Accepts optional query params and ClickHouse settings separately.
+	 */
+	async command(
+		query: string,
+		params?: Record<string, string | number | string[]>,
+		settings?: Record<string, string | number>,
+	): Promise<void> {
+		await this.client.command({
+			query,
+			query_params: params as Record<string, unknown>,
+			clickhouse_settings: settings,
+		});
+	}
+
+	/**
 	 * Import a Parquet file into the prices table.
 	 * Supports two modes:
 	 * - `http` (default): binary upload over HTTP
@@ -383,5 +399,55 @@ export async function closeClickHouse(): Promise<void> {
 		await clientInstance.close();
 		clientInstance = null;
 		rawClient = null;
+	}
+}
+
+// Batch client singleton — long timeouts for refresh/rebuild operations
+let batchClientInstance: ClickHouseClient | null = null;
+let rawBatchClient: CHClient | null = null;
+
+/**
+ * Get or create a ClickHouse client with extended timeouts for batch operations
+ * (refresh, rebuild, heavy aggregation). Uses 10-min request timeout and
+ * 5-min server-side max_execution_time.
+ */
+export function getClickHouseBatch(): ClickHouseClient {
+	if (batchClientInstance) {
+		return batchClientInstance;
+	}
+
+	const url = process.env.CLICKHOUSE_URL;
+	if (!url) {
+		throw new Error("CLICKHOUSE_URL environment variable is required");
+	}
+
+	rawBatchClient = createClient({
+		url,
+		database: process.env.CLICKHOUSE_DATABASE || "default",
+		username: process.env.CLICKHOUSE_USERNAME,
+		password: process.env.CLICKHOUSE_PASSWORD,
+		request_timeout: 600_000, // 10 minutes
+		clickhouse_settings: {
+			max_execution_time: 300, // 5 minutes
+		},
+	});
+
+	batchClientInstance = new ClickHouseClient(rawBatchClient, {
+		url,
+		database: process.env.CLICKHOUSE_DATABASE || "default",
+		username: process.env.CLICKHOUSE_USERNAME,
+		password: process.env.CLICKHOUSE_PASSWORD,
+	});
+	return batchClientInstance;
+}
+
+/**
+ * Close the batch ClickHouse client.
+ */
+export async function closeClickHouseBatch(): Promise<void> {
+	if (batchClientInstance) {
+		await batchClientInstance.close();
+		batchClientInstance = null;
+		rawBatchClient = null;
 	}
 }
