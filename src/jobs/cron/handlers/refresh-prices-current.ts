@@ -15,14 +15,23 @@
  * If any step fails before the EXCHANGE, the live table is untouched.
  */
 
-import { getClickHouseBatch } from "@/lib/clickhouse";
 import { loadMissingToClickHouse } from "@/ingestion/clickhouse-sync";
+import { getClickHouseBatch } from "@/lib/clickhouse";
 import { createLogger } from "@/utils/logger";
 import type { CronExecutionContext, CronJobHandler } from "../types";
 
 const log = createLogger("app");
 
 const STAGING_TABLE = "prices_current_staging";
+const HEAVY_CHAIN_ROW_THRESHOLD = 15_000_000;
+const HEAVY_CHAIN_BUCKET_COUNT = 8;
+const REFRESH_QUERY_SETTINGS = {
+	max_execution_time: 1800,
+	max_bytes_before_external_group_by: 100_000_000,
+	max_bytes_before_external_sort: 100_000_000,
+	max_memory_usage: 8_000_000_000,
+	max_threads: 4,
+} as const;
 
 const REFRESH_QUERY = `INSERT INTO ${STAGING_TABLE}
 	(retailer_item_id, chain_slug, store_id, name, brand, category,
@@ -40,6 +49,7 @@ FROM prices
 WHERE chain_slug = {chainSlug:String}
 	AND target_date >= today() - 30
 	AND target_date <= today()
+	AND cityHash64(retailer_item_id, store_id) % {bucketCount:UInt8} = {bucket:UInt8}
 GROUP BY retailer_item_id, chain_slug, store_id`;
 
 async function dropTableIfExists(
@@ -61,27 +71,30 @@ export const refreshPricesCurrentHandler: CronJobHandler = {
 		const startTime = Date.now();
 
 		// Step 0: Sync pending parquet files so the raw prices table is up-to-date.
-		// loadMissing uses deleteSnapshot mutations which can crash ClickHouse on
-		// low-disk servers. We catch errors and wait briefly to let CH recover.
-		try {
-			const syncResult = await loadMissingToClickHouse();
-			log.info("Synced pending parquet files before refresh", {
-				imported: syncResult.imported,
-				pending: syncResult.pending,
-				runId: context.runId,
-			});
-		} catch (syncError) {
-			log.warn("Parquet sync failed, continuing with existing data", {
-				error: syncError,
-				runId: context.runId,
-			});
-			// Give ClickHouse time to recover if the sync crashed it
-			await new Promise((resolve) => { setTimeout(resolve, 10_000); });
-		}
+		const syncResult = await loadMissingToClickHouse({
+			maxAgeDays: 35,
+			reimportUpdated: false,
+		});
+		log.info("Synced pending parquet files before refresh", {
+			imported: syncResult.imported,
+			pending: syncResult.pending,
+			runId: context.runId,
+		});
 
-		// Step 1: Get all chains from the raw prices table
-		const chains = await clickhouse.query<{ chain_slug: string }>(
-			"SELECT DISTINCT chain_slug FROM prices ORDER BY chain_slug",
+		// Step 1: Get all chains and estimate their 30-day size to pick a safe
+		// bucket count for memory-constrained aggregations.
+		const chains = await clickhouse.query<{
+			chain_slug: string;
+			rows_30d: string;
+		}>(
+			`SELECT
+				chain_slug,
+				count() AS rows_30d
+			FROM prices
+			WHERE target_date >= today() - 30
+				AND target_date <= today()
+			GROUP BY chain_slug
+			ORDER BY chain_slug`,
 		);
 
 		if (chains.length === 0) {
@@ -93,23 +106,35 @@ export const refreshPricesCurrentHandler: CronJobHandler = {
 
 		// Step 2: Prepare staging table (drop if leftover from a previous failed run)
 		await dropTableIfExists(clickhouse, STAGING_TABLE);
-		await clickhouse.command(
-			`CREATE TABLE ${STAGING_TABLE} AS prices_current`,
-		);
+		await clickhouse.command(`CREATE TABLE ${STAGING_TABLE} AS prices_current`);
 
 		// Step 3: Populate staging table per-chain
 		let chainsProcessed = 0;
 		try {
-			for (const { chain_slug } of chains) {
+			for (const chain of chains) {
+				const chain_slug = chain.chain_slug;
+				const rows30d = Number(chain.rows_30d);
+				const bucketCount =
+					Number.isFinite(rows30d) && rows30d >= HEAVY_CHAIN_ROW_THRESHOLD
+						? HEAVY_CHAIN_BUCKET_COUNT
+						: 1;
 				const chainStart = Date.now();
-				await clickhouse.command(
-					REFRESH_QUERY,
-					{ chainSlug: chain_slug },
-					{ max_execution_time: 1800 },
-				);
+				for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+					await clickhouse.command(
+						REFRESH_QUERY,
+						{
+							chainSlug: chain_slug,
+							bucketCount,
+							bucket,
+						},
+						REFRESH_QUERY_SETTINGS,
+					);
+				}
 				chainsProcessed += 1;
 				log.info("Refreshed chain into staging table", {
 					chain_slug,
+					rows30d,
+					bucketCount,
 					chainsProcessed,
 					totalChains: chains.length,
 					durationMs: Date.now() - chainStart,

@@ -24,12 +24,13 @@ import { registerCronJob } from "./registry";
  * the in-memory registry. No database access happens here.
  */
 export function registerAllCronJobs(): void {
-	// Daily price ingestion at 6 AM UTC
+	// Weekday ingestion at 2:00 AM Europe/Zagreb so downstream refresh
+	// can complete before users start browsing around 5:00 AM local time.
 	registerCronJob({
 		id: "daily-ingestion",
 		name: "Daily Price Ingestion",
-		cronExpression: "0 6 * * *",
-		timezone: "UTC",
+		cronExpression: "0 2 * * 1-5",
+		timezone: "Europe/Zagreb",
 		taskType: "ingestion",
 		handler: dailyIngestionHandler,
 	});
@@ -99,12 +100,12 @@ export function registerAllCronJobs(): void {
 		handler: triageQueueRefreshHandler,
 	});
 
-	// Refresh prices_current materialized table after daily ingestion
+	// Weekday refresh at 4:15 AM Europe/Zagreb after ingestion.
 	registerCronJob({
 		id: "refresh-prices-current",
 		name: "Refresh Current Prices Table",
-		cronExpression: "0 8 * * *", // 8 AM UTC (after ingestion at 6 AM)
-		timezone: "UTC",
+		cronExpression: "15 4 * * 1-5",
+		timezone: "Europe/Zagreb",
 		taskType: "clickhouse",
 		handler: refreshPricesCurrentHandler,
 	});

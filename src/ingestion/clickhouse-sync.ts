@@ -1,14 +1,28 @@
 import { inArray } from "drizzle-orm";
 import { getDatabase } from "@/db";
 import { parquetFiles } from "@/db/schema";
-import { getClickHouse } from "@/lib/clickhouse";
-import { getStorage, resolveStoragePath } from "@/lib/storage";
+import { getClickHouseBatch } from "@/lib/clickhouse";
+import { getStorage, LocalStorage, resolveStoragePath } from "@/lib/storage";
 
 export interface ClickHouseSyncStatus {
 	totalFiles: number;
 	importedFiles: number;
 	pendingFiles: number;
 	lastImportedAt?: Date | null;
+}
+
+interface LoadMissingOptions {
+	/**
+	 * Restrict sync to parquet snapshots whose target date is within
+	 * the last `maxAgeDays` days (UTC), inclusive.
+	 */
+	maxAgeDays?: number;
+	/**
+	 * When true (default), parquet files with updated metadata are
+	 * re-imported (delete + import). For daily refresh pipelines on
+	 * constrained disks, this can be disabled to import only never-seen files.
+	 */
+	reimportUpdated?: boolean;
 }
 
 function parseParquetKey(storageKey: string): {
@@ -42,6 +56,7 @@ async function upsertParquetRecord(
 	const storage = getStorage();
 	const info = await storage.getInfo(storageKey);
 	const { chainSlug, targetDate } = parseParquetKey(storageKey);
+	const syncedAt = importedAt ?? new Date();
 
 	const targetDateStr = targetDate.toISOString().split("T")[0];
 	await db
@@ -53,7 +68,7 @@ async function upsertParquetRecord(
 			fileSize: info.size,
 			checksum: info.checksum,
 			importedAt,
-			updatedAt: new Date(),
+			updatedAt: syncedAt,
 		})
 		.onConflictDoUpdate({
 			target: parquetFiles.storageKey,
@@ -63,9 +78,9 @@ async function upsertParquetRecord(
 				fileSize: info.size,
 				checksum: info.checksum,
 				importedAt,
-				updatedAt: new Date(),
+				updatedAt: syncedAt,
 			},
-	});
+		});
 }
 
 type ParquetImportState = {
@@ -103,18 +118,33 @@ async function loadParquetImportState(
 	return states;
 }
 
+async function importParquetStorageKey(
+	storageKey: string,
+	clickhouse: ReturnType<typeof getClickHouseBatch>,
+): Promise<void> {
+	const storage = getStorage();
+
+	if (storage instanceof LocalStorage) {
+		const filePath = resolveStoragePath(storageKey);
+		await clickhouse.importParquetFile(filePath);
+		return;
+	}
+
+	const payload = await storage.get(storageKey);
+	await clickhouse.importParquetBuffer(payload);
+}
+
 export async function loadAllToClickHouse(): Promise<{
 	imported: number;
 }> {
-	const clickhouse = getClickHouse();
 	const keys = await listParquetKeys();
+	const clickhouse = getClickHouseBatch();
 
 	await clickhouse.truncatePrices();
 
 	let imported = 0;
 	for (const key of keys) {
-		const filePath = resolveStoragePath(key);
-		await clickhouse.importParquetFile(filePath);
+		await importParquetStorageKey(key, clickhouse);
 		await upsertParquetRecord(key, new Date());
 		imported += 1;
 	}
@@ -122,41 +152,94 @@ export async function loadAllToClickHouse(): Promise<{
 	return { imported };
 }
 
-export async function loadMissingToClickHouse(): Promise<{
+export async function loadMissingToClickHouse(
+	options?: LoadMissingOptions,
+): Promise<{
 	imported: number;
 	pending: number;
 }> {
-	const clickhouse = getClickHouse();
+	const clickhouse = getClickHouseBatch();
 	const keys = await listParquetKeys();
 	const stateByKey = await loadParquetImportState(keys);
-	const pendingKeys = keys.filter((key) => {
+	const now = new Date();
+	const maxAgeDaysRaw = options?.maxAgeDays;
+	const reimportUpdated = options?.reimportUpdated ?? true;
+	const maxAgeDays =
+		typeof maxAgeDaysRaw === "number" &&
+		Number.isFinite(maxAgeDaysRaw) &&
+		maxAgeDaysRaw >= 0
+			? Math.floor(maxAgeDaysRaw)
+			: null;
+	const minTargetDate =
+		maxAgeDays === null
+			? null
+			: new Date(
+					Date.UTC(
+						now.getUTCFullYear(),
+						now.getUTCMonth(),
+						now.getUTCDate() - maxAgeDays,
+					),
+				);
+
+	const pendingItems = keys.flatMap((key) => {
+		if (minTargetDate) {
+			const { targetDate } = parseParquetKey(key);
+			if (targetDate < minTargetDate) {
+				return [];
+			}
+		}
+
 		const state = stateByKey.get(key);
 		if (!state) {
-			return true;
+			const { chainSlug, targetDate } = parseParquetKey(key);
+			return [
+				{
+					key,
+					chainSlug,
+					targetDate: targetDate.toISOString().slice(0, 10),
+					replaceExisting: false,
+				},
+			];
 		}
 		if (!state.importedAt) {
-			return true;
+			const { chainSlug, targetDate } = parseParquetKey(key);
+			return [
+				{
+					key,
+					chainSlug,
+					targetDate: targetDate.toISOString().slice(0, 10),
+					replaceExisting: false,
+				},
+			];
 		}
-		return state.updatedAt > state.importedAt;
+		if (!reimportUpdated || state.updatedAt <= state.importedAt) {
+			return [];
+		}
+
+		const { chainSlug, targetDate } = parseParquetKey(key);
+		return [
+			{
+				key,
+				chainSlug,
+				targetDate: targetDate.toISOString().slice(0, 10),
+				replaceExisting: true,
+			},
+		];
 	});
 
 	let imported = 0;
-	for (const key of pendingKeys) {
-		const { chainSlug, targetDate } = parseParquetKey(key);
-		// Always clear an existing chain/day snapshot before import so sync is idempotent,
-		// even when parquet_files.imported_at is missing or stale.
-		await clickhouse.deleteSnapshot(
-			chainSlug,
-			targetDate.toISOString().slice(0, 10),
-		);
+	for (const item of pendingItems) {
+		if (item.replaceExisting) {
+			// Clear chain/day snapshot first to keep re-import idempotent.
+			await clickhouse.deleteSnapshot(item.chainSlug, item.targetDate);
+		}
 
-		const filePath = resolveStoragePath(key);
-		await clickhouse.importParquetFile(filePath);
-		await upsertParquetRecord(key, new Date());
+		await importParquetStorageKey(item.key, clickhouse);
+		await upsertParquetRecord(item.key, new Date());
 		imported += 1;
 	}
 
-	return { imported, pending: Math.max(pendingKeys.length - imported, 0) };
+	return { imported, pending: Math.max(pendingItems.length - imported, 0) };
 }
 
 export async function getClickHouseSyncStatus(): Promise<ClickHouseSyncStatus> {

@@ -96,6 +96,10 @@ export async function syncJobsToDatabase(): Promise<void> {
 				.where(eq(cronJobs.id, job.id));
 
 			if (existing) {
+				const scheduleChanged =
+					existing.cronExpression !== job.cronExpression ||
+					(existing.timezone ?? "UTC") !== timezone;
+
 				// Update existing job (preserve enabled state and next_run_at if already set)
 				await db
 					.update(cronJobs)
@@ -106,8 +110,10 @@ export async function syncJobsToDatabase(): Promise<void> {
 						taskType: job.taskType,
 						taskPayload: job.taskPayload ?? null,
 						updatedAt: new Date(),
-						// Only update nextRunAt if it's null (job was previously disabled or new)
-						...(existing.nextRunAt === null ? { nextRunAt } : {}),
+						// Recalculate next run when schedule changes, or when it is currently unset.
+						...(scheduleChanged || existing.nextRunAt === null
+							? { nextRunAt }
+							: {}),
 					})
 					.where(eq(cronJobs.id, job.id));
 
