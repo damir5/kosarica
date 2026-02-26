@@ -101,7 +101,7 @@ export const refreshPricesCurrentHandler: CronJobHandler = {
 				await clickhouse.command(
 					REFRESH_QUERY,
 					{ chainSlug: chain_slug },
-					{ max_execution_time: 300 },
+					{ max_execution_time: 1800 },
 				);
 				chainsProcessed += 1;
 				log.info("Refreshed chain into staging table", {

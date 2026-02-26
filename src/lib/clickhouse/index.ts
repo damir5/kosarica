@@ -426,9 +426,9 @@ export function getClickHouseBatch(): ClickHouseClient {
 		database: process.env.CLICKHOUSE_DATABASE || "default",
 		username: process.env.CLICKHOUSE_USERNAME,
 		password: process.env.CLICKHOUSE_PASSWORD,
-		request_timeout: 600_000, // 10 minutes
+		request_timeout: 1_800_000, // 30 minutes — large chains (34-53M rows) need >10min
 		clickhouse_settings: {
-			max_execution_time: 300, // 5 minutes
+			max_execution_time: 1800, // 30 minutes server-side
 		},
 	});
 
