@@ -59,10 +59,10 @@ export function StoresMapView({
 		if (!data?.stores) return [];
 
 		return data.stores
-			.filter((s) => s.latitude && s.longitude)
 			.map((store) => {
-				const lat = Number.parseFloat(store.latitude!);
-				const lng = Number.parseFloat(store.longitude!);
+				if (!store.latitude || !store.longitude) return null;
+				const lat = Number.parseFloat(store.latitude);
+				const lng = Number.parseFloat(store.longitude);
 				if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
 
 				const color = STORE_COLORS[store.chainSlug as StoreSlug] ?? "#6b7280";

@@ -59,8 +59,12 @@ export const listNearbyStores = procedure
 
 		const nearby = storeRows
 			.map((store) => {
-				const storeLat = Number.parseFloat(store.latitude!);
-				const storeLng = Number.parseFloat(store.longitude!);
+				const latitude = store.latitude;
+				const longitude = store.longitude;
+				if (!latitude || !longitude) return null;
+				const storeLat = Number.parseFloat(latitude);
+				const storeLng = Number.parseFloat(longitude);
+				if (Number.isNaN(storeLat) || Number.isNaN(storeLng)) return null;
 				const distanceKm = haversineDistance(
 					input.lat,
 					input.lng,
@@ -69,6 +73,7 @@ export const listNearbyStores = procedure
 				);
 				return { ...store, distanceKm: Math.round(distanceKm * 10) / 10 };
 			})
+			.filter((store) => store != null)
 			.filter((store) => store.distanceKm <= input.radiusKm)
 			.sort((a, b) => a.distanceKm - b.distanceKm);
 

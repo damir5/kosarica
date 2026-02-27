@@ -1,5 +1,6 @@
 import path from "node:path";
 import { LocalStorage } from "./local";
+import { getS3StorageConfigFromEnv, S3Storage } from "./s3";
 
 /**
  * Metadata for stored files.
@@ -55,8 +56,18 @@ export interface Storage {
 	getChecksum(key: string): Promise<string>;
 }
 
+type StorageBackend = "local" | "s3";
+
 // Singleton storage instance
 let storageInstance: Storage | null = null;
+
+function parseStorageBackend(env: NodeJS.ProcessEnv = process.env): StorageBackend {
+	const raw = env.STORAGE_BACKEND?.trim().toLowerCase();
+	if (raw === "s3") {
+		return "s3";
+	}
+	return "local";
+}
 
 /**
  * Get or create the storage instance.
@@ -67,11 +78,16 @@ export function getStorage(): Storage {
 		return storageInstance;
 	}
 
+	const backend = parseStorageBackend();
+	if (backend === "s3") {
+		storageInstance = new S3Storage(getS3StorageConfigFromEnv());
+		return storageInstance;
+	}
+
 	const basePath = process.env.STORAGE_PATH;
 	if (!basePath) {
 		throw new Error("STORAGE_PATH environment variable is required");
 	}
-
 	storageInstance = new LocalStorage(basePath);
 	return storageInstance;
 }
@@ -219,6 +235,7 @@ export {
 } from "./compression";
 // Re-export components
 export { computeChecksum, LocalStorage, MIN_COMPRESSION_SIZE } from "./local";
+export { getS3StorageConfigFromEnv, S3Storage } from "./s3";
 // Re-export temp storage utilities
 export {
 	cleanupTempDirs,

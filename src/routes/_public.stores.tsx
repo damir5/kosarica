@@ -61,17 +61,21 @@ function StoresPage() {
 
 			{isLoading ? (
 				<TkSkeleton className="h-[300px] w-full rounded-lg" />
-			) : (
-				<Section>
-					<Suspense fallback={<TkSkeleton className="h-[300px] w-full rounded-lg" />}>
-						<StoreMap
-							center={[location!.lat, location!.lng]}
-							stores={stores}
-							className="h-[300px] rounded-lg"
-						/>
-					</Suspense>
-				</Section>
-			)}
+				) : (
+					<Section>
+						<Suspense fallback={<TkSkeleton className="h-[300px] w-full rounded-lg" />}>
+							{location ? (
+								<StoreMap
+									center={[location.lat, location.lng]}
+									stores={stores}
+									className="h-[300px] rounded-lg"
+								/>
+							) : (
+								<TkSkeleton className="h-[300px] w-full rounded-lg" />
+							)}
+						</Suspense>
+					</Section>
+				)}
 
 			{!isLoading && stores.length > 0 && (
 				<Section title="Po lancima">

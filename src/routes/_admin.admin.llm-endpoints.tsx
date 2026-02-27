@@ -450,23 +450,23 @@ function AdminLlmEndpointsPage() {
 								</div>
 							</div>
 						</div>
-						<div className="space-y-2">
-							<Label>Capabilities</Label>
-							<div className="grid gap-2 md:grid-cols-2">
-								{CAPABILITIES.map((capability) => (
-									<label
-										key={capability}
-										className="flex items-center gap-2 text-sm"
-									>
-										<Checkbox
-											checked={formCapabilities.has(capability)}
-											onChange={() => handleToggleFormCapability(capability)}
-										/>
-										{capability}
-									</label>
-								))}
+							<div className="space-y-2">
+								<Label>Capabilities</Label>
+								<div className="grid gap-2 md:grid-cols-2">
+									{CAPABILITIES.map((capability) => (
+										<div
+											key={capability}
+											className="flex items-center gap-2 text-sm"
+										>
+											<Checkbox
+												checked={formCapabilities.has(capability)}
+												onChange={() => handleToggleFormCapability(capability)}
+											/>
+											<span>{capability}</span>
+										</div>
+									))}
+								</div>
 							</div>
-						</div>
 						{formError ? (
 							<div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
 								{formError}
@@ -570,7 +570,7 @@ function AdminLlmEndpointsPage() {
 													<TableCell>
 														<div className="grid gap-1">
 															{CAPABILITIES.map((capability) => (
-																<label
+																<div
 																	key={`${row.id}-${capability}`}
 																	className="flex items-center gap-2 text-xs"
 																>
@@ -580,8 +580,8 @@ function AdminLlmEndpointsPage() {
 																			handleToggleDraftCapability(row.id, capability)
 																		}
 																	/>
-																	{capability}
-																</label>
+																	<span>{capability}</span>
+																</div>
 															))}
 														</div>
 													</TableCell>

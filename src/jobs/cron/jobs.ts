@@ -11,6 +11,7 @@ import { conflictCheckHandler } from "./handlers/conflict-check";
 import { dailyIngestionHandler } from "./handlers/daily-ingestion";
 import { featureMatchBatchHandler } from "./handlers/feature-match-batch";
 import { llmEndpointHealthCheckHandler } from "./handlers/llm-endpoint-health-check";
+import { publishedPriceProbeHandler } from "./handlers/published-price-probe";
 import { refreshPricesCurrentHandler } from "./handlers/refresh-prices-current";
 import { semanticClusteringHandler } from "./handlers/semantic-clustering";
 import { tempCleanupHandler } from "./handlers/temp-cleanup";
@@ -33,6 +34,16 @@ export function registerAllCronJobs(): void {
 		timezone: "Europe/Zagreb",
 		taskType: "ingestion",
 		handler: dailyIngestionHandler,
+	});
+
+	// Re-probe late publishers every 15 minutes in the morning window.
+	registerCronJob({
+		id: "published-price-probe",
+		name: "Published Price Probe",
+		cronExpression: "*/15 2-8 * * 1-5",
+		timezone: "Europe/Zagreb",
+		taskType: "ingestion",
+		handler: publishedPriceProbeHandler,
 	});
 
 	// Temporary storage cleanup every 6 hours

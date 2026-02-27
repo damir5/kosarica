@@ -621,7 +621,14 @@ export const listVirtualStores = procedure
 				.groupBy(stores.priceSourceStoreId);
 
 			countMap = new Map(
-				linkedCounts.map((r) => [r.priceSourceStoreId!, r.count]),
+				linkedCounts
+					.filter(
+						(
+							row,
+						): row is typeof row & { priceSourceStoreId: string } =>
+							row.priceSourceStoreId != null,
+					)
+					.map((r) => [r.priceSourceStoreId, r.count]),
 			);
 		}
 

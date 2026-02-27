@@ -531,7 +531,7 @@ async function main(): Promise<void> {
 			try {
 				const warmupBatch = batches[0] ?? [];
 				if (warmupBatch.length > 0) {
-					const messages = buildEvalMessages(warmupBatch.slice(0, 3));
+					const messages = buildEvalMessages(warmupBatch.slice(0, 3), llmIdByRealId);
 					await callOpenAiCompatible({ target, messages });
 				}
 			} catch {

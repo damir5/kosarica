@@ -15,10 +15,6 @@
 import { sql } from "drizzle-orm";
 import { getDatabase, closeDatabase } from "@/db";
 import {
-	chains,
-	ingestionFiles,
-	ingestionRuns,
-	ingestionStoreStats,
 	storeIdentifiers,
 	stores,
 } from "@/db/schema";
@@ -591,12 +587,25 @@ async function main(): Promise<void> {
 			${flags.chain ? sql`AND chain_slug = ${flags.chain}` : sql``}
 		`);
 
-		const physicalByPriceSource = new Map<string, Array<(typeof linkedPhysical)[number]>>();
-		for (const p of linkedPhysical as unknown as Array<any>) {
-			const list = physicalByPriceSource.get(p.priceSourceStoreId as string) ?? [];
-			list.push(p);
-			physicalByPriceSource.set(p.priceSourceStoreId as string, list);
-		}
+	type LinkedPhysicalRow = {
+		id: string;
+		chainSlug: string;
+		address: string | null;
+		city: string | null;
+		postalCode: string | null;
+		latitude: string | null;
+		longitude: string | null;
+		priceSourceStoreId: string | null;
+		status: string | null;
+	};
+	const linkedPhysicalRows = linkedPhysical as unknown as LinkedPhysicalRow[];
+	const physicalByPriceSource = new Map<string, LinkedPhysicalRow[]>();
+	for (const p of linkedPhysicalRows) {
+		if (!p.priceSourceStoreId) continue;
+		const list = physicalByPriceSource.get(p.priceSourceStoreId) ?? [];
+		list.push(p);
+		physicalByPriceSource.set(p.priceSourceStoreId, list);
+	}
 
 	let physicalCreated = 0;
 	let physicalBackfilled = 0;

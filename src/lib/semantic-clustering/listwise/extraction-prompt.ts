@@ -8,31 +8,33 @@ import type {
 	OfferSpec,
 } from "./types";
 
+const extractionItemsSchema = {
+	type: "array",
+	items: {
+		type: "object",
+		properties: {
+			id: { type: "string" },
+			brand: { type: ["string", "null"] },
+			product: { type: ["string", "null"] },
+			variant: { type: ["string", "null"] },
+			pack_count: { type: ["number", "null"] },
+			unit_size: { type: ["string", "null"] },
+			unit_amount_ml_or_g: { type: ["number", "null"] },
+			container: { type: ["string", "null"] },
+			total_quantity: { type: ["number", "null"] },
+			total_amount_ml_or_g: { type: ["number", "null"] },
+		},
+		required: ["id"],
+		additionalProperties: true,
+	},
+};
+
 const EXTRACTION_SCHEMA: BuiltPrompt["jsonSchema"] = {
 	name: "offer_spec_extraction",
 	schema: {
 		type: "object",
 		properties: {
-			items: {
-				type: "array",
-				items: {
-					type: "object",
-					properties: {
-						id: { type: "string" },
-						brand: { type: ["string", "null"] },
-						product: { type: ["string", "null"] },
-						variant: { type: ["string", "null"] },
-						pack_count: { type: ["number", "null"] },
-						unit_size: { type: ["string", "null"] },
-						unit_amount_ml_or_g: { type: ["number", "null"] },
-						container: { type: ["string", "null"] },
-						total_quantity: { type: ["number", "null"] },
-						total_amount_ml_or_g: { type: ["number", "null"] },
-					},
-					required: ["id"],
-					additionalProperties: true,
-				},
-			},
+			items: extractionItemsSchema,
 		},
 		required: ["items"],
 		additionalProperties: true,
@@ -50,7 +52,7 @@ const BULK_EXTRACTION_SCHEMA: BuiltPrompt["jsonSchema"] = {
 					type: "object",
 					properties: {
 						group_id: { type: "string" },
-						items: EXTRACTION_SCHEMA.schema.properties.items,
+						items: extractionItemsSchema,
 					},
 					required: ["group_id", "items"],
 					additionalProperties: true,

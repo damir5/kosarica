@@ -6,50 +6,57 @@ import type {
 	GroupItem,
 } from "./types";
 
+const baseProductsSchema = {
+	type: "array",
+	items: {
+		type: "object",
+		properties: {
+			base_id: { type: "string" },
+			canonical_name: { type: "string" },
+			brand: { type: ["string", "null"] },
+			category: { type: ["string", "null"] },
+			pack_variants: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						variant_key: { type: "string" },
+						variant_label: { type: "string" },
+						item_ids: {
+							type: "array",
+							items: { type: "string" },
+						},
+						unit_size: { type: ["string", "null"] },
+						pack_count: { type: ["number", "null"] },
+						container: { type: ["string", "null"] },
+					},
+					required: ["variant_key", "variant_label", "item_ids"],
+					additionalProperties: true,
+				},
+			},
+		},
+		required: ["base_id", "canonical_name", "pack_variants"],
+		additionalProperties: true,
+	},
+};
+
+const unclassifiedSchema = {
+	type: "array",
+	items: { type: "string" },
+};
+
+const confidenceSchema = { type: ["number", "null"] };
+const reasoningSchema = { type: ["string", "null"] };
+
 const CLUSTERING_SCHEMA: BuiltPrompt["jsonSchema"] = {
 	name: "offer_cluster_output",
 	schema: {
 		type: "object",
 		properties: {
-			base_products: {
-				type: "array",
-				items: {
-					type: "object",
-					properties: {
-						base_id: { type: "string" },
-						canonical_name: { type: "string" },
-						brand: { type: ["string", "null"] },
-						category: { type: ["string", "null"] },
-						pack_variants: {
-							type: "array",
-							items: {
-								type: "object",
-								properties: {
-									variant_key: { type: "string" },
-									variant_label: { type: "string" },
-									item_ids: {
-										type: "array",
-										items: { type: "string" },
-									},
-									unit_size: { type: ["string", "null"] },
-									pack_count: { type: ["number", "null"] },
-									container: { type: ["string", "null"] },
-								},
-								required: ["variant_key", "variant_label", "item_ids"],
-								additionalProperties: true,
-							},
-						},
-					},
-					required: ["base_id", "canonical_name", "pack_variants"],
-					additionalProperties: true,
-				},
-			},
-			unclassified: {
-				type: "array",
-				items: { type: "string" },
-			},
-			confidence: { type: ["number", "null"] },
-			reasoning: { type: ["string", "null"] },
+			base_products: baseProductsSchema,
+			unclassified: unclassifiedSchema,
+			confidence: confidenceSchema,
+			reasoning: reasoningSchema,
 		},
 		required: ["base_products", "unclassified"],
 		additionalProperties: true,
@@ -67,10 +74,10 @@ const BULK_CLUSTERING_SCHEMA: BuiltPrompt["jsonSchema"] = {
 					type: "object",
 					properties: {
 						group_id: { type: "string" },
-						base_products: CLUSTERING_SCHEMA.schema.properties.base_products,
-						unclassified: CLUSTERING_SCHEMA.schema.properties.unclassified,
-						confidence: CLUSTERING_SCHEMA.schema.properties.confidence,
-						reasoning: CLUSTERING_SCHEMA.schema.properties.reasoning,
+						base_products: baseProductsSchema,
+						unclassified: unclassifiedSchema,
+						confidence: confidenceSchema,
+						reasoning: reasoningSchema,
 					},
 					required: ["group_id", "base_products", "unclassified"],
 					additionalProperties: true,

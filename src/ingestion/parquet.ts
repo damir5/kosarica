@@ -1,4 +1,5 @@
-import { mkdir } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { zstdCompressSync, zstdDecompressSync } from "node:zlib";
 import { PARQUET_COMPRESSION_METHODS } from "@dsnp/parquetjs/dist/lib/compression";
@@ -8,7 +9,7 @@ import {
 	ParquetWriter,
 	type WriterOptions,
 } from "@dsnp/parquetjs/dist/parquet";
-import { resolveStoragePath } from "@/lib/storage";
+import { getStorage, LocalStorage, resolveStoragePath } from "@/lib/storage";
 
 export interface ParquetPriceRow {
 	target_date: Date;
@@ -97,15 +98,62 @@ async function openParquetWriter(
 	return ParquetWriter.openFile(PRICE_SCHEMA, filePath, options);
 }
 
+interface ParquetOutputTarget {
+	filePath: string;
+	persist(storageKey: string): Promise<void>;
+	cleanup(): Promise<void>;
+}
+
+async function createOutputTarget(storageKey: string): Promise<ParquetOutputTarget> {
+	const storage = getStorage();
+
+	if (storage instanceof LocalStorage) {
+		const filePath = resolveStoragePath(storageKey);
+		await mkdir(path.dirname(filePath), { recursive: true });
+		return {
+			filePath,
+			async persist() {
+				// No-op: writer already persisted directly to local storage path.
+			},
+			async cleanup() {
+				// No-op for local direct writes.
+			},
+		};
+	}
+
+	const tempDir = await mkdtemp(path.join(tmpdir(), "kosarica-parquet-"));
+	const filePath = path.join(tempDir, "prices.parquet");
+	await mkdir(path.dirname(filePath), { recursive: true });
+
+	return {
+		filePath,
+		async persist(key: string) {
+			const data = await readFile(filePath);
+			await storage.put(key, data, {
+				contentType: "application/octet-stream",
+				originalName: path.basename(key),
+				custom: {
+					file_type: "parquet",
+				},
+			});
+		},
+		async cleanup() {
+			await rm(tempDir, { recursive: true, force: true });
+		},
+	};
+}
+
 export async function createPricesParquetAppender(
 	storageKey: string,
 ): Promise<PricesParquetAppender> {
-	const filePath = resolveStoragePath(storageKey);
-	await mkdir(path.dirname(filePath), { recursive: true });
+	const target = await createOutputTarget(storageKey);
+	const filePath = target.filePath;
 
 	const writer = await openParquetWriter(filePath);
 	let rowCount = 0;
 	let closed = false;
+	let persisted = false;
+	let cleanedUp = false;
 	let writeQueue: Promise<void> = Promise.resolve();
 
 	const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
@@ -140,6 +188,17 @@ export async function createPricesParquetAppender(
 				if (!closed) {
 					await writer.close();
 					closed = true;
+				}
+				if (!persisted) {
+					try {
+						await target.persist(storageKey);
+						persisted = true;
+					} finally {
+						if (!cleanedUp) {
+							await target.cleanup();
+							cleanedUp = true;
+						}
+					}
 				}
 				return { filePath, rowCount };
 			});

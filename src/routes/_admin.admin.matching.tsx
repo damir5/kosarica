@@ -20,6 +20,18 @@ export const Route = createFileRoute("/_admin/admin/matching")({
 	component: AdminMatchingPage,
 });
 
+function parseOptionalInt(value: string): number | undefined {
+	if (value.trim().length === 0) return undefined;
+	const n = Number.parseInt(value, 10);
+	return Number.isFinite(n) ? n : undefined;
+}
+
+function parseOptionalFloat(value: string): number | undefined {
+	if (value.trim().length === 0) return undefined;
+	const n = Number.parseFloat(value);
+	return Number.isFinite(n) ? n : undefined;
+}
+
 function AdminMatchingPage() {
 	const queryClient = useQueryClient();
 
@@ -54,32 +66,20 @@ function AdminMatchingPage() {
 		});
 	};
 
-	const toInt = (value: string): number | undefined => {
-		if (value.trim().length === 0) return undefined;
-		const n = Number.parseInt(value, 10);
-		return Number.isFinite(n) ? n : undefined;
-	};
-
-	const toFloat = (value: string): number | undefined => {
-		if (value.trim().length === 0) return undefined;
-		const n = Number.parseFloat(value);
-		return Number.isFinite(n) ? n : undefined;
-	};
-
 	const unifiedInput = useMemo<
 		Parameters<typeof orpc.admin.matching.triggerUnifiedMatching.call>[0]
 	>(
 		() => ({
-			limit: toInt(unifiedLimit),
+			limit: parseOptionalInt(unifiedLimit),
 			dryRun: unifiedDryRun,
-			minPrimaryConfidence: toFloat(unifiedMinPrimaryConfidence),
-			groupsPerCall: toInt(unifiedGroupsPerCall),
+			minPrimaryConfidence: parseOptionalFloat(unifiedMinPrimaryConfidence),
+			groupsPerCall: parseOptionalInt(unifiedGroupsPerCall),
 			blocking: {
-				barcodeLimit: toInt(unifiedBarcodeLimit),
-				barcodeMinChains: toInt(unifiedBarcodeMinChains),
-				deterministicLimit: toInt(unifiedDeterministicLimit),
-				embeddingLimit: toInt(unifiedEmbeddingLimit),
-				lexicalLimit: toInt(unifiedLexicalLimit),
+				barcodeLimit: parseOptionalInt(unifiedBarcodeLimit),
+				barcodeMinChains: parseOptionalInt(unifiedBarcodeMinChains),
+				deterministicLimit: parseOptionalInt(unifiedDeterministicLimit),
+				embeddingLimit: parseOptionalInt(unifiedEmbeddingLimit),
+				lexicalLimit: parseOptionalInt(unifiedLexicalLimit),
 			},
 		}),
 		[
@@ -99,12 +99,12 @@ function AdminMatchingPage() {
 		Parameters<
 			typeof orpc.admin.matching.triggerListwiseSemanticClustering.call
 		>[0]
-	>(
+		>(
 		() => ({
-			limit: toInt(listwiseLimit),
-			minChains: toInt(listwiseMinChains),
+			limit: parseOptionalInt(listwiseLimit),
+			minChains: parseOptionalInt(listwiseMinChains),
 			dryRun: listwiseDryRun,
-			minPrimaryConfidence: toFloat(listwiseMinPrimaryConfidence),
+			minPrimaryConfidence: parseOptionalFloat(listwiseMinPrimaryConfidence),
 		}),
 		[
 			listwiseDryRun,

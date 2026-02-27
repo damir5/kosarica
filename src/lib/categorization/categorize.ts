@@ -161,7 +161,7 @@ function isLikelyResponseFormatError(
 	if (status !== 400 && status !== 422) {
 		return false;
 	}
-	return /response[_\s-]?format|json_schema|json_object|unsupported\s+media\s+type/i.test(
+	return /response[_\s-]?format|json_schema|json_object|unsupported\s+media\s+type|guidance.*structured\s+output|tokenizer.*not\s+supported|xgrammar|outlines.*backend/i.test(
 		bodyText,
 	);
 }
@@ -287,62 +287,58 @@ async function callModel(
 			}
 
 			if (config.provider === "ollama") {
+				const headers: Record<string, string> = {
+					"Content-Type": "application/json",
+				};
+				const apiKey = readApiKey(config);
+				if (apiKey.length > 0) {
+					headers.Authorization = `Bearer ${apiKey}`;
+				}
+				if (categorizationRpmLimiter) {
+					await categorizationRpmLimiter.wait();
+				}
+
+				const controller = new AbortController();
+				const timeoutMs = config.timeoutMs ?? 300_000;
+				const timeout = setTimeout(() => {
+					log.warn("Aborting Ollama call due to fetch timeout", {
+						provider: config.provider,
+						model: config.model,
+						timeoutMs,
+					});
+					controller.abort();
+				}, timeoutMs);
+
 				try {
-					const headers: Record<string, string> = {
-						"Content-Type": "application/json",
-					};
-					const apiKey = readApiKey(config);
-					if (apiKey.length > 0) {
-						headers.Authorization = `Bearer ${apiKey}`;
-					}
-					if (categorizationRpmLimiter) {
-						await categorizationRpmLimiter.wait();
-					}
-
-					const controller = new AbortController();
-					const timeoutMs = config.timeoutMs ?? 300_000;
-					const timeout = setTimeout(() => {
-						log.warn("Aborting Ollama call due to fetch timeout", {
-							provider: config.provider,
-							model: config.model,
-							timeoutMs,
-						});
-						controller.abort();
-					}, timeoutMs);
-
-					try {
-						const response = await fetch(
-							toOllamaChatEndpoint(config.endpoint ?? ""),
-							{
-								method: "POST",
-								headers,
-								body: JSON.stringify({
-									model: config.model,
-									stream: false,
-									options: { temperature: 0 },
-									messages: [
-										{ role: "system", content: messages.systemMessage },
-										{ role: "user", content: messages.userMessage },
-									],
-								}),
-								signal: controller.signal,
-							},
+					const response = await fetch(
+						toOllamaChatEndpoint(config.endpoint ?? ""),
+						{
+							method: "POST",
+							headers,
+							body: JSON.stringify({
+								model: config.model,
+								stream: false,
+								options: { temperature: 0 },
+								messages: [
+									{ role: "system", content: messages.systemMessage },
+									{ role: "user", content: messages.userMessage },
+								],
+							}),
+							signal: controller.signal,
+						},
+					);
+					const bodyText = await response.text();
+					if (!response.ok) {
+						throw new Error(
+							`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText} body=${bodyText.slice(0, 280)}`,
 						);
-						const bodyText = await response.text();
-						if (!response.ok) {
-							throw new Error(
-								`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText} body=${bodyText.slice(0, 280)}`,
-							);
-						}
-
-						const jsonBody = JSON.parse(bodyText) as unknown;
-						const content = extractOllamaMessageContent(jsonBody);
-						return extractJsonPayload(content);
-					} finally {
-						clearTimeout(timeout);
 					}
-				} catch (error) {
-					throw error;
+
+					const jsonBody = JSON.parse(bodyText) as unknown;
+					const content = extractOllamaMessageContent(jsonBody);
+					return extractJsonPayload(content);
+				} finally {
+					clearTimeout(timeout);
 				}
 			}
 
@@ -353,127 +349,123 @@ async function callModel(
 			}
 
 			const apiKey = readApiKey(config);
-			try {
-				const headers: Record<string, string> = {
-					"Content-Type": "application/json",
-				};
-				if (apiKey.length > 0) {
-					headers.Authorization = `Bearer ${apiKey}`;
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+			};
+			if (apiKey.length > 0) {
+				headers.Authorization = `Bearer ${apiKey}`;
+			}
+			if (config.provider === "openrouter") {
+				headers["HTTP-Referer"] =
+					process.env.OPENROUTER_HTTP_REFERER ?? "https://kosarica.local";
+				headers["X-Title"] =
+					process.env.OPENROUTER_X_TITLE ?? "Kosarica Categorization";
+			}
+
+			const baseBody = {
+				model: config.model,
+				temperature: 0,
+				max_tokens: config.maxTokens ?? 9000,
+				messages: [
+					{ role: "system", content: messages.systemMessage },
+					{ role: "user", content: messages.userMessage },
+				],
+			};
+
+			const tryRequest = async (
+				withResponseFormat: boolean,
+			): Promise<{
+				ok: boolean;
+				status: number;
+				statusText: string;
+				bodyText: string;
+				headers: Record<string, string>;
+			}> => {
+				if (categorizationRpmLimiter) {
+					await categorizationRpmLimiter.wait();
 				}
-				if (config.provider === "openrouter") {
-					headers["HTTP-Referer"] =
-						process.env.OPENROUTER_HTTP_REFERER ?? "https://kosarica.local";
-					headers["X-Title"] =
-						process.env.OPENROUTER_X_TITLE ?? "Kosarica Categorization";
-				}
-
-				const baseBody = {
-					model: config.model,
-					temperature: 0,
-					max_tokens: config.maxTokens ?? 9000,
-					messages: [
-						{ role: "system", content: messages.systemMessage },
-						{ role: "user", content: messages.userMessage },
-					],
-				};
-
-				const tryRequest = async (
-					withResponseFormat: boolean,
-				): Promise<{
-					ok: boolean;
-					status: number;
-					statusText: string;
-					bodyText: string;
-					headers: Record<string, string>;
-				}> => {
-					if (categorizationRpmLimiter) {
-						await categorizationRpmLimiter.wait();
-					}
-					// Start timeout AFTER the RPM wait to ensure fetch has the full time window
-					const controller = new AbortController();
-					const timeoutMs = config.timeoutMs ?? 300_000;
-					const timeout = setTimeout(() => {
-						log.warn("Aborting LLM call due to fetch timeout", {
-							provider: config.provider,
-							model: config.model,
-							timeoutMs,
-						});
-						controller.abort();
-					}, timeoutMs);
-
-					try {
-						const response = await fetch(config.endpoint ?? "", {
-							method: "POST",
-							headers,
-							body: JSON.stringify(
-								withResponseFormat
-									? {
-											...baseBody,
-											response_format: { type: "json_object" },
-										}
-									: baseBody,
-							),
-							signal: controller.signal,
-						});
-						const bodyText = await response.text();
-						const rateLimitHeaders: Record<string, string> = {};
-						const headerNames = [
-							"retry-after",
-							"x-ratelimit-limit",
-							"x-ratelimit-remaining",
-							"x-ratelimit-reset",
-							"x-ratelimit-reset-requests",
-							"x-ratelimit-reset-tokens",
-							"x-request-id",
-							"cf-ray",
-						];
-						for (const name of headerNames) {
-							const value = response.headers.get(name);
-							if (value) {
-								rateLimitHeaders[name] = value;
-							}
-						}
-						return {
-							ok: response.ok,
-							status: response.status,
-							statusText: response.statusText,
-							bodyText,
-							headers: rateLimitHeaders,
-						};
-					} finally {
-						clearTimeout(timeout);
-					}
-				};
-
-				let result = await tryRequest(true);
-				if (
-					!result.ok &&
-					isLikelyResponseFormatError(result.status, result.bodyText)
-				) {
-					result = await tryRequest(false);
-				}
-
-				if (!result.ok) {
-					log.warn("Categorization LLM HTTP error", {
+				// Start timeout AFTER the RPM wait to ensure fetch has the full time window
+				const controller = new AbortController();
+				const timeoutMs = config.timeoutMs ?? 300_000;
+				const timeout = setTimeout(() => {
+					log.warn("Aborting LLM call due to fetch timeout", {
 						provider: config.provider,
 						model: config.model,
-						attempt,
-						status: result.status,
-						statusText: result.statusText,
-						bodySnippet: result.bodyText.slice(0, 280),
-						rateLimitHeaders: result.headers,
+						timeoutMs,
 					});
-					throw new Error(
-						`${config.provider}:${config.model} HTTP ${result.status} ${result.statusText} body=${result.bodyText.slice(0, 280)}`,
-					);
-				}
+					controller.abort();
+				}, timeoutMs);
 
-				const jsonBody = JSON.parse(result.bodyText) as unknown;
-				const content = extractMessageContent(jsonBody);
-				return extractJsonPayload(content);
-			} catch (error) {
-				throw error;
+				try {
+					const response = await fetch(config.endpoint ?? "", {
+						method: "POST",
+						headers,
+						body: JSON.stringify(
+							withResponseFormat
+								? {
+										...baseBody,
+										response_format: { type: "json_object" },
+									}
+								: baseBody,
+						),
+						signal: controller.signal,
+					});
+					const bodyText = await response.text();
+					const rateLimitHeaders: Record<string, string> = {};
+					const headerNames = [
+						"retry-after",
+						"x-ratelimit-limit",
+						"x-ratelimit-remaining",
+						"x-ratelimit-reset",
+						"x-ratelimit-reset-requests",
+						"x-ratelimit-reset-tokens",
+						"x-request-id",
+						"cf-ray",
+					];
+					for (const name of headerNames) {
+						const value = response.headers.get(name);
+						if (value) {
+							rateLimitHeaders[name] = value;
+						}
+					}
+					return {
+						ok: response.ok,
+						status: response.status,
+						statusText: response.statusText,
+						bodyText,
+						headers: rateLimitHeaders,
+					};
+				} finally {
+					clearTimeout(timeout);
+				}
+			};
+
+			let result = await tryRequest(true);
+			if (
+				!result.ok &&
+				isLikelyResponseFormatError(result.status, result.bodyText)
+			) {
+				result = await tryRequest(false);
 			}
+
+			if (!result.ok) {
+				log.warn("Categorization LLM HTTP error", {
+					provider: config.provider,
+					model: config.model,
+					attempt,
+					status: result.status,
+					statusText: result.statusText,
+					bodySnippet: result.bodyText.slice(0, 280),
+					rateLimitHeaders: result.headers,
+				});
+				throw new Error(
+					`${config.provider}:${config.model} HTTP ${result.status} ${result.statusText} body=${result.bodyText.slice(0, 280)}`,
+				);
+			}
+
+			const jsonBody = JSON.parse(result.bodyText) as unknown;
+			const content = extractMessageContent(jsonBody);
+			return extractJsonPayload(content);
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
 			const isAbort = error instanceof Error && error.name === "AbortError";

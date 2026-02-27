@@ -153,7 +153,7 @@ function normalizeCityName(city: string): string {
 function extractCityFromGarbage(value: string): string | null {
 	const lower = value.toLowerCase().trim();
 	const cityAbbr = Object.keys(CITY_ABBREVIATIONS).find((abbr) =>
-		lower.startsWith(abbr + " "),
+		lower.startsWith(`${abbr} `),
 	);
 	if (cityAbbr) {
 		return CITY_ABBREVIATIONS[cityAbbr];

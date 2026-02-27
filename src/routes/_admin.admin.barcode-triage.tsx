@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -66,11 +66,20 @@ function AdminBarcodeTriagePage() {
 		enabled: searchTerm.length >= 2,
 	});
 
-	const invalidate = () => {
+	const invalidate = useCallback(() => {
 		queryClient.invalidateQueries({
 			queryKey: orpc.admin.barcodeTriage.key({ type: "query" }),
 		});
-	};
+	}, [queryClient]);
+
+	const goNext = useCallback(() => {
+		const currentIndex = queueItems.findIndex(
+			(item) => item.barcode === selectedBarcode,
+		);
+		if (currentIndex >= 0 && currentIndex + 1 < queueItems.length) {
+			setSelectedBarcode(queueItems[currentIndex + 1].barcode);
+		}
+	}, [queueItems, selectedBarcode]);
 
 	const claimMutation = useMutation({
 		mutationFn: (barcode: string) =>
@@ -91,16 +100,7 @@ function AdminBarcodeTriagePage() {
 		},
 	});
 
-	const goNext = () => {
-		const currentIndex = queueItems.findIndex(
-			(item) => item.barcode === selectedBarcode,
-		);
-		if (currentIndex >= 0 && currentIndex + 1 < queueItems.length) {
-			setSelectedBarcode(queueItems[currentIndex + 1].barcode);
-		}
-	};
-
-	const submitCreate = () => {
+	const submitCreate = useCallback(() => {
 		if (!selectedBarcode) return;
 		const fallbackName =
 			detailQuery.data?.items[0]?.name ?? `EAN ${selectedBarcode}`;
@@ -110,25 +110,25 @@ function AdminBarcodeTriagePage() {
 			canonicalName: fallbackName,
 			packAmount: detailQuery.data?.items[0]?.packAmount ?? 1,
 		});
-	};
+	}, [decisionMutation, detailQuery.data, selectedBarcode]);
 
-	const submitMap = () => {
+	const submitMap = useCallback(() => {
 		if (!selectedBarcode || !selectedSkuId) return;
 		decisionMutation.mutate({
 			decisionType: "map_existing_sku",
 			barcode: selectedBarcode,
 			canonicalSkuId: selectedSkuId,
 		});
-	};
+	}, [decisionMutation, selectedBarcode, selectedSkuId]);
 
-	const submitNotMatch = () => {
+	const submitNotMatch = useCallback(() => {
 		if (!selectedBarcode) return;
 		decisionMutation.mutate({
 			decisionType: "not_match",
 			barcode: selectedBarcode,
 			reason: "different_product",
 		});
-	};
+	}, [decisionMutation, selectedBarcode]);
 
 	const bulkApproveMutation = useMutation({
 		mutationFn: async () => {
@@ -214,7 +214,7 @@ function AdminBarcodeTriagePage() {
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [selectedBarcode, selectedSkuId, queueItems, detailQuery.data]);
+	}, [goNext, submitCreate, submitMap, submitNotMatch]);
 
 	return (
 		<div className="mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6 lg:px-8">

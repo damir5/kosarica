@@ -1503,17 +1503,17 @@ async function processIngestionFile(options: {
 		}
 
 		const validation = adapter.validateRow(row);
-		if (!validation.isValid) {
-			fileFailedRows += 1;
-			fileErrorCount += 1;
-			failedRows.push({
-				chainSlug,
-				runId,
-				fileId,
-				storeIdentifier,
-				row,
-				errors: validation.errors,
-			});
+			if (!validation.isValid) {
+				fileFailedRows += 1;
+				fileErrorCount += 1;
+				failedRows.push({
+					chainSlug,
+					runId,
+					fileId,
+					storeIdentifier: resolvedIdentifier.value,
+					row,
+					errors: validation.errors,
+				});
 			validationErrors.push({
 				runId,
 				fileId,
@@ -2132,6 +2132,24 @@ export async function runIngestion(
 		} catch (categorizationScheduleError) {
 			log.warn("Failed to queue categorization task (non-fatal)", {
 				error: errorToObject(categorizationScheduleError),
+				runId,
+				chainSlug,
+			});
+		}
+
+		try {
+			await scheduleTask({
+				taskType: "clickhouse",
+				priority: 12,
+				payload: {
+					type: "clickhouseSync",
+					mode: "missing",
+				},
+			});
+			log.info("Queued ClickHouse sync task", { runId, chainSlug });
+		} catch (clickhouseScheduleError) {
+			log.warn("Failed to queue ClickHouse sync task (non-fatal)", {
+				error: errorToObject(clickhouseScheduleError),
 				runId,
 				chainSlug,
 			});

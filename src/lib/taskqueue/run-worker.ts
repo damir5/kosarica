@@ -13,6 +13,10 @@ import {
 	loadAllToClickHouse,
 	loadMissingToClickHouse,
 } from "@/ingestion/clickhouse-sync";
+import {
+	refreshPricesCurrentForAllChains,
+	refreshPricesCurrentForChains,
+} from "@/ingestion/clickhouse-current-refresh";
 import { rerunIngestionRun, runIngestion } from "@/ingestion/pipeline";
 import { processBarcodeClusters } from "@/lib/barcode-anchoring";
 import {
@@ -118,10 +122,25 @@ export function createTaskQueueWorker(options?: {
 			throw new Error("Invalid payload for clickhouse task");
 		}
 		if (payload.mode === "all") {
-			await loadAllToClickHouse();
+			const syncResult = await loadAllToClickHouse();
+			await refreshPricesCurrentForAllChains();
+			log.info("ClickHouse full sync completed", {
+				taskId: task.id,
+				importedFiles: syncResult.imported,
+				importedChains: syncResult.importedChains.length,
+			});
 			return;
 		}
-		await loadMissingToClickHouse();
+		const syncResult = await loadMissingToClickHouse();
+		if (syncResult.importedChains.length > 0) {
+			await refreshPricesCurrentForChains(syncResult.importedChains);
+		}
+		log.info("ClickHouse incremental sync completed", {
+			taskId: task.id,
+			importedFiles: syncResult.imported,
+			importedChains: syncResult.importedChains.length,
+			pendingFiles: syncResult.pending,
+		});
 	});
 
 	worker.registerHandler("categorize", async (task) => {

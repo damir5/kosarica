@@ -7,7 +7,7 @@ import {
 	ChevronRight,
 	ExternalLink,
 	Link2,
-	Map,
+	Map as MapIcon,
 	MapPin,
 	Plus,
 	Search,
@@ -345,7 +345,7 @@ function StoresPage() {
 						}`}
 						onClick={() => setActiveTab("map")}
 					>
-						<Map className="h-4 w-4" />
+						<MapIcon className="h-4 w-4" />
 						Map
 					</button>
 				</div>

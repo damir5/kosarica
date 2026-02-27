@@ -168,7 +168,16 @@ export class ClickHouseClient {
 			await this.importParquetFileViaUserFiles(filePath);
 			return;
 		}
-		await this.importParquetFileViaHttp(filePath);
+		const payload = await readFile(filePath);
+		await this.importParquetBuffer(payload);
+	}
+
+	/**
+	 * Import Parquet payload bytes into the prices table via HTTP.
+	 * Useful when storage backend is remote (S3/object storage).
+	 */
+	async importParquetBuffer(payload: Buffer): Promise<void> {
+		await this.importParquetPayloadViaHttp(payload);
 	}
 
 	private async importParquetFileViaUserFiles(filePath: string): Promise<void> {
@@ -179,8 +188,7 @@ export class ClickHouseClient {
 		});
 	}
 
-	private async importParquetFileViaHttp(filePath: string): Promise<void> {
-		const payload = await readFile(filePath);
+	private async importParquetPayloadViaHttp(payload: Buffer): Promise<void> {
 		const url = buildParquetInsertUrl(this.config);
 		const authHeader = toBasicAuthHeader(this.config);
 		const response = await fetch(url, {
@@ -189,7 +197,7 @@ export class ClickHouseClient {
 				"content-type": "application/octet-stream",
 				...(authHeader ? { authorization: authHeader } : {}),
 			},
-			body: payload,
+			body: new Uint8Array(payload),
 			signal: AbortSignal.timeout(parseImportTimeoutMs()),
 		});
 

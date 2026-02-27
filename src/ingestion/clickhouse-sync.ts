@@ -136,6 +136,7 @@ async function importParquetStorageKey(
 
 export async function loadAllToClickHouse(): Promise<{
 	imported: number;
+	importedChains: string[];
 }> {
 	const keys = await listParquetKeys();
 	const clickhouse = getClickHouseBatch();
@@ -143,13 +144,16 @@ export async function loadAllToClickHouse(): Promise<{
 	await clickhouse.truncatePrices();
 
 	let imported = 0;
+	const importedChains = new Set<string>();
 	for (const key of keys) {
+		const { chainSlug } = parseParquetKey(key);
 		await importParquetStorageKey(key, clickhouse);
 		await upsertParquetRecord(key, new Date());
+		importedChains.add(chainSlug);
 		imported += 1;
 	}
 
-	return { imported };
+	return { imported, importedChains: Array.from(importedChains) };
 }
 
 export async function loadMissingToClickHouse(
@@ -157,6 +161,7 @@ export async function loadMissingToClickHouse(
 ): Promise<{
 	imported: number;
 	pending: number;
+	importedChains: string[];
 }> {
 	const clickhouse = getClickHouseBatch();
 	const keys = await listParquetKeys();
@@ -228,6 +233,7 @@ export async function loadMissingToClickHouse(
 	});
 
 	let imported = 0;
+	const importedChains = new Set<string>();
 	for (const item of pendingItems) {
 		if (item.replaceExisting) {
 			// Clear chain/day snapshot first to keep re-import idempotent.
@@ -236,10 +242,15 @@ export async function loadMissingToClickHouse(
 
 		await importParquetStorageKey(item.key, clickhouse);
 		await upsertParquetRecord(item.key, new Date());
+		importedChains.add(item.chainSlug);
 		imported += 1;
 	}
 
-	return { imported, pending: Math.max(pendingItems.length - imported, 0) };
+	return {
+		imported,
+		pending: Math.max(pendingItems.length - imported, 0),
+		importedChains: Array.from(importedChains),
+	};
 }
 
 export async function getClickHouseSyncStatus(): Promise<ClickHouseSyncStatus> {

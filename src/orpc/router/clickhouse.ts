@@ -29,7 +29,7 @@ export const startSync = superadminProcedure
 	.input(
 		z.object({
 			mode: z.enum(["missing", "all"]).default("missing"),
-			priority: z.number().optional().default(0),
+			priority: z.number().optional().default(12),
 		}),
 	)
 	.handler(async ({ input }) => {

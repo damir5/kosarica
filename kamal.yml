@@ -32,10 +32,12 @@ env:
     LOG_LEVEL: info
     NODE_OPTIONS: --enable-source-maps
     WEB_CONCURRENCY: 2
+    STORAGE_BACKEND: s3
     STORAGE_PATH: /app/data/storage
     TEMP_STORAGE_PATH: /app/data/temp
+    S3_FORCE_PATH_STYLE: "true"
     CLICKHOUSE_URL: http://kosarica-clickhouse:8123
-    CLICKHOUSE_IMPORT_MODE: infile
+    CLICKHOUSE_IMPORT_MODE: http
     CLICKHOUSE_USER_FILES_SUBDIR: storage
     OTEL_EXPORTER_OTLP_ENDPOINT: kosarica-opentelemetry-collector:4317
     OTEL_SERVICE_NAME: kosarica-nodejs
@@ -67,6 +69,12 @@ env:
     - OPENROUTER_API_KEY
     - ZAI_API_KEY
     - VERTEX_EXPRESS_API_KEY
+    - S3_ENDPOINT
+    - S3_REGION
+    - S3_BUCKET
+    - S3_PREFIX
+    - S3_ACCESS_KEY_ID
+    - S3_SECRET_ACCESS_KEY
 
 # Builder configuration
 builder:

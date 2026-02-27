@@ -187,7 +187,10 @@ function generateFullyDisambiguatedName(store: StoreWithChainName): string {
 		if (houseNumber) {
 			// Replace street-only with full address
 			parts.pop();
-			parts.push(address!.trim());
+			const fullAddress = address?.trim();
+			if (fullAddress) {
+				parts.push(fullAddress);
+			}
 		}
 	} else if (postalCode?.trim()) {
 		parts.push(`(${postalCode.trim()})`);
