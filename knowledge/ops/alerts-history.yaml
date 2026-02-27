@@ -1,6 +1,6 @@
 _meta:
   version: "1.0"
-  updated_at: 2026-02-25T18:05:18.180Z
+  updated_at: 2026-02-27T12:36:11.758Z
   updated_by: knowledge-kpi-script
   description: Append-only alert history from knowledge KPI runs
 entries:
@@ -119,6 +119,12 @@ entries:
     threshold: 16
     message: Loop sweep coverage is lagging
   - at: 2026-02-25T18:05:18.173Z
+    severity: critical
+    metric: loop_shards_missing
+    value: 64
+    threshold: 16
+    message: Loop sweep coverage is lagging
+  - at: 2026-02-27T12:36:11.717Z
     severity: critical
     metric: loop_shards_missing
     value: 64
