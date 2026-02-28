@@ -37,10 +37,8 @@ async function hasDueIngestionTasks(
 		WHERE task_type = 'ingestion'
 			AND payload->>'targetDate' = ${targetDate}
 			AND id <> ${currentTaskId}
-			AND (
-				status IN ('claimed', 'processing')
-				OR (status = 'pending' AND scheduled_for <= NOW())
-			)
+			AND status = 'pending'
+			AND scheduled_for <= NOW()
 		LIMIT 1
 	`);
 	const rows = toRows<{ id: string }>(result);
