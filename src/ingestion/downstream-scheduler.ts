@@ -1,9 +1,9 @@
 import { sql } from "drizzle-orm";
-import { getDatabase } from "@/db";
-import { scheduleTask } from "@/lib/taskqueue";
+import { getDatabase, taskQueue } from "@/db";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("daily-ingestion");
+const DOWNSTREAM_CLICKHOUSE_LOCK_ID = 1952535;
 
 interface ScheduleDailyDownstreamOptions {
 	taskId: string;
@@ -74,6 +74,52 @@ async function hasQueuedClickHouseSyncTask(): Promise<boolean> {
 	return rows.length > 0;
 }
 
+function isLockAcquired(result: unknown): boolean {
+	const rows = toRows<{ acquired?: boolean }>(result);
+	return rows[0]?.acquired === true;
+}
+
+async function tryQueueClickHouseSyncTask(): Promise<boolean> {
+	const db = getDatabase();
+	return db.transaction(async (tx) => {
+		const lockResult = await tx.execute(sql`
+			SELECT pg_try_advisory_xact_lock(${DOWNSTREAM_CLICKHOUSE_LOCK_ID}) AS acquired
+		`);
+		if (!isLockAcquired(lockResult)) {
+			return false;
+		}
+
+		const alreadyQueued = await tx.execute(sql`
+			SELECT id
+			FROM task_queue
+			WHERE task_type = 'clickhouse'
+				AND status IN ('pending', 'claimed', 'processing')
+				AND payload->>'type' = 'clickhouseSync'
+				AND payload->>'mode' = 'missing'
+			LIMIT 1
+		`);
+		if (toRows<{ id: string }>(alreadyQueued).length > 0) {
+			return false;
+		}
+
+		await tx.insert(taskQueue).values({
+			taskType: "clickhouse",
+			payload: {
+				type: "clickhouseSync",
+				mode: "missing",
+			},
+			priority: 12,
+			status: "pending",
+			scheduledFor: sql`NOW()`,
+			maxRetries: 3,
+			createdAt: sql`NOW()`,
+			updatedAt: sql`NOW()`,
+		});
+
+		return true;
+	});
+}
+
 export async function scheduleDailyIngestionDownstream(
 	options: ScheduleDailyDownstreamOptions,
 ): Promise<void> {
@@ -103,19 +149,14 @@ export async function scheduleDailyIngestionDownstream(
 		return;
 	}
 
-	const clickHouseAlreadyQueued = await hasQueuedClickHouseSyncTask();
-	if (clickHouseAlreadyQueued) {
+	if (await hasQueuedClickHouseSyncTask()) {
 		return;
 	}
 
-	await scheduleTask({
-		taskType: "clickhouse",
-		priority: 12,
-		payload: {
-			type: "clickhouseSync",
-			mode: "missing",
-		},
-	});
+	const queued = await tryQueueClickHouseSyncTask();
+	if (!queued) {
+		return;
+	}
 
 	log.info("Queued ClickHouse sync after scheduled ingestion round", {
 		targetDate,
