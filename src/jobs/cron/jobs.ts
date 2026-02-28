@@ -25,12 +25,12 @@ import { registerCronJob } from "./registry";
  * the in-memory registry. No database access happens here.
  */
 export function registerAllCronJobs(): void {
-	// Weekday ingestion at 2:00 AM Europe/Zagreb so downstream refresh
-	// can complete before users start browsing around 5:00 AM local time.
+	// Weekday ingestion retries hourly from 1:00 AM local time so
+	// late-publishing chains are picked up automatically.
 	registerCronJob({
 		id: "daily-ingestion",
 		name: "Daily Price Ingestion",
-		cronExpression: "0 2 * * 1-5",
+		cronExpression: "0 1-23 * * 1-5",
 		timezone: "Europe/Zagreb",
 		taskType: "ingestion",
 		handler: dailyIngestionHandler,

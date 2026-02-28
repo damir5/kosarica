@@ -5,6 +5,7 @@
  */
 
 import { chainIds } from "@/ingestion/adapters/config";
+import { formatDateInTimezone } from "@/ingestion/time";
 import { createLogger } from "@/utils/logger";
 import type {
 	CronExecutionContext,
@@ -32,11 +33,10 @@ export const dailyIngestionHandler: CronJobHandler = {
 			.map((chain) => chain.trim())
 			.filter(Boolean);
 		const chains = configuredChains.length > 0 ? configuredChains : chainIds;
-		const targetDate = [
-			context.scheduledFor.getFullYear(),
-			String(context.scheduledFor.getMonth() + 1).padStart(2, "0"),
-			String(context.scheduledFor.getDate()).padStart(2, "0"),
-		].join("-");
+		const targetDate = formatDateInTimezone(
+			context.scheduledFor,
+			"Europe/Zagreb",
+		);
 
 		const tasks: TaskToEnqueue[] = [];
 

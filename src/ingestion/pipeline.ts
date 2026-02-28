@@ -1752,24 +1752,69 @@ export async function runIngestion(
 	log.info("Starting ingestion", { chainSlug, targetDate: dateStr });
 
 	if (!options.force) {
-		const existing = await db
+		const activeRun = await db
 			.select({ id: ingestionRuns.id, status: ingestionRuns.status })
 			.from(ingestionRuns)
 			.where(
 				and(
 					eq(ingestionRuns.chainSlug, chainSlug),
 					eq(ingestionRuns.targetDate, targetDate),
-					inArray(ingestionRuns.status, ["pending", "running", "completed"]),
+					inArray(ingestionRuns.status, ["pending", "running"]),
 				),
 			)
+			.orderBy(desc(ingestionRuns.createdAt))
 			.limit(1);
 
-		if (existing[0]) {
+		if (activeRun[0]) {
 			return {
-				runId: existing[0].id,
+				runId: activeRun[0].id,
 				status: "skipped",
-				message: "Duplicate ingestion run exists",
+				message: "Ingestion already pending or running for target date",
 			};
+		}
+
+		const completedRun = await db
+			.select({
+				id: ingestionRuns.id,
+				totalEntries: ingestionRuns.totalEntries,
+				processedEntries: ingestionRuns.processedEntries,
+				statusType: ingestionRuns.statusType,
+				statusReason: ingestionRuns.statusReason,
+				createdAt: ingestionRuns.createdAt,
+			})
+			.from(ingestionRuns)
+			.where(
+				and(
+					eq(ingestionRuns.chainSlug, chainSlug),
+					eq(ingestionRuns.targetDate, targetDate),
+					eq(ingestionRuns.status, "completed"),
+				),
+			)
+			.orderBy(desc(ingestionRuns.createdAt))
+			.limit(1);
+
+		const latestCompleted = completedRun[0];
+		if (latestCompleted) {
+			const totalEntries = Number(latestCompleted.totalEntries ?? 0);
+			const processedEntries = Number(latestCompleted.processedEntries ?? 0);
+			const hasIngestedData = totalEntries > 0 || processedEntries > 0;
+
+			if (hasIngestedData) {
+				return {
+					runId: latestCompleted.id,
+					status: "skipped",
+					message: "Ingestion already completed with data for target date",
+				};
+			}
+
+			log.info("Retrying completed ingestion run with no ingested entries", {
+				chainSlug,
+				targetDate: dateStr,
+				previousRunId: latestCompleted.id,
+				previousStatusType: latestCompleted.statusType,
+				previousStatusReason: latestCompleted.statusReason,
+				previousCreatedAt: latestCompleted.createdAt?.toISOString(),
+			});
 		}
 	}
 

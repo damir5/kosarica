@@ -7,6 +7,7 @@
 
 import { sql } from "drizzle-orm";
 import { chainIds } from "@/ingestion/adapters/config";
+import { formatDateInTimezone } from "@/ingestion/time";
 import { getDb } from "@/utils/bindings";
 import { createLogger } from "@/utils/logger";
 import type {
@@ -29,11 +30,7 @@ interface ActiveIngestionRow {
 }
 
 function toTargetDate(scheduledFor: Date): string {
-	return [
-		scheduledFor.getUTCFullYear(),
-		String(scheduledFor.getUTCMonth() + 1).padStart(2, "0"),
-		String(scheduledFor.getUTCDate()).padStart(2, "0"),
-	].join("-");
+	return formatDateInTimezone(scheduledFor, "Europe/Zagreb");
 }
 
 function getConfiguredChains(): string[] {
