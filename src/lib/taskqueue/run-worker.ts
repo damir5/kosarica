@@ -17,6 +17,7 @@ import {
 	refreshPricesCurrentForAllChains,
 	refreshPricesCurrentForChains,
 } from "@/ingestion/clickhouse-current-refresh";
+import { scheduleDailyIngestionDownstream } from "@/ingestion/downstream-scheduler";
 import { rerunIngestionRun, runIngestion } from "@/ingestion/pipeline";
 import { processBarcodeClusters } from "@/lib/barcode-anchoring";
 import {
@@ -86,7 +87,7 @@ export function createTaskQueueWorker(options?: {
 					type: "ingestion",
 					chainSlug: payload.chainSlug,
 					targetDate: payload.targetDate,
-					force: true,
+					force: payload.force ?? false,
 					source: payload.source ?? "worker",
 				},
 			});
@@ -94,6 +95,11 @@ export function createTaskQueueWorker(options?: {
 		if (result.status === "failed") {
 			throw new Error(`Ingestion failed for run ${result.runId}`);
 		}
+		await scheduleDailyIngestionDownstream({
+			taskId: task.id,
+			targetDate: payload.targetDate,
+			source: payload.source ?? "worker",
+		});
 	});
 
 	worker.registerHandler("rerun", async (task) => {

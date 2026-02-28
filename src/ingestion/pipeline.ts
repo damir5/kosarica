@@ -2182,22 +2182,25 @@ export async function runIngestion(
 			});
 		}
 
-		try {
-			await scheduleTask({
-				taskType: "clickhouse",
-				priority: 12,
-				payload: {
-					type: "clickhouseSync",
-					mode: "missing",
-				},
-			});
-			log.info("Queued ClickHouse sync task", { runId, chainSlug });
-		} catch (clickhouseScheduleError) {
-			log.warn("Failed to queue ClickHouse sync task (non-fatal)", {
-				error: errorToObject(clickhouseScheduleError),
-				runId,
-				chainSlug,
-			});
+		if (source !== "scheduled") {
+			try {
+				await scheduleTask({
+					taskType: "clickhouse",
+					priority: 12,
+					payload: {
+						type: "clickhouseSync",
+						mode: "missing",
+					},
+				});
+				log.info("Queued ClickHouse sync task", { runId, chainSlug, source });
+			} catch (clickhouseScheduleError) {
+				log.warn("Failed to queue ClickHouse sync task (non-fatal)", {
+					error: errorToObject(clickhouseScheduleError),
+					runId,
+					chainSlug,
+					source,
+				});
+			}
 		}
 
 		const totalDurationMs = Date.now() - runWallStart;

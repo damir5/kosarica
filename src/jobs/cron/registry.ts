@@ -6,7 +6,7 @@
  * when the instance becomes the leader.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import { cronJobs } from "@/db/schema";
 import { getDb } from "@/utils/bindings";
 import { createLogger } from "@/utils/logger";
@@ -142,6 +142,30 @@ export async function syncJobsToDatabase(): Promise<void> {
 			log.error("Failed to sync job to database", { jobId: job.id }, error);
 			throw error;
 		}
+	}
+
+	// Disable jobs that are no longer registered in code so stale schedules
+	// cannot keep running after deploys.
+	const registeredJobIds = registeredJobs.map((job) => job.id);
+	const disabledJobs = await db
+		.update(cronJobs)
+		.set({
+			enabled: false,
+			updatedAt: new Date(),
+		})
+		.where(
+			and(
+				eq(cronJobs.enabled, true),
+				notInArray(cronJobs.id, registeredJobIds),
+			),
+		)
+		.returning({ id: cronJobs.id });
+
+	if (disabledJobs.length > 0) {
+		log.info("Disabled stale cron jobs not present in registry", {
+			count: disabledJobs.length,
+			jobIds: disabledJobs.map((row) => row.id),
+		});
 	}
 
 	log.info("Jobs synced to database", { count: registeredJobs.length });
