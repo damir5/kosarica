@@ -25,22 +25,22 @@ import { registerCronJob } from "./registry";
  * the in-memory registry. No database access happens here.
  */
 export function registerAllCronJobs(): void {
-	// Weekday ingestion retries hourly from 1:00 AM local time so
-	// late-publishing chains are picked up automatically.
+	// Daily ingestion retries hourly from 1:00 AM local time so
+	// late-publishing chains are picked up automatically, including weekends.
 	registerCronJob({
 		id: "daily-ingestion",
 		name: "Daily Price Ingestion",
-		cronExpression: "0 1-23 * * 1-5",
+		cronExpression: "0 1-23 * * *",
 		timezone: "Europe/Zagreb",
 		taskType: "ingestion",
 		handler: dailyIngestionHandler,
 	});
 
-	// Re-probe late publishers every 15 minutes in the morning window.
+	// Re-probe late publishers every 15 minutes in the morning window, daily.
 	registerCronJob({
 		id: "published-price-probe",
 		name: "Published Price Probe",
-		cronExpression: "*/15 2-8 * * 1-5",
+		cronExpression: "*/15 2-8 * * *",
 		timezone: "Europe/Zagreb",
 		taskType: "ingestion",
 		handler: publishedPriceProbeHandler,
@@ -111,11 +111,11 @@ export function registerAllCronJobs(): void {
 		handler: triageQueueRefreshHandler,
 	});
 
-	// Weekday refresh at 4:15 AM Europe/Zagreb after ingestion.
+	// Daily refresh at 4:15 AM Europe/Zagreb after ingestion.
 	registerCronJob({
 		id: "refresh-prices-current",
 		name: "Refresh Current Prices Table",
-		cronExpression: "15 4 * * 1-5",
+		cronExpression: "15 4 * * *",
 		timezone: "Europe/Zagreb",
 		taskType: "clickhouse",
 		handler: refreshPricesCurrentHandler,
