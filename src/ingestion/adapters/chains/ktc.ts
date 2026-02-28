@@ -1,5 +1,4 @@
-import type { Result } from "neverthrow";
-import { err, ok, ResultAsync } from "neverthrow";
+import { err, ok, Result, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
@@ -156,7 +155,8 @@ export class KtcAdapter extends BaseCsvAdapter {
 					continue;
 				}
 				seenUrls.add(fileUrl);
-				const filename = this.extractFilenameFromUrl(fileUrl);
+				const filenameResult = this.extractFilenameFromUrl(fileUrl);
+				const filename = filenameResult.isErr() ? fileUrl : filenameResult.value;
 				const fileDate = this.extractDateFromFilename(filename);
 				if (filterDate && fileDate && fileDate !== filterDate) {
 					continue;
@@ -240,7 +240,8 @@ export class KtcAdapter extends BaseCsvAdapter {
 				continue;
 			}
 			seenUrls.add(fileUrl);
-			const filename = this.extractFilenameFromUrl(fileUrl);
+			const filenameResult = this.extractFilenameFromUrl(fileUrl);
+			const filename = filenameResult.isErr() ? fileUrl : filenameResult.value;
 			const fileDate = this.extractDateFromFilename(filename);
 			if (filterDate && fileDate && fileDate !== filterDate) {
 				continue;
@@ -321,14 +322,15 @@ export class KtcAdapter extends BaseCsvAdapter {
 		return "";
 	}
 
-	protected extractFilenameFromUrl(fileUrl: string): string {
-		try {
-			const parsed = new URL(fileUrl);
-			const parts = parsed.pathname.split("/");
-			return parts[parts.length - 1] ?? fileUrl;
-		} catch {
-			return fileUrl;
-		}
+	protected extractFilenameFromUrl(fileUrl: string): Result<string, Error> {
+		return Result.fromThrowable(
+			() => {
+				const parsed = new URL(fileUrl);
+				const parts = parsed.pathname.split("/");
+				return parts[parts.length - 1] ?? fileUrl;
+			},
+			(e) => new Error(`Failed to extract filename from URL ${fileUrl}: ${e instanceof Error ? e.message : String(e)}`),
+		)();
 	}
 
 	extractStoreMetadata(file: DiscoveredFile): StoreMetadata | null {

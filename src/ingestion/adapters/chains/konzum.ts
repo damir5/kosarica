@@ -1,4 +1,4 @@
-import type { Result } from "neverthrow";
+import { Result } from "neverthrow";
 import { err, ok, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
@@ -110,9 +110,9 @@ export class KonzumAdapter extends BaseCsvAdapter {
 					continue;
 				}
 				seen.add(fileUrl);
-				const filename = this.ensureCsvExtension(
-					this.decodeFilename(encodedFilename),
-				);
+				const decodeResult = this.decodeFilename(encodedFilename);
+				const decodedFilename = decodeResult.isErr() ? encodedFilename.replace(/\+/g, " ") : decodeResult.value;
+				const filename = this.ensureCsvExtension(decodedFilename);
 				const fileDate = this.extractDateFromFilename(filename);
 				if (date && fileDate && fileDate !== date) {
 					continue;
@@ -221,12 +221,11 @@ export class KonzumAdapter extends BaseCsvAdapter {
 		return `${base.protocol}//${base.host}${href}`;
 	}
 
-	private decodeFilename(encoded: string): string {
-		try {
-			return decodeURIComponent(encoded.replace(/\+/g, " "));
-		} catch {
-			return encoded.replace(/\+/g, " ");
-		}
+	private decodeFilename(encoded: string): Result<string, Error> {
+		return Result.fromThrowable(
+			() => decodeURIComponent(encoded.replace(/\+/g, " ")),
+			(e) => new Error(`Failed to decode filename ${encoded}: ${e instanceof Error ? e.message : String(e)}`)
+		)();
 	}
 
 	private ensureCsvExtension(filename: string): string {

@@ -1,4 +1,4 @@
-import type { Result } from "neverthrow";
+import { Result } from "neverthrow";
 import { err, ok, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "./errors";
 

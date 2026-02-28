@@ -311,16 +311,14 @@ function mapItemToRow(
 	let priceStatus: PriceStatus = "unavailable";
 	let priceUnavailableReason: PriceUnavailableReason | undefined = "missing";
 	if (priceValue) {
-		try {
-			const parsedPrice = parsePrice(priceValue);
-			if (parsedPrice > 0) {
-				price = parsedPrice;
-				priceStatus = "available";
-				priceUnavailableReason = undefined;
-			} else {
-				priceUnavailableReason = "non_positive";
-			}
-		} catch {
+		const priceResult = parsePrice(priceValue);
+		if (priceResult.isOk() && priceResult.value > 0) {
+			price = priceResult.value;
+			priceStatus = "available";
+			priceUnavailableReason = undefined;
+		} else if (priceResult.isOk()) {
+			priceUnavailableReason = "non_positive";
+		} else {
 			priceUnavailableReason = "invalid";
 		}
 	}
@@ -484,11 +482,11 @@ function parseOptionalPrice(value?: string): number | undefined {
 	if (!value) {
 		return undefined;
 	}
-	try {
-		return parsePrice(value);
-	} catch {
-		return undefined;
+	const result = parsePrice(value);
+	if (result.isOk()) {
+		return result.value;
 	}
+	return undefined;
 }
 
 function parseDate(value?: string): Date | undefined {

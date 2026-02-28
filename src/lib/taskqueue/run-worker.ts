@@ -129,23 +129,29 @@ export function createTaskQueueWorker(options?: {
 		}
 		if (payload.mode === "all") {
 			const syncResult = await loadAllToClickHouse();
+			if (syncResult.isErr()) {
+				throw syncResult.error;
+			}
 			await refreshPricesCurrentForAllChains();
 			log.info("ClickHouse full sync completed", {
 				taskId: task.id,
-				importedFiles: syncResult.imported,
-				importedChains: syncResult.importedChains.length,
+				importedFiles: syncResult.value.imported,
+				importedChains: syncResult.value.importedChains.length,
 			});
 			return;
 		}
 		const syncResult = await loadMissingToClickHouse();
-		if (syncResult.importedChains.length > 0) {
-			await refreshPricesCurrentForChains(syncResult.importedChains);
+		if (syncResult.isErr()) {
+			throw syncResult.error;
+		}
+		if (syncResult.value.importedChains.length > 0) {
+			await refreshPricesCurrentForChains(syncResult.value.importedChains);
 		}
 		log.info("ClickHouse incremental sync completed", {
 			taskId: task.id,
-			importedFiles: syncResult.imported,
-			importedChains: syncResult.importedChains.length,
-			pendingFiles: syncResult.pending,
+			importedFiles: syncResult.value.imported,
+			importedChains: syncResult.value.importedChains.length,
+			pendingFiles: syncResult.value.pending,
 		});
 	});
 

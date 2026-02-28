@@ -336,41 +336,38 @@ function mapRowToNormalized(
 	// Handle case where regular price is empty but discount price exists
 	// This happens in some retailers (e.g., DM) where only the sale price is provided
 	if (!priceStr && discountStr) {
-		try {
-			const parsedPrice = parsePrice(discountStr);
-			if (parsedPrice > 0) {
-				price = parsedPrice;
-				priceStatus = "available";
-				priceUnavailableReason = undefined;
-			} else {
-				priceUnavailableReason = "non_positive";
-			}
-			// Don't set discountPrice since we don't have the original price.
-		} catch {
+		const priceResult = parsePrice(discountStr);
+		if (priceResult.isOk() && priceResult.value > 0) {
+			price = priceResult.value;
+			priceStatus = "available";
+			priceUnavailableReason = undefined;
+		} else if (priceResult.isOk()) {
+			priceUnavailableReason = "non_positive";
+		} else {
 			priceUnavailableReason = "invalid";
 		}
+		// Don't set discountPrice since we don't have the original price.
 	} else {
 		// Normal case: parse regular price
 		if (priceStr) {
-			try {
-				const parsedPrice = parsePrice(priceStr);
-				if (parsedPrice > 0) {
-					price = parsedPrice;
-					priceStatus = "available";
-					priceUnavailableReason = undefined;
-				} else {
-					priceUnavailableReason = "non_positive";
-				}
-			} catch {
+			const priceResult = parsePrice(priceStr);
+			if (priceResult.isOk() && priceResult.value > 0) {
+				price = priceResult.value;
+				priceStatus = "available";
+				priceUnavailableReason = undefined;
+			} else if (priceResult.isOk()) {
+				priceUnavailableReason = "non_positive";
+			} else {
 				priceUnavailableReason = "invalid";
 			}
 		}
 
 		// Parse discount price if available
 		if (discountStr) {
-			try {
-				discountPrice = parsePrice(discountStr);
-			} catch {
+			const discountResult = parsePrice(discountStr);
+			if (discountResult.isOk()) {
+				discountPrice = discountResult.value;
+			} else {
 				warnings.push({
 					rowNumber,
 					field: "discountPrice",
@@ -390,9 +387,10 @@ function mapRowToNormalized(
 	let unitPrice: number | undefined;
 	const unitPriceStr = getString(indices.unitPrice);
 	if (unitPriceStr) {
-		try {
-			unitPrice = parsePrice(unitPriceStr);
-		} catch {
+		const unitPriceResult = parsePrice(unitPriceStr);
+		if (unitPriceResult.isOk()) {
+			unitPrice = unitPriceResult.value;
+		} else {
 			warnings.push({
 				rowNumber,
 				field: "unitPrice",
@@ -404,9 +402,10 @@ function mapRowToNormalized(
 	let lowestPrice30d: number | undefined;
 	const lowestPriceStr = getString(indices.lowestPrice30d);
 	if (lowestPriceStr) {
-		try {
-			lowestPrice30d = parsePrice(lowestPriceStr);
-		} catch {
+		const lowestPriceResult = parsePrice(lowestPriceStr);
+		if (lowestPriceResult.isOk()) {
+			lowestPrice30d = lowestPriceResult.value;
+		} else {
 			warnings.push({
 				rowNumber,
 				field: "lowestPrice30d",
@@ -418,9 +417,10 @@ function mapRowToNormalized(
 	let anchorPrice: number | undefined;
 	const anchorPriceStr = getString(indices.anchorPrice);
 	if (anchorPriceStr) {
-		try {
-			anchorPrice = parsePrice(anchorPriceStr);
-		} catch {
+		const anchorPriceResult = parsePrice(anchorPriceStr);
+		if (anchorPriceResult.isOk()) {
+			anchorPrice = anchorPriceResult.value;
+		} else {
 			warnings.push({
 				rowNumber,
 				field: "anchorPrice",

@@ -75,9 +75,16 @@ export const refreshPricesCurrentHandler: CronJobHandler = {
 			maxAgeDays: 35,
 			reimportUpdated: false,
 		});
+		if (syncResult.isErr()) {
+			log.error("Failed to sync pending parquet files", {
+				error: syncResult.error,
+				runId: context.runId,
+			});
+			throw syncResult.error;
+		}
 		log.info("Synced pending parquet files before refresh", {
-			imported: syncResult.imported,
-			pending: syncResult.pending,
+			imported: syncResult.value.imported,
+			pending: syncResult.value.pending,
 			runId: context.runId,
 		});
 

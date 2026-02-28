@@ -1,8 +1,20 @@
+import { err, ok, type Result } from "neverthrow";
+
 const currencySuffixPattern = /\s*(KN|KUNA|HRK|EUR|USD)\s*$/i;
 
-export function parsePrice(value: string): number {
+export interface PriceParseError {
+	readonly _tag: "PriceParseError";
+	readonly message: string;
+	readonly value?: string;
+}
+
+function priceParseError(message: string, value?: string): PriceParseError {
+	return { _tag: "PriceParseError", message, value };
+}
+
+export function parsePrice(value: string): Result<number, PriceParseError> {
 	if (!value || value.trim() === "") {
-		throw new Error("empty price value");
+		return err(priceParseError("empty price value", value));
 	}
 
 	let cleaned = value.trim();
@@ -12,7 +24,7 @@ export function parsePrice(value: string): number {
 		.trim();
 
 	if (cleaned === "") {
-		throw new Error("no numeric value found");
+		return err(priceParseError("no numeric value found", value));
 	}
 
 	const lastDot = cleaned.lastIndexOf(".");
@@ -26,10 +38,10 @@ export function parsePrice(value: string): number {
 
 	const parsed = Number.parseFloat(cleaned);
 	if (Number.isNaN(parsed)) {
-		throw new Error("invalid price format");
+		return err(priceParseError("invalid price format", value));
 	}
 
-	return Math.round(parsed * 100);
+	return ok(Math.round(parsed * 100));
 }
 
 export function formatCents(cents: number): string {

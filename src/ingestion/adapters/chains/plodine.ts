@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
-import type { Result } from "neverthrow";
+import { Result } from "neverthrow";
 import { err, errAsync, ok, okAsync, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
@@ -245,7 +245,11 @@ export class PlodineAdapter extends BaseCsvAdapter {
 	}
 
 	async expandZip(content: Buffer, filename: string): Promise<ExpandedFile[]> {
-		const expanded = await expandZip(content, filename);
+		const expandedResult = await expandZip(content, filename);
+		if (expandedResult.isErr()) {
+			return [];
+		}
+		const expanded = expandedResult.value;
 		const processed = expanded.map((file) =>
 			file.type === "csv"
 				? { ...file, content: this.preprocessCsvContent(file.content) }

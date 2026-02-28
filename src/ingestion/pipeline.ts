@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { err, ok, Result, ResultAsync } from "neverthrow";
 import { getDatabase } from "@/db";
 import {
 	activeIngestionOperations,
@@ -45,6 +46,8 @@ import {
 	getStorage,
 } from "@/lib/storage";
 import { scheduleTask } from "@/lib/taskqueue";
+import { type DbError, dbError } from "@/lib/errors";
+import { extractPgCode } from "@/lib/safe-db";
 import { generatePrefixedId } from "@/utils/id";
 import { createLogger, errorToObject } from "@/utils/logger";
 
@@ -69,6 +72,22 @@ export interface IngestionResult {
 }
 
 const log = createLogger("ingestion");
+
+// Pipeline-specific error types
+export interface PipelineError {
+	readonly _tag: "PipelineError";
+	readonly operation: string;
+	readonly message: string;
+	readonly cause?: unknown;
+}
+
+export function pipelineError(
+	opts: Omit<PipelineError, "_tag">,
+): PipelineError {
+	return { _tag: "PipelineError", ...opts };
+}
+
+export type IngestionError = DbError | PipelineError;
 
 interface IngestionPerformanceConfig {
 	fileConcurrency: number;
@@ -230,18 +249,19 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 	return chunks;
 }
 
-async function runWithConcurrency<T>(
+async function runWithConcurrency<T, E>(
 	items: T[],
 	concurrency: number,
 	handler: (item: T, index: number) => Promise<void>,
-): Promise<void> {
+	errorMapper: (error: unknown) => E,
+): Promise<Result<void, E>> {
 	if (items.length === 0) {
-		return;
+		return ok(undefined);
 	}
 
 	const maxWorkers = Math.max(1, Math.min(concurrency, items.length));
 	let nextIndex = 0;
-	let firstError: unknown = null;
+	let firstError: E | null = null;
 
 	const workers = Array.from({ length: maxWorkers }, async () => {
 		while (true) {
@@ -254,13 +274,12 @@ async function runWithConcurrency<T>(
 				return;
 			}
 
-			try {
-				await handler(items[currentIndex], currentIndex);
-			} catch (error) {
-				if (!firstError) {
-					firstError = error;
-				}
-				return;
+			const result = await ResultAsync.fromPromise(
+				handler(items[currentIndex], currentIndex),
+				errorMapper,
+			);
+			if (result.isErr() && !firstError) {
+				firstError = result.error;
 			}
 		}
 	});
@@ -268,8 +287,9 @@ async function runWithConcurrency<T>(
 	await Promise.allSettled(workers);
 
 	if (firstError) {
-		throw firstError;
+		return err(firstError);
 	}
+	return ok(undefined);
 }
 
 function hashString(input: string): number {
@@ -342,34 +362,51 @@ async function withDeadlockRetry<T>(
 	operationName: string,
 	operation: () => Promise<T>,
 	options?: Partial<DeadlockRetryOptions>,
-): Promise<T> {
+): Promise<Result<T, DbError>> {
 	const maxAttempts = options?.maxAttempts ?? 3;
 	const baseBackoffMs = options?.baseBackoffMs ?? 100;
 	const onRetry = options?.onRetry;
 
 	let lastError: unknown;
 	for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-		try {
-			return await operation();
-		} catch (error) {
-			lastError = error;
-			if (!isDeadlockError(error) || attempt === maxAttempts) {
-				throw error;
-			}
-
-			onRetry?.();
-			const backoffMs = baseBackoffMs * 2 ** (attempt - 1);
-			log.warn("Deadlock detected, retrying operation", {
-				operation: operationName,
-				attempt,
-				maxAttempts,
-				backoffMs,
-			});
-			await new Promise((resolve) => setTimeout(resolve, backoffMs));
+		const result = await ResultAsync.fromPromise(operation(), (e) => e);
+		if (result.isOk()) {
+			return ok(result.value);
 		}
+
+		lastError = result.error;
+		if (!isDeadlockError(result.error) || attempt === maxAttempts) {
+			return err(
+				dbError({
+					operation: operationName,
+					message:
+						result.error instanceof Error
+							? result.error.message
+							: String(result.error),
+					code: extractPgCode(result.error),
+					cause: result.error,
+				}),
+			);
+		}
+
+		onRetry?.();
+		const backoffMs = baseBackoffMs * 2 ** (attempt - 1);
+		log.warn("Deadlock detected, retrying operation", {
+			operation: operationName,
+			attempt,
+			maxAttempts,
+			backoffMs,
+		});
+		await new Promise((resolve) => setTimeout(resolve, backoffMs));
 	}
 
-	throw lastError;
+	return err(
+		dbError({
+			operation: operationName,
+			message: lastError instanceof Error ? lastError.message : String(lastError),
+			cause: lastError,
+		}),
+	);
 }
 
 function formatDateLocal(date: Date): string {
@@ -406,13 +443,17 @@ function mergeMetadata(
 ): string {
 	let base: Record<string, unknown> = {};
 	if (existing) {
-		try {
-			const parsed = JSON.parse(existing);
-			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-				base = parsed as Record<string, unknown>;
-			}
-		} catch {
-			base = {};
+		const parseResult = Result.fromThrowable(
+			() => JSON.parse(existing) as Record<string, unknown>,
+			() => null,
+		)();
+		if (
+			parseResult.isOk() &&
+			parseResult.value &&
+			typeof parseResult.value === "object" &&
+			!Array.isArray(parseResult.value)
+		) {
+			base = parseResult.value;
 		}
 	}
 	return JSON.stringify({
@@ -1592,7 +1633,7 @@ async function processIngestionFile(options: {
 
 	const shardResults = await Promise.all(
 		Array.from(shardGroups.entries()).map(async ([shardIndex, group]) => {
-			const resolved = await itemWriteSharder.enqueueShard(shardIndex, () =>
+			const resolvedResult = await itemWriteSharder.enqueueShard(shardIndex, () =>
 				withDeadlockRetry(
 					"resolveRetailerItemsForRows",
 					() =>
@@ -1612,7 +1653,11 @@ async function processIngestionFile(options: {
 				),
 			);
 
-			return { group, resolved };
+			if (resolvedResult.isErr()) {
+				throw resolvedResult.error;
+			}
+
+			return { group, resolved: resolvedResult.value };
 		}),
 	);
 
@@ -1839,13 +1884,15 @@ export async function runIngestion(
 
 		let lockAcquired = true;
 		if (options.taskId) {
-			try {
-				await tx.insert(activeIngestionOperations).values({
+			const lockResult = await ResultAsync.fromPromise(
+				tx.insert(activeIngestionOperations).values({
 					chainSlug,
 					targetDate: dateStr,
 					taskId: options.taskId,
-				});
-			} catch {
+				}),
+				() => null,
+			);
+			if (lockResult.isErr()) {
 				lockAcquired = false;
 			}
 		}
@@ -1905,9 +1952,14 @@ export async function runIngestion(
 	let parquetAppenderPromise: Promise<PricesParquetAppender> | null = null;
 	const pendingParquetWrites = new Set<Promise<void>>();
 
-	const getParquetAppender = (): Promise<PricesParquetAppender> => {
+	const getParquetAppender = async (): Promise<PricesParquetAppender> => {
 		if (!parquetAppenderPromise) {
-			parquetAppenderPromise = createPricesParquetAppender(parquetKey);
+			const result = createPricesParquetAppender(parquetKey);
+			const appender = await result;
+			if (appender.isErr()) {
+				throw appender.error;
+			}
+			parquetAppenderPromise = Promise.resolve(appender.value);
 		}
 		return parquetAppenderPromise;
 	};
@@ -1939,7 +1991,8 @@ export async function runIngestion(
 		}
 	};
 
-	try {
+	const mainResult = await ResultAsync.fromPromise(
+		(async () => {
 		const adapter = getAdapter(chainSlug as never);
 		const runWallStart = Date.now();
 		const discoverStartedAt = Date.now();
@@ -2072,7 +2125,7 @@ export async function runIngestion(
 				.where(eq(ingestionRuns.id, runId));
 		};
 
-		await runWithConcurrency(
+		const concurrencyResult = await runWithConcurrency(
 			filesToProcess,
 			performanceConfig.fileConcurrency,
 			async (fileEntry, index) => {
@@ -2128,7 +2181,11 @@ export async function runIngestion(
 
 				await maybeUpdateProgress(false);
 			},
+			(e) => e,
 		);
+		if (concurrencyResult.isErr()) {
+			throw concurrencyResult.error;
+		}
 		if (pendingParquetWrites.size > 0) {
 			await Promise.all(Array.from(pendingParquetWrites));
 		}
@@ -2146,64 +2203,73 @@ export async function runIngestion(
 			const searchIndexStartedAt = Date.now();
 			const itemIdsToIndex = Array.from(itemIdsForSearchIndex);
 
-			try {
-				await indexRetailerItemsBatch(itemIdsToIndex);
+			const searchIndexResult = await ResultAsync.fromPromise(
+				indexRetailerItemsBatch(itemIdsToIndex),
+				(e) => e,
+			);
+			if (searchIndexResult.isOk()) {
 				searchIndexDurationMs = Date.now() - searchIndexStartedAt;
 				log.info("Search index updated", {
 					indexed: itemIdsToIndex.length,
 					durationMs: searchIndexDurationMs,
 				});
-			} catch (searchError) {
+			} else {
 				log.warn("Search indexing failed (non-fatal)", {
-					error: errorToObject(searchError),
+					error: errorToObject(searchIndexResult.error),
 					itemCount: itemIdsToIndex.length,
 				});
 			}
 		}
 
-		try {
-			await scheduleTask({
+		const categorizeResult = await ResultAsync.fromPromise(
+			scheduleTask({
 				taskType: "categorize",
 				payload: {
 					type: "categorize",
 					runId,
 					chainSlug,
 				},
-			});
+			}),
+			(e) => e,
+		);
+		if (categorizeResult.isOk()) {
 			log.info("Queued categorization task", {
 				runId,
 				chainSlug,
 			});
-		} catch (categorizationScheduleError) {
+		} else {
 			log.warn("Failed to queue categorization task (non-fatal)", {
-				error: errorToObject(categorizationScheduleError),
+				error: errorToObject(categorizeResult.error),
 				runId,
 				chainSlug,
 			});
 		}
 
 		if (source !== "scheduled") {
-			try {
-				await scheduleTask({
+			const clickhouseResult = await ResultAsync.fromPromise(
+				scheduleTask({
 					taskType: "clickhouse",
 					priority: 12,
 					payload: {
 						type: "clickhouseSync",
 						mode: "missing",
 					},
-				});
+				}),
+				(e) => e,
+			);
+			if (clickhouseResult.isOk()) {
 				log.info("Queued ClickHouse sync task", { runId, chainSlug, source });
-			} catch (clickhouseScheduleError) {
+			} else {
 				log.warn("Failed to queue ClickHouse sync task (non-fatal)", {
-					error: errorToObject(clickhouseScheduleError),
+					error: errorToObject(clickhouseResult.error),
 					runId,
 					chainSlug,
 					source,
 				});
-			}
 		}
+	}
 
-		const totalDurationMs = Date.now() - runWallStart;
+	const totalDurationMs = Date.now() - runWallStart;
 
 		await db
 			.update(ingestionRuns)
@@ -2262,20 +2328,29 @@ export async function runIngestion(
 
 		// Cleanup temp directory on success
 		if (tempDirPath) {
-			try {
-				await deleteTempDir(tempDirPath);
+			const cleanupResult = await ResultAsync.fromPromise(
+				deleteTempDir(tempDirPath),
+				(e) => e,
+			);
+			if (cleanupResult.isOk()) {
 				log.info("Cleaned up temporary directory", { path: tempDirPath });
-			} catch (cleanupError) {
+			} else {
 				// Don't fail the ingestion if cleanup fails
 				log.warn("Failed to cleanup temporary directory", {
 					path: tempDirPath,
-					error: errorToObject(cleanupError),
+					error: errorToObject(cleanupResult.error),
 				});
 			}
 		}
 
-		return { runId, status: "completed" };
-	} catch (error) {
+		return { runId, status: "completed" as const };
+		})(),
+		(error) => error,
+	);
+
+
+	if (mainResult.isErr()) {
+		const error = mainResult.error;
 		log.error("Ingestion failed", {
 			chainSlug,
 			runId,
@@ -2283,12 +2358,16 @@ export async function runIngestion(
 		});
 
 		if (parquetAppenderPromise) {
-			try {
-				const parquetAppender = await parquetAppenderPromise;
-				await parquetAppender.close();
-			} catch (closeError) {
+			const promise = parquetAppenderPromise as Promise<PricesParquetAppender>;
+			const closeResult = await ResultAsync.fromPromise(
+				promise.then(async (appender) => {
+					await appender.close();
+				}),
+				(e) => e,
+			);
+			if (closeResult.isErr()) {
 				log.warn("Failed to close parquet writer after ingestion error", {
-					error: errorToObject(closeError),
+					error: errorToObject(closeResult.error),
 				});
 			}
 		}
@@ -2355,28 +2434,35 @@ export async function runIngestion(
 			statusType,
 			statusSeverity: "critical",
 		};
-	} finally {
-		if (options.taskId) {
-			await db
-				.delete(activeIngestionOperations)
-				.where(eq(activeIngestionOperations.taskId, options.taskId));
-		}
-
-		// Attempt best-effort cleanup of old temp dirs on each run
-		try {
-			const cleaned = await cleanupTempDirs("expanded");
-			if (cleaned.length > 0) {
-				const totalSize = cleaned.reduce((sum, dir) => sum + dir.sizeBytes, 0);
-				log.info("Cleaned up old temporary directories", {
-					count: cleaned.length,
-					totalSizeBytes: totalSize,
-				});
-			}
-		} catch (cleanupError) {
-			// Don't fail if cleanup fails
-			log.debug("Background temp cleanup failed", {}, cleanupError);
-		}
 	}
+
+	// Cleanup on both success and error paths
+	if (options.taskId) {
+		await db
+			.delete(activeIngestionOperations)
+			.where(eq(activeIngestionOperations.taskId, options.taskId));
+	}
+
+	// Attempt best-effort cleanup of old temp dirs on each run
+	const cleanupResult = await ResultAsync.fromPromise(
+		cleanupTempDirs("expanded"),
+		(e) => e,
+	);
+	if (cleanupResult.isOk()) {
+		const cleaned = cleanupResult.value;
+		if (cleaned.length > 0) {
+			const totalSize = cleaned.reduce((sum, dir) => sum + dir.sizeBytes, 0);
+			log.info("Cleaned up old temporary directories", {
+				count: cleaned.length,
+				totalSizeBytes: totalSize,
+			});
+		}
+	} else {
+		// Don't fail if cleanup fails
+		log.debug("Background temp cleanup failed", {}, cleanupResult.error);
+	}
+
+	return mainResult.value;
 }
 
 export async function rerunIngestionRun(

@@ -64,3 +64,15 @@ export function toLogContext(e: AppError): Record<string, unknown> {
 		cause: cause !== undefined ? serializeError(cause) : undefined,
 	};
 }
+
+export function errorToHttpStatus(e: AppError): number {
+	switch (e._tag) {
+		case "DbError":
+			return isUniqueViolation(e) ? 409 : 500;
+		case "FetchError":
+			return 502;
+		case "StorageError":
+			return 500;
+	}
+}
+

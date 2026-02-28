@@ -16,13 +16,21 @@ async function main() {
 	switch (mode) {
 		case "all": {
 			const result = await loadAllToClickHouse();
-			console.log(`Imported ${result.imported} parquet file(s).`);
+			if (result.isErr()) {
+				console.error("Error:", result.error);
+				process.exit(1);
+			}
+			console.log(`Imported ${result.value.imported} parquet file(s).`);
 			break;
 		}
 		case "missing": {
 			const result = await loadMissingToClickHouse();
+			if (result.isErr()) {
+				console.error("Error:", result.error);
+				process.exit(1);
+			}
 			console.log(
-				`Imported ${result.imported} parquet file(s). Pending ${result.pending}.`,
+				`Imported ${result.value.imported} parquet file(s). Pending ${result.value.pending}.`,
 			);
 			break;
 		}

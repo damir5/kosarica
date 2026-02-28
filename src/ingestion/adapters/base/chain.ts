@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Result } from "neverthrow";
+import { Result } from "neverthrow";
 import { err, errAsync, ok, okAsync, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
@@ -164,8 +164,18 @@ export class BaseChainAdapter {
 					}
 					seen.add(href);
 
-					const fileUrl = resolveUrl(this.config.baseUrl, href);
-					const filename = this.extractFilenameFromUrl(fileUrl);
+					const resolveResult = resolveUrl(this.config.baseUrl, href);
+					if (resolveResult.isErr()) {
+						continue;
+					}
+					const fileUrl = resolveResult.value;
+
+					const filenameResult = this.extractFilenameFromUrl(fileUrl);
+					if (filenameResult.isErr()) {
+						continue;
+					}
+					const filename = filenameResult.value;
+
 					const type = this.detectFileType(filename);
 
 					files.push({
@@ -292,18 +302,19 @@ export class BaseChainAdapter {
 		};
 	}
 
-	protected extractFilenameFromUrl(url: string): string {
-		try {
-			const parsed = new URL(url);
-			const pathname = parsed.pathname;
-			const parts = pathname.split("/");
-			const filename = parts[parts.length - 1];
-			return filename
-				? filename.split("?")[0]
-				: `unknown.${this.supportedTypes[0]}`;
-		} catch {
-			return `unknown.${this.supportedTypes[0]}`;
-		}
+	protected extractFilenameFromUrl(url: string): Result<string, Error> {
+		return Result.fromThrowable(
+			() => {
+				const parsed = new URL(url);
+				const pathname = parsed.pathname;
+				const parts = pathname.split("/");
+				const filename = parts[parts.length - 1];
+				return filename
+					? filename.split("?")[0]
+					: `unknown.${this.supportedTypes[0]}`;
+			},
+			(e) => new Error(`Failed to extract filename from URL ${url}: ${e instanceof Error ? e.message : String(e)}`)
+		)();
 	}
 
 	protected detectFileType(filename: string): FileType {
@@ -479,24 +490,24 @@ function calculateRateLimitBackoff(
 	const capped = Math.min(exponential, config.maxBackoffMs);
 	return capped + Math.random() * 0.25 * capped;
 }
-
-function resolveUrl(baseUrl: string, href: string): string {
+function resolveUrl(baseUrl: string, href: string): Result<string, Error> {
 	if (href.startsWith("http://") || href.startsWith("https://")) {
-		return href;
+		return ok(href);
 	}
-	try {
-		const base = new URL(baseUrl);
-		if (href.startsWith("/")) {
-			return `${base.protocol}//${base.host}${href}`;
-		}
-		const basePath = base.pathname;
-		const prefix = basePath.includes("/")
-			? basePath.slice(0, basePath.lastIndexOf("/") + 1)
-			: "/";
-		return `${base.protocol}//${base.host}${prefix}${href}`;
-	} catch {
-		return href;
-	}
+	return Result.fromThrowable(
+		() => {
+			const base = new URL(baseUrl);
+			if (href.startsWith("/")) {
+				return `${base.protocol}//${base.host}${href}`;
+			}
+			const basePath = base.pathname;
+			const prefix = basePath.includes("/")
+				? basePath.slice(0, basePath.lastIndexOf("/") + 1)
+				: "/";
+			return `${base.protocol}//${base.host}${prefix}${href}`;
+		},
+		(e) => new Error(`Failed to resolve URL ${href} relative to ${baseUrl}: ${e instanceof Error ? e.message : String(e)}`)
+	)();
 }
 
 function sleep(ms: number): Promise<void> {

@@ -475,43 +475,37 @@ function mapRowToNormalized(
 	const priceStr = getValue("price");
 	const discountPriceStr = getValue("discountPrice");
 	if (priceStr) {
-		try {
-			const parsedPrice = parsePrice(priceStr);
-			if (parsedPrice > 0) {
-				price = parsedPrice;
-				priceStatus = "available";
-				priceUnavailableReason = undefined;
-			} else {
-				priceUnavailableReason = "non_positive";
-			}
-		} catch {
+		const priceResult = parsePrice(priceStr);
+		if (priceResult.isOk() && priceResult.value > 0) {
+			price = priceResult.value;
+			priceStatus = "available";
+			priceUnavailableReason = undefined;
+		} else if (priceResult.isOk()) {
+			priceUnavailableReason = "non_positive";
+		} else {
 			priceUnavailableReason = "invalid";
 		}
 	}
 
 	if (priceStatus === "unavailable" && discountPriceStr) {
-		try {
-			const parsed = parsePrice(discountPriceStr);
-			if (parsed > 0) {
-				price = parsed;
-				priceStatus = "available";
-				priceUnavailableReason = undefined;
-			} else {
-				priceUnavailableReason = "non_positive";
-			}
-		} catch {
-			if (priceUnavailableReason === "missing") {
-				priceUnavailableReason = "invalid";
-			}
+		const discountResult = parsePrice(discountPriceStr);
+		if (discountResult.isOk() && discountResult.value > 0) {
+			price = discountResult.value;
+			priceStatus = "available";
+			priceUnavailableReason = undefined;
+		} else if (discountResult.isOk()) {
+			priceUnavailableReason = "non_positive";
+		} else if (priceUnavailableReason === "missing") {
+			priceUnavailableReason = "invalid";
 		}
 	}
 
+
 	let discountPrice: number | undefined;
 	if (discountPriceStr) {
-		try {
-			discountPrice = parsePrice(discountPriceStr);
-		} catch {
-			// Ignore
+		const discountResult = parsePrice(discountPriceStr);
+		if (discountResult.isOk()) {
+			discountPrice = discountResult.value;
 		}
 	}
 
@@ -534,33 +528,33 @@ function mapRowToNormalized(
 		}
 	}
 
+
 	let unitPrice: number | undefined;
 	const unitPriceStr = getValue("unitPrice");
 	if (unitPriceStr) {
-		try {
-			unitPrice = parsePrice(unitPriceStr);
-		} catch {
-			// Ignore
+		const unitPriceResult = parsePrice(unitPriceStr);
+		if (unitPriceResult.isOk()) {
+			unitPrice = unitPriceResult.value;
 		}
 	}
+
 
 	let lowestPrice30d: number | undefined;
 	const lowestPriceStr = getValue("lowestPrice30d");
 	if (lowestPriceStr) {
-		try {
-			lowestPrice30d = parsePrice(lowestPriceStr);
-		} catch {
-			// Ignore
+		const lowestPriceResult = parsePrice(lowestPriceStr);
+		if (lowestPriceResult.isOk()) {
+			lowestPrice30d = lowestPriceResult.value;
 		}
 	}
+
 
 	let anchorPrice: number | undefined;
 	const anchorPriceStr = getValue("anchorPrice");
 	if (anchorPriceStr) {
-		try {
-			anchorPrice = parsePrice(anchorPriceStr);
-		} catch {
-			// Ignore
+		const anchorPriceResult = parsePrice(anchorPriceStr);
+		if (anchorPriceResult.isOk()) {
+			anchorPrice = anchorPriceResult.value;
 		}
 	}
 

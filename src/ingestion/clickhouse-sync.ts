@@ -1,4 +1,5 @@
 import { inArray } from "drizzle-orm";
+import { err, ok, type Result } from "neverthrow";
 import { getDatabase } from "@/db";
 import { parquetFiles } from "@/db/schema";
 import { getClickHouseBatch } from "@/lib/clickhouse";
@@ -25,21 +26,24 @@ interface LoadMissingOptions {
 	reimportUpdated?: boolean;
 }
 
-function parseParquetKey(storageKey: string): {
-	chainSlug: string;
-	targetDate: Date;
-} {
+function parseParquetKey(storageKey: string): Result<
+	{
+		chainSlug: string;
+		targetDate: Date;
+	},
+	Error
+> {
 	const match = storageKey.match(
 		/^parquet\/([^/]+)\/(\d{4}-\d{2}-\d{2})\/prices\.parquet$/,
 	);
 	if (!match) {
-		throw new Error(`invalid parquet storage key: ${storageKey}`);
+		return err(new Error(`invalid parquet storage key: ${storageKey}`));
 	}
 
 	const [, chainSlug, dateStr] = match;
 	const [year, month, day] = dateStr.split("-").map((part) => Number(part));
 	const targetDate = new Date(Date.UTC(year, month - 1, day));
-	return { chainSlug, targetDate };
+	return ok({ chainSlug, targetDate });
 }
 
 async function listParquetKeys(): Promise<string[]> {
@@ -51,11 +55,16 @@ async function listParquetKeys(): Promise<string[]> {
 async function upsertParquetRecord(
 	storageKey: string,
 	importedAt: Date | null,
-): Promise<void> {
+): Promise<Result<void, Error>> {
+	const parseResult = parseParquetKey(storageKey);
+	if (parseResult.isErr()) {
+		return Promise.resolve(err(parseResult.error));
+	}
+	const { chainSlug, targetDate } = parseResult.value;
+
 	const db = getDatabase();
 	const storage = getStorage();
 	const info = await storage.getInfo(storageKey);
-	const { chainSlug, targetDate } = parseParquetKey(storageKey);
 	const syncedAt = importedAt ?? new Date();
 
 	const targetDateStr = targetDate.toISOString().split("T")[0];
@@ -81,6 +90,7 @@ async function upsertParquetRecord(
 				updatedAt: syncedAt,
 			},
 		});
+	return Promise.resolve(ok(undefined));
 }
 
 type ParquetImportState = {
@@ -134,10 +144,15 @@ async function importParquetStorageKey(
 	await clickhouse.importParquetBuffer(payload);
 }
 
-export async function loadAllToClickHouse(): Promise<{
-	imported: number;
-	importedChains: string[];
-}> {
+export async function loadAllToClickHouse(): Promise<
+	Result<
+		{
+			imported: number;
+			importedChains: string[];
+		},
+		Error
+	>
+> {
 	const keys = await listParquetKeys();
 	const clickhouse = getClickHouseBatch();
 
@@ -146,23 +161,35 @@ export async function loadAllToClickHouse(): Promise<{
 	let imported = 0;
 	const importedChains = new Set<string>();
 	for (const key of keys) {
-		const { chainSlug } = parseParquetKey(key);
+		const parseResult = parseParquetKey(key);
+		if (parseResult.isErr()) {
+			return err(parseResult.error);
+		}
+		const { chainSlug } = parseResult.value;
 		await importParquetStorageKey(key, clickhouse);
-		await upsertParquetRecord(key, new Date());
+		const upsertResult = await upsertParquetRecord(key, new Date());
+		if (upsertResult.isErr()) {
+			return err(upsertResult.error);
+		}
 		importedChains.add(chainSlug);
 		imported += 1;
 	}
 
-	return { imported, importedChains: Array.from(importedChains) };
+	return ok({ imported, importedChains: Array.from(importedChains) });
 }
 
 export async function loadMissingToClickHouse(
 	options?: LoadMissingOptions,
-): Promise<{
-	imported: number;
-	pending: number;
-	importedChains: string[];
-}> {
+): Promise<
+	Result<
+		{
+			imported: number;
+			pending: number;
+			importedChains: string[];
+		},
+		Error
+	>
+> {
 	const clickhouse = getClickHouseBatch();
 	const keys = await listParquetKeys();
 	const stateByKey = await loadParquetImportState(keys);
@@ -186,51 +213,53 @@ export async function loadMissingToClickHouse(
 					),
 				);
 
-	const pendingItems = keys.flatMap((key) => {
-		if (minTargetDate) {
-			const { targetDate } = parseParquetKey(key);
-			if (targetDate < minTargetDate) {
-				return [];
-			}
+	// Build pending items list with error handling
+	const pendingItems: {
+		key: string;
+		chainSlug: string;
+		targetDate: string;
+		replaceExisting: boolean;
+	}[] = [];
+
+	for (const key of keys) {
+		const parseResult = parseParquetKey(key);
+		if (parseResult.isErr()) {
+			return err(parseResult.error);
+		}
+		const { chainSlug, targetDate } = parseResult.value;
+
+		if (minTargetDate && targetDate < minTargetDate) {
+			continue;
 		}
 
 		const state = stateByKey.get(key);
 		if (!state) {
-			const { chainSlug, targetDate } = parseParquetKey(key);
-			return [
-				{
-					key,
-					chainSlug,
-					targetDate: targetDate.toISOString().slice(0, 10),
-					replaceExisting: false,
-				},
-			];
+			pendingItems.push({
+				key,
+				chainSlug,
+				targetDate: targetDate.toISOString().slice(0, 10),
+				replaceExisting: false,
+			});
+			continue;
 		}
 		if (!state.importedAt) {
-			const { chainSlug, targetDate } = parseParquetKey(key);
-			return [
-				{
-					key,
-					chainSlug,
-					targetDate: targetDate.toISOString().slice(0, 10),
-					replaceExisting: false,
-				},
-			];
+			pendingItems.push({
+				key,
+				chainSlug,
+				targetDate: targetDate.toISOString().slice(0, 10),
+				replaceExisting: false,
+			});
+			continue;
 		}
-		if (!reimportUpdated || state.updatedAt <= state.importedAt) {
-			return [];
-		}
-
-		const { chainSlug, targetDate } = parseParquetKey(key);
-		return [
-			{
+		if (reimportUpdated && state.updatedAt > state.importedAt) {
+			pendingItems.push({
 				key,
 				chainSlug,
 				targetDate: targetDate.toISOString().slice(0, 10),
 				replaceExisting: true,
-			},
-		];
-	});
+			});
+		}
+	}
 
 	let imported = 0;
 	const importedChains = new Set<string>();
@@ -241,16 +270,19 @@ export async function loadMissingToClickHouse(
 		}
 
 		await importParquetStorageKey(item.key, clickhouse);
-		await upsertParquetRecord(item.key, new Date());
+		const upsertResult = await upsertParquetRecord(item.key, new Date());
+		if (upsertResult.isErr()) {
+			return err(upsertResult.error);
+		}
 		importedChains.add(item.chainSlug);
 		imported += 1;
 	}
 
-	return {
+	return ok({
 		imported,
 		pending: Math.max(pendingItems.length - imported, 0),
 		importedChains: Array.from(importedChains),
-	};
+	});
 }
 
 export async function getClickHouseSyncStatus(): Promise<ClickHouseSyncStatus> {

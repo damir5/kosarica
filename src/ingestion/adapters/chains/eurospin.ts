@@ -1,4 +1,4 @@
-import { okAsync, ResultAsync } from "neverthrow";
+import { okAsync, Result, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { CsvColumnMapping } from "../../parsers/csv";
@@ -116,7 +116,8 @@ export class EurospinAdapter extends BaseCsvAdapter {
 					}
 					seen.add(fileUrl);
 					if (!filename) {
-						filename = this.extractFilenameFromUrl(fileUrl);
+						const filenameResult = this.extractFilenameFromUrl(fileUrl);
+						filename = filenameResult.isErr() ? fileUrl : filenameResult.value;
 					}
 					const fileDate = this.extractDateFromFilename(filename);
 					if (date && fileDate && fileDate !== date) {
@@ -141,8 +142,11 @@ export class EurospinAdapter extends BaseCsvAdapter {
 	}
 
 	async expandZip(content: Buffer, filename: string): Promise<ExpandedFile[]> {
-		const expanded = await expandZip(content, filename);
-		return expanded.filter((file) => file.type === "csv");
+		const expandedResult = await expandZip(content, filename);
+		if (expandedResult.isErr()) {
+			return [];
+		}
+		return expandedResult.value.filter((file) => file.type === "csv");
 	}
 
 	parse(
@@ -164,14 +168,15 @@ export class EurospinAdapter extends BaseCsvAdapter {
 		return `${this.baseUrl()}/${href}`;
 	}
 
-	protected extractFilenameFromUrl(fileUrl: string): string {
-		try {
-			const parsed = new URL(fileUrl);
-			const parts = parsed.pathname.split("/");
-			return parts[parts.length - 1] ?? fileUrl;
-		} catch {
-			return fileUrl;
-		}
+	protected extractFilenameFromUrl(fileUrl: string): Result<string, Error> {
+		return Result.fromThrowable(
+			() => {
+				const parsed = new URL(fileUrl);
+				const parts = parsed.pathname.split("/");
+				return parts[parts.length - 1] ?? fileUrl;
+			},
+			(e) => new Error(`Failed to extract filename from URL ${fileUrl}: ${e instanceof Error ? e.message : String(e)}`),
+		)();
 	}
 
 	private extractDateFromFilename(filename: string): string {

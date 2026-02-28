@@ -135,8 +135,11 @@ export class LidlAdapter extends BaseCsvAdapter {
 	}
 
 	async expandZip(content: Buffer, filename: string): Promise<ExpandedFile[]> {
-		const expanded = await expandZip(content, filename);
-		return expanded.filter((file) => file.type === "csv");
+		const expandedResult = await expandZip(content, filename);
+		if (expandedResult.isErr()) {
+			return [];
+		}
+		return expandedResult.value.filter((file) => file.type === "csv");
 	}
 
 	parse(

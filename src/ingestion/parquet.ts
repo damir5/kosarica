@@ -9,7 +9,9 @@ import {
 	ParquetWriter,
 	type WriterOptions,
 } from "@dsnp/parquetjs/dist/parquet";
+import { err, errAsync, ok, okAsync, ResultAsync } from "neverthrow";
 import { getStorage, LocalStorage, resolveStoragePath } from "@/lib/storage";
+import { storageError, type StorageError } from "@/lib/errors";
 
 export interface ParquetPriceRow {
 	target_date: Date;
@@ -87,15 +89,24 @@ const PRICE_SCHEMA = new ParquetSchema({
 });
 
 export interface PricesParquetAppender {
-	appendRows(rows: ParquetPriceRow[]): Promise<void>;
-	close(): Promise<{ filePath: string; rowCount: number }>;
+	appendRows(rows: ParquetPriceRow[]): ResultAsync<void, StorageError>;
+	close(): ResultAsync<{ filePath: string; rowCount: number }, StorageError>;
 }
 
-async function openParquetWriter(
+function openParquetWriter(
 	filePath: string,
-): Promise<ParquetWriter> {
+): ResultAsync<ParquetWriter, StorageError> {
 	const options: WriterOptions = {};
-	return ParquetWriter.openFile(PRICE_SCHEMA, filePath, options);
+	return ResultAsync.fromPromise(
+		ParquetWriter.openFile(PRICE_SCHEMA, filePath, options),
+		(e) =>
+			storageError({
+				operation: "put",
+				key: filePath,
+				message: e instanceof Error ? e.message : "Failed to open parquet writer",
+				cause: e,
+			}),
+	);
 }
 
 interface ParquetOutputTarget {
@@ -104,13 +115,24 @@ interface ParquetOutputTarget {
 	cleanup(): Promise<void>;
 }
 
-async function createOutputTarget(storageKey: string): Promise<ParquetOutputTarget> {
+function createOutputTarget(
+	storageKey: string,
+): ResultAsync<ParquetOutputTarget, StorageError> {
 	const storage = getStorage();
 
 	if (storage instanceof LocalStorage) {
 		const filePath = resolveStoragePath(storageKey);
-		await mkdir(path.dirname(filePath), { recursive: true });
-		return {
+		return ResultAsync.fromPromise(
+			mkdir(path.dirname(filePath), { recursive: true }),
+			(e) =>
+				storageError({
+					operation: "put",
+					key: storageKey,
+					message:
+						e instanceof Error ? e.message : "Failed to create directory",
+					cause: e,
+				}),
+		).map(() => ({
 			filePath,
 			async persist() {
 				// No-op: writer already persisted directly to local storage path.
@@ -118,99 +140,149 @@ async function createOutputTarget(storageKey: string): Promise<ParquetOutputTarg
 			async cleanup() {
 				// No-op for local direct writes.
 			},
-		};
+		}));
 	}
 
-	const tempDir = await mkdtemp(path.join(tmpdir(), "kosarica-parquet-"));
-	const filePath = path.join(tempDir, "prices.parquet");
-	await mkdir(path.dirname(filePath), { recursive: true });
-
-	return {
-		filePath,
-		async persist(key: string) {
-			const data = await readFile(filePath);
-			await storage.put(key, data, {
-				contentType: "application/octet-stream",
-				originalName: path.basename(key),
-				custom: {
-					file_type: "parquet",
-				},
-			});
-		},
-		async cleanup() {
-			await rm(tempDir, { recursive: true, force: true });
-		},
-	};
+	return ResultAsync.fromPromise(
+		mkdtemp(path.join(tmpdir(), "kosarica-parquet-")),
+		(e) =>
+			storageError({
+				operation: "put",
+				key: storageKey,
+				message:
+					e instanceof Error ? e.message : "Failed to create temp directory",
+				cause: e,
+			}),
+	).andThen((tempDir) => {
+		const filePath = path.join(tempDir, "prices.parquet");
+		return ResultAsync.fromPromise(
+			mkdir(path.dirname(filePath), { recursive: true }),
+			(e) =>
+				storageError({
+					operation: "put",
+					key: storageKey,
+					message:
+						e instanceof Error ? e.message : "Failed to create directory",
+					cause: e,
+				}),
+		).map(() => ({
+			filePath,
+			async persist(key: string) {
+				const data = await readFile(filePath);
+				await storage.put(key, data, {
+					contentType: "application/octet-stream",
+					originalName: path.basename(key),
+					custom: {
+						file_type: "parquet",
+					},
+				});
+			},
+			async cleanup() {
+				await rm(tempDir, { recursive: true, force: true });
+			},
+		}));
+	});
 }
 
-export async function createPricesParquetAppender(
+export function createPricesParquetAppender(
 	storageKey: string,
-): Promise<PricesParquetAppender> {
-	const target = await createOutputTarget(storageKey);
-	const filePath = target.filePath;
+): ResultAsync<PricesParquetAppender, StorageError> {
+	return createOutputTarget(storageKey).andThen((target) => {
+		const filePath = target.filePath;
 
-	const writer = await openParquetWriter(filePath);
-	let rowCount = 0;
-	let closed = false;
-	let persisted = false;
-	let cleanedUp = false;
-	let writeQueue: Promise<void> = Promise.resolve();
+		return openParquetWriter(filePath).map((writer) => {
+			let rowCount = 0;
+			let closed = false;
+			let persisted = false;
+			let cleanedUp = false;
+			let writeQueue: Promise<void> = Promise.resolve();
 
-	const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
-		const next = writeQueue.then(operation);
-		writeQueue = next.then(
-			() => undefined,
-			() => undefined,
-		);
-		return next;
-	};
+			const enqueue = <T>(operation: () => ResultAsync<T, StorageError>): ResultAsync<T, StorageError> => {
+				const deferred = new Promise<{ result: T } | { error: StorageError }>((resolve) => {
+					writeQueue = writeQueue.then(
+						() => operation().match(
+							(result) => resolve({ result }),
+							(error) => resolve({ error }),
+						),
+						(error) => resolve({ error: storageError({ operation: "put", key: storageKey, message: error instanceof Error ? error.message : "Queue error", cause: error }) }),
+					);
+				});
+				return ResultAsync.fromPromise(deferred, () => storageError({ operation: "put", key: storageKey, message: "Queue error" })).andThen((result) =>
+					"error" in result ? errAsync(result.error) : okAsync(result.result)
+				);
+			};
 
-	return {
-		async appendRows(rows: ParquetPriceRow[]): Promise<void> {
-			if (rows.length === 0) {
-				return;
-			}
-
-			await enqueue(async () => {
-				if (closed) {
-					throw new Error("Cannot append rows after parquet writer is closed");
-				}
-
-				for (const row of rows) {
-					await writer.appendRow(row as Record<string, unknown>);
-				}
-				rowCount += rows.length;
-			});
-		},
-
-		async close(): Promise<{ filePath: string; rowCount: number }> {
-			return enqueue(async () => {
-				if (!closed) {
-					await writer.close();
-					closed = true;
-				}
-				if (!persisted) {
-					try {
-						await target.persist(storageKey);
-						persisted = true;
-					} finally {
-						if (!cleanedUp) {
-							await target.cleanup();
-							cleanedUp = true;
-						}
+			return {
+				appendRows(rows: ParquetPriceRow[]): ResultAsync<void, StorageError> {
+					if (rows.length === 0) {
+						return okAsync(undefined);
 					}
-				}
-				return { filePath, rowCount };
-			});
-		},
-	};
+
+					return enqueue(() => ResultAsync.fromPromise(
+						(async () => {
+							if (closed) {
+								return err(storageError({
+									operation: "put",
+									key: storageKey,
+									message: "Cannot append rows after parquet writer is closed",
+								}));
+							}
+
+							for (const row of rows) {
+								await writer.appendRow(row as Record<string, unknown>);
+							}
+							rowCount += rows.length;
+							return ok(undefined);
+						})(),
+						(e) =>
+							storageError({
+								operation: "put",
+								key: storageKey,
+								message: e instanceof Error ? e.message : "Failed to append rows",
+								cause: e,
+							}),
+					).andThen((result) => result));
+				},
+
+				close(): ResultAsync<{ filePath: string; rowCount: number }, StorageError> {
+				return enqueue(() => ResultAsync.fromPromise(
+					(async () => {
+						if (!closed) {
+							await writer.close();
+							closed = true;
+						}
+						if (!persisted) {
+							try {
+								await target.persist(storageKey);
+								persisted = true;
+							} finally {
+								if (!cleanedUp) {
+									await target.cleanup();
+									cleanedUp = true;
+								}
+							}
+						}
+						return ok({ filePath, rowCount });
+					})(),
+					(e) =>
+						storageError({
+							operation: "put",
+							key: storageKey,
+							message: e instanceof Error ? e.message : "Failed to close parquet writer",
+							cause: e,
+						}),
+				).andThen((result) => result));
+				},
+			};
+		});
+	});
 }
 
-export async function writePricesParquet(
+export function writePricesParquet(
 	storageKey: string,
 	rows: ParquetPriceRow[],
-): Promise<{ filePath: string; rowCount: number }> {
-	const appender = await createPricesParquetAppender(storageKey);
-	await appender.appendRows(rows);
-	return appender.close();
+): ResultAsync<{ filePath: string; rowCount: number }, StorageError> {
+	return createPricesParquetAppender(storageKey).andThen((appender) =>
+		appender.appendRows(rows).andThen(() => appender.close()),
+	);
 }

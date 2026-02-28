@@ -1,4 +1,4 @@
-import { okAsync, ResultAsync } from "neverthrow";
+import { okAsync, Result, ResultAsync } from "neverthrow";
 import { type FetchError, fetchError } from "@/lib/errors";
 import type { IngestionClassified } from "../../errors";
 import type { XmlFieldMapping } from "../../parsers/xml";
@@ -130,7 +130,8 @@ export class StudenacAdapter extends BaseXmlAdapter {
 						continue;
 					}
 					seen.add(fileUrl);
-					const filename = this.extractFilenameFromUrl(fileUrl);
+					const filenameResult = this.extractFilenameFromUrl(fileUrl);
+					const filename = filenameResult.isErr() ? fileUrl : filenameResult.value;
 					const fileDate = this.extractDateFromFilename(filename);
 					if (filterDate && fileDate && fileDate !== filterDate) {
 						continue;
@@ -206,18 +207,22 @@ export class StudenacAdapter extends BaseXmlAdapter {
 	}
 
 	async expandZip(content: Buffer, filename: string): Promise<ExpandedFile[]> {
-		const expanded = await expandZip(content, filename);
-		return expanded.filter((file) => file.type === "xml");
+		const expandedResult = await expandZip(content, filename);
+		if (expandedResult.isErr()) {
+			return [];
+		}
+		return expandedResult.value.filter((file) => file.type === "xml");
 	}
 
-	protected extractFilenameFromUrl(fileUrl: string): string {
-		try {
-			const parsed = new URL(fileUrl);
-			const parts = parsed.pathname.split("/");
-			return parts[parts.length - 1] ?? fileUrl;
-		} catch {
-			return fileUrl;
-		}
+	protected extractFilenameFromUrl(fileUrl: string): Result<string, Error> {
+		return Result.fromThrowable(
+			() => {
+				const parsed = new URL(fileUrl);
+				const parts = parsed.pathname.split("/");
+				return parts[parts.length - 1] ?? fileUrl;
+			},
+			(e) => new Error(`Failed to extract filename from URL ${fileUrl}: ${e instanceof Error ? e.message : String(e)}`),
+		)();
 	}
 
 	private extractDateFromFilename(filename: string): string {
