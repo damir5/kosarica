@@ -1,4 +1,7 @@
+import { err, ok, type Result } from "neverthrow";
 import { z } from "zod";
+import { validationError } from "@/lib/errors";
+import type { CascadeThresholds } from "./types";
 import type { CascadeThresholds } from "./types";
 
 const ProviderSchema = z.enum([
@@ -82,43 +85,71 @@ function isLoopbackHost(hostname: string): boolean {
 	);
 }
 
-function enforceEndpointSafety(endpoint: string, modelId: string): void {
+function enforceEndpointSafety(
+	endpoint: string,
+	modelId: string,
+): Result<void, ReturnType<typeof validationError>> {
 	const env = (process.env.NODE_ENV ?? "development").toLowerCase();
 	if (env === "development" || env === "test") {
-		return;
+		return ok(undefined);
 	}
 	if (process.env.ALLOW_LOOPBACK_LLM_ENDPOINT === "true") {
-		return;
+		return ok(undefined);
 	}
 
-	const url = new URL(endpoint);
+	let url: URL;
+	try {
+		url = new URL(endpoint);
+	} catch {
+		return err(
+			validationError({
+				message: `Invalid endpoint URL for model ${modelId}: ${endpoint}`,
+			}),
+		);
+	}
 	if (!isLoopbackHost(url.hostname)) {
-		return;
+		return ok(undefined);
 	}
 
-	throw new Error(
-		`Unsafe LLM endpoint for model ${modelId}: loopback host '${url.hostname}' is not allowed in ${env} (set ALLOW_LOOPBACK_LLM_ENDPOINT=true to override)`,
+	return err(
+		validationError({
+			message: `Unsafe LLM endpoint for model ${modelId}: loopback host '${url.hostname}' is not allowed in ${env} (set ALLOW_LOOPBACK_LLM_ENDPOINT=true to override)`,
+		}),
 	);
 }
 
 export function parseEnsembleConfig(
 	raw: string | undefined,
-): EnsembleModelConfig[] {
+): Result<EnsembleModelConfig[], ReturnType<typeof validationError>> {
 	if (!raw || raw.trim().length === 0) {
-		throw new Error("Model config JSON is required");
+		return err(validationError({ message: "Model config JSON is required" }));
 	}
 
-	const parsed = EnsembleSchema.parse(JSON.parse(raw));
+	let parsed: z.infer<typeof EnsembleSchema>;
+	try {
+		parsed = EnsembleSchema.parse(JSON.parse(raw));
+	} catch (e) {
+		return err(
+			validationError({
+				message: `Invalid model config JSON: ${e instanceof Error ? e.message : String(e)}`,
+			}),
+		);
+	}
 
-	return parsed.map((entry) => {
+	const configs: EnsembleModelConfig[] = [];
+	for (const entry of parsed) {
 		const endpoint = entry.endpoint ?? DEFAULT_ENDPOINTS[entry.provider];
-		enforceEndpointSafety(endpoint, entry.id);
-		return {
+		const safetyResult = enforceEndpointSafety(endpoint, entry.id);
+		if (safetyResult.isErr()) {
+			return err(safetyResult.error);
+		}
+		configs.push({
 			...entry,
 			endpoint,
 			apiKeyEnv: entry.apiKeyEnv ?? defaultApiKeyEnv(entry.provider),
-		};
-	});
+		});
+	}
+	return ok(configs);
 }
 
 export function readApiKey(config: EnsembleModelConfig): string {
@@ -133,4 +164,24 @@ export function readApiKey(config: EnsembleModelConfig): string {
 		throw new Error(`Missing API key for model ${config.id}: set ${envName}`);
 	}
 	return apiKey;
+}
+
+export function readApiKeySafe(
+	config: EnsembleModelConfig,
+): Result<string, ReturnType<typeof validationError>> {
+	if (config.provider === "ollama") {
+		const envName = config.apiKeyEnv;
+		return ok(envName ? (process.env[envName] ?? "") : "");
+	}
+
+	const envName = config.apiKeyEnv ?? defaultApiKeyEnv(config.provider);
+	const apiKey = process.env[envName];
+	if (!apiKey) {
+		return err(
+			validationError({
+				message: `Missing API key for model ${config.id}: set ${envName}`,
+			}),
+		);
+	}
+	return ok(apiKey);
 }

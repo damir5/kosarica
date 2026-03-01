@@ -4,11 +4,13 @@ import {
 	endpointToModelConfig,
 } from "@/lib/llm-routing";
 import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
+import { err, ok, type Result, type ResultAsync } from "neverthrow";
 import {
 	type EnsembleModelConfig,
-	readApiKey,
+	readApiKeySafe,
 	STRICT_CASCADE_THRESHOLDS,
 } from "./config";
+import { llmError } from "@/lib/errors";
 import type {
 	CascadeResult,
 	CascadeThresholds,
@@ -193,14 +195,16 @@ function extractJsonCandidates(content: string): string[] {
 	return candidates;
 }
 
-export function extractJsonPayload(content: string): unknown {
+export function extractJsonPayloadSafe(
+	content: string,
+): Result<unknown, ReturnType<typeof llmError>> {
 	const cleaned = stripModelWrappers(content).trim();
 	if (cleaned.length === 0) {
-		throw new Error("Model response is empty");
+		return err(llmError({ provider: "unknown", message: "Model response is empty" }));
 	}
 
 	try {
-		return JSON.parse(cleaned);
+		return ok(JSON.parse(cleaned));
 	} catch {
 		// Continue to candidate scanning.
 	}
@@ -208,24 +212,44 @@ export function extractJsonPayload(content: string): unknown {
 	const candidates = extractJsonCandidates(cleaned);
 	for (const candidate of candidates) {
 		try {
-			return JSON.parse(candidate);
+			return ok(JSON.parse(candidate));
 		} catch {
 			// Continue scanning.
 		}
 	}
 
 	const snippet = cleaned.slice(0, 320);
-	throw new Error(`Response does not contain valid JSON. Snippet: ${snippet}`);
+	return err(
+		llmError({
+			provider: "unknown",
+			message: `Response does not contain valid JSON. Snippet: ${snippet}`,
+		}),
+	);
 }
 
-function parseVerdict(value: unknown): SemanticVerdict {
+export function extractJsonPayload(content: string): unknown {
+	const result = extractJsonPayloadSafe(content);
+	if (result.isErr()) {
+		throw new Error(result.error.message);
+	}
+	return result.value;
+}
+
+function parseVerdictSafe(
+	value: unknown,
+): Result<SemanticVerdict, ReturnType<typeof llmError>> {
 	const normalized = String(value ?? "")
 		.trim()
 		.toUpperCase();
 	if (ALLOWED_VERDICTS.includes(normalized as SemanticVerdict)) {
-		return normalized as SemanticVerdict;
+		return ok(normalized as SemanticVerdict);
 	}
-	throw new Error(`Invalid verdict in response: ${String(value)}`);
+	return err(
+		llmError({
+			provider: "unknown",
+			message: `Invalid verdict in response: ${String(value)}`,
+		}),
+	);
 }
 
 function parseReasoning(value: unknown): string {
@@ -236,7 +260,7 @@ function parseReasoning(value: unknown): string {
 function normalizeBatchEntries(
 	payload: unknown,
 	expectedPairIds: Set<string>,
-): LLMBatchJsonResponse[] {
+): Result<LLMBatchJsonResponse[], ReturnType<typeof llmError>> {
 	const sourceEntries: unknown[] = (() => {
 		if (Array.isArray(payload)) {
 			return payload;
@@ -280,36 +304,54 @@ function normalizeBatchEntries(
 			continue;
 		}
 
+		const verdictResult = parseVerdictSafe(candidate.verdict);
+		if (verdictResult.isErr()) {
+			return err(verdictResult.error);
+		}
+
 		normalized.push({
 			pairId,
-			verdict: parseVerdict(candidate.verdict),
+			verdict: verdictResult.value,
 			confidence: clampConfidence(Number(candidate.confidence ?? 0)),
 			reasoning: parseReasoning(candidate.reasoning),
 		});
 	}
 
-	return normalized;
+	return ok(normalized);
 }
 
-function parseBatchJson(
+function parseBatchJsonSafe(
 	content: string,
 	expectedPairIds: Set<string>,
-): Map<string, LLMJsonResponse> {
-	const payload = extractJsonPayload(content);
-	const entries = normalizeBatchEntries(payload, expectedPairIds);
-	if (entries.length === 0) {
-		throw new Error("No valid pair decisions in JSON response");
+): Result<Map<string, LLMJsonResponse>, ReturnType<typeof llmError>> {
+	const payloadResult = extractJsonPayloadSafe(content);
+	if (payloadResult.isErr()) {
+		return err(payloadResult.error);
+	}
+
+	const entriesResult = normalizeBatchEntries(payloadResult.value, expectedPairIds);
+	if (entriesResult.isErr()) {
+		return err(entriesResult.error);
+	}
+
+	if (entriesResult.value.length === 0) {
+		return err(
+			llmError({
+				provider: "unknown",
+				message: "No valid pair decisions in JSON response",
+			}),
+		);
 	}
 
 	const decisions = new Map<string, LLMJsonResponse>();
-	for (const entry of entries) {
+	for (const entry of entriesResult.value) {
 		decisions.set(entry.pairId, {
 			verdict: entry.verdict,
 			confidence: entry.confidence,
 			reasoning: entry.reasoning,
 		});
 	}
-	return decisions;
+	return ok(decisions);
 }
 
 function buildJsonSchemaResponseFormat(): OpenAiResponseFormat {
@@ -399,26 +441,32 @@ function toOllamaChatEndpoint(endpoint: string): string {
 	return endpoint.replace(/\/v1\/chat\/completions\/?$/i, "/api/chat");
 }
 
-function extractOllamaMessageContent(data: unknown): string {
+function extractOllamaMessageContentSafe(
+	data: unknown,
+): Result<string, ReturnType<typeof llmError>> {
 	if (!data || typeof data !== "object") {
-		throw new Error("Invalid Ollama response payload");
+		return err(llmError({ provider: "ollama", message: "Invalid Ollama response payload" }));
 	}
 	const message = (data as { message?: { content?: unknown } }).message;
 	const content = message?.content;
 	if (typeof content === "string") {
 		const trimmed = content.trim();
 		if (trimmed.length > 0) {
-			return trimmed;
+			return ok(trimmed);
 		}
 	}
-	throw new Error("No message content returned by Ollama");
+	return err(llmError({ provider: "ollama", message: "No message content returned by Ollama" }));
 }
 
 async function callOpenAiCompatibleBatch(
 	config: EnsembleModelConfig,
 	pairs: SemanticBatchPairInput[],
 ): Promise<Map<string, LLMJsonResponse>> {
-	const apiKey = readApiKey(config);
+	const apiKeyResult = readApiKeySafe(config);
+	if (apiKeyResult.isErr()) {
+		throw new Error(apiKeyResult.error.message);
+	}
+	const apiKey = apiKeyResult.value;
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 	const preferenceKey = openAiEndpointPreferenceKey(config);
@@ -504,7 +552,11 @@ async function callOpenAiCompatibleBatch(
 				});
 			}
 
-			return parseBatchJson(content, expectedPairIds);
+			const parseResult = parseBatchJsonSafe(content, expectedPairIds);
+			if (parseResult.isErr()) {
+				throw new Error(parseResult.error.message);
+			}
+			return parseResult.value;
 		}
 
 		throw lastError ?? new Error("OpenAI-compatible batch request failed");
@@ -524,9 +576,12 @@ async function callOllamaBatch(
 		const headers: Record<string, string> = {
 			"Content-Type": "application/json",
 		};
-		const apiKey = readApiKey(config);
-		if (apiKey.length > 0) {
-			headers.Authorization = `Bearer ${apiKey}`;
+		const apiKeyResult = readApiKeySafe(config);
+		if (apiKeyResult.isErr()) {
+			throw new Error(apiKeyResult.error.message);
+		}
+		if (apiKeyResult.value.length > 0) {
+			headers.Authorization = `Bearer ${apiKeyResult.value}`;
 		}
 
 		const response = await fetch(toOllamaChatEndpoint(config.endpoint ?? ""), {
@@ -552,8 +607,18 @@ async function callOllamaBatch(
 		}
 
 		const data = await response.json();
-		const content = extractOllamaMessageContent(data);
-		return parseBatchJson(content, new Set(pairs.map((pair) => pair.pairId)));
+		const contentResult = extractOllamaMessageContentSafe(data);
+		if (contentResult.isErr()) {
+			throw new Error(contentResult.error.message);
+		}
+		const parseResult = parseBatchJsonSafe(
+			contentResult.value,
+			new Set(pairs.map((pair) => pair.pairId)),
+		);
+		if (parseResult.isErr()) {
+			throw new Error(parseResult.error.message);
+		}
+		return parseResult.value;
 	} finally {
 		clearTimeout(timeout);
 	}
@@ -563,7 +628,11 @@ async function callClaudeBatch(
 	config: EnsembleModelConfig,
 	pairs: SemanticBatchPairInput[],
 ): Promise<Map<string, LLMJsonResponse>> {
-	const apiKey = readApiKey(config);
+	const apiKeyResult = readApiKeySafe(config);
+	if (apiKeyResult.isErr()) {
+		throw new Error(apiKeyResult.error.message);
+	}
+	const apiKey = apiKeyResult.value;
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
@@ -598,7 +667,14 @@ async function callClaudeBatch(
 		if (!textPart) {
 			throw new Error("No text content in Claude response");
 		}
-		return parseBatchJson(textPart, new Set(pairs.map((pair) => pair.pairId)));
+		const parseResult = parseBatchJsonSafe(
+			textPart,
+			new Set(pairs.map((pair) => pair.pairId)),
+		);
+		if (parseResult.isErr()) {
+			throw new Error(parseResult.error.message);
+		}
+		return parseResult.value;
 	} finally {
 		clearTimeout(timeout);
 	}
@@ -639,7 +715,11 @@ async function callVertexExpressBatch(
 		responseSchema: buildVertexBatchResponseSchema(),
 	});
 
-	return parseBatchJson(responseText, expectedPairIds);
+	const parseResult = parseBatchJsonSafe(responseText, expectedPairIds);
+	if (parseResult.isErr()) {
+		throw new Error(parseResult.error.message);
+	}
+	return parseResult.value;
 }
 
 async function callModelBatch(
