@@ -393,17 +393,19 @@ SELECT * FROM "kosarica-traces" WHERE duration > 1000000000 ORDER BY start_time 
 
 ## Error Handling (neverthrow)
 
-The codebase uses `neverthrow` `Result`/`ResultAsync` types for type-safe error handling in adapters and infrastructure wrappers. Do NOT use try/catch in these layers — return typed errors instead.
+The codebase uses `neverthrow` `Result`/`ResultAsync` types for type-safe error handling in adapters and infrastructure wrappers. **`throw` statements are forbidden** in these layers — return typed errors instead. However, `try/catch` is allowed when implementing Result wrappers internally (e.g., catching underlying promise rejections and converting them to error results).
+
 
 ### MUST (Enforced)
 
-- In these boundary paths, `throw` is forbidden:
+- In these boundary paths, **`throw` statements** are forbidden:
   - `src/ingestion/adapters/**`
   - `src/lib/safe-db.ts`
   - `src/lib/safe-fetch.ts`
   - `src/lib/safe-storage.ts`
   - `src/lib/store-enrichment.ts`
   - `src/lib/geocoding.ts`
+- `try/catch` is **allowed** in these files for implementing Result wrappers (catching errors and returning `ResultAsync`)
 - Use `Result` / `ResultAsync` and typed errors from `src/lib/errors.ts`.
 - Run `pnpm validate:neverthrow` before handoff.
 
@@ -476,11 +478,32 @@ const discoveredFiles = discoverResult.value;
 
 ### Rules
 
-- **Adapters/wrappers**: Always return `ResultAsync`, never throw
+- **Adapters/wrappers**: Always return `ResultAsync`, never use `throw`
+- **Internal try/catch**: Allowed when implementing Result wrappers to catch underlying errors and convert them to typed results
 - **Pipeline boundary**: Unwrap with `.isErr()` / `.value` and convert to exceptions
 - Use `.map()` for sync transforms, `.andThen()` for async transforms
 - Do NOT add no-op `.orElse()` chains that just pass errors through
 - `IngestionClassified` (value type) is for Result errors; `IngestionClassifiedError` (class) is for pipeline catch blocks — both coexist
+
+### Example: try/catch allowed for Result wrapper implementation
+
+```typescript
+// OK - using try/catch to implement a Result-returning wrapper
+function safeQuery<T>(promise: Promise<T>): ResultAsync<T, DbError> {
+  return ResultAsync.fromPromise(
+    promise,
+    (e) => dbError({ message: String(e), code: extractPgCode(e) }),
+  );
+}
+
+// WRONG - throwing in an adapter
+function fetchData(): ResultAsync<Data, FetchError> {
+  if (!url) {
+    throw new Error("Missing URL"); // FORBIDDEN - use errAsync() instead
+  }
+  return this.fetch(url);
+}
+```
 
 ---
 

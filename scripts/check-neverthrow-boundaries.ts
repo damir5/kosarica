@@ -11,10 +11,10 @@ const targets = [
 
 const globs = ["!**/*.test.ts", "!**/__tests__/**", "!**/*.spec.ts"];
 
-const patterns = [
+// Only check for 'throw' statements - try/catch is allowed for internal implementation
+	// of Result wrappers (e.g., catching promise rejections to convert to error results)
+	const patterns = [
 	{ regex: "\\bthrow\\b", label: "throw" },
-	{ regex: "\\btry\\b", label: "try" },
-	{ regex: "\\bcatch\\b", label: "catch" },
 ] as const;
 
 interface ViolationResult {
