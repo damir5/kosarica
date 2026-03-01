@@ -741,7 +741,7 @@ async function callModelBatch(
 						? await callVertexExpressBatch(config, pairs)
 						: config.provider === "ollama"
 							? await callOllamaBatch(config, pairs)
-					: await callOpenAiCompatibleBatch(config, pairs);
+						: await callOpenAiCompatibleBatch(config, pairs);
 
 			const latencyMs = Date.now() - start;
 			const votes = new Map<string, SemanticVote>();
@@ -780,6 +780,7 @@ async function callModelBatch(
 		}
 	}
 
+	// All retries failed - throw the last error
 	throw lastError instanceof Error
 		? lastError
 		: new Error(`Model call failed for ${config.id}`);
