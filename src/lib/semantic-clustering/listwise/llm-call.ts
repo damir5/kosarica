@@ -1,13 +1,18 @@
 import { createLogger } from "@/utils/logger";
 import {
 	type EnsembleModelConfig,
-	readApiKey,
+	readApiKeySafe,
 } from "../config";
+import {
+	extractJsonPayload,
+	extractJsonPayloadSafe,
+} from "../llm";
 import {
 	callVertexExpressGenerateContent,
 	type VertexExpressUsage,
 } from "@/lib/llm/vertex-express";
-import { extractJsonPayload } from "../llm";
+import { llmError } from "@/lib/errors";
+import { err, ok, type Result } from "neverthrow";
 import {
 	buildClusteringPrompt,
 	buildBulkClusteringPrompt,
@@ -283,9 +288,14 @@ function extractVertexTokenUsage(usage: VertexExpressUsage): TokenUsage {
 	};
 }
 
-function extractOpenAiContent(data: unknown): string {
+function extractOpenAiContentSafe(
+	provider: string,
+	data: unknown,
+): Result<string, ReturnType<typeof llmError>> {
 	if (!data || typeof data !== "object") {
-		throw new Error("OpenAI-compatible response body is invalid");
+		return err(
+			llmError({ provider, message: "OpenAI-compatible response body is invalid" }),
+		);
 	}
 
 	const choices = (
@@ -304,7 +314,7 @@ function extractOpenAiContent(data: unknown): string {
 	if (typeof content === "string") {
 		const trimmed = content.trim();
 		if (trimmed.length > 0) {
-			return trimmed;
+			return ok(trimmed);
 		}
 	}
 	if (Array.isArray(content)) {
@@ -321,7 +331,7 @@ function extractOpenAiContent(data: unknown): string {
 			.join("")
 			.trim();
 		if (text.length > 0) {
-			return text;
+			return ok(text);
 		}
 	}
 
@@ -330,37 +340,41 @@ function extractOpenAiContent(data: unknown): string {
 		.find((value): value is string => typeof value === "string")
 		?.trim();
 	if (toolCallArgs && toolCallArgs.length > 0) {
-		return toolCallArgs;
+		return ok(toolCallArgs);
 	}
 
 	const parsedPayload = message?.parsed;
 	if (parsedPayload && typeof parsedPayload === "object") {
 		const serialized = JSON.stringify(parsedPayload);
 		if (serialized.trim().length > 0) {
-			return serialized;
+			return ok(serialized);
 		}
 	}
 
-	throw new Error("No text content in OpenAI-compatible response");
+	return err(
+		llmError({ provider, message: "No text content in OpenAI-compatible response" }),
+	);
 }
 
 function toOllamaChatEndpoint(endpoint: string): string {
 	return endpoint.replace(/\/v1\/chat\/completions\/?$/i, "/api/chat");
 }
 
-function extractOllamaContent(data: unknown): string {
+function extractOllamaContentSafe(
+	data: unknown,
+): Result<string, ReturnType<typeof llmError>> {
 	if (!data || typeof data !== "object") {
-		throw new Error("Ollama response body is invalid");
+		return err(llmError({ provider: "ollama", message: "Ollama response body is invalid" }));
 	}
 	const message = (data as { message?: { content?: unknown } }).message;
 	const content = message?.content;
 	if (typeof content === "string") {
 		const trimmed = content.trim();
 		if (trimmed.length > 0) {
-			return trimmed;
+			return ok(trimmed);
 		}
 	}
-	throw new Error("No text content in Ollama response");
+	return err(llmError({ provider: "ollama", message: "No text content in Ollama response" }));
 }
 
 function extractOllamaTokenUsage(data: unknown): TokenUsage {
@@ -415,7 +429,11 @@ async function callOpenAiCompatible(
 	userMsg: string,
 	jsonSchema?: PromptSchema,
 ): Promise<ModelCallResult> {
-	const apiKey = readApiKey(config);
+	const apiKeyResult = readApiKeySafe(config);
+	if (apiKeyResult.isErr()) {
+		throw new Error(apiKeyResult.error.message);
+	}
+	const apiKey = apiKeyResult.value;
 	const headers: Record<string, string> = {
 		"Content-Type": "application/json",
 	};
@@ -499,19 +517,14 @@ async function callOpenAiCompatible(
 			const isLastAttempt = index === formats.length - 1;
 			let content: string | null = null;
 			let payload: unknown;
-			try {
-				content = extractOpenAiContent(body);
-				payload = extractJsonPayload(content);
-			} catch (error) {
-				const parseError =
-					error instanceof Error ? error.message : String(error);
+
+			const contentResult = extractOpenAiContentSafe(config.provider, body);
+			if (contentResult.isErr()) {
+				const parseError = contentResult.error.message;
 				if (process.env.LISTWISE_DEBUG_RESPONSES === "1") {
 					const fallbackContent = (() => {
-						try {
-							return extractOpenAiContent(body);
-						} catch {
-							return null;
-						}
+						const fallback = extractOpenAiContentSafe(config.provider, body);
+						return fallback.isErr() ? null : fallback.value;
 					})();
 					log.warn("Listwise response parse failed", {
 						model: config.model,
@@ -534,8 +547,29 @@ async function callOpenAiCompatible(
 					);
 					continue;
 				}
-				throw error;
+				throw new Error(parseError);
 			}
+			content = contentResult.value;
+
+			const payloadResult = extractJsonPayloadSafe(content);
+			if (payloadResult.isErr()) {
+				const parseError = payloadResult.error.message;
+				if (!isLastAttempt) {
+					log.warn(
+						"OpenAI-compatible response JSON could not be parsed; trying fallback format",
+						{
+							model: config.model,
+							endpoint: config.endpoint,
+							format: format.type,
+							parseError,
+						},
+					);
+					continue;
+				}
+				throw new Error(parseError);
+			}
+			payload = payloadResult.value;
+
 			const tokenUsage = extractOpenAiTokenUsage(body);
 			const activeFormat = format.type;
 			if (
@@ -568,7 +602,11 @@ async function callOllamaNative(
 	systemMsg: string,
 	userMsg: string,
 ): Promise<ModelCallResult> {
-	const apiKey = readApiKey(config);
+	const apiKeyResult = readApiKeySafe(config);
+	if (apiKeyResult.isErr()) {
+		throw new Error(apiKeyResult.error.message);
+	}
+	const apiKey = apiKeyResult.value;
 	const headers: Record<string, string> = {
 		"Content-Type": "application/json",
 	};
@@ -603,9 +641,17 @@ async function callOllamaNative(
 		}
 
 		const data = await response.json();
-		const text = extractOllamaContent(data);
+		const textResult = extractOllamaContentSafe(data);
+		if (textResult.isErr()) {
+			throw new Error(textResult.error.message);
+		}
+		const text = textResult.value;
+		const payloadResult = extractJsonPayloadSafe(text);
+		if (payloadResult.isErr()) {
+			throw new Error(payloadResult.error.message);
+		}
 		return {
-			payload: extractJsonPayload(text),
+			payload: payloadResult.value,
 			latencyMs: 0,
 			responseText: text,
 			tokenUsage: extractOllamaTokenUsage(data),
@@ -620,7 +666,11 @@ async function callClaude(
 	systemMsg: string,
 	userMsg: string,
 ): Promise<ModelCallResult> {
-	const apiKey = readApiKey(config);
+	const apiKeyResult = readApiKeySafe(config);
+	if (apiKeyResult.isErr()) {
+		throw new Error(apiKeyResult.error.message);
+	}
+	const apiKey = apiKeyResult.value;
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
@@ -664,8 +714,12 @@ async function callClaude(
 			throw new Error("No text content in Claude response");
 		}
 
+		const payloadResult = extractJsonPayloadSafe(text);
+		if (payloadResult.isErr()) {
+			throw new Error(payloadResult.error.message);
+		}
 		return {
-			payload: extractJsonPayload(text),
+			payload: payloadResult.value,
 			latencyMs: 0,
 			responseText: text,
 			tokenUsage: {
@@ -683,16 +737,19 @@ async function callClaude(
 	}
 }
 
-export async function callModel(
+export async function callModelSafe(
 	config: EnsembleModelConfig,
 	systemMsg: string,
 	userMsg: string,
 	jsonSchema?: PromptSchema,
 ): Promise<
-	ModelCallResult & {
-		promptTokenEstimate: number;
-		responseTokenEstimate: number;
-	}
+	Result<
+		ModelCallResult & {
+			promptTokenEstimate: number;
+			responseTokenEstimate: number;
+		},
+		ReturnType<typeof llmError>
+	>
 > {
 	let lastError: unknown;
 	for (let attempt = 0; attempt <= config.maxRetries; attempt += 1) {
@@ -708,12 +765,12 @@ export async function callModel(
 						: await callOpenAiCompatible(config, systemMsg, userMsg, jsonSchema);
 
 			const latencyMs = Date.now() - startedAt;
-			return {
+			return ok({
 				...result,
 				latencyMs,
 				promptTokenEstimate: estimateTokens(`${systemMsg}\n${userMsg}`),
 				responseTokenEstimate: estimateTokens(result.responseText),
-			};
+			});
 		} catch (error) {
 			lastError = error;
 			if (attempt < config.maxRetries) {
@@ -724,9 +781,16 @@ export async function callModel(
 		}
 	}
 
-	throw lastError instanceof Error
-		? lastError
-		: new Error(`Model call failed for ${config.id}`);
+	return err(
+		llmError({
+			provider: config.provider,
+			message:
+				lastError instanceof Error
+					? lastError.message
+					: `Model call failed for ${config.id}`,
+			cause: lastError,
+		}),
+	);
 }
 
 export async function processGroupWithLLM(
@@ -752,12 +816,16 @@ export async function processGroupWithLLM(
 		groupId: group.groupId,
 	});
 
-	const extractionCall = await callModel(
+	const extractionCallResult = await callModelSafe(
 		config,
 		extractionPrompt.system,
 		extractionPrompt.user,
 		extractionPrompt.jsonSchema,
 	);
+	if (extractionCallResult.isErr()) {
+		throw new Error(extractionCallResult.error.message);
+	}
+	const extractionCall = extractionCallResult.value;
 	const extraction = parseExtractionResponse(
 		extractionCall.payload,
 		group.items,
@@ -800,12 +868,16 @@ export async function processGroupWithLLM(
 		groupId: group.groupId,
 	});
 
-	const clusteringCall = await callModel(
+	const clusteringCallResult = await callModelSafe(
 		config,
 		clusteringPrompt.system,
 		clusteringPrompt.user,
 		clusteringPrompt.jsonSchema,
 	);
+	if (clusteringCallResult.isErr()) {
+		throw new Error(clusteringCallResult.error.message);
+	}
+	const clusteringCall = clusteringCallResult.value;
 	const clustering = parseClusteringResponse(
 		clusteringCall.payload,
 		group.items,
@@ -891,12 +963,16 @@ export async function processGroupsWithLLM(
 		groupId: bulkLabel,
 	});
 
-	const extractionCall = await callModel(
+	const extractionCallResult = await callModelSafe(
 		config,
 		extractionPrompt.system,
 		extractionPrompt.user,
 		extractionPrompt.jsonSchema,
 	);
+	if (extractionCallResult.isErr()) {
+		throw new Error(extractionCallResult.error.message);
+	}
+	const extractionCall = extractionCallResult.value;
 	const extractionByGroup = parseBulkExtractionResponse(
 		extractionCall.payload,
 		groups.map((group) => ({ groupId: group.groupId, items: group.items })),
@@ -946,12 +1022,16 @@ export async function processGroupsWithLLM(
 		groupId: bulkLabel,
 	});
 
-	const clusteringCall = await callModel(
+	const clusteringCallResult = await callModelSafe(
 		config,
 		clusteringPrompt.system,
 		clusteringPrompt.user,
 		clusteringPrompt.jsonSchema,
 	);
+	if (clusteringCallResult.isErr()) {
+		throw new Error(clusteringCallResult.error.message);
+	}
+	const clusteringCall = clusteringCallResult.value;
 	const clusteringByGroup = parseBulkClusteringResponse(
 		clusteringCall.payload,
 		groups.map((group) => ({ groupId: group.groupId, items: group.items })),

@@ -4,7 +4,7 @@ import {
 	endpointToModelConfig,
 } from "@/lib/llm-routing";
 import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
-import { err, ok, type Result, type ResultAsync } from "neverthrow";
+import { err, ok, type Result } from "neverthrow";
 import {
 	type EnsembleModelConfig,
 	readApiKeySafe,
@@ -722,12 +722,12 @@ async function callVertexExpressBatch(
 	return parseResult.value;
 }
 
-async function callModelBatch(
+async function callModelBatchSafe(
 	config: EnsembleModelConfig,
 	pairs: SemanticBatchPairInput[],
-): Promise<Map<string, SemanticVote>> {
+): Promise<Result<Map<string, SemanticVote>, ReturnType<typeof llmError>>> {
 	if (pairs.length === 0) {
-		return new Map();
+		return ok(new Map());
 	}
 
 	let lastError: unknown;
@@ -769,7 +769,7 @@ async function callModelBatch(
 				});
 			}
 
-			return votes;
+			return ok(votes);
 		} catch (error) {
 			lastError = error;
 			if (attempt < config.maxRetries) {
@@ -780,10 +780,17 @@ async function callModelBatch(
 		}
 	}
 
-	// All retries failed - throw the last error
-	throw lastError instanceof Error
-		? lastError
-		: new Error(`Model call failed for ${config.id}`);
+	// All retries failed
+	return err(
+		llmError({
+			provider: config.provider,
+			message:
+				lastError instanceof Error
+					? lastError.message
+					: `Model call failed for ${config.id}`,
+			cause: lastError,
+		}),
+	);
 }
 
 function systemErrorResult(
@@ -918,21 +925,20 @@ export async function evaluatePairsWithCascadeBatch(input: {
 		votesByPair.set(pair.pairId, []);
 	}
 
-	const model1 = modelConfigs[0];
-	try {
-		const firstVotes = await callModelBatch(model1, input.pairs);
-		for (const pair of input.pairs) {
-			const vote = firstVotes.get(pair.pairId);
-			if (vote) {
-				votesByPair.get(pair.pairId)?.push(vote);
-			}
-		}
-	} catch (error) {
-		const message = `Primary model failed: ${String(error)}`;
+const model1 = modelConfigs[0];
+	const firstVotesResult = await callModelBatchSafe(model1, input.pairs);
+	if (firstVotesResult.isErr()) {
+		const message = `Primary model failed: ${firstVotesResult.error.message}`;
 		for (const pair of input.pairs) {
 			results.set(pair.pairId, systemErrorResult(message));
 		}
 		return results;
+	}
+	for (const pair of input.pairs) {
+		const vote = firstVotesResult.value.get(pair.pairId);
+		if (vote) {
+			votesByPair.get(pair.pairId)?.push(vote);
+		}
 	}
 
 	let unresolvedPairs = input.pairs.filter((pair) => {
@@ -942,18 +948,11 @@ export async function evaluatePairsWithCascadeBatch(input: {
 		);
 	});
 
-	if (modelConfigs.length >= 2 && unresolvedPairs.length > 0) {
+if (modelConfigs.length >= 2 && unresolvedPairs.length > 0) {
 		const model2 = modelConfigs[1];
-		try {
-			const secondVotes = await callModelBatch(model2, unresolvedPairs);
-			for (const pair of unresolvedPairs) {
-				const vote = secondVotes.get(pair.pairId);
-				if (vote) {
-					votesByPair.get(pair.pairId)?.push(vote);
-				}
-			}
-		} catch (error) {
-			const message = `Verification model failed: ${String(error)}`;
+		const secondVotesResult = await callModelBatchSafe(model2, unresolvedPairs);
+		if (secondVotesResult.isErr()) {
+			const message = `Verification model failed: ${secondVotesResult.error.message}`;
 			for (const pair of unresolvedPairs) {
 				results.set(
 					pair.pairId,
@@ -961,10 +960,17 @@ export async function evaluatePairsWithCascadeBatch(input: {
 				);
 			}
 			unresolvedPairs = [];
+		} else {
+			for (const pair of unresolvedPairs) {
+				const vote = secondVotesResult.value.get(pair.pairId);
+				if (vote) {
+					votesByPair.get(pair.pairId)?.push(vote);
+				}
+			}
 		}
 	}
 
-	if (modelConfigs.length >= 3 && unresolvedPairs.length > 0) {
+if (modelConfigs.length >= 3 && unresolvedPairs.length > 0) {
 		const tieBreakerPairs = unresolvedPairs.filter((pair) =>
 			needsTieBreaker(
 				votesByPair.get(pair.pairId) ?? [],
@@ -974,21 +980,21 @@ export async function evaluatePairsWithCascadeBatch(input: {
 
 		if (tieBreakerPairs.length > 0) {
 			const model3 = modelConfigs[2];
-			try {
-				const thirdVotes = await callModelBatch(model3, tieBreakerPairs);
-				for (const pair of tieBreakerPairs) {
-					const vote = thirdVotes.get(pair.pairId);
-					if (vote) {
-						votesByPair.get(pair.pairId)?.push(vote);
-					}
-				}
-			} catch (error) {
-				const message = `Tie-breaker model failed: ${String(error)}`;
+			const thirdVotesResult = await callModelBatchSafe(model3, tieBreakerPairs);
+			if (thirdVotesResult.isErr()) {
+				const message = `Tie-breaker model failed: ${thirdVotesResult.error.message}`;
 				for (const pair of tieBreakerPairs) {
 					results.set(
 						pair.pairId,
 						systemErrorResult(message, votesByPair.get(pair.pairId) ?? []),
 					);
+				}
+			} else {
+				for (const pair of tieBreakerPairs) {
+					const vote = thirdVotesResult.value.get(pair.pairId);
+					if (vote) {
+						votesByPair.get(pair.pairId)?.push(vote);
+					}
 				}
 			}
 		}

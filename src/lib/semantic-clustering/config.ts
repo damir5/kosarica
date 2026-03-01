@@ -2,7 +2,6 @@ import { err, ok, type Result } from "neverthrow";
 import { z } from "zod";
 import { validationError } from "@/lib/errors";
 import type { CascadeThresholds } from "./types";
-import type { CascadeThresholds } from "./types";
 
 const ProviderSchema = z.enum([
 	"openai",
@@ -118,7 +117,7 @@ function enforceEndpointSafety(
 	);
 }
 
-export function parseEnsembleConfig(
+export function parseEnsembleConfigSafe(
 	raw: string | undefined,
 ): Result<EnsembleModelConfig[], ReturnType<typeof validationError>> {
 	if (!raw || raw.trim().length === 0) {
@@ -150,6 +149,16 @@ export function parseEnsembleConfig(
 		});
 	}
 	return ok(configs);
+}
+
+export function parseEnsembleConfig(
+	raw: string | undefined,
+): EnsembleModelConfig[] {
+	const result = parseEnsembleConfigSafe(raw);
+	if (result.isErr()) {
+		throw new Error(result.error.message);
+	}
+	return result.value;
 }
 
 export function readApiKey(config: EnsembleModelConfig): string {

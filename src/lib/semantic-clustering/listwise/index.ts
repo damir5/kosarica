@@ -8,7 +8,7 @@ export {
 } from "./extraction-prompt";
 export { type BuildGroupQuery, buildGroupFromQuery } from "./group-gen";
 export {
-	callModel,
+	callModelSafe,
 	processGroupWithLLM,
 	setListwisePromptHook,
 } from "./llm-call";
