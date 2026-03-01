@@ -1,10 +1,12 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import { type DatabaseType, retailerItemFeatures, retailerItems } from "@/db";
 import { logLlmDecision } from "@/lib/llm-observability";
 import { getDiverseEndpoints } from "@/lib/llm-routing";
 import { extractJsonPayload } from "@/lib/semantic-clustering/llm";
 import { getDb } from "@/utils/bindings";
 import { createLogger, errorToObject } from "@/utils/logger";
+import { llmError, type LlmError } from "@/lib/errors";
 import {
 	type ParsedCategorization,
 	parseCategorizationResponse,
@@ -57,7 +59,7 @@ const DEFAULT_OPTIONS: Required<ReverificationOptions> = {
 	requireUnanimousForZeroConfidence: true,
 };
 
-async function callSingleModel(
+function callSingleModel(
 	config: {
 		id: string;
 		provider: string;
@@ -69,7 +71,7 @@ async function callSingleModel(
 		apiKeyEnv?: string;
 	},
 	messages: { systemMessage: string; userMessage: string },
-): Promise<{ payload: unknown; latencyMs: number }> {
+): ResultAsync<{ payload: unknown; latencyMs: number }, LlmError> {
 	const apiKeyEnv =
 		config.apiKeyEnv ??
 		(config.provider === "openai"
@@ -113,31 +115,54 @@ async function callSingleModel(
 		controller.abort();
 	}, timeoutMs);
 
-	try {
-		const response = await fetch(config.endpoint, {
-			method: "POST",
-			headers,
-			body: JSON.stringify(body),
-			signal: controller.signal,
-		});
+	type FetchResult =
+		| { ok: true; payload: unknown; latencyMs: number }
+		| { ok: false; error: LlmError };
 
-		const bodyText = await response.text();
-		if (!response.ok) {
-			throw new Error(
-				`${config.provider}:${config.model} HTTP ${response.status} ${response.statusText}`,
-			);
+	return ResultAsync.fromPromise(
+		(async (): Promise<FetchResult> => {
+			try {
+				const response = await fetch(config.endpoint, {
+					method: "POST",
+					headers,
+					body: JSON.stringify(body),
+					signal: controller.signal,
+				});
+
+				const bodyText = await response.text();
+				if (!response.ok) {
+					return {
+						ok: false,
+						error: llmError({
+							provider: config.provider,
+							message: `${config.provider}:${config.model} HTTP ${response.status} ${response.statusText}`,
+						}),
+					};
+				}
+
+				const jsonBody = JSON.parse(bodyText) as unknown;
+				const content =
+					(jsonBody as { choices?: Array<{ message?: { content?: string } }> })
+						?.choices?.[0]?.message?.content ?? "";
+				const payload = extractJsonPayload(content);
+
+				return { ok: true, payload, latencyMs: Date.now() - startedAt };
+				} finally {
+					clearTimeout(timeout);
+				}
+			})(),
+		(e) =>
+			llmError({
+				provider: config.provider,
+				message: e instanceof Error ? e.message : String(e),
+				cause: e,
+			}),
+	).andThen((result): ResultAsync<{ payload: unknown; latencyMs: number }, LlmError> => {
+		if (result.ok) {
+			return okAsync(result);
 		}
-
-		const jsonBody = JSON.parse(bodyText) as unknown;
-		const content =
-			(jsonBody as { choices?: Array<{ message?: { content?: string } }> })
-				?.choices?.[0]?.message?.content ?? "";
-		const payload = extractJsonPayload(content);
-
-		return { payload, latencyMs: Date.now() - startedAt };
-	} finally {
-		clearTimeout(timeout);
-	}
+		return errAsync(result.error);
+	});
 }
 
 function normalizeProductType(value: string | null): string {
@@ -436,46 +461,49 @@ export async function reverifyItems(
 		const votes: ReverificationVote[] = [];
 
 		for (const endpoint of endpoints) {
-			try {
-				const { payload, latencyMs } = await callSingleModel(
-					{
-						id: endpoint.id,
-						provider: endpoint.provider,
-						model: endpoint.model,
-						endpoint: endpoint.endpoint ?? "",
-						timeoutMs: endpoint.timeoutMs ?? 120_000,
-						maxTokens: endpoint.maxTokens,
-						maxRetries: endpoint.maxRetries,
-					},
-					messages,
-				);
+			const result = await callSingleModel(
+				{
+					id: endpoint.id,
+					provider: endpoint.provider,
+					model: endpoint.model,
+					endpoint: endpoint.endpoint ?? "",
+					timeoutMs: endpoint.timeoutMs ?? 120_000,
+					maxTokens: endpoint.maxTokens,
+					maxRetries: endpoint.maxRetries,
+				},
+				messages,
+			);
 
-				const parsed = parseCategorizationResponse(payload, new Set([llmId]));
-				const parsedItem = parsed.get(llmId);
-
-				if (parsedItem) {
-					votes.push({
-						modelId: endpoint.model,
-						provider: endpoint.provider,
-						endpointId: endpoint.id,
-						confidence: parsedItem.confidence,
-						everydayName: parsedItem.everydayName,
-						productType: parsedItem.productType,
-						brand: parsedItem.brand,
-						variant: parsedItem.variant,
-						searchTags: parsedItem.searchTags,
-						extractedAmount: parsedItem.extractedAmount,
-						extractedUnit: parsedItem.extractedUnit,
-						packAmount: parsedItem.packAmount,
-						containerType: parsedItem.containerType,
-						latencyMs,
-					});
-				}
-			} catch (error) {
+			if (result.isErr()) {
 				log.warn("Reverification model call failed", {
 					itemId: item.itemId,
 					model: endpoint.model,
-					error: error instanceof Error ? error.message : String(error),
+					error: result.error.message,
+				});
+				continue;
+			}
+
+			const { payload, latencyMs } = result.value;
+
+			const parsed = parseCategorizationResponse(payload, new Set([llmId]));
+			const parsedItem = parsed.get(llmId);
+
+			if (parsedItem) {
+				votes.push({
+					modelId: endpoint.model,
+					provider: endpoint.provider,
+					endpointId: endpoint.id,
+					confidence: parsedItem.confidence,
+					everydayName: parsedItem.everydayName,
+					productType: parsedItem.productType,
+					brand: parsedItem.brand,
+					variant: parsedItem.variant,
+					searchTags: parsedItem.searchTags,
+					extractedAmount: parsedItem.extractedAmount,
+					extractedUnit: parsedItem.extractedUnit,
+					packAmount: parsedItem.packAmount,
+					containerType: parsedItem.containerType,
+					latencyMs,
 				});
 			}
 		}
