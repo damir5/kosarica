@@ -531,17 +531,31 @@ async function ensureCollection(
 		brandGroup?: string | null;
 	},
 ): Promise<string> {
-	const [existing] = await tx
-		.select({ id: smartCollections.id })
+	const slug = slugify(input.title);
+	const existingRows = await tx
+		.select({
+			id: smartCollections.id,
+			ruleKey: smartCollections.ruleKey,
+			slug: smartCollections.slug,
+		})
 		.from(smartCollections)
-		.where(eq(smartCollections.ruleKey, input.ruleKey))
-		.limit(1);
+		.where(
+			or(
+				eq(smartCollections.ruleKey, input.ruleKey),
+				eq(smartCollections.slug, slug),
+			),
+		)
+		.limit(5);
+
+	const existingByRule = existingRows.find((row) => row.ruleKey === input.ruleKey);
+	const existingBySlug = existingRows.find((row) => row.slug === slug);
+	const existing = existingByRule ?? existingBySlug;
 
 	if (existing) {
 		await tx
 			.update(smartCollections)
 			.set({
-				slug: slugify(input.title),
+				slug,
 				title: input.title,
 				collectionType: input.collectionType,
 				taxonomy: input.taxonomy ?? null,
@@ -556,7 +570,7 @@ async function ensureCollection(
 	const [inserted] = await tx
 		.insert(smartCollections)
 		.values({
-			slug: slugify(input.title),
+			slug,
 			title: input.title,
 			collectionType: input.collectionType,
 			ruleKey: input.ruleKey,
