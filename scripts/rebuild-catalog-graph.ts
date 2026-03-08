@@ -269,7 +269,7 @@ function buildGraph(
 				id: existingFamily?.id ?? generatePrefixedId("pfm"),
 				familyKey: familyIdentity.familyKey,
 				slug: makeUniqueSlug(
-					slugify(familyIdentity.displayName),
+					slugify(familyIdentity.displayName) || "product",
 					familyIdentity.familyKey,
 					existingFamily?.slug ?? null,
 					familySlugOwners,

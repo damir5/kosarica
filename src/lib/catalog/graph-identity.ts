@@ -201,9 +201,13 @@ function deriveBaseLabel(
 	const rawName = stripContainerNoise(
 		stripQuantityNoise(removeDiacritics(cleanNullable(row.name) ?? row.name)),
 	);
+	const fallbackRawName = normalizeWhitespace(
+		removeDiacritics(cleanNullable(row.name) ?? row.name),
+	);
+	const safeRawName = rawName.length > 0 ? rawName : fallbackRawName;
 
 	if (isFresh) {
-		const freshBase = everydayName ?? rawName;
+		const freshBase = everydayName ?? safeRawName;
 		const extra =
 			featureVariant &&
 			!normalizeProductName(freshBase).includes(
@@ -236,12 +240,14 @@ function deriveBaseLabel(
 
 	if (
 		brandGroup &&
-		!normalizeProductName(rawName).includes(normalizeProductName(brandGroup))
+		!normalizeProductName(safeRawName).includes(
+			normalizeProductName(brandGroup),
+		)
 	) {
-		return normalizeWhitespace(`${brandGroup} ${rawName}`);
+		return normalizeWhitespace(`${brandGroup} ${safeRawName}`);
 	}
 
-	return rawName;
+	return safeRawName || "Unnamed Product";
 }
 
 function buildPackLabel(params: {
