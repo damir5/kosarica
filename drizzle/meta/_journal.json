@@ -148,6 +148,13 @@
       "when": 1772947728706,
       "tag": "0020_kind_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1772980920573,
+      "tag": "0021_lyrical_sheva_callister",
+      "breakpoints": true
     }
   ]
 }

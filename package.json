@@ -41,6 +41,7 @@
     "commodity:auto-link": "tsx scripts/auto-link-commodities.ts",
     "feature:candidates": "tsx scripts/generate-feature-candidates.ts",
     "catalog:conflicts": "tsx scripts/detect-catalog-conflicts.ts",
+    "catalog:rebuild-graph": "tsx scripts/rebuild-catalog-graph.ts",
     "geocode:dry": "tsx scripts/batch-geocode-stores.ts --dry-run",
     "geocode": "tsx scripts/batch-geocode-stores.ts",
     "backfill:display-names": "tsx scripts/backfill-display-names.ts",

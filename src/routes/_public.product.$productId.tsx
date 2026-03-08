@@ -1,270 +1,296 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { lazy, Suspense, useState } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { Check, ShoppingBasket } from "lucide-react";
 import { toast } from "sonner";
-import {
-	DataFreshnessBadge,
-	PriceComparisonRow,
-	SimilarVariantCard,
-	type StoreSlug,
-} from "@/components/public/domain";
 import { PageContainer, Section } from "@/components/public/layout";
 import {
 	Heading,
 	Text,
 	TkButton,
+	TkCard,
+	TkCardContent,
 	TkSkeleton,
 } from "@/components/public/primitives";
-import { computeDealLevel } from "@/lib/deal-levels";
-import { useNearbyStores } from "@/hooks/use-nearby-stores";
+import { PriceDisplay } from "@/components/public/domain";
 import { useBasket } from "@/hooks/use-basket";
 import { orpc } from "@/orpc/client";
 
-const PriceHistoryChart = lazy(() =>
-	import("@/components/public/charts").then((m) => ({
-		default: m.PriceHistoryChart,
-	})),
-);
-
 export const Route = createFileRoute("/_public/product/$productId")({
-	loader: ({ context, params }) => {
-		context.queryClient.prefetchQuery(
-			orpc.products.get.queryOptions({
-				input: { productId: params.productId },
-			}),
-		);
-	},
 	head: () => ({
-		meta: [
-			{
-				title: "Proizvod | Tvoja Košarica",
-			},
-		],
+		meta: [{ title: "Obitelj proizvoda | Tvoja Košarica" }],
 	}),
-	component: ProductDetailPage,
+	component: ProductFamilyPage,
 });
 
-function ProductDetailPage() {
+function ProductFamilyPage() {
 	const { productId } = Route.useParams();
 	const router = useRouter();
-	const { priceStoreIds, isActive: locationActive } = useNearbyStores();
-	const [showAll, setShowAll] = useState(false);
 	const { addItem, items } = useBasket();
-	const isInBasket = items.some((i) => i.productId === productId);
-
-	const { data, isLoading } = useQuery(
-		orpc.products.get.queryOptions({
-			input: { productId },
+	const familyQuery = useQuery(
+		orpc.catalog.getFamily.queryOptions({
+			input: { familyIdOrSlug: productId },
 		}),
 	);
 
-	if (isLoading || !data) {
+	const familyId = familyQuery.data?.family.id;
+	const graphQuery = useQuery({
+		...orpc.catalog.getFamilyGraph.queryOptions({
+			input: { familyId: familyId ?? "" },
+		}),
+		enabled: Boolean(familyId),
+	});
+
+	const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(undefined);
+	const activeVariantId =
+		selectedVariantId ?? graphQuery.data?.variants[0]?.id ?? undefined;
+
+	const offersQuery = useQuery({
+		...orpc.catalog.getFamilyOffers.queryOptions({
+			input: {
+				familyId: familyId ?? "",
+				variantId: activeVariantId,
+			},
+		}),
+		enabled: Boolean(familyId),
+	});
+
+	const family = familyQuery.data?.family;
+	const variants = graphQuery.data?.variants ?? [];
+	const offers = offersQuery.data?.offers ?? [];
+
+	const isInBasket = items.some((item) => item.productId === family?.id);
+	const bestOffer = offers[0];
+
+	const groupedOffers = useMemo(() => {
+		const byChain = new Map<string, (typeof offers)[number]>();
+		for (const offer of offers) {
+			const existing = byChain.get(offer.chainSlug);
+			if (
+				!existing ||
+				(offer.effectivePrice != null &&
+					(existing.effectivePrice == null ||
+						offer.effectivePrice < existing.effectivePrice))
+			) {
+				byChain.set(offer.chainSlug, offer);
+			}
+		}
+		return Array.from(byChain.values()).sort(
+			(a, b) => (a.effectivePrice ?? 0) - (b.effectivePrice ?? 0),
+		);
+	}, [offers]);
+
+	if (familyQuery.isLoading || !family) {
 		return (
 			<PageContainer>
-				<TkSkeleton className="h-8 w-48 mb-4" />
-				<TkSkeleton className="h-6 w-32 mb-6" />
-				<TkSkeleton className="h-[200px] w-full mb-4" />
-				<TkSkeleton className="h-24 w-full mb-2" />
-				<TkSkeleton className="h-24 w-full mb-2" />
-				<TkSkeleton className="h-24 w-full" />
+				<TkSkeleton className="mb-4 h-8 w-48" />
+				<TkSkeleton className="mb-3 h-10 w-80" />
+				<TkSkeleton className="h-32 w-full" />
 			</PageContainer>
 		);
 	}
 
-	const { product, storePrices, priceHistory } = data;
-
-	// Filter store prices by nearby stores when location is active
-	const filteredStorePrices = locationActive && !showAll
-		? storePrices.filter((sp) => priceStoreIds.includes(sp.storeId))
-		: storePrices;
-
-	// Deduplicate store prices: keep the lowest effective price per chain
-	const bestByChain = new Map<string, (typeof storePrices)[number]>();
-	for (const sp of filteredStorePrices) {
-		const existing = bestByChain.get(sp.chainSlug);
-		if (
-			!existing ||
-			(sp.effectivePrice != null &&
-				(existing.effectivePrice == null ||
-					sp.effectivePrice < existing.effectivePrice))
-		) {
-			bestByChain.set(sp.chainSlug, sp);
-		}
-	}
-
-	const uniquePrices = Array.from(bestByChain.values())
-		.filter((sp) => sp.effectivePrice != null)
-		.sort((a, b) => (a.effectivePrice ?? 0) - (b.effectivePrice ?? 0));
-
-	const bestPrice =
-		uniquePrices.length > 0 ? (uniquePrices[0].effectivePrice ?? 0) : 0;
-
-	const comparisonPrices = uniquePrices.map((sp) => {
-		const priceEur = (sp.effectivePrice ?? 0) / 100;
-		return {
-			store: sp.chainSlug as StoreSlug,
-			price: priceEur,
-			deal: computeDealLevel(sp.effectivePrice ?? 0, bestPrice),
-			itemName: sp.itemName || undefined,
-			unitPrice: sp.unitPriceCents != null ? sp.unitPriceCents / 100 : null,
-			unitLabel: sp.unitLabel,
-		};
-	});
-
-	const latestDate = storePrices.reduce<string | null>((latest, sp) => {
-		if (!latest || sp.lastSeenAt > latest) return sp.lastSeenAt;
-		return latest;
-	}, null);
-
 	return (
 		<PageContainer>
 			<div className="mb-4">
-				<TkButton
-					variant="ghost"
-					size="sm"
-					onClick={() => router.history.back()}
-				>
+				<TkButton variant="ghost" size="sm" onClick={() => router.history.back()}>
 					&larr; Natrag
 				</TkButton>
 			</div>
 
 			<Heading level={1} size="xl">
-				{product.name}
+				{family.displayName}
 			</Heading>
-			<div className="flex items-center gap-2 mt-1 mb-6">
-				{product.category && (
-					<Text as="span" variant="caption" className="text-tk-text-secondary">
-						{product.category}
+			<div className="mt-2 flex flex-wrap gap-2">
+				{family.taxonomy && (
+					<Text variant="caption" className="text-tk-text-secondary">
+						{family.taxonomy}
 					</Text>
 				)}
-				{product.unit && (
-					<Text as="span" variant="caption" className="text-tk-text-secondary">
-						{product.unit}
-						{product.unitQuantity ? ` ${product.unitQuantity}` : ""}
+				{family.qualityLabel && (
+					<Text variant="caption" className="text-tk-accent">
+						{family.qualityLabel}
 					</Text>
 				)}
-				{latestDate && <DataFreshnessBadge lastUpdated={latestDate} />}
+				<Text variant="caption" className="text-tk-text-secondary">
+					{family.chainCount} lanaca
+				</Text>
 			</div>
 
-			{priceHistory.length >= 2 && (
-				<Section title="Povijest cijena">
-					<Suspense fallback={<TkSkeleton className="h-[200px] w-full" />}>
-						<PriceHistoryChart data={priceHistory} />
-					</Suspense>
-				</Section>
-			)}
-
-			{comparisonPrices.length > 0 && (
-				<Section title="Cijene po trgovinama">
-					{locationActive && (
-						<div className="flex justify-end mb-2">
-							<button
-								type="button"
-								onClick={() => setShowAll((prev) => !prev)}
-								className="text-xs font-medium text-tk-accent hover:underline"
-							>
-								{showAll ? "Samo bliske trgovine" : "Sve trgovine"}
-							</button>
-						</div>
-					)}
-					<PriceComparisonRow
-						productName={product.name}
-						category={product.category ?? undefined}
-						unit={
-							product.unit
-								? `${product.unit}${product.unitQuantity ? ` ${product.unitQuantity}` : ""}`
-								: undefined
-						}
-						prices={comparisonPrices}
-					/>
-				</Section>
-			)}
-
-			{comparisonPrices.length === 0 && (
-				<Section>
-					<Text className="text-tk-text-secondary">
-						Trenutno nema dostupnih cijena za ovaj proizvod.
-					</Text>
-				</Section>
-			)}
-
-			<SimilarVariantsSection productId={product.id} />
-
-			{comparisonPrices.length > 0 && (
-				<div className="flex gap-2 mt-6 mb-8">
-					<TkButton
-						onClick={() => {
-							addItem.mutate(
-								{
-									productId: product.id,
-									name: product.name,
-									bestPrice: bestPrice > 0 ? bestPrice : undefined,
-									bestStore:
-										uniquePrices.length > 0
-											? (uniquePrices[0].chainSlug as StoreSlug)
-											: undefined,
-								},
-								{
-									onSuccess: () => {
-										toast.success(`${product.name} dodan u košaricu`);
-									},
-								},
-							);
-						}}
-					>
-						{isInBasket ? (
-							<>
-								<Check className="size-4" />
-								U košarici &mdash; dodaj još
-							</>
-						) : (
-							<>
-								<ShoppingBasket className="size-4" />
-								Dodaj u košaricu
-							</>
-						)}
-					</TkButton>
-					<TkButton variant="outline">Postavi alarm</TkButton>
+			<Section title="Pakiranja i odabir varijante">
+				<div className="flex flex-wrap gap-2">
+					{variants.map((variant) => (
+						<button
+							key={variant.id}
+							type="button"
+							onClick={() => setSelectedVariantId(variant.id)}
+							className={`rounded-full border px-3 py-2 text-sm ${
+								activeVariantId === variant.id
+									? "border-tk-accent bg-tk-accent-light text-tk-accent"
+									: "border-tk-border bg-tk-surface text-tk-text-secondary"
+							}`}
+						>
+							{variant.packLabel ?? variant.displayName}
+							{variant.bestPriceCents != null && (
+								<span className="ml-2 font-medium">
+									{(variant.bestPriceCents / 100).toFixed(2).replace(".", ",")} €
+								</span>
+							)}
+						</button>
+					))}
 				</div>
+			</Section>
+
+			<Section title="Cijene po lancima">
+				{offersQuery.isLoading ? (
+					<div className="grid gap-3 md:grid-cols-2">
+						{Array.from({ length: 6 }).map((_, index) => (
+							<TkSkeleton key={index} className="h-24 w-full" />
+						))}
+					</div>
+				) : groupedOffers.length === 0 ? (
+					<Text className="text-tk-text-secondary">
+						Trenutno nema dostupnih cijena za ovu varijantu.
+					</Text>
+				) : (
+					<div className="grid gap-3 md:grid-cols-2">
+						{groupedOffers.map((offer) => (
+							<TkCard key={`${offer.chainSlug}:${offer.variantId}`}>
+								<TkCardContent className="pt-4">
+									<div className="flex items-start justify-between gap-3">
+										<div>
+											<Heading size="sm">{offer.chainName}</Heading>
+											<Text variant="caption" className="text-tk-text-secondary">
+												{offer.itemName}
+											</Text>
+											{offer.unitPriceCents != null && offer.unitLabel && (
+												<Text
+													variant="caption"
+													className="mt-1 block text-tk-text-tertiary"
+												>
+													{(offer.unitPriceCents / 100).toFixed(2).replace(".", ",")} € /{" "}
+													{offer.unitLabel}
+												</Text>
+											)}
+										</div>
+										{offer.effectivePrice != null && (
+											<PriceDisplay
+												amount={offer.effectivePrice / 100}
+												size="compact"
+												deal={
+													offer.discountPrice != null &&
+													offer.discountPrice !== offer.effectivePrice
+														? "good"
+														: undefined
+												}
+											/>
+										)}
+									</div>
+								</TkCardContent>
+							</TkCard>
+						))}
+					</div>
+				)}
+			</Section>
+
+			<div className="mb-8 mt-6 flex gap-2">
+				<TkButton
+					onClick={() => {
+						addItem.mutate(
+							{
+								productId: family.id,
+								name: family.displayName,
+								bestPrice: bestOffer?.effectivePrice ?? undefined,
+								bestStore: undefined,
+							},
+							{
+								onSuccess: () => toast.success(`${family.displayName} dodan u košaricu`),
+							},
+						);
+					}}
+				>
+					{isInBasket ? (
+						<>
+							<Check className="size-4" />
+							U košarici
+						</>
+					) : (
+						<>
+							<ShoppingBasket className="size-4" />
+							Dodaj u košaricu
+						</>
+					)}
+				</TkButton>
+			</div>
+
+			{(graphQuery.data?.relatedFamilies.length ?? 0) > 0 && (
+				<Section title="Povezane obitelji">
+					<div className="grid gap-3 md:grid-cols-3">
+						{graphQuery.data?.relatedFamilies.map((related) => (
+							<Link
+								key={related.id}
+								to="/product/$productId"
+								params={{ productId: related.slug }}
+							>
+								<TkCard hover className="h-full cursor-pointer">
+									<TkCardContent className="pt-4">
+										<Heading size="sm">{related.displayName}</Heading>
+										<Text variant="caption" className="mt-2 block text-tk-text-secondary">
+											{related.variantCount} pakiranja
+										</Text>
+									</TkCardContent>
+								</TkCard>
+							</Link>
+						))}
+					</div>
+				</Section>
+			)}
+
+			{(graphQuery.data?.collectionPreviews.length ?? 0) > 0 && (
+				<Section title="Pametne kolekcije">
+					<div className="space-y-4">
+						{graphQuery.data?.collectionPreviews.map((collection) => (
+							<div key={collection.id}>
+								<div className="mb-2 flex items-center justify-between">
+									<Heading size="sm">{collection.title}</Heading>
+									<Link
+										to="/search"
+										search={{ collection: collection.slug }}
+										className="text-sm text-tk-accent"
+									>
+										Otvori kolekciju
+									</Link>
+								</div>
+								<div className="grid gap-3 md:grid-cols-3">
+									{collection.families.map((related) => (
+										<Link
+											key={related.id}
+											to="/product/$productId"
+											params={{ productId: related.slug }}
+										>
+											<TkCard hover className="cursor-pointer">
+												<TkCardContent className="pt-4">
+													<Heading size="sm">{related.displayName}</Heading>
+													{related.bestPriceCents != null && (
+														<div className="mt-2">
+															<PriceDisplay
+																amount={related.bestPriceCents / 100}
+																size="compact"
+															/>
+														</div>
+													)}
+												</TkCardContent>
+											</TkCard>
+										</Link>
+									))}
+								</div>
+							</div>
+						))}
+					</div>
+				</Section>
 			)}
 		</PageContainer>
-	);
-}
-
-function SimilarVariantsSection({ productId }: { productId: string }) {
-	const { data: variants, isLoading } = useQuery(
-		orpc.products.getSimilarVariants.queryOptions({
-			input: { productId },
-		}),
-	);
-
-	if (!isLoading && (!variants || variants.length === 0)) {
-		return null;
-	}
-
-	return (
-		<Section title="Druge veličine">
-			<div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
-				{isLoading
-					? Array.from({ length: 3 }).map((_, i) => (
-							<TkSkeleton key={i} className="flex-none w-56 h-24 rounded-lg" />
-						))
-					: variants?.map((v) => (
-							<SimilarVariantCard
-								key={v.id}
-								id={v.id}
-								name={v.name}
-								packDescription={v.packDescription}
-								bestPriceCents={v.bestPriceCents}
-								unitPriceCents={v.unitPriceCents}
-								unitLabel={v.unitLabel}
-								bestChainSlug={v.bestChainSlug}
-							/>
-						))}
-			</div>
-		</Section>
 	);
 }

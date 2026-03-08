@@ -785,6 +785,207 @@ export const canonicalSkus = pgTable(
 	}),
 );
 
+export const productFamilies = pgTable(
+	"product_families",
+	{
+		id: cuid2("pfm").primaryKey(),
+		familyKey: text("family_key").notNull(),
+		slug: text("slug").notNull(),
+		displayName: text("display_name").notNull(),
+		titleNormalized: text("title_normalized").notNull(),
+		familyGroupKey: text("family_group_key").notNull(),
+		taxonomy: text("taxonomy"),
+		familyKind: text("family_kind").notNull().default("standard"),
+		brandGroup: text("brand_group"),
+		coreName: text("core_name"),
+		qualityLabel: text("quality_label"),
+		imageUrl: text("image_url"),
+		status: text("status").notNull().default("active"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		familyKeyUnique: uniqueIndex("product_families_family_key_unique").on(
+			table.familyKey,
+		),
+		slugUnique: uniqueIndex("product_families_slug_unique").on(table.slug),
+		groupIdx: index("product_families_group_idx").on(table.familyGroupKey),
+		taxonomyIdx: index("product_families_taxonomy_idx").on(table.taxonomy),
+		brandIdx: index("product_families_brand_idx").on(table.brandGroup),
+		titleIdx: index("product_families_title_idx").on(table.titleNormalized),
+		statusIdx: index("product_families_status_idx").on(table.status),
+		familyKindCheck: check(
+			"product_families_family_kind_check",
+			sql`family_kind IN ('standard', 'commodity', 'fresh', 'branded', 'private_label')`,
+		),
+		statusCheck: check(
+			"product_families_status_check",
+			sql`status IN ('active', 'hidden', 'draft')`,
+		),
+	}),
+);
+
+export const productVariants = pgTable(
+	"product_variants",
+	{
+		id: cuid2("pvt").primaryKey(),
+		familyId: text("family_id")
+			.notNull()
+			.references(() => productFamilies.id, { onDelete: "cascade" }),
+		variantKey: text("variant_key").notNull(),
+		displayName: text("display_name").notNull(),
+		packLabel: text("pack_label"),
+		normalizedUnit: text("normalized_unit"),
+		normalizedQuantity: real("normalized_quantity"),
+		packCount: integer("pack_count").notNull().default(1),
+		containerType: text("container_type"),
+		imageUrl: text("image_url"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		familyIdx: index("product_variants_family_idx").on(table.familyId),
+		familyVariantUnique: uniqueIndex(
+			"product_variants_family_variant_unique",
+		).on(table.familyId, table.variantKey),
+	}),
+);
+
+export const offerVariantLinks = pgTable(
+	"offer_variant_links",
+	{
+		id: cuid2("ovl").primaryKey(),
+		variantId: text("variant_id")
+			.notNull()
+			.references(() => productVariants.id, { onDelete: "cascade" }),
+		retailerItemId: text("retailer_item_id")
+			.notNull()
+			.references(() => retailerItems.id, { onDelete: "cascade" }),
+		source: text("source").notNull(),
+		confidence: real("confidence"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		variantIdx: index("offer_variant_links_variant_idx").on(table.variantId),
+		itemUnique: uniqueIndex("offer_variant_links_item_unique").on(
+			table.retailerItemId,
+		),
+		sourceCheck: check(
+			"offer_variant_links_source_check",
+			sql`source IN ('graph_sync', 'manual', 'reviewed')`,
+		),
+	}),
+);
+
+export const familyRelations = pgTable(
+	"family_relations",
+	{
+		id: cuid2("frl").primaryKey(),
+		sourceFamilyId: text("source_family_id")
+			.notNull()
+			.references(() => productFamilies.id, { onDelete: "cascade" }),
+		targetFamilyId: text("target_family_id")
+			.notNull()
+			.references(() => productFamilies.id, { onDelete: "cascade" }),
+		relationType: text("relation_type").notNull(),
+		score: real("score"),
+		source: text("source").notNull().default("graph_sync"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		sourceIdx: index("family_relations_source_idx").on(table.sourceFamilyId),
+		targetIdx: index("family_relations_target_idx").on(table.targetFamilyId),
+		relationUnique: uniqueIndex("family_relations_unique").on(
+			table.sourceFamilyId,
+			table.targetFamilyId,
+			table.relationType,
+		),
+		relationTypeCheck: check(
+			"family_relations_type_check",
+			sql`relation_type IN ('quality_tier', 'formula_sibling', 'brand_line_sibling', 'taxonomy_sibling', 'adjacent_substitute')`,
+		),
+	}),
+);
+
+export const smartCollections = pgTable(
+	"smart_collections",
+	{
+		id: cuid2("scl").primaryKey(),
+		slug: text("slug").notNull(),
+		title: text("title").notNull(),
+		collectionType: text("collection_type").notNull(),
+		ruleKey: text("rule_key").notNull(),
+		taxonomy: text("taxonomy"),
+		brandGroup: text("brand_group"),
+		status: text("status").notNull().default("active"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		slugUnique: uniqueIndex("smart_collections_slug_unique").on(table.slug),
+		ruleKeyUnique: uniqueIndex("smart_collections_rule_key_unique").on(
+			table.ruleKey,
+		),
+		typeIdx: index("smart_collections_type_idx").on(table.collectionType),
+		taxonomyIdx: index("smart_collections_taxonomy_idx").on(table.taxonomy),
+		brandIdx: index("smart_collections_brand_idx").on(table.brandGroup),
+		statusIdx: index("smart_collections_status_idx").on(table.status),
+		typeCheck: check(
+			"smart_collections_type_check",
+			sql`collection_type IN ('taxonomy', 'brand', 'family_group')`,
+		),
+		statusCheck: check(
+			"smart_collections_status_check",
+			sql`status IN ('active', 'hidden')`,
+		),
+	}),
+);
+
+export const smartCollectionMembers = pgTable(
+	"smart_collection_members",
+	{
+		id: cuid2("scm").primaryKey(),
+		collectionId: text("collection_id")
+			.notNull()
+			.references(() => smartCollections.id, { onDelete: "cascade" }),
+		familyId: text("family_id")
+			.notNull()
+			.references(() => productFamilies.id, { onDelete: "cascade" }),
+		rank: integer("rank").notNull().default(0),
+		score: real("score"),
+		source: text("source").notNull().default("graph_sync"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => ({
+		collectionIdx: index("smart_collection_members_collection_idx").on(
+			table.collectionId,
+		),
+		familyIdx: index("smart_collection_members_family_idx").on(table.familyId),
+		memberUnique: uniqueIndex("smart_collection_members_unique").on(
+			table.collectionId,
+			table.familyId,
+		),
+	}),
+);
+
 export const barcodeSkuMappings = pgTable(
 	"barcode_sku_mappings",
 	{

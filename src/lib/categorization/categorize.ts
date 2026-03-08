@@ -7,7 +7,7 @@ import {
 	retailerItemFeatures,
 	retailerItems,
 } from "@/db";
-import { autoLinkCommodityItems } from "@/lib/catalog/commodity-linking";
+import { syncCatalogGraphForItems } from "@/lib/catalog/graph-sync";
 import { chunk } from "@/lib/collections/chunk";
 import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
 import { logLlmDecision } from "@/lib/llm-observability";
@@ -16,7 +16,6 @@ import {
 	endpointToModelConfig,
 	recordEndpointResult,
 } from "@/lib/llm-routing";
-import { indexCanonicalSkusBatch, indexRetailerItemsBatch } from "@/lib/search";
 import {
 	type EnsembleModelConfig,
 	readApiKey,
@@ -114,25 +113,22 @@ export interface CategorizationBatchResult {
 	escalated: number;
 }
 
-async function syncCommodityCatalogForItems(itemIds: string[]): Promise<void> {
+async function syncCatalogGraph(itemIds: string[]): Promise<void> {
 	if (itemIds.length === 0) {
 		return;
 	}
 
 	try {
-		const commodityResult = await autoLinkCommodityItems(itemIds);
-		if (commodityResult.affectedSkuIds.length > 0) {
-			await indexCanonicalSkusBatch(commodityResult.affectedSkuIds);
-		}
-		await indexRetailerItemsBatch(itemIds);
-
-		log.info("Commodity catalog synced after categorization", {
+		const graphResult = await syncCatalogGraphForItems(itemIds);
+		log.info("Catalog graph synced after categorization", {
 			itemCount: itemIds.length,
-			linkedItems: commodityResult.linkedItems,
-			affectedSkus: commodityResult.affectedSkuIds.length,
+			familiesTouched: graphResult.familiesTouched,
+			variantsTouched: graphResult.variantsTouched,
+			offersLinked: graphResult.offersLinked,
+			collectionsTouched: graphResult.collectionsTouched,
 		});
 	} catch (error) {
-		log.warn("Commodity catalog sync failed after categorization", {
+		log.warn("Catalog graph sync failed after categorization", {
 			error: errorToObject(error),
 			itemCount: itemIds.length,
 		});
@@ -1119,7 +1115,7 @@ export async function categorizeBatch(
 		}
 	}
 
-	await syncCommodityCatalogForItems(dedupedIds);
+	await syncCatalogGraph(dedupedIds);
 
 	return { succeeded, failed, escalated };
 }

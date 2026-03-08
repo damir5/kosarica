@@ -2,6 +2,7 @@ import { getConfigInfo } from "./admin";
 import * as alerts from "./alerts";
 import * as barcodeTriage from "./barcode-triage";
 import * as basket from "./basket";
+import * as catalog from "./catalog";
 import {
 	getCategories,
 	getStoresByChain,
@@ -15,8 +16,6 @@ import * as llmDecisions from "./llm-decisions";
 import * as llmEndpoints from "./llm-endpoints";
 import * as matching from "./matching";
 import * as prices from "./prices";
-import { getProductPrices, getSimilarVariants } from "./products-public";
-import * as search from "./search";
 import {
 	approveDecision,
 	getClusterStats,
@@ -64,10 +63,14 @@ import {
 export default {
 	listTodos,
 	addTodo,
-	catalogPrices: {
-		list: listCatalogPrices,
-		getStoresByChain,
-		getCategories,
+	catalog: {
+		getCategories: catalog.getCategories,
+		getFeatured: catalog.getFeatured,
+		listFamilies: catalog.listFamilies,
+		getFamily: catalog.getFamily,
+		getFamilyGraph: catalog.getFamilyGraph,
+		getFamilyOffers: catalog.getFamilyOffers,
+		getCollection: catalog.getCollection,
 	},
 	stores: {
 		list: listStores,
@@ -86,14 +89,6 @@ export default {
 	prices: {
 		getStorePrices: prices.getStorePrices,
 		searchItems: prices.searchItems,
-	},
-	search: {
-		autocomplete: search.autocomplete,
-		search: search.search,
-	},
-	products: {
-		get: getProductPrices,
-		getSimilarVariants,
 	},
 	alerts: {
 		list: alerts.listAlerts,
