@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
-import { getDatabase, type DatabaseType } from "@/db";
+import { type DatabaseType, getDatabase } from "@/db";
 import {
 	familyRelations,
 	offerVariantLinks,
@@ -11,56 +11,22 @@ import {
 	smartCollections,
 } from "@/db/schema";
 import {
-	normalizeProductName,
-	normalizeWhitespace,
-	removeDiacritics,
-} from "@/lib/matching/normalize";
+	type CatalogIdentitySourceRow,
+	type DerivedFamilyIdentity,
+	type DerivedVariantIdentity,
+	deriveFamilyIdentity,
+	deriveVariantIdentity,
+	slugify,
+	stripQualityMarkers,
+	toTitleCase,
+} from "@/lib/catalog/graph-identity";
+import { normalizeProductName } from "@/lib/matching/normalize";
 import { generatePrefixedId } from "@/utils/id";
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("matching");
 
-type CatalogSourceRow = {
-	id: string;
-	name: string;
-	brand: string | null;
-	category: string | null;
-	subcategory: string | null;
-	imageUrl: string | null;
-	normalizedUnit: string | null;
-	normalizedQuantity: number | null;
-	featureEverydayName: string | null;
-	featureProductType: string | null;
-	featureVariant: string | null;
-	featureBrand: string | null;
-	featureExtractedUnit: string | null;
-	featureTotalAmount: number | null;
-	featurePackAmount: number | null;
-	featureContainerType: string | null;
-};
-
-type DerivedFamilyIdentity = {
-	displayName: string;
-	familyKey: string;
-	familyGroupKey: string;
-	taxonomy: string | null;
-	familyKind: "standard" | "commodity" | "fresh" | "branded" | "private_label";
-	brandGroup: string | null;
-	coreName: string | null;
-	qualityLabel: string | null;
-	imageUrl: string | null;
-};
-
-type DerivedVariantIdentity = {
-	displayName: string;
-	variantKey: string;
-	packLabel: string | null;
-	normalizedUnit: string | null;
-	normalizedQuantity: number | null;
-	packCount: number;
-	containerType: string | null;
-	imageUrl: string | null;
-};
+type CatalogSourceRow = CatalogIdentitySourceRow;
 
 type SyncGraphResult = {
 	familiesTouched: number;
@@ -69,292 +35,6 @@ type SyncGraphResult = {
 	collectionsTouched: number;
 	relationsTouched: number;
 };
-
-const QUALITY_MARKERS: Array<{ pattern: RegExp; label: string }> = [
-	{ pattern: /\bbio\b|\beko\b|\borganic\b|\borganski\b/, label: "Bio" },
-	{ pattern: /\bzero\b/, label: "Zero" },
-	{ pattern: /\bmax\b/, label: "Max" },
-	{ pattern: /\bultra\b/, label: "Ultra" },
-	{ pattern: /\bplatinum\b/, label: "Platinum" },
-	{ pattern: /\bsensitive\b/, label: "Sensitive" },
-	{ pattern: /\ball in one\b|\ballin1\b|\baio\b/, label: "All in One" },
-	{ pattern: /\bclassic\b|\boriginal\b/, label: "Original" },
-];
-
-const FRESH_TAXONOMY_PATTERNS = [
-	"voce",
-	"voce i povrce",
-	"povrce",
-	"meso",
-	"janjetina",
-	"teletina",
-	"svinjetina",
-	"piletina",
-	"riba",
-];
-
-const CONTAINER_NOISE = [
-	"pet",
-	"boca",
-	"limenka",
-	"can",
-	"box",
-	"pak",
-	"paket",
-	"kom",
-	"tableta",
-	"tablete",
-	"tabs",
-	"caps",
-	"kapsule",
-	"jar",
-	"vreca",
-	"vrecica",
-];
-
-function toTitleCase(value: string): string {
-	return value
-		.split(" ")
-		.filter(Boolean)
-		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-		.join(" ");
-}
-
-function slugify(value: string): string {
-	return normalizeProductName(value).replace(/\s+/g, "-").slice(0, 96);
-}
-
-function cleanNullable(value: string | null | undefined): string | null {
-	if (!value) {
-		return null;
-	}
-	const trimmed = normalizeWhitespace(value);
-	return trimmed.length > 0 ? trimmed : null;
-}
-
-function normalizeTokenValue(value: string | null | undefined): string | null {
-	const cleaned = cleanNullable(value);
-	if (!cleaned) {
-		return null;
-	}
-	return normalizeProductName(cleaned);
-}
-
-function looksFreshTaxonomy(value: string | null): boolean {
-	if (!value) {
-		return false;
-	}
-	const normalized = normalizeProductName(value);
-	return FRESH_TAXONOMY_PATTERNS.some((token) => normalized.includes(token));
-}
-
-function detectQualityLabel(values: Array<string | null | undefined>): string | null {
-	const joined = normalizeProductName(values.filter(Boolean).join(" "));
-	for (const marker of QUALITY_MARKERS) {
-		if (marker.pattern.test(joined)) {
-			return marker.label;
-		}
-	}
-	return null;
-}
-
-function stripQuantityNoise(value: string): string {
-	return normalizeWhitespace(
-		value
-			.replace(/\b\d+\s*[xX×]\s*\d+[.,]?\d*\s*(kg|g|gr|l|lt|lit|ltr|ml|kom|pcs)\b/giu, " ")
-			.replace(/\b\d+[.,]?\d*\s*(kg|g|gr|l|lt|lit|ltr|ml|kom|pcs)\b/giu, " ")
-			.replace(/\b\d+\/\d+\b/gu, " ")
-			.replace(/\b\d+\b/gu, " "),
-	);
-}
-
-function stripContainerNoise(value: string): string {
-	let stripped = value;
-	for (const token of CONTAINER_NOISE) {
-		stripped = stripped.replace(new RegExp(`\\b${token}\\b`, "giu"), " ");
-	}
-	return normalizeWhitespace(stripped);
-}
-
-function normalizeBrandGroup(row: CatalogSourceRow, isFresh: boolean): string | null {
-	if (isFresh) {
-		return null;
-	}
-	return cleanNullable(row.featureBrand ?? row.brand);
-}
-
-function deriveTaxonomy(row: CatalogSourceRow): string | null {
-	return cleanNullable(row.featureProductType ?? row.category ?? row.subcategory);
-}
-
-function deriveBaseLabel(row: CatalogSourceRow, isFresh: boolean): string {
-	const everydayName = cleanNullable(row.featureEverydayName);
-	const featureVariant = cleanNullable(row.featureVariant);
-	const brandGroup = normalizeBrandGroup(row, isFresh);
-	const rawName = stripContainerNoise(
-		stripQuantityNoise(removeDiacritics(cleanNullable(row.name) ?? row.name)),
-	);
-
-	if (isFresh) {
-		const freshBase = everydayName ?? rawName;
-		const extra =
-			featureVariant && !normalizeProductName(freshBase).includes(normalizeProductName(featureVariant))
-				? featureVariant
-				: null;
-		return normalizeWhitespace([freshBase, extra].filter(Boolean).join(" "));
-	}
-
-	if (everydayName) {
-		const display = normalizeWhitespace(
-			[
-				brandGroup &&
-				!normalizeProductName(everydayName).includes(normalizeProductName(brandGroup))
-					? brandGroup
-					: null,
-				everydayName,
-				featureVariant,
-			]
-				.filter(Boolean)
-				.join(" "),
-		);
-		if (display.length > 0) {
-			return display;
-		}
-	}
-
-	if (
-		brandGroup &&
-		!normalizeProductName(rawName).includes(normalizeProductName(brandGroup))
-	) {
-		return normalizeWhitespace(`${brandGroup} ${rawName}`);
-	}
-
-	return rawName;
-}
-
-function buildPackLabel(params: {
-	quantity: number | null;
-	unit: string | null;
-	packCount: number;
-	containerType: string | null;
-}): string | null {
-	const quantity = params.quantity;
-	const unit = cleanNullable(params.unit);
-	const packCount = params.packCount > 0 ? params.packCount : 1;
-	const pieces = [];
-	if (quantity != null && Number.isFinite(quantity) && quantity > 0 && unit) {
-		const amount =
-			Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(2).replace(/\.?0+$/, "");
-		pieces.push(packCount > 1 ? `${packCount}x${amount} ${unit}` : `${amount} ${unit}`);
-	} else if (packCount > 1) {
-		pieces.push(`${packCount} kom`);
-	}
-	if (params.containerType) {
-		pieces.push(params.containerType);
-	}
-	const label = normalizeWhitespace(pieces.join(" "));
-	return label.length > 0 ? label : null;
-}
-
-function deriveFamilyIdentity(row: CatalogSourceRow): DerivedFamilyIdentity {
-	const taxonomy = deriveTaxonomy(row);
-	const isFresh = looksFreshTaxonomy(taxonomy);
-	const brandGroup = normalizeBrandGroup(row, isFresh);
-	const qualityLabel = detectQualityLabel([
-		row.name,
-		row.featureEverydayName,
-		row.featureVariant,
-	]);
-	const baseLabel = deriveBaseLabel(row, isFresh);
-	const normalizedBase = normalizeProductName(baseLabel);
-	const normalizedQuality = qualityLabel ? normalizeProductName(qualityLabel) : null;
-	const baseWithoutQuality =
-		normalizedQuality && normalizedBase.includes(normalizedQuality)
-			? normalizeWhitespace(
-					normalizedBase.replace(new RegExp(`\\b${normalizedQuality}\\b`, "gu"), " "),
-				)
-			: normalizedBase;
-
-	const displayName = toTitleCase(
-		normalizeWhitespace(
-			[
-				baseLabel,
-				qualityLabel &&
-				!normalizedBase.includes(normalizeProductName(qualityLabel))
-					? qualityLabel
-					: null,
-			]
-				.filter(Boolean)
-				.join(" "),
-		),
-	);
-
-	const familyKind = isFresh
-		? "fresh"
-		: brandGroup
-			? "branded"
-			: "commodity";
-
-	const familyKey = [
-		normalizeTokenValue(taxonomy) ?? "uncategorized",
-		normalizeTokenValue(brandGroup) ?? "generic",
-		normalizeTokenValue(displayName) ?? "unnamed",
-	].join("|");
-
-	return {
-		displayName,
-		familyKey,
-		familyGroupKey: [
-			normalizeTokenValue(taxonomy) ?? "uncategorized",
-			normalizeTokenValue(brandGroup) ?? "generic",
-			baseWithoutQuality || normalizeTokenValue(displayName) || "unnamed",
-		].join("|"),
-		taxonomy,
-		familyKind,
-		brandGroup,
-		coreName: cleanNullable(row.featureEverydayName) ?? toTitleCase(baseWithoutQuality),
-		qualityLabel,
-		imageUrl: row.imageUrl,
-	};
-}
-
-function deriveVariantIdentity(
-	row: CatalogSourceRow,
-	family: DerivedFamilyIdentity,
-): DerivedVariantIdentity {
-	const quantity = row.featureTotalAmount ?? row.normalizedQuantity ?? null;
-	const unit = cleanNullable(row.featureExtractedUnit ?? row.normalizedUnit);
-	const packCount =
-		row.featurePackAmount != null && row.featurePackAmount > 0
-			? row.featurePackAmount
-			: 1;
-	const containerType = cleanNullable(row.featureContainerType);
-	const packLabel = buildPackLabel({
-		quantity,
-		unit,
-		packCount,
-		containerType,
-	});
-	const displayName = normalizeWhitespace(
-		[family.displayName, packLabel].filter(Boolean).join(" "),
-	);
-	return {
-		displayName,
-		variantKey: [
-			family.familyKey,
-			unit ?? "unitless",
-			quantity != null ? String(quantity) : "na",
-			String(packCount),
-			normalizeTokenValue(containerType) ?? "none",
-		].join("|"),
-		packLabel,
-		normalizedUnit: unit,
-		normalizedQuantity: quantity,
-		packCount,
-		containerType,
-		imageUrl: row.imageUrl ?? family.imageUrl,
-	};
-}
 
 async function upsertFamily(
 	tx: DatabaseType,
@@ -366,11 +46,25 @@ async function upsertFamily(
 		.where(eq(productFamilies.familyKey, family.familyKey))
 		.limit(1);
 
+	let slug = slugify(family.displayName) || "product";
+	const slugBase = slug.slice(0, 88) || "product";
+	for (let counter = 2; ; counter += 1) {
+		const [collision] = await tx
+			.select({ id: productFamilies.id })
+			.from(productFamilies)
+			.where(eq(productFamilies.slug, slug))
+			.limit(1);
+		if (!collision || collision.id === existing?.id) {
+			break;
+		}
+		slug = `${slugBase}-${counter}`;
+	}
+
 	if (existing) {
 		await tx
 			.update(productFamilies)
 			.set({
-				slug: slugify(family.displayName),
+				slug,
 				displayName: family.displayName,
 				titleNormalized: normalizeProductName(family.displayName),
 				familyGroupKey: family.familyGroupKey,
@@ -391,7 +85,7 @@ async function upsertFamily(
 		.insert(productFamilies)
 		.values({
 			familyKey: family.familyKey,
-			slug: slugify(family.displayName),
+			slug,
 			displayName: family.displayName,
 			titleNormalized: normalizeProductName(family.displayName),
 			familyGroupKey: family.familyGroupKey,
@@ -477,12 +171,14 @@ async function rebuildFamilyGroupRelations(
 
 	const familyIds = families.map((family) => family.id);
 	if (familyIds.length > 0) {
-		await tx.delete(familyRelations).where(
-			or(
-				inArray(familyRelations.sourceFamilyId, familyIds),
-				inArray(familyRelations.targetFamilyId, familyIds),
-			),
-		);
+		await tx
+			.delete(familyRelations)
+			.where(
+				or(
+					inArray(familyRelations.sourceFamilyId, familyIds),
+					inArray(familyRelations.targetFamilyId, familyIds),
+				),
+			);
 	}
 
 	const grouped = new Map<string, typeof families>();
@@ -531,25 +227,29 @@ async function ensureCollection(
 		brandGroup?: string | null;
 	},
 ): Promise<string> {
-	const slug = slugify(input.title);
-	const existingRows = await tx
+	const desiredSlug = slugify(input.title) || "collection";
+	const [existing] = await tx
 		.select({
 			id: smartCollections.id,
-			ruleKey: smartCollections.ruleKey,
 			slug: smartCollections.slug,
 		})
 		.from(smartCollections)
-		.where(
-			or(
-				eq(smartCollections.ruleKey, input.ruleKey),
-				eq(smartCollections.slug, slug),
-			),
-		)
-		.limit(5);
+		.where(eq(smartCollections.ruleKey, input.ruleKey))
+		.limit(1);
 
-	const existingByRule = existingRows.find((row) => row.ruleKey === input.ruleKey);
-	const existingBySlug = existingRows.find((row) => row.slug === slug);
-	const existing = existingByRule ?? existingBySlug;
+	let slug = desiredSlug;
+	const slugBase = desiredSlug.slice(0, 88) || "collection";
+	for (let counter = 2; ; counter += 1) {
+		const [collision] = await tx
+			.select({ id: smartCollections.id })
+			.from(smartCollections)
+			.where(eq(smartCollections.slug, slug))
+			.limit(1);
+		if (!collision || collision.id === existing?.id) {
+			break;
+		}
+		slug = `${slugBase}-${counter}`;
+	}
 
 	if (existing) {
 		await tx
@@ -650,9 +350,7 @@ async function rebuildCollectionsForFamilies(
 				.onConflictDoNothing();
 		}
 
-		const baseTitle = family.displayName
-			.replace(/\b(Bio|Zero|Max|Ultra|Platinum|Sensitive|All in One|Original)\b/giu, "")
-			.trim();
+		const baseTitle = stripQualityMarkers(family.displayName);
 		const collectionId = await ensureCollection(tx, {
 			ruleKey: `family-group:${family.familyGroupKey}`,
 			title: baseTitle.length > 0 ? baseTitle : family.displayName,
@@ -761,15 +459,23 @@ export async function syncCatalogGraphForItems(
 				familyGroupKey: productFamilies.familyGroupKey,
 			})
 			.from(offerVariantLinks)
-			.innerJoin(productVariants, eq(productVariants.id, offerVariantLinks.variantId))
-			.innerJoin(productFamilies, eq(productFamilies.id, productVariants.familyId))
+			.innerJoin(
+				productVariants,
+				eq(productVariants.id, offerVariantLinks.variantId),
+			)
+			.innerJoin(
+				productFamilies,
+				eq(productFamilies.id, productVariants.familyId),
+			)
 			.where(inArray(offerVariantLinks.retailerItemId, itemIds));
 
 		await tx
 			.delete(offerVariantLinks)
 			.where(inArray(offerVariantLinks.retailerItemId, itemIds));
 
-		const touchedFamilyIds = new Set(previousFamilies.map((family) => family.id));
+		const touchedFamilyIds = new Set(
+			previousFamilies.map((family) => family.id),
+		);
 		const touchedFamilyGroupKeys = new Set(
 			previousFamilies.map((family) => family.familyGroupKey),
 		);
