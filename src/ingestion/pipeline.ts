@@ -33,7 +33,8 @@ import type {
 } from "@/ingestion/types";
 import { normalizeCategory } from "@/lib/matching/categories";
 import { computeNameHash, parseUnit } from "@/lib/matching/normalize";
-import { indexRetailerItemsBatch } from "@/lib/search";
+import { autoLinkCommodityItems } from "@/lib/catalog/commodity-linking";
+import { indexCanonicalSkusBatch, indexRetailerItemsBatch } from "@/lib/search";
 import {
 	buildArchiveKey,
 	buildExpandedKey,
@@ -2192,16 +2193,41 @@ export async function runIngestion(
 		await maybeUpdateProgress(true);
 		const processingDurationMs = Date.now() - processingStartedAt;
 
-		let searchIndexDurationMs = 0;
 		if (parquetRowsWritten > 0) {
 			const parquetFinalizeStartedAt = Date.now();
 			const parquetAppender = await getParquetAppender();
 			await parquetAppender.close();
 			await recordParquetFile(chainSlug, targetDate, parquetKey);
 			parquetDurationMs += Date.now() - parquetFinalizeStartedAt;
+		}
 
+		let searchIndexDurationMs = 0;
+		const itemIdsToIndex = Array.from(itemIdsForSearchIndex);
+		if (itemIdsToIndex.length > 0) {
 			const searchIndexStartedAt = Date.now();
-			const itemIdsToIndex = Array.from(itemIdsForSearchIndex);
+			const commodityLinkResult = await ResultAsync.fromPromise(
+				autoLinkCommodityItems(itemIdsToIndex),
+				(e) => e,
+			);
+			if (commodityLinkResult.isOk()) {
+				if (commodityLinkResult.value.affectedSkuIds.length > 0) {
+					const productIndexResult = await ResultAsync.fromPromise(
+						indexCanonicalSkusBatch(commodityLinkResult.value.affectedSkuIds),
+						(e) => e,
+					);
+					if (productIndexResult.isErr()) {
+						log.warn("Canonical product indexing failed (non-fatal)", {
+							error: errorToObject(productIndexResult.error),
+							skuCount: commodityLinkResult.value.affectedSkuIds.length,
+						});
+					}
+				}
+			} else {
+				log.warn("Commodity auto-linking failed (non-fatal)", {
+					error: errorToObject(commodityLinkResult.error),
+					itemCount: itemIdsToIndex.length,
+				});
+			}
 
 			const searchIndexResult = await ResultAsync.fromPromise(
 				indexRetailerItemsBatch(itemIdsToIndex),
@@ -2211,6 +2237,10 @@ export async function runIngestion(
 				searchIndexDurationMs = Date.now() - searchIndexStartedAt;
 				log.info("Search index updated", {
 					indexed: itemIdsToIndex.length,
+					commodityLinked:
+						commodityLinkResult.isOk()
+							? commodityLinkResult.value.linkedItems
+							: 0,
 					durationMs: searchIndexDurationMs,
 				});
 			} else {

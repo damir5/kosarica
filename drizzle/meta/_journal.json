@@ -141,6 +141,13 @@
       "when": 1771787643123,
       "tag": "0019_known_princess_powerful",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1772947728706,
+      "tag": "0020_kind_gambit",
+      "breakpoints": true
     }
   ]
 }

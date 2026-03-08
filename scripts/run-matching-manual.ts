@@ -66,7 +66,6 @@ async function main() {
 			candidateInsertLimit,
 			adjudicationBatchSize,
 			llmPromptBatchSize,
-			rebuildClusters: true,
 		});
 
 		totalFeatures += result.featuresUpserted;

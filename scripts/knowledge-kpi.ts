@@ -137,7 +137,7 @@ async function collectDashboard(
 			FROM retailer_items ri
 			WHERE ri.merged_into_id IS NULL
 			AND NOT EXISTS (
-				SELECT 1 FROM cluster_members cm WHERE cm.retailer_item_id = ri.id
+				SELECT 1 FROM sku_item_links sil WHERE sil.retailer_item_id = ri.id
 			)
 		`),
 		countQuery(db, sql`

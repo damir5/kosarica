@@ -12,14 +12,14 @@ import { authProcedure, type AuthenticatedContext } from "../base";
 
 const CreateAlertInputSchema = z
 	.object({
-		variantClusterId: z.string().optional(),
-		baseClusterId: z.string().optional(),
+		canonicalSkuId: z.string().optional(),
+		baseProductId: z.string().optional(),
 		alertScope: z.enum(["variant", "base"]).optional(),
 		targetPrice: z.number().int().min(1),
 		direction: z.enum(["below", "above"]),
 	})
-	.refine((input) => Boolean(input.variantClusterId || input.baseClusterId), {
-		message: "One of variantClusterId or baseClusterId is required.",
+	.refine((input) => Boolean(input.canonicalSkuId || input.baseProductId), {
+		message: "One of canonicalSkuId or baseProductId is required.",
 	});
 
 function resolveScope(
@@ -28,7 +28,7 @@ function resolveScope(
 	if (input.alertScope) {
 		return input.alertScope;
 	}
-	return input.baseClusterId ? "base" : "variant";
+	return input.baseProductId ? "base" : "variant";
 }
 
 // ============================================================================
@@ -52,18 +52,18 @@ export const listAlerts = authProcedure
 		const result = await db.execute(sql`
 			SELECT
 				pa.id,
-				pa.variant_cluster_id,
-				pa.base_cluster_id,
+				pa.canonical_sku_id,
+				pa.base_product_id,
 				pa.alert_scope,
-				COALESCE(pvc.canonical_name, pbc.canonical_name) AS display_name,
+				COALESCE(csv.canonical_name, csb.canonical_name) AS display_name,
 				pa.target_price,
 				pa.direction,
 				pa.status,
 				pa.triggered_at,
 				pa.created_at
 			FROM price_alerts pa
-			LEFT JOIN product_clusters pvc ON pvc.id = pa.variant_cluster_id
-			LEFT JOIN product_clusters pbc ON pbc.id = pa.base_cluster_id
+			LEFT JOIN canonical_skus csv ON csv.id = pa.canonical_sku_id
+			LEFT JOIN canonical_skus csb ON csb.id = pa.base_product_id
 			WHERE pa.user_id = ${user.id}
 			${statusFilter}
 			ORDER BY pa.created_at DESC
@@ -71,8 +71,8 @@ export const listAlerts = authProcedure
 
 		const alerts = ((result as { rows?: unknown[] }).rows ?? []) as Array<{
 			id: string;
-			variant_cluster_id: string | null;
-			base_cluster_id: string | null;
+			canonical_sku_id: string | null;
+			base_product_id: string | null;
 			alert_scope: "variant" | "base";
 			display_name: string | null;
 			target_price: number;
@@ -85,8 +85,8 @@ export const listAlerts = authProcedure
 		return {
 			alerts: alerts.map((alert) => ({
 				id: alert.id,
-				variantClusterId: alert.variant_cluster_id,
-				baseClusterId: alert.base_cluster_id,
+				canonicalSkuId: alert.canonical_sku_id,
+				baseProductId: alert.base_product_id,
 				alertScope: alert.alert_scope,
 				productName: alert.display_name,
 				targetPrice: alert.target_price,
@@ -110,15 +110,15 @@ export const createAlert = authProcedure
 		const alertScope = resolveScope(input);
 
 		if (alertScope === "variant") {
-			if (!input.variantClusterId) {
-				throw new Error("variantClusterId is required for variant scoped alerts");
+			if (!input.canonicalSkuId) {
+				throw new Error("canonicalSkuId is required for variant scoped alerts");
 			}
 			const [alert] = await db
 				.insert(priceAlerts)
 				.values({
 					userId: user.id,
-					variantClusterId: input.variantClusterId,
-					baseClusterId: null,
+					canonicalSkuId: input.canonicalSkuId,
+					baseProductId: null,
 					alertScope,
 					targetPrice: input.targetPrice,
 					direction: input.direction,
@@ -127,7 +127,7 @@ export const createAlert = authProcedure
 				.onConflictDoUpdate({
 					target: [
 						priceAlerts.userId,
-						priceAlerts.variantClusterId,
+						priceAlerts.canonicalSkuId,
 						priceAlerts.direction,
 					],
 					set: {
@@ -141,16 +141,16 @@ export const createAlert = authProcedure
 			return { alert };
 		}
 
-		if (!input.baseClusterId) {
-			throw new Error("baseClusterId is required for base scoped alerts");
+		if (!input.baseProductId) {
+			throw new Error("baseProductId is required for base scoped alerts");
 		}
 
 		const [alert] = await db
 			.insert(priceAlerts)
 			.values({
 				userId: user.id,
-				variantClusterId: null,
-				baseClusterId: input.baseClusterId,
+				canonicalSkuId: null,
+				baseProductId: input.baseProductId,
 				alertScope,
 				targetPrice: input.targetPrice,
 				direction: input.direction,
@@ -159,7 +159,7 @@ export const createAlert = authProcedure
 			.onConflictDoUpdate({
 				target: [
 					priceAlerts.userId,
-					priceAlerts.baseClusterId,
+					priceAlerts.baseProductId,
 					priceAlerts.direction,
 				],
 				set: {
@@ -209,16 +209,16 @@ export const alertHistory = authProcedure
 		const result = await db.execute(sql`
 			SELECT
 				pa.id,
-				pa.variant_cluster_id,
-				pa.base_cluster_id,
+				pa.canonical_sku_id,
+				pa.base_product_id,
 				pa.alert_scope,
-				COALESCE(pvc.canonical_name, pbc.canonical_name) AS display_name,
+				COALESCE(csv.canonical_name, csb.canonical_name) AS display_name,
 				pa.target_price,
 				pa.direction,
 				pa.triggered_at
 			FROM price_alerts pa
-			LEFT JOIN product_clusters pvc ON pvc.id = pa.variant_cluster_id
-			LEFT JOIN product_clusters pbc ON pbc.id = pa.base_cluster_id
+			LEFT JOIN canonical_skus csv ON csv.id = pa.canonical_sku_id
+			LEFT JOIN canonical_skus csb ON csb.id = pa.base_product_id
 			WHERE pa.user_id = ${user.id}
 				AND pa.status = 'triggered'
 			ORDER BY pa.triggered_at DESC
@@ -226,8 +226,8 @@ export const alertHistory = authProcedure
 
 		const history = ((result as { rows?: unknown[] }).rows ?? []) as Array<{
 			id: string;
-			variant_cluster_id: string | null;
-			base_cluster_id: string | null;
+			canonical_sku_id: string | null;
+			base_product_id: string | null;
 			alert_scope: "variant" | "base";
 			display_name: string | null;
 			target_price: number;
@@ -238,8 +238,8 @@ export const alertHistory = authProcedure
 		return {
 			history: history.map((entry) => ({
 				id: entry.id,
-				variantClusterId: entry.variant_cluster_id,
-				baseClusterId: entry.base_cluster_id,
+				canonicalSkuId: entry.canonical_sku_id,
+				baseProductId: entry.base_product_id,
 				alertScope: entry.alert_scope,
 				productName: entry.display_name,
 				targetPrice: entry.target_price,

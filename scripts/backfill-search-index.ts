@@ -6,13 +6,14 @@
  */
 
 import "dotenv/config";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDatabase } from "@/db";
 import {
+	canonicalSkus,
 	chains,
-	productClusters,
 	retailerItems,
 	searchIndex,
+	skuItemLinks,
 	stores,
 } from "@/db/schema";
 import { generatePrefixedId } from "@/utils/id";
@@ -24,12 +25,23 @@ async function backfillProducts(): Promise<number> {
 	let total = 0;
 	let offset = 0;
 
-	console.log("Backfilling product clusters...");
+	console.log("Backfilling canonical products...");
+	await db.delete(searchIndex).where(eq(searchIndex.entityType, "product"));
 
 	while (true) {
 		const batch = await db
-			.select()
-			.from(productClusters)
+			.select({
+				id: canonicalSkus.id,
+				canonicalName: canonicalSkus.canonicalName,
+				productType: canonicalSkus.productType,
+			})
+			.from(canonicalSkus)
+			.where(
+				and(
+					eq(canonicalSkus.isBaseProduct, true),
+					isNull(canonicalSkus.mergedIntoId),
+				),
+			)
 			.limit(BATCH_SIZE)
 			.offset(offset);
 
@@ -40,22 +52,22 @@ async function backfillProducts(): Promise<number> {
 			entityType: "product" as const,
 			entityId: product.id,
 			chainSlug: null,
-			category: product.clusterType,
+			category: product.productType ?? "product",
 			subcategory: null,
-			title: product.canonicalName ?? "Cluster",
+			title: product.canonicalName,
 			subtitle: null,
-			body:
-				[product.canonicalName, product.clusterType]
-					.filter(Boolean)
-					.join(" ") || null,
+			body: [product.canonicalName, product.productType].filter(Boolean).join(" ") || null,
 			imageUrl: null,
-		}));
+		}))
+			.filter((value) => value.title.length > 0);
 
-		await db.insert(searchIndex).values(values).onConflictDoNothing();
+		if (values.length > 0) {
+			await db.insert(searchIndex).values(values).onConflictDoNothing();
+		}
 
-		total += batch.length;
+		total += values.length;
 		offset += BATCH_SIZE;
-		console.log(`  Product clusters: ${total} indexed`);
+		console.log(`  Products: ${total} indexed`);
 	}
 
 	return total;
@@ -67,11 +79,31 @@ async function backfillItems(): Promise<number> {
 	let offset = 0;
 
 	console.log("Backfilling retailer items...");
+	await db.delete(searchIndex).where(eq(searchIndex.entityType, "item"));
 
 	while (true) {
 		const batch = await db
-			.select()
+			.select({
+				id: retailerItems.id,
+				chainSlug: retailerItems.chainSlug,
+				category: retailerItems.category,
+				subcategory: retailerItems.subcategory,
+				name: retailerItems.name,
+				brand: retailerItems.brand,
+				description: retailerItems.description,
+				imageUrl: retailerItems.imageUrl,
+			})
 			.from(retailerItems)
+			.leftJoin(
+				skuItemLinks,
+				eq(skuItemLinks.retailerItemId, retailerItems.id),
+			)
+			.where(
+				and(
+					isNull(retailerItems.mergedIntoId),
+					isNull(skuItemLinks.retailerItemId),
+				),
+			)
 			.limit(BATCH_SIZE)
 			.offset(offset);
 
@@ -81,7 +113,7 @@ async function backfillItems(): Promise<number> {
 			id: generatePrefixedId("six"),
 			entityType: "item" as const,
 			entityId: item.id,
-			chainSlug: item.chainSlug ?? null,
+			chainSlug: item.chainSlug,
 			category: item.category ?? null,
 			subcategory: item.subcategory ?? null,
 			title: item.name,
@@ -111,6 +143,7 @@ async function backfillStores(): Promise<number> {
 	const db = getDatabase();
 
 	console.log("Backfilling stores...");
+	await db.delete(searchIndex).where(eq(searchIndex.entityType, "store"));
 
 	const storeRows = await db
 		.select({

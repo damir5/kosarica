@@ -1,9 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import {
-	productClusters,
-	semanticPairDecisions,
-} from "@/db/schema";
+import { canonicalSkus, semanticPairDecisions } from "@/db/schema";
 import { runSemanticClusteringPipeline } from "@/lib/semantic-clustering";
 import { getDb } from "@/utils/bindings";
 import { superadminProcedure } from "../base";
@@ -170,7 +167,6 @@ export const triggerPipeline = superadminProcedure
 				llmPromptBatchSize: z.number().int().min(1).max(200).optional(),
 				semanticNeighborCount: z.number().int().min(1).max(1000).optional(),
 				lexicalNeighborCount: z.number().int().min(1).max(1000).optional(),
-				rebuildClusters: z.boolean().optional(),
 			})
 			.optional(),
 	)
@@ -184,7 +180,6 @@ export const triggerPipeline = superadminProcedure
 			llmPromptBatchSize: input?.llmPromptBatchSize,
 			semanticNeighborCount: input?.semanticNeighborCount,
 			lexicalNeighborCount: input?.lexicalNeighborCount,
-			rebuildClusters: input?.rebuildClusters,
 		});
 	});
 
@@ -201,10 +196,10 @@ export const getClusterStats = superadminProcedure.handler(async () => {
 
 	const [clusterStats] = await db
 		.select({
-			variant: sql<number>`count(*) FILTER (WHERE ${productClusters.clusterType} = 'variant')`,
-			base: sql<number>`count(*) FILTER (WHERE ${productClusters.clusterType} = 'base')`,
+			variant: sql<number>`count(*) FILTER (WHERE ${canonicalSkus.isBaseProduct} = false AND ${canonicalSkus.mergedIntoId} IS NULL)`,
+			base: sql<number>`count(*) FILTER (WHERE ${canonicalSkus.isBaseProduct} = true AND ${canonicalSkus.mergedIntoId} IS NULL)`,
 		})
-		.from(productClusters);
+		.from(canonicalSkus);
 
 	return {
 		decisions: decisionStats,

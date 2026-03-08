@@ -38,7 +38,12 @@ export const categorizeTaskPayload = z
 		chainSlug: z.string().optional(),
 		batchSize: z.number().int().min(1).max(5000).optional(),
 		maxBatches: z.number().int().min(1).max(20_000).optional(),
-		maxRuntimeMinutes: z.number().int().min(1).max(24 * 60).optional(),
+		maxRuntimeMinutes: z
+			.number()
+			.int()
+			.min(1)
+			.max(24 * 60)
+			.optional(),
 	})
 	.superRefine((payload, ctx) => {
 		const hasRunId =
@@ -71,7 +76,6 @@ export const semanticClusteringPairwiseTaskPayload = z.object({
 	candidateInsertLimit: z.number().int().min(1).max(200_000).optional(),
 	adjudicationBatchSize: z.number().int().min(1).max(10_000).optional(),
 	llmPromptBatchSize: z.number().int().min(1).max(200).optional(),
-	rebuildClusters: z.boolean().optional(),
 });
 
 export const semanticClusteringListwiseTaskPayload = z.object({

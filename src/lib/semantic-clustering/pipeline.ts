@@ -1,12 +1,9 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { embedTexts, preparePassageText } from "@/lib/embeddings";
 import { logLlmDecision } from "@/lib/llm-observability";
 import {
-	clusterMembers,
-	clusterRelations,
-	productClusters,
+	canonicalSkus,
 	retailerItemFeatures,
-	retailerItems,
 	semanticPairDecisions,
 } from "@/db/schema";
 import { getDb } from "@/utils/bindings";
@@ -33,7 +30,6 @@ interface PipelineOptions {
 	lexicalWeight?: number;
 	structuredWeight?: number;
 	categoryWeight?: number;
-	rebuildClusters?: boolean;
 }
 
 interface PipelineResult {
@@ -120,7 +116,9 @@ function clamp01(value: number): number {
 	return Math.max(0, Math.min(1, value));
 }
 
-function toBoolFlag(value: number | string | boolean | null | undefined): boolean {
+function toBoolFlag(
+	value: number | string | boolean | null | undefined,
+): boolean {
 	if (typeof value === "boolean") {
 		return value;
 	}
@@ -128,7 +126,11 @@ function toBoolFlag(value: number | string | boolean | null | undefined): boolea
 		return value > 0;
 	}
 	if (typeof value === "string") {
-		return value === "1" || value.toLowerCase() === "t" || value.toLowerCase() === "true";
+		return (
+			value === "1" ||
+			value.toLowerCase() === "t" ||
+			value.toLowerCase() === "true"
+		);
 	}
 	return false;
 }
@@ -137,50 +139,9 @@ function buildPairId(itemAId: string, itemBId: string): string {
 	return `${itemAId}|${itemBId}`;
 }
 
-class UnionFind {
-	private readonly parent = new Map<string, string>();
-
-	makeSet(id: string): void {
-		if (!this.parent.has(id)) {
-			this.parent.set(id, id);
-		}
-	}
-
-	find(id: string): string {
-		this.makeSet(id);
-		const current = this.parent.get(id);
-		if (!current) {
-			return id;
-		}
-		if (current === id) {
-			return id;
-		}
-		const root = this.find(current);
-		this.parent.set(id, root);
-		return root;
-	}
-
-	union(a: string, b: string): void {
-		const rootA = this.find(a);
-		const rootB = this.find(b);
-		if (rootA !== rootB) {
-			this.parent.set(rootB, rootA);
-		}
-	}
-
-	components(ids: string[]): Map<string, string[]> {
-		const grouped = new Map<string, string[]>();
-		for (const id of ids) {
-			const root = this.find(id);
-			const list = grouped.get(root) ?? [];
-			list.push(id);
-			grouped.set(root, list);
-		}
-		return grouped;
-	}
-}
-
-function decideFinalStatus(state: string): "APPROVED" | "REJECTED" | "PENDING_REVIEW" | "SYSTEM_ERROR" {
+function decideFinalStatus(
+	state: string,
+): "APPROVED" | "REJECTED" | "PENDING_REVIEW" | "SYSTEM_ERROR" {
 	if (state === "AUTO_APPROVED") {
 		return "APPROVED";
 	}
@@ -191,33 +152,6 @@ function decideFinalStatus(state: string): "APPROVED" | "REJECTED" | "PENDING_RE
 		return "SYSTEM_ERROR";
 	}
 	return "PENDING_REVIEW";
-}
-
-function pickRepresentativeName(names: Map<string, string>, ids: string[]): string {
-	const candidates = ids
-		.map((id) => names.get(id) ?? "")
-		.filter((name) => name.length > 0)
-		.sort((a, b) => a.length - b.length);
-	return candidates[0] ?? "Cluster";
-}
-
-function determineRelationshipType(a: DecisionRow, b: DecisionRow): string {
-	if (
-		a.pack_amount_a != null &&
-		a.pack_amount_b != null &&
-		a.pack_amount_a !== a.pack_amount_b
-	) {
-		return "MULTIPACK_VARIANT";
-	}
-	if (
-		a.container_type_a &&
-		a.container_type_b &&
-		a.container_type_a !== a.container_type_b
-	) {
-		return "CONTAINER_VARIANT";
-	}
-	void b;
-	return "SIZE_VARIANT";
 }
 
 function buildFeatureEmbeddingText(row: FeatureEmbeddingRow): string {
@@ -386,7 +320,9 @@ async function upsertFeatures(batchSize: number): Promise<{
 	return { featuresUpserted: rows.length, featureEmbeddingsUpserted };
 }
 
-export async function backfillMissingFeatureEmbeddings(batchSize: number): Promise<number> {
+export async function backfillMissingFeatureEmbeddings(
+	batchSize: number,
+): Promise<number> {
 	if (batchSize <= 0) {
 		return 0;
 	}
@@ -447,7 +383,8 @@ export async function backfillMissingFeatureEmbeddings(batchSize: number): Promi
 			})),
 		);
 
-		const updateRows: Array<{ retailerItemId: string; vectorLiteral: string }> = [];
+		const updateRows: Array<{ retailerItemId: string; vectorLiteral: string }> =
+			[];
 		for (const row of rows) {
 			const embedding = embeddingsByItemId.get(row.retailer_item_id);
 			if (!embedding) {
@@ -463,7 +400,9 @@ export async function backfillMissingFeatureEmbeddings(batchSize: number): Promi
 			return 0;
 		}
 
-		const values = updateRows.map((row) => sql`(${row.retailerItemId}::text, ${row.vectorLiteral}::vector)`);
+		const values = updateRows.map(
+			(row) => sql`(${row.retailerItemId}::text, ${row.vectorLiteral}::vector)`,
+		);
 		await tx.execute(sql`
 			WITH updates(retailer_item_id, embedding) AS (
 				VALUES ${sql.join(values, sql`, `)}
@@ -484,14 +423,17 @@ function heuristicVerdictFromCandidate(input: {
 	containerMatch: boolean;
 	amountRatio: number;
 }): SemanticVerdict {
-	const exactAmount = Number.isFinite(input.amountRatio) && input.amountRatio <= 1.08;
+	const exactAmount =
+		Number.isFinite(input.amountRatio) && input.amountRatio <= 1.08;
 	if (input.packMatch && input.containerMatch && exactAmount) {
 		return "EXACT_MATCH";
 	}
 	return "SAME_BASE_DIFFERENT_VARIANT";
 }
 
-async function queueCandidates(config: CandidateQueueConfig): Promise<CandidateQueueResult> {
+async function queueCandidates(
+	config: CandidateQueueConfig,
+): Promise<CandidateQueueResult> {
 	const db = getDb();
 	const candidatesResult = await db.execute(sql`
 		WITH source AS (
@@ -748,7 +690,8 @@ async function queueCandidates(config: CandidateQueueConfig): Promise<CandidateQ
 			: 1;
 		const embeddingSimilarity = clamp01(candidate.embedding_similarity);
 
-		let finalStatus: "APPROVED" | "REJECTED" | "PENDING_REVIEW" = "PENDING_REVIEW";
+		let finalStatus: "APPROVED" | "REJECTED" | "PENDING_REVIEW" =
+			"PENDING_REVIEW";
 		let finalVerdict: SemanticVerdict | null = null;
 		let finalConfidence: number | null = null;
 		let llmReasoning: string | null = null;
@@ -809,7 +752,10 @@ async function queueCandidates(config: CandidateQueueConfig): Promise<CandidateQ
 	return { inserted, autoApproved, autoRejected, pendingReview };
 }
 
-async function adjudicatePairs(batchSize: number, llmPromptBatchSize: number): Promise<{
+async function adjudicatePairs(
+	batchSize: number,
+	llmPromptBatchSize: number,
+): Promise<{
 	pairsAdjudicated: number;
 	autoApproved: number;
 	autoRejected: number;
@@ -909,7 +855,9 @@ async function adjudicatePairs(batchSize: number, llmPromptBatchSize: number): P
 				.set({
 					llmVerdict: result.finalVerdict,
 					llmConfidence: result.finalConfidence,
-					llmReasoning: result.votes.map((vote) => `${vote.modelId}: ${vote.reasoning}`).join(" | "),
+					llmReasoning: result.votes
+						.map((vote) => `${vote.modelId}: ${vote.reasoning}`)
+						.join(" | "),
 					consensusScore: result.consensusScore,
 					votesJson: JSON.stringify(result.votes),
 					finalVerdict: result.finalVerdict,
@@ -962,11 +910,14 @@ async function adjudicatePairs(batchSize: number, llmPromptBatchSize: number): P
 					modelId:
 						result.votes.map((vote) => vote.modelId).join(",") || "heuristic",
 					provider:
-						result.votes.map((vote) => vote.provider).join(",") || "rule-engine",
+						result.votes.map((vote) => vote.provider).join(",") ||
+						"rule-engine",
 					verdict: result.finalVerdict,
 					confidence: result.finalConfidence,
 					reasoning:
-						result.votes.map((vote) => `${vote.modelId}:${vote.reasoning}`).join(" | ") ||
+						result.votes
+							.map((vote) => `${vote.modelId}:${vote.reasoning}`)
+							.join(" | ") ||
 						(result.systemError ?? "No reasoning"),
 				});
 			} catch (error) {
@@ -987,184 +938,19 @@ async function adjudicatePairs(batchSize: number, llmPromptBatchSize: number): P
 	};
 }
 
-async function rebuildClustersFromApproved(): Promise<{
+async function getCatalogStats(): Promise<{
 	variantClusters: number;
 	baseClusters: number;
 }> {
 	const db = getDb();
-	const approvedResult = await db.execute(sql`
-		SELECT
-			item_a_id,
-			item_b_id,
-			final_verdict,
-			COALESCE(final_confidence, llm_confidence, 0) AS confidence
-		FROM semantic_pair_decisions
-		WHERE final_status = 'APPROVED'
-	`);
+	const [stats] = await db
+		.select({
+			variantClusters: sql<number>`count(*) FILTER (WHERE ${canonicalSkus.isBaseProduct} = false AND ${canonicalSkus.mergedIntoId} IS NULL)`,
+			baseClusters: sql<number>`count(*) FILTER (WHERE ${canonicalSkus.isBaseProduct} = true AND ${canonicalSkus.mergedIntoId} IS NULL)`,
+		})
+		.from(canonicalSkus);
 
-	const approvedRows = getRows<{
-		item_a_id: string;
-		item_b_id: string;
-		final_verdict: SemanticVerdict;
-		confidence: number;
-	}>(approvedResult);
-
-	// Rebuild semantics require replacing previous cluster state, even if empty.
-	await db.delete(clusterRelations);
-	await db.delete(clusterMembers);
-	await db.delete(productClusters);
-
-	if (approvedRows.length === 0) {
-		return { variantClusters: 0, baseClusters: 0 };
-	}
-
-	const allItemIds = new Set<string>();
-	for (const row of approvedRows) {
-		allItemIds.add(row.item_a_id);
-		allItemIds.add(row.item_b_id);
-	}
-
-	const namesRows = await db
-		.select({ id: retailerItems.id, name: retailerItems.name })
-		.from(retailerItems)
-		.where(inArray(retailerItems.id, Array.from(allItemIds)));
-	const itemNames = new Map(namesRows.map((row) => [row.id, row.name]));
-
-	const variantUf = new UnionFind();
-	for (const itemId of allItemIds) {
-		variantUf.makeSet(itemId);
-	}
-	for (const row of approvedRows) {
-		if (row.final_verdict === "EXACT_MATCH") {
-			variantUf.union(row.item_a_id, row.item_b_id);
-		}
-	}
-
-	const variantComponents = variantUf.components(Array.from(allItemIds));
-	const itemToVariantCluster = new Map<string, string>();
-	for (const ids of variantComponents.values()) {
-		const clusterId = generatePrefixedId("pcl");
-		const representativeItemId = ids[0] ?? null;
-		const canonicalName = pickRepresentativeName(itemNames, ids);
-		await db.insert(productClusters).values({
-			id: clusterId,
-			clusterType: "variant",
-			canonicalName,
-			representativeRetailerItemId: representativeItemId,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-		});
-
-		for (const itemId of ids) {
-			itemToVariantCluster.set(itemId, clusterId);
-			await db.insert(clusterMembers).values({
-				id: generatePrefixedId("pcm"),
-				clusterId,
-				retailerItemId: itemId,
-				variantClusterId: null,
-				isCanonical: itemId === representativeItemId,
-				createdAt: new Date(),
-			});
-		}
-	}
-
-	const baseUf = new UnionFind();
-	for (const variantId of new Set(itemToVariantCluster.values())) {
-		baseUf.makeSet(variantId);
-	}
-
-	for (const row of approvedRows) {
-		if (row.final_verdict !== "SAME_BASE_DIFFERENT_VARIANT") {
-			continue;
-		}
-		const clusterA = itemToVariantCluster.get(row.item_a_id);
-		const clusterB = itemToVariantCluster.get(row.item_b_id);
-		if (!clusterA || !clusterB) {
-			continue;
-		}
-		baseUf.union(clusterA, clusterB);
-	}
-
-	const baseComponents = baseUf.components(Array.from(new Set(itemToVariantCluster.values())));
-	for (const variantIds of baseComponents.values()) {
-		const baseClusterId = generatePrefixedId("pcl");
-		const canonicalName =
-			variantIds
-				.map((variantId) => {
-					const representative = Array.from(itemToVariantCluster.entries()).find(
-						([, clusterId]) => clusterId === variantId,
-					);
-					return representative ? itemNames.get(representative[0]) ?? "" : "";
-				})
-				.find((name) => name.length > 0) ?? "Base Product";
-
-		await db.insert(productClusters).values({
-			id: baseClusterId,
-			clusterType: "base",
-			canonicalName,
-			representativeRetailerItemId: null,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-		});
-
-		for (const variantId of variantIds) {
-			await db.insert(clusterMembers).values({
-				id: generatePrefixedId("pcm"),
-				clusterId: baseClusterId,
-				retailerItemId: null,
-				variantClusterId: variantId,
-				isCanonical: false,
-				createdAt: new Date(),
-			});
-		}
-	}
-
-	const detailedRowsResult = await db.execute(sql`
-		SELECT
-			d.item_a_id,
-			d.item_b_id,
-			d.final_verdict,
-			COALESCE(d.final_confidence, d.llm_confidence, 0) as confidence,
-			fa.pack_amount as pack_amount_a,
-			fb.pack_amount as pack_amount_b,
-			fa.container_type as container_type_a,
-			fb.container_type as container_type_b
-		FROM semantic_pair_decisions d
-		JOIN retailer_item_features fa ON fa.retailer_item_id = d.item_a_id
-		JOIN retailer_item_features fb ON fb.retailer_item_id = d.item_b_id
-		WHERE d.final_status = 'APPROVED'
-			AND d.final_verdict = 'SAME_BASE_DIFFERENT_VARIANT'
-	`);
-
-	const relationRows = getRows<DecisionRow>(detailedRowsResult);
-	const seen = new Set<string>();
-	for (const row of relationRows) {
-		const fromVariant = itemToVariantCluster.get(row.item_a_id);
-		const toVariant = itemToVariantCluster.get(row.item_b_id);
-		if (!fromVariant || !toVariant || fromVariant === toVariant) {
-			continue;
-		}
-		const [fromId, toId] = [fromVariant, toVariant].sort();
-		const key = `${fromId}:${toId}`;
-		if (seen.has(key)) {
-			continue;
-		}
-		seen.add(key);
-		await db.insert(clusterRelations).values({
-			id: generatePrefixedId("pcr"),
-			fromClusterId: fromId,
-			toClusterId: toId,
-			relationshipType: determineRelationshipType(row, row),
-			confidence: 0.9,
-			reasoning: "Derived from approved base-variant decision",
-			createdAt: new Date(),
-		});
-	}
-
-	return {
-		variantClusters: variantComponents.size,
-		baseClusters: baseComponents.size,
-	};
+	return stats ?? { variantClusters: 0, baseClusters: 0 };
 }
 
 export async function runSemanticClusteringPipeline(
@@ -1184,7 +970,6 @@ export async function runSemanticClusteringPipeline(
 	const lexicalWeight = options.lexicalWeight ?? 0.3;
 	const structuredWeight = options.structuredWeight ?? 0.2;
 	const categoryWeight = options.categoryWeight ?? 0.05;
-	const rebuildClusters = options.rebuildClusters ?? true;
 
 	const featureUpsertResult = await upsertFeatures(featureBatchSize);
 	const embeddingsBackfilled = await backfillMissingFeatureEmbeddings(
@@ -1206,9 +991,7 @@ export async function runSemanticClusteringPipeline(
 		adjudicationBatchSize,
 		llmPromptBatchSize,
 	);
-	const clusters = rebuildClusters
-		? await rebuildClustersFromApproved()
-		: { variantClusters: 0, baseClusters: 0 };
+	const clusters = await getCatalogStats();
 
 	const result: PipelineResult = {
 		featuresUpserted: featureUpsertResult.featuresUpserted,

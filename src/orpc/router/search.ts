@@ -1,6 +1,6 @@
 import { inArray } from "drizzle-orm";
 import * as z from "zod";
-import { skuItemLinks } from "@/db/schema";
+import { canonicalSkus, skuItemLinks } from "@/db/schema";
 import { getClickHouse, parseNumber } from "@/lib/clickhouse";
 import { autocompleteSearch, fullSearch } from "@/lib/search/queries";
 import type { SearchSort } from "@/lib/search/types";
@@ -82,7 +82,7 @@ async function fetchBestPrices(
 }
 
 /**
- * Resolve product entity IDs (canonical SKUs or product clusters) to retailer item IDs
+ * Resolve product entity IDs (base canonical products) to retailer item IDs
  * via the sku_item_links table.
  */
 async function resolveProductItemIds(
@@ -93,19 +93,54 @@ async function resolveProductItemIds(
 	}
 
 	const db = getDb();
+	const productRows = await db
+		.select({
+			id: canonicalSkus.id,
+			baseProductId: canonicalSkus.baseProductId,
+			isBaseProduct: canonicalSkus.isBaseProduct,
+		})
+		.from(canonicalSkus)
+		.where(inArray(canonicalSkus.id, productEntityIds));
+	const descendantRows = await db
+		.select({
+			id: canonicalSkus.id,
+			baseProductId: canonicalSkus.baseProductId,
+		})
+		.from(canonicalSkus)
+		.where(inArray(canonicalSkus.baseProductId, productEntityIds));
+
+	const skuIdsToResolve = new Set<string>(productEntityIds);
+	for (const row of descendantRows) {
+		skuIdsToResolve.add(row.id);
+	}
+
 	const links = await db
 		.select({
 			skuId: skuItemLinks.canonicalSkuId,
 			retailerItemId: skuItemLinks.retailerItemId,
 		})
 		.from(skuItemLinks)
-		.where(inArray(skuItemLinks.canonicalSkuId, productEntityIds));
+		.where(inArray(skuItemLinks.canonicalSkuId, Array.from(skuIdsToResolve)));
 
 	const mapping = new Map<string, string[]>();
+	for (const productId of productEntityIds) {
+		mapping.set(productId, []);
+	}
 	for (const link of links) {
 		const existing = mapping.get(link.skuId) ?? [];
 		existing.push(link.retailerItemId);
 		mapping.set(link.skuId, existing);
+	}
+
+	for (const row of productRows) {
+		if (!row.isBaseProduct) {
+			continue;
+		}
+		const baseItemIds = mapping.get(row.id) ?? [];
+		const childItemIds = descendantRows
+			.filter((child) => child.baseProductId === row.id)
+			.flatMap((child) => mapping.get(child.id) ?? []);
+		mapping.set(row.id, Array.from(new Set([...baseItemIds, ...childItemIds])));
 	}
 	return mapping;
 }

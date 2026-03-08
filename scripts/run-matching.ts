@@ -13,7 +13,6 @@ async function main() {
 		candidateInsertLimit: 5000,
 		adjudicationBatchSize: 200,
 		llmPromptBatchSize: 25,
-		rebuildClusters: true,
 	});
 
 	const duration = Date.now() - startTime;

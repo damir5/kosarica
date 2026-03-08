@@ -15,10 +15,6 @@ function parsePositiveIntArg(argv: string[], flag: string, fallback: number): nu
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function parseBoolFlag(argv: string[], flag: string): boolean {
-	return argv.includes(flag);
-}
-
 function loadRuntimeEnv(): void {
 	if (process.env.DATABASE_URL) {
 		return;
@@ -45,7 +41,7 @@ async function main() {
 	loadRuntimeEnv();
 	const argv = process.argv.slice(2);
 
-	if (parseBoolFlag(argv, "--dry-run")) {
+	if (argv.includes("--dry-run")) {
 		console.log(
 			"Knowledge apply dry-run is deprecated after legacy matcher removal; no mutations were applied.",
 		);
@@ -78,8 +74,6 @@ async function main() {
 		"--llm-prompt-batch-size",
 		25,
 	);
-	const rebuildClusters = !parseBoolFlag(argv, "--no-rebuild-clusters");
-
 	const result = await runSemanticClusteringPipeline({
 		featureBatchSize,
 		embeddingBackfillBatchSize,
@@ -87,7 +81,6 @@ async function main() {
 		candidateInsertLimit,
 		adjudicationBatchSize,
 		llmPromptBatchSize,
-		rebuildClusters,
 	});
 
 	console.log("Knowledge apply summary:");

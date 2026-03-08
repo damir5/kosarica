@@ -38,6 +38,7 @@
     "categorization:backfill": "tsx scripts/backfill-categorizations.ts",
     "barcode:classify": "tsx scripts/classify-barcodes.ts",
     "barcode:auto-link": "tsx scripts/auto-link-barcodes.ts",
+    "commodity:auto-link": "tsx scripts/auto-link-commodities.ts",
     "feature:candidates": "tsx scripts/generate-feature-candidates.ts",
     "catalog:conflicts": "tsx scripts/detect-catalog-conflicts.ts",
     "geocode:dry": "tsx scripts/batch-geocode-stores.ts --dry-run",

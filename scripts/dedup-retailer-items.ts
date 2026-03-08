@@ -11,12 +11,11 @@
 import { eq, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "@/db";
 import {
-	clusterMembers,
-	productClusters,
 	retailerItemBarcodes,
 	retailerItemFeatures,
 	retailerItems,
 	semanticPairDecisions,
+	skuItemLinks,
 } from "@/db/schema";
 import { computeNameHash } from "@/lib/matching/normalize";
 import { createLogger } from "@/utils/logger";
@@ -242,25 +241,18 @@ async function mergeDuplicates(groups: DupGroup[]): Promise<{
 			DELETE FROM retailer_item_features WHERE retailer_item_id IN (${dupIdList})
 		`);
 
-		// Keep cluster representative pointer stable.
+		// Move canonical SKU link when possible, then clear stale duplicate links.
 		await db.execute(sql`
-			UPDATE product_clusters
-			SET representative_retailer_item_id = ${survivorId}
-			WHERE representative_retailer_item_id IN (${dupIdList})
-		`);
-
-		// Move cluster member pointer when possible, then clear stale duplicate members.
-		await db.execute(sql`
-			UPDATE cluster_members
+			UPDATE sku_item_links
 			SET retailer_item_id = ${survivorId}
 			WHERE retailer_item_id IN (${dupIdList})
 			AND NOT EXISTS (
-				SELECT 1 FROM cluster_members existing
+				SELECT 1 FROM sku_item_links existing
 				WHERE existing.retailer_item_id = ${survivorId}
 			)
 		`);
 		await db.execute(sql`
-			DELETE FROM cluster_members WHERE retailer_item_id IN (${dupIdList})
+			DELETE FROM sku_item_links WHERE retailer_item_id IN (${dupIdList})
 		`);
 
 		// Any pair decisions involving merged-away items are invalid and should be rebuilt.
@@ -274,13 +266,9 @@ async function mergeDuplicates(groups: DupGroup[]): Promise<{
 			.set({ updatedAt: new Date() })
 			.where(eq(retailerItemFeatures.retailerItemId, survivorId));
 		await db
-			.update(clusterMembers)
+			.update(skuItemLinks)
 			.set({ createdAt: new Date() })
-			.where(eq(clusterMembers.retailerItemId, survivorId));
-		await db
-			.update(productClusters)
-			.set({ updatedAt: new Date() })
-			.where(eq(productClusters.representativeRetailerItemId, survivorId));
+			.where(eq(skuItemLinks.retailerItemId, survivorId));
 		await db.execute(sql`
 			UPDATE semantic_pair_decisions
 			SET updated_at = NOW()

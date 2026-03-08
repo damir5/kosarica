@@ -162,9 +162,6 @@ FULL_TABLES=(
   sku_item_links
   barcode_sku_mappings
   retailer_item_features
-  product_clusters
-  cluster_members
-  cluster_relations
   search_index
   llm_endpoints
   llm_endpoint_capabilities

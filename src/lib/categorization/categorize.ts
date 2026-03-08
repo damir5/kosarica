@@ -7,6 +7,7 @@ import {
 	retailerItemFeatures,
 	retailerItems,
 } from "@/db";
+import { autoLinkCommodityItems } from "@/lib/catalog/commodity-linking";
 import { chunk } from "@/lib/collections/chunk";
 import { callVertexExpressGenerateContent } from "@/lib/llm/vertex-express";
 import { logLlmDecision } from "@/lib/llm-observability";
@@ -15,6 +16,7 @@ import {
 	endpointToModelConfig,
 	recordEndpointResult,
 } from "@/lib/llm-routing";
+import { indexCanonicalSkusBatch, indexRetailerItemsBatch } from "@/lib/search";
 import {
 	type EnsembleModelConfig,
 	readApiKey,
@@ -110,6 +112,31 @@ export interface CategorizationBatchResult {
 	succeeded: number;
 	failed: number;
 	escalated: number;
+}
+
+async function syncCommodityCatalogForItems(itemIds: string[]): Promise<void> {
+	if (itemIds.length === 0) {
+		return;
+	}
+
+	try {
+		const commodityResult = await autoLinkCommodityItems(itemIds);
+		if (commodityResult.affectedSkuIds.length > 0) {
+			await indexCanonicalSkusBatch(commodityResult.affectedSkuIds);
+		}
+		await indexRetailerItemsBatch(itemIds);
+
+		log.info("Commodity catalog synced after categorization", {
+			itemCount: itemIds.length,
+			linkedItems: commodityResult.linkedItems,
+			affectedSkus: commodityResult.affectedSkuIds.length,
+		});
+	} catch (error) {
+		log.warn("Commodity catalog sync failed after categorization", {
+			error: errorToObject(error),
+			itemCount: itemIds.length,
+		});
+	}
 }
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
@@ -405,12 +432,12 @@ function callModel(
 		const tryRequest = async (
 			withResponseFormat: boolean,
 		): Promise<{
-				ok: boolean;
-				status: number;
-				statusText: string;
-				bodyText: string;
-				headers: Record<string, string>;
-			}> => {
+			ok: boolean;
+			status: number;
+			statusText: string;
+			bodyText: string;
+			headers: Record<string, string>;
+		}> => {
 			if (categorizationRpmLimiter) {
 				await categorizationRpmLimiter.wait();
 			}
@@ -436,7 +463,7 @@ function callModel(
 									...baseBody,
 									response_format: { type: "json_object" },
 								}
-								: baseBody,
+							: baseBody,
 					),
 					signal: controller.signal,
 				});
@@ -513,9 +540,9 @@ function callModel(
 						(error && typeof error === "object" && "_tag" in error)
 							? (error as LlmError)
 							: llmError({
-								provider: config.provider,
-								message: String(error),
-							});
+									provider: config.provider,
+									message: String(error),
+								});
 					lastError = llmErr;
 					const isAbort = error instanceof Error && error.name === "AbortError";
 					log.warn("Categorization LLM call failed", {
@@ -523,7 +550,9 @@ function callModel(
 						model: config.model,
 						attempt,
 						maxAttempts,
-				errorType: isAbort ? "AbortError/timeout" : error?.constructor?.name,
+						errorType: isAbort
+							? "AbortError/timeout"
+							: error?.constructor?.name,
 						errorMessage:
 							"message" in llmErr
 								? (llmErr as LlmError).message.slice(0, 200)
@@ -800,7 +829,7 @@ async function categorizeChunk(
 		itemId: llmIdByRealId.get(item.itemId) ?? item.itemId,
 	}));
 
-const primaryMessages = await buildCategorizationMessages(primaryPromptItems);
+	const primaryMessages = await buildCategorizationMessages(primaryPromptItems);
 	const primaryStartedAt = Date.now();
 	const primaryResult = await callModel(models.primaryModel, primaryMessages);
 	if (primaryResult.isErr()) {
@@ -1089,6 +1118,8 @@ export async function categorizeBatch(
 			});
 		}
 	}
+
+	await syncCommodityCatalogForItems(dedupedIds);
 
 	return { succeeded, failed, escalated };
 }

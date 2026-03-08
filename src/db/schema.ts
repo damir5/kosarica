@@ -1127,90 +1127,6 @@ export const barcodeTriageClaims = pgTable(
 	}),
 );
 
-// Deprecated: replaced by canonical_skus + sku_item_links + barcode_sku_mappings.
-export const productClusters = pgTable(
-	"product_clusters",
-	{
-		id: cuid2("pcl").primaryKey(),
-		clusterType: text("cluster_type").notNull(), // 'variant' | 'base'
-		canonicalName: text("canonical_name"),
-		representativeRetailerItemId: text(
-			"representative_retailer_item_id",
-		).references(() => retailerItems.id, {
-			onDelete: "set null",
-		}),
-		createdAt: timestamp("created_at").defaultNow(),
-		updatedAt: timestamp("updated_at").defaultNow(),
-	},
-	(table) => ({
-		typeIdx: index("product_clusters_type_idx").on(table.clusterType),
-		repIdx: index("product_clusters_representative_item_idx").on(
-			table.representativeRetailerItemId,
-		),
-	}),
-);
-
-export const clusterMembers = pgTable(
-	"cluster_members",
-	{
-		id: cuid2("pcm").primaryKey(),
-		clusterId: text("cluster_id")
-			.notNull()
-			.references(() => productClusters.id, { onDelete: "cascade" }),
-		retailerItemId: text("retailer_item_id").references(() => retailerItems.id, {
-			onDelete: "cascade",
-		}),
-		variantClusterId: text("variant_cluster_id").references(
-			() => productClusters.id,
-			{
-				onDelete: "cascade",
-			},
-		),
-		isCanonical: boolean("is_canonical").notNull().default(false),
-		createdAt: timestamp("created_at").defaultNow(),
-	},
-	(table) => ({
-		clusterIdx: index("cluster_members_cluster_idx").on(table.clusterId),
-		itemUnique: uniqueIndex("cluster_members_item_uniq")
-			.on(table.retailerItemId)
-			.where(sql`retailer_item_id IS NOT NULL`),
-		variantUnique: uniqueIndex("cluster_members_variant_uniq")
-			.on(table.variantClusterId)
-			.where(sql`variant_cluster_id IS NOT NULL`),
-		clusterItemUnique: uniqueIndex("cluster_members_cluster_item_unique")
-			.on(table.clusterId, table.retailerItemId)
-			.where(sql`retailer_item_id IS NOT NULL`),
-		clusterVariantUnique: uniqueIndex("cluster_members_cluster_variant_unique")
-			.on(table.clusterId, table.variantClusterId)
-			.where(sql`variant_cluster_id IS NOT NULL`),
-	}),
-);
-
-export const clusterRelations = pgTable(
-	"cluster_relations",
-	{
-		id: cuid2("pcr").primaryKey(),
-		fromClusterId: text("from_cluster_id")
-			.notNull()
-			.references(() => productClusters.id, { onDelete: "cascade" }),
-		toClusterId: text("to_cluster_id")
-			.notNull()
-			.references(() => productClusters.id, { onDelete: "cascade" }),
-		relationshipType: text("relationship_type").notNull(), // MULTIPACK_VARIANT | SIZE_VARIANT | CONTAINER_VARIANT
-		confidence: real("confidence"),
-		reasoning: text("reasoning"),
-		createdAt: timestamp("created_at").defaultNow(),
-	},
-	(table) => ({
-		fromIdx: index("cluster_relations_from_idx").on(table.fromClusterId),
-		toIdx: index("cluster_relations_to_idx").on(table.toClusterId),
-		pairUnique: uniqueIndex("cluster_relations_pair_uniq").on(
-			table.fromClusterId,
-			table.toClusterId,
-		),
-	}),
-);
-
 export const llmDecisionCache = pgTable(
 	"llm_decision_cache",
 	{
@@ -1406,13 +1322,13 @@ export const priceAlerts = pgTable(
 		userId: text("user_id")
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
-		variantClusterId: text("variant_cluster_id").references(
-			() => productClusters.id,
+		canonicalSkuId: text("canonical_sku_id").references(
+			() => canonicalSkus.id,
 			{
 				onDelete: "cascade",
 			},
 		),
-		baseClusterId: text("base_cluster_id").references(() => productClusters.id, {
+		baseProductId: text("base_product_id").references(() => canonicalSkus.id, {
 			onDelete: "cascade",
 		}),
 		alertScope: text("alert_scope").notNull().default("variant"), // 'variant' | 'base'
@@ -1426,21 +1342,21 @@ export const priceAlerts = pgTable(
 	},
 	(table) => ({
 		userIdx: index("price_alerts_user_id_idx").on(table.userId),
-		variantClusterIdx: index("price_alerts_variant_cluster_id_idx").on(
-			table.variantClusterId,
+		canonicalSkuIdx: index("price_alerts_canonical_sku_id_idx").on(
+			table.canonicalSkuId,
 		),
-		baseClusterIdx: index("price_alerts_base_cluster_id_idx").on(
-			table.baseClusterId,
+		baseProductIdx: index("price_alerts_base_product_id_idx").on(
+			table.baseProductId,
 		),
 		statusIdx: index("price_alerts_status_idx").on(table.status),
-		userVariantUnique: uniqueIndex("price_alerts_user_variant_unique").on(
+		userSkuUnique: uniqueIndex("price_alerts_user_sku_unique").on(
 			table.userId,
-			table.variantClusterId,
+			table.canonicalSkuId,
 			table.direction,
 		),
 		userBaseUnique: uniqueIndex("price_alerts_user_base_unique").on(
 			table.userId,
-			table.baseClusterId,
+			table.baseProductId,
 			table.direction,
 		),
 	}),

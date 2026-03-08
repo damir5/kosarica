@@ -250,11 +250,34 @@ async function loadStorePrices(retailerItemIds: string[]) {
 
 async function getItemIdsForSku(skuId: string): Promise<string[]> {
 	const db = getDb();
+	const [sku] = await db
+		.select({
+			id: canonicalSkus.id,
+			isBaseProduct: canonicalSkus.isBaseProduct,
+		})
+		.from(canonicalSkus)
+		.where(eq(canonicalSkus.id, skuId))
+		.limit(1);
+	if (!sku) {
+		return [];
+	}
+
+	const targetSkuIds = new Set<string>([skuId]);
+	if (sku.isBaseProduct) {
+		const childRows = await db
+			.select({ id: canonicalSkus.id })
+			.from(canonicalSkus)
+			.where(eq(canonicalSkus.baseProductId, skuId));
+		for (const child of childRows) {
+			targetSkuIds.add(child.id);
+		}
+	}
+
 	const rows = await db
 		.select({ retailerItemId: skuItemLinks.retailerItemId })
 		.from(skuItemLinks)
-		.where(eq(skuItemLinks.canonicalSkuId, skuId));
-	return rows.map((row) => row.retailerItemId);
+		.where(inArray(skuItemLinks.canonicalSkuId, Array.from(targetSkuIds)));
+	return Array.from(new Set(rows.map((row) => row.retailerItemId)));
 }
 
 async function buildSkuProductPayload(

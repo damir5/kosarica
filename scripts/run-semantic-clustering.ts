@@ -45,7 +45,6 @@ async function main() {
 		candidateInsertLimit,
 		adjudicationBatchSize,
 		llmPromptBatchSize,
-		rebuildClusters: true,
 	});
 
 	console.log("\n=== Semantic Clustering Pipeline ===");
